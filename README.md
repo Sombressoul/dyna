@@ -21,6 +21,7 @@ The whole process can be visually represented by three plots (one per step): Com
 ### Components
 
 ![DyNAF Components](./doc/DyNAF_Components.png)
+
 The first plot displays four distinct DyNAF waves, each corresponding to a different set of parameters ($\alpha_i$, $\beta_i$, $\gamma_i$, $\delta_i$). These waves represent individual activation functions with unique characteristics:
    - The blue wave (Set 1) has a standard bell shape, centered around zero.
    - The orange wave (Set 2) is wider, indicating a broader range of influence.
