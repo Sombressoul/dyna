@@ -16,23 +16,28 @@ $$f(x) = x \left(1 + \sum_{i=1}^{n} \alpha_i \left( \frac{1}{1 + e^{|\beta_i| (x
 
 Here, each transformation is defined by a quad of parameters ($\alpha_i$, $\beta_i$, $\gamma_i$, $\delta_i$), which control the amplitude, steepness, width, and a center shift of the "bell" shape, respectively. The sum of these transformations, when added to 1, modulates the original input `x`, allowing for complex, point-specific non-linearities.
 
-The whole process can be visually represented by the following three plots:
+The whole process can be visually represented by three plots (one per step): Components, Nonlinearity and Transformation.
+
+### Components
 
 ![DyNAF Components](doc/DyNAF_Components.png)
-
-1. **DyNAF Components**: The first plot displays four distinct DyNAF waves, each corresponding to a different set of parameters ($\alpha_i$, $\beta_i$, $\gamma_i$, $\delta_i$). These waves represent individual activation functions with unique characteristics:
+The first plot displays four distinct DyNAF waves, each corresponding to a different set of parameters ($\alpha_i$, $\beta_i$, $\gamma_i$, $\delta_i$). These waves represent individual activation functions with unique characteristics:
    - The blue wave (Set 1) has a standard bell shape, centered around zero.
    - The orange wave (Set 2) is wider, indicating a broader range of influence.
    - The green wave (Set 3) is narrower and taller, suggesting a more localized but stronger activation.
    - The red wave (Set 4) is an inverse bell, representing a suppressive effect in its region.
 
+### Nonlinearity
+
 ![DyNAF Nonlinearity](doc/DyNAF_Nonlinearity.png)
 
-2. **DyNAF Nonlinearity**: The second plot illustrates the resulting waveform derived from the sum of the initial four DyNAF waves plus one. This represents the multiplicative term that will be applied to the input data, showcasing the composite effect of combining multiple DyNAF components. The waveform varies significantly across the input range, indicating a rich, data-driven nonlinearity.
+The second plot illustrates the resulting waveform derived from the sum of the initial four DyNAF waves plus one. This represents the multiplicative term that will be applied to the input data, showcasing the composite effect of combining multiple DyNAF components. The waveform varies significantly across the input range, indicating a rich, data-driven nonlinearity.
+
+### Transformation
 
 ![DyNAF Transformation](doc/DyNAF_Transformation.png)
 
-3. **DyNAF Transformation**: The third plot demonstrates the final transformation applied to the input data. It compares the original input `x` (blue line) with the transformed output (orange line), which is the product of the input and the multiplicative term. This plot highlights the regions where the input is amplified, suppressed, or left unchanged, depicting the targeted, complex nonlinearity introduced by the DyNAF process.
+The third plot demonstrates the final transformation applied to the input data. It compares the original input `x` (blue line) with the transformed output (orange line), which is the product of the input and the multiplicative term. This plot highlights the regions where the input is amplified, suppressed, or left unchanged, depicting the targeted, complex nonlinearity introduced by the DyNAF process.
 
 Together, these plots elucidate the mechanism by which DyNAF applies a dynamic, data-driven transformation to the input data, adjusting the neural network's activation in a flexible and context-dependent (when combined with a Theta network) manner.
 
