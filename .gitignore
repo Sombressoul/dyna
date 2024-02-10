@@ -1,0 +1,8 @@
+__pycache__
+/PAC.NFO
+/.venv
+/.activate
+/data
+/build
+/dist
+/*.egg-info
