@@ -11,14 +11,18 @@ class CIFAR100DyNAFActivationPerFeature(nn.Module):
         super(CIFAR100DyNAFActivationPerFeature, self).__init__()
 
         activation_conv = nn.ReLU()
+        count_modes = 11
+        expected_range = [-2.5, +2.5]
 
         self.a_conv_pre = nn.Conv2d(3, 32, 3, 1, 1)
         self.a_activation_pre = activation_conv
         self.a_linear = nn.Linear(32, 8)
         self.a_activation_mid = DyNAFActivation(
             passive=True,
-            count_modes=10,
+            count_modes=count_modes,
             features=8,
+            expected_input_min=expected_range[0],
+            expected_input_max=expected_range[1],
         )
         self.a_conv_post = nn.Conv2d(8, 32, 3, 2, 1)
         self.a_activation_post = activation_conv
@@ -29,8 +33,10 @@ class CIFAR100DyNAFActivationPerFeature(nn.Module):
         self.b_linear = nn.Linear(32, 8)
         self.b_activation_mid = DyNAFActivation(
             passive=True,
-            count_modes=10,
+            count_modes=count_modes,
             features=8,
+            expected_input_min=expected_range[0],
+            expected_input_max=expected_range[1],
         )
         self.b_conv_post = nn.Conv2d(8, 32, 3, 2, 1)
         self.b_activation_post = activation_conv
@@ -41,8 +47,10 @@ class CIFAR100DyNAFActivationPerFeature(nn.Module):
         self.c_linear = nn.Linear(32, 8)
         self.c_activation_mid = DyNAFActivation(
             passive=True,
-            count_modes=10,
+            count_modes=count_modes,
             features=8,
+            expected_input_min=expected_range[0],
+            expected_input_max=expected_range[1],
         )
         self.c_conv_post = nn.Conv2d(8, 32, 3, 2, 1)
         self.c_activation_post = activation_conv
@@ -51,16 +59,20 @@ class CIFAR100DyNAFActivationPerFeature(nn.Module):
         self.d_linear = nn.Linear(512, 96)
         self.d_activation = DyNAFActivation(
             passive=True,
-            count_modes=10,
+            count_modes=count_modes,
             features=96,
+            expected_input_min=expected_range[0],
+            expected_input_max=expected_range[1],
         )
         self.d_batch_norm = nn.BatchNorm1d(96)
 
         self.e_linear = nn.Linear(96, 100)
         self.e_activation = DyNAFActivation(
             passive=True,
-            count_modes=10,
+            count_modes=count_modes,
             features=100,
+            expected_input_min=expected_range[0],
+            expected_input_max=expected_range[1],
         )
         self.e_batch_norm = nn.BatchNorm1d(100)
 
