@@ -26,19 +26,19 @@ Conventional activation functions like ReLU or sigmoid offer consistent, unchang
 
 `DyNAF` transcends these constraints by employing a biologically inspired "wave" function, whose characteristics are modulated by a set of dynamically generated parameters. This design mirrors the adaptability observed in biological neurons, where synaptic efficacy is modulated by a variety of neurotransmitters, allowing for a highly flexible response to incoming signals. The parameters governing this modulation are produced by an ancillary model, the Theta-network, which can be independently tailored and refined to suit the overarching network architecture.
 
-By emulating the nuanced regulatory mechanisms of biological neurons, DyNAF offers a more versatile and context-sensitive approach to neural computation, promising enhancements in the network's ability to discern and adapt to the nuanced features of the data it processes.
+By emulating the nuanced regulatory mechanisms of biological neurons, `DyNAF` offers a more versatile and context-sensitive approach to neural computation, promising enhancements in the network's ability to discern and adapt to the nuanced features of the data it processes.
 
 ### Framework Breakdown
 
-The DyNAF framework consists of two primary components, each drawing inspiration from the complex mechanisms of biological neurons:
+The `DyNAF` framework consists of two primary components, each drawing inspiration from the complex mechanisms of biological neurons:
 
-1. **DyNAF Activation Function**: At the core of DyNAF is a dynamic activation function, characterized by its ability to adapt its shape and response based on external parameters. This adaptability is akin to the way biological neurons alter their activation thresholds and response curves in the presence of different concentrations and types of neurotransmitters. The DyNAF function employs a set of parameters, akin to a 'neurotransmitter profile,' which modulates the activation response to more accurately reflect the underlying data patterns.
+1. **DyNAF Activation Function**: At the core of `DyNAF` is a dynamic activation function, characterized by its ability to adapt its shape and response based on external parameters. This adaptability is akin to the way biological neurons alter their activation thresholds and response curves in the presence of different concentrations and types of neurotransmitters. The `DyNAF` function employs a set of parameters, akin to a 'neurotransmitter profile,' which modulates the activation response to more accurately reflect the underlying data patterns.
 
-2. **DyNAF Linear Layer Modification**: To generate the 'neurotransmitter profile' for each neuron within the network, the DyNAF framework introduces a modification to the traditional linear layer. This modified layer, in addition to computing the standard linear transformation of its inputs, also produces a set of dynamic parameters for each output feature. These parameters are then utilized by the DyNAF activation function, mirroring the biological process where the local environment and history of synaptic activity influence a neuron's response to stimuli.
+2. **DyNAF Linear Layer Modification**: To generate the 'neurotransmitter profile' for each neuron within the network, the `DyNAF` framework introduces a modification to the traditional linear layer. This modified layer, in addition to computing the standard linear transformation of its inputs, also produces a set of dynamic parameters for each output feature. These parameters are then utilized by the `DyNAF` activation function, mirroring the biological process where the local environment and history of synaptic activity influence a neuron's response to stimuli.
 
 The interaction between these two components is crucial: the modified linear layer, acting as a 'neuromodulator factory,' tailors the activation landscape for each neuron, allowing for an unprecedented level of adaptability and specificity in the network's processing capabilities.
 
-By integrating these components, DyNAF not only enhances the model's capacity to learn complex and nuanced data representations but also opens new avenues for research into more biologically faithful artificial neural networks.
+By integrating these components, `DyNAF` not only enhances the model's capacity to learn complex and nuanced data representations but also opens new avenues for research into more biologically faithful artificial neural networks.
 
 ## DyNAF: Activation Function
 
@@ -54,7 +54,7 @@ The whole process can be visually represented by three plots (one per step): Com
 
 ![DyNAF Components](./doc/DyNAF_Components.png)
 
-The first plot displays four distinct DyNAF waves, each corresponding to a different set of parameters ($\alpha_i$, $\beta_i$, $\gamma_i$, $\delta_i$). These waves represent individual activation functions with unique characteristics:
+The first plot displays four distinct `DyNAF` waves, each corresponding to a different set of parameters ($\alpha_i$, $\beta_i$, $\gamma_i$, $\delta_i$). These waves represent individual activation functions with unique characteristics:
    - The blue wave (Set 1) has a standard bell shape, centered around zero.
    - The orange wave (Set 2) is wider, indicating a broader range of influence.
    - The green wave (Set 3) is narrower and taller, suggesting a more localized but stronger activation.
@@ -64,15 +64,15 @@ The first plot displays four distinct DyNAF waves, each corresponding to a diffe
 
 ![DyNAF Nonlinearity](./doc/DyNAF_Nonlinearity.png)
 
-The second plot illustrates the resulting waveform derived from the sum of the initial four DyNAF waves plus one. This represents the multiplicative term that will be applied to the input data, showcasing the composite effect of combining multiple DyNAF components. The waveform varies significantly across the input range, indicating a rich, data-driven nonlinearity.
+The second plot illustrates the resulting waveform derived from the sum of the initial four `DyNAF` waves plus one. This represents the multiplicative term that will be applied to the input data, showcasing the composite effect of combining multiple `DyNAF` components. The waveform varies significantly across the input range, indicating a rich, data-driven nonlinearity.
 
 ### Transformation
 
 ![DyNAF Transformation](./doc/DyNAF_Transformation.png)
 
-The third plot demonstrates the final transformation applied to the input data. It compares the original input `x` (blue line) with the transformed output (orange line), which is the product of the input and the multiplicative term. This plot highlights the regions where the input is amplified, suppressed, or left unchanged, depicting the targeted, complex nonlinearity introduced by the DyNAF process.
+The third plot demonstrates the final transformation applied to the input data. It compares the original input `x` (blue line) with the transformed output (orange line), which is the product of the input and the multiplicative term. This plot highlights the regions where the input is amplified, suppressed, or left unchanged, depicting the targeted, complex nonlinearity introduced by the `DyNAF` process.
 
-Together, these plots elucidate the mechanism by which DyNAF applies a dynamic, data-driven transformation to the input data, adjusting the neural network's activation in a flexible and context-dependent (when combined with a Theta network) manner.
+Together, these plots elucidate the mechanism by which `DyNAF` applies a dynamic, data-driven transformation to the input data, adjusting the neural network's activation in a flexible and context-dependent (when combined with a Theta network) manner.
 
 ### Impact on Exploding/Vanishing Gradients
 
@@ -80,21 +80,21 @@ One of the significant challenges in training deep neural networks is the proble
 
 The `DyNAF` module, in conjunction with the Theta-network, is designed to mitigate these issues through its dynamic, data-driven approach to activation functions:
 
-- **Smooth Gradients**: The underlying sigmoidal components of the DyNAF function produce smooth gradients. Because sigmoids have a bounded derivative, the gradients are less likely to reach extremely high or low values. This inherent property can contribute to more stable training, especially in deep networks.
+- **Smooth Gradients**: The underlying sigmoidal components of the `DyNAF` function produce smooth gradients. Because sigmoids have a bounded derivative, the gradients are less likely to reach extremely high or low values. This inherent property can contribute to more stable training, especially in deep networks.
 
-- **Selective Activation**: The multiplicative nature of the DyNAF function, where the output is the input scaled by the sum of transformations plus one, ensures that regions of the input space that do not require transformation can pass through with their gradients unchanged. This selective activation helps in maintaining a healthy gradient flow, reducing the risk of vanishing gradients.
+- **Selective Activation**: The multiplicative nature of the `DyNAF` function, where the output is the input scaled by the sum of transformations plus one, ensures that regions of the input space that do not require transformation can pass through with their gradients unchanged. This selective activation helps in maintaining a healthy gradient flow, reducing the risk of vanishing gradients.
 
 - **Data-Driven Modulation**: Since the parameters generated by the Theta-network are data-dependent, the activation function can adapt to the specifics of the data at hand. This adaptability means that the network can learn to avoid regions of the parameter space that might cause gradient issues, a form of learned robustness against these problems.
 
 #### Preventive Measures in Design
 
-While the design of DyNAF aims to reduce the likelihood of exploding or vanishing gradients, it is still essential to implement preventive measures in the network's training regimen:
+While the design of `DyNAF` aims to reduce the likelihood of exploding or vanishing gradients, it is still essential to implement preventive measures in the network's training regimen:
 
-- **Careful Initialization**: The parameters of both DyNAF (when it operates in the passive mode) or the Theta-network should be initialized to values that start the training process with gradients of a reasonable magnitude.
+- **Careful Initialization**: The parameters of both `DyNAF` (when it operates in the passive mode) or the Theta-network should be initialized to values that start the training process with gradients of a reasonable magnitude.
   
 - **Gradient Clipping**: During training, gradient clipping can be employed to prevent the gradients from exceeding a certain threshold, thus avoiding the exploding gradients problem.
 
-By incorporating these design elements and training strategies, DyNAF seeks to provide a more stable training experience, particularly for deep and complex neural network architectures where the exploding or vanishing gradients problem is most prevalent.
+By incorporating these design elements and training strategies, `DyNAF` seeks to provide a more stable training experience, particularly for deep and complex neural network architectures where the exploding or vanishing gradients problem is most prevalent.
 
 ### Modes of Operation
 
