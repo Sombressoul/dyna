@@ -97,16 +97,16 @@ def main():
     parser.add_argument(
         "--lr",
         type=float,
-        default=1.5e-4,
+        default=1.0e-3,
         metavar="LR",
-        help="learning rate (default: 1.5e-4)",
+        help="learning rate (default: 1.0e-3)",
     )
     parser.add_argument(
         "--wd",
         type=float,
-        default=1.0e-5,
+        default=1.0e-1,
         metavar="WD",
-        help="Weight decay (default: 1.0e-5)",
+        help="Weight decay (default: 1.0e-1)",
     )
     parser.add_argument(
         "--seed",
@@ -174,7 +174,7 @@ def main():
     print("# =================############================= #")
     print("\n")
 
-    optimizer = optim.Adam(
+    optimizer = optim.AdamW(
         model.parameters(),
         lr=args.lr,
         weight_decay=args.wd,
