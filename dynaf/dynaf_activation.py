@@ -11,9 +11,8 @@ class DyNAFActivation(nn.Module):
         passive: Optional[bool] = True,
         count_modes: Optional[int] = 5,
         features: Optional[int] = 1,
-        expected_input_min: Optional[float] = -1.0,
-        expected_input_max: Optional[float] = 1.0,
-        eps: Optional[float] = 1e-3,
+        expected_input_min: Optional[float] = -5.0,
+        expected_input_max: Optional[float] = +5.0,
     ):
         super(DyNAFActivation, self).__init__()
 
@@ -22,14 +21,13 @@ class DyNAFActivation(nn.Module):
         self.features = features
         self.expected_input_min = expected_input_min
         self.expected_input_max = expected_input_max
-        self.eps = eps
 
         # Init alphas.
         alphas = torch.empty([self.count_modes, 1, self.features])
         alphas = torch.nn.init.normal_(
             alphas,
             mean=0.0,
-            std=math.sqrt(2.0),
+            std=1.0 / self.count_modes,
         )
 
         # Init betas.
@@ -47,31 +45,29 @@ class DyNAFActivation(nn.Module):
         gammas = torch.empty([self.count_modes, 1, self.features])
         gammas = torch.nn.init.uniform_(
             gammas,
-            a=self.eps,
-            b=math.sqrt(math.fabs(self.expected_input_max - self.expected_input_min)),
+            a=1.0 / self.count_modes,
+            b=math.fabs(self.expected_input_max - self.expected_input_min) / 2.0,
         )
 
         # Init deltas.
-        deltas = torch.arange(
-            start=self.expected_input_min,
-            end=self.expected_input_max,
-            step=(
-                math.fabs(self.expected_input_max - self.expected_input_min)
-                / self.count_modes
-            ),
-        ) + (
+        delta_step = (
             math.fabs(self.expected_input_max - self.expected_input_min)
             / self.count_modes
+        )
+        deltas = (
+            torch.arange(
+                start=self.expected_input_min,
+                end=self.expected_input_max,
+                step=delta_step,
+            )
+            + delta_step / 2.0
         )
         deltas = deltas.reshape([-1, 1, 1]).repeat([1, 1, self.features])
         deltas_bias = torch.empty_like(deltas)
         deltas_bias = torch.nn.init.normal_(
             deltas_bias,
             mean=0.0,
-            std=(
-                math.fabs(self.expected_input_max - self.expected_input_min)
-                / self.count_modes
-            ),
+            std=delta_step / 2.0,
         )
         deltas = deltas + deltas_bias
 
@@ -99,14 +95,17 @@ class DyNAFActivation(nn.Module):
         deltas = modes_expanded[:, 3, :]
 
         transformed = alphas * (
-            (
-                1.0
-                / (1 + torch.e ** (torch.abs(betas) * (x - deltas - torch.abs(gammas))))
-            )
-            - (
-                1.0
-                / (1 + torch.e ** (torch.abs(betas) * (x - deltas + torch.abs(gammas))))
-            )
+            # (
+            #     1.0
+            #     / (1 + torch.e ** (torch.abs(betas) * (x - deltas - torch.abs(gammas))))
+            # )
+            # - (
+            #     1.0
+            #     / (1 + torch.e ** (torch.abs(betas) * (x - deltas + torch.abs(gammas))))
+            # )
+            # NOTE: The same sigmoid, but numerically stable. Thanks to PyTorch team!
+            -torch.sigmoid(betas * (x - deltas - torch.abs(gammas)))
+            + torch.sigmoid(betas * (x - deltas + torch.abs(gammas)))
         )
 
         return transformed
