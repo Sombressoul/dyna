@@ -38,12 +38,23 @@ class DyNAFActivation(nn.Module):
     def _dynaf(
         self,
         x: torch.Tensor,
-        mode: torch.Tensor,
+        modes: torch.Tensor,
     ) -> torch.Tensor:
-        return mode[0] * (
-            F.sigmoid(mode[1].abs() * (x - mode[2] - mode[3].abs()))
-            - F.sigmoid(mode[1].abs() * (x - mode[2] + mode[3].abs()))
+        x_expanded = x.unsqueeze(0).expand([self.count_modes, *x.shape])
+        modes_expanded = modes.reshape([*modes.shape[0:2], *[1 for _ in range(len(x_expanded.shape)-2)], x.shape[-1]])
+        
+        transformed = modes_expanded[:, 0, :] * (
+            F.sigmoid(
+                modes_expanded[:, 1, :].abs()
+                * (x_expanded - modes_expanded[:, 2, :] - modes_expanded[:, 3, :].abs())
+            )
+            - F.sigmoid(
+                modes_expanded[:, 1, :].abs()
+                * (x_expanded - modes_expanded[:, 2, :] + modes_expanded[:, 3, :].abs())
+            )
         )
+
+        return transformed
 
     def forward(
         self,
@@ -58,22 +69,15 @@ class DyNAFActivation(nn.Module):
         else:
             assert modes is not None, "modes must be provided in active mode"
 
-        nonlinearity = torch.zeros_like(x)
-        components = []
-        for mode in modes:
-            component = self._dynaf(x, mode)
-            nonlinearity += component
-
-            if return_components:
-                components.append(component)
-
-        nonlinearity = nonlinearity + 1.0
+        components = self._dynaf(x, modes)
+        nonlinearity = components.sum(dim=0) + 1.0
+        x_transformed = x * nonlinearity
 
         if return_nonlinearity and return_components:
-            return x, nonlinearity, components
+            return x_transformed, nonlinearity, components
         elif return_nonlinearity:
-            return x, nonlinearity
+            return x_transformed, nonlinearity
         elif return_components:
-            return x, components
+            return x_transformed, components
         else:
-            return x
+            return x_transformed
