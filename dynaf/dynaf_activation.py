@@ -48,10 +48,7 @@ class DyNAFActivation(nn.Module):
         gammas = torch.nn.init.uniform_(
             gammas,
             a=self.eps,
-            b=math.log(
-                math.fabs(self.expected_input_max - self.expected_input_min),
-                math.sqrt(2),
-            ),
+            b=math.sqrt(math.fabs(self.expected_input_max - self.expected_input_min)),
         )
 
         # Init deltas.
