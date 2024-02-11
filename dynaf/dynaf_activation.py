@@ -13,6 +13,7 @@ class DyNAFActivation(nn.Module):
         features: Optional[int] = 1,
         expected_input_min: Optional[float] = -1.0,
         expected_input_max: Optional[float] = 1.0,
+        eps: Optional[float] = 1e-3,
     ):
         super(DyNAFActivation, self).__init__()
 
@@ -21,6 +22,7 @@ class DyNAFActivation(nn.Module):
         self.features = features
         self.expected_input_min = expected_input_min
         self.expected_input_max = expected_input_max
+        self.eps = eps
 
         # Init alphas.
         alphas = torch.empty([self.count_modes, 1, self.features])
@@ -40,11 +42,12 @@ class DyNAFActivation(nn.Module):
 
         # Init gammas.
         gammas = torch.empty([self.count_modes, 1, self.features])
-        gammas = torch.nn.init.constant_(
+        gammas = torch.nn.init.uniform_(
             gammas,
-            val=math.sqrt(
-                math.fabs(self.expected_input_max - self.expected_input_min)
-                / self.count_modes
+            a=self.eps,
+            b=math.log(
+                math.fabs(self.expected_input_max - self.expected_input_min),
+                math.sqrt(2),
             ),
         )
 
