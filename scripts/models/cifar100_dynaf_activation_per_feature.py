@@ -17,7 +17,7 @@ class CIFAR100DyNAFActivationPerFeature(nn.Module):
         self.a_linear = nn.Linear(32, 8)
         self.a_activation_mid = DyNAFActivation(
             passive=True,
-            count_modes=5,
+            count_modes=10,
             features=8,
         )
         self.a_conv_post = nn.Conv2d(8, 32, 3, 2, 1)
@@ -29,7 +29,7 @@ class CIFAR100DyNAFActivationPerFeature(nn.Module):
         self.b_linear = nn.Linear(32, 8)
         self.b_activation_mid = DyNAFActivation(
             passive=True,
-            count_modes=5,
+            count_modes=10,
             features=8,
         )
         self.b_conv_post = nn.Conv2d(8, 32, 3, 2, 1)
@@ -41,7 +41,7 @@ class CIFAR100DyNAFActivationPerFeature(nn.Module):
         self.c_linear = nn.Linear(32, 8)
         self.c_activation_mid = DyNAFActivation(
             passive=True,
-            count_modes=5,
+            count_modes=10,
             features=8,
         )
         self.c_conv_post = nn.Conv2d(8, 32, 3, 2, 1)
@@ -51,7 +51,7 @@ class CIFAR100DyNAFActivationPerFeature(nn.Module):
         self.d_linear = nn.Linear(512, 96)
         self.d_activation = DyNAFActivation(
             passive=True,
-            count_modes=5,
+            count_modes=10,
             features=96,
         )
         self.d_batch_norm = nn.BatchNorm1d(96)
@@ -59,7 +59,7 @@ class CIFAR100DyNAFActivationPerFeature(nn.Module):
         self.e_linear = nn.Linear(96, 100)
         self.e_activation = DyNAFActivation(
             passive=True,
-            count_modes=5,
+            count_modes=10,
             features=100,
         )
         self.e_batch_norm = nn.BatchNorm1d(100)
