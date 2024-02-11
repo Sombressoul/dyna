@@ -1,14 +1,39 @@
 import torch
 import matplotlib.pyplot as plt
+import argparse
 
 from dynaf import DyNAFActivation
 
+parser = argparse.ArgumentParser(description="evaluation")
+parser.add_argument(
+    "--count-modes",
+    type=int,
+    default=7,
+    metavar="N",
+    help="wave modes count (default: 7)",
+)
+parser.add_argument(
+    "--e-min",
+    type=float,
+    default=-2.5,
+    metavar="N",
+    help="expected input min (default: -2.5)",
+)
+parser.add_argument(
+    "--e-max",
+    type=float,
+    default=+2.5,
+    metavar="N",
+    help="expected input max (default: +2.5)",
+)
+args = parser.parse_args()
+
 dynaf_activation = DyNAFActivation(
     passive=True,
-    count_modes=7,
+    count_modes=args.count_modes,
     features=1,
-    expected_input_min=-10.0,
-    expected_input_max=+10.0,
+    expected_input_min=args.e_min,
+    expected_input_max=args.e_max,
 )
 x = torch.linspace(-10, 10, 1000).unsqueeze(-1)
 
