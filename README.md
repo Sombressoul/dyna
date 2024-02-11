@@ -1,6 +1,5 @@
 - [Dynamic Neural Activation Functions (DyNAF)](#dynamic-neural-activation-functions-dynaf)
   - [Overview](#overview)
-    - [Framework Breakdown](#framework-breakdown)
   - [Key Concepts](#key-concepts)
     - [DyNAF Activation](#dynaf-activation)
     - [Theta-network](#theta-network)
@@ -24,27 +23,15 @@
 
 # Dynamic Neural Activation Functions (DyNAF)
 
-The `DyNAF` framework extends neural network activation functions by introducing dynamic, adaptable non-linearities inspired by the complexity of biological neural systems. This approach enables the activation function to dynamically adjust its response based on the input data, facilitating a customized non-linear transformation for every input instance.
+The `DyNAF` initiative refines the concept of activation functions within neural networks by introducing a system of dynamic, data-responsive non-linearities that draw inspiration from the nuanced operations of biological neural systems. This innovative approach allows for an activation function that can adjust its response in real-time to the incoming data, providing a bespoke non-linear transformation tailored to each specific input.
 
 ## Overview
 
-Conventional activation functions like ReLU or sigmoid offer consistent, unchanging transformations of their inputs. Effective across numerous applications, these static functions may not fully capture the intricate patterns and relationships present in complex datasets.
+Traditional activation functions such as ReLU and sigmoid are characterized by their fixed, uniform response to inputs. While these functions are broadly effective and have been instrumental in numerous neural network applications, their static nature may limit the network's capacity to fully interpret and utilize complex data patterns and relationships.
 
-`DyNAF` transcends these constraints by employing a biologically inspired "wave" function, whose characteristics are modulated by a set of dynamically generated parameters. This design mirrors the adaptability observed in biological neurons, where synaptic efficacy is modulated by a variety of neurotransmitters, allowing for a highly flexible response to incoming signals. The parameters governing this modulation are produced by an ancillary model, the Theta-network, which can be independently tailored and refined to suit the overarching network architecture.
+`DyNAF` surpasses these limitations by adopting a "wave" function inspired by biological principles, which can modify its behavior based on a dynamically generated set of parameters. This capability reflects the biological phenomenon observed in neurons, where the effectiveness of synaptic transmission is influenced by various neuromodulators, resulting in a highly adaptive and flexible response to stimuli. The generation of these modulatory parameters is handled by a specialized module known as the Theta-network, which can be customized and optimized separately from the main network to align with specific architectural needs.
 
-By emulating the nuanced regulatory mechanisms of biological neurons, `DyNAF` offers a more versatile and context-sensitive approach to neural computation, promising enhancements in the network's ability to discern and adapt to the nuanced features of the data it processes.
-
-### Framework Breakdown
-
-The `DyNAF` framework consists of two primary components, each drawing inspiration from the complex mechanisms of biological neurons:
-
-1. **DyNAF Activation Function**: At the core of `DyNAF` is a dynamic activation function, characterized by its ability to adapt its shape and response based on external parameters. This adaptability is akin to the way biological neurons alter their activation thresholds and response curves in the presence of different concentrations and types of neurotransmitters. The `DyNAF` function employs a set of parameters, akin to a 'neurotransmitter profile,' which modulates the activation response to more accurately reflect the underlying data patterns.
-
-2. **DyNAF Linear Layer Modification (Theta-network)**: To generate the 'neurotransmitter profile' for each neuron within the network, the `DyNAF` framework introduces a modification to the traditional linear layer. This modified layer, in addition to computing the standard linear transformation of its inputs, also produces a set of dynamic parameters for each output feature. These parameters are then utilized by the `DyNAF` activation function, mirroring the biological process where the local environment and history of synaptic activity influence a neuron's response to stimuli.
-
-The interaction between these two components is crucial: the modified linear layer, acting as a 'neuromodulator factory,' tailors the activation landscape for each neuron, allowing for an unprecedented level of adaptability and specificity in the network's processing capabilities.
-
-By integrating these components, `DyNAF` not only enhances the model's capacity to learn complex and nuanced data representations but also opens new avenues for research into more biologically faithful artificial neural networks.
+In mirroring the sophisticated regulatory functions observed in biological neurons, `DyNAF` introduces a level of versatility and sensitivity to context within neural network computation that holds the promise of significantly enhancing the network's proficiency in identifying and responding to complex data characteristics. This approach not only broadens the scope of neural network capabilities but also paves the way for more biologically realistic models of neural computation.
 
 ## Key Concepts
 
@@ -54,7 +41,7 @@ The DyNAF Activation function represents the cornerstone of the DyNAF framework,
 
 ### Theta-network
 
-The Theta-network is an ancillary neural network module responsible for generating the param-quads that guide the DyNAF Activation function. Acting as a "neuromodulator factory," the Theta-network synthesizes these parameters based on the current state and inputs of the network, effectively determining the modulation and adaptation of the DyNAF Activation function. The Theta-network can operate in both passive and active modes, offering flexibility in how these param-quads are derived and applied.
+The Theta-network is an ancillary neural network module responsible for generating the param-quads that guide the DyNAF Activation function. Acting as a "neuromodulator factory," the Theta-network synthesizes these parameters based on the current state and inputs of the network, effectively determining the modulation and adaptation of the DyNAF Activation function.
 
 ### DyNAF Components
 
