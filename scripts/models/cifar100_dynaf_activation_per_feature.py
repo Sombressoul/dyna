@@ -11,8 +11,8 @@ class CIFAR100DyNAFActivationPerFeature(nn.Module):
         super(CIFAR100DyNAFActivationPerFeature, self).__init__()
 
         activation_conv = nn.ReLU()
-        count_modes = 7
-        expected_range = [-2.5, +2.5]
+        count_modes = 21
+        expected_range = [-7.5, +7.5]
 
         self.a_conv_pre = nn.Conv2d(3, 32, 3, 1, 1)
         self.a_activation_pre = activation_conv
