@@ -37,7 +37,10 @@ class DyNAFActivation(nn.Module):
         betas = torch.nn.init.uniform_(
             betas,
             a=1.0 / math.sqrt(self.count_modes),
-            b=math.sqrt(self.count_modes),
+            b=math.log(
+                self.count_modes,
+                math.sqrt(2),
+            ),
         )
 
         # Init gammas.
