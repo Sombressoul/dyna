@@ -40,17 +40,28 @@ class DyNAFActivation(nn.Module):
         x: torch.Tensor,
         modes: torch.Tensor,
     ) -> torch.Tensor:
-        x_expanded = x.unsqueeze(0).expand([self.count_modes, *x.shape])
-        modes_expanded = modes.reshape([*modes.shape[0:2], *[1 for _ in range(len(x_expanded.shape)-2)], x.shape[-1]])
-        
-        transformed = modes_expanded[:, 0, :] * (
-            F.sigmoid(
-                modes_expanded[:, 1, :].abs()
-                * (x_expanded - modes_expanded[:, 2, :] - modes_expanded[:, 3, :].abs())
+        x_expanded = x.unsqueeze(0).expand([modes.shape[0], *x.shape])
+        modes_expanded = modes.reshape(
+            [
+                *modes.shape[0:2],
+                *[1 for _ in range(len(x_expanded.shape) - 2)],
+                x.shape[-1],
+            ]
+        )
+
+        alphas = modes_expanded[:, 0, :]
+        betas = modes_expanded[:, 1, :]
+        gammas = modes_expanded[:, 2, :]
+        deltas = modes_expanded[:, 3, :]
+
+        transformed = alphas * (
+            (
+                1.0
+                / (1 + torch.e ** (torch.abs(betas) * (x - deltas - torch.abs(gammas))))
             )
-            - F.sigmoid(
-                modes_expanded[:, 1, :].abs()
-                * (x_expanded - modes_expanded[:, 2, :] + modes_expanded[:, 3, :].abs())
+            - (
+                1.0
+                / (1 + torch.e ** (torch.abs(betas) * (x - deltas + torch.abs(gammas))))
             )
         )
 
