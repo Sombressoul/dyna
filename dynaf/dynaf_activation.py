@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
+import math
 
 from typing import Optional
 
@@ -11,27 +11,68 @@ class DyNAFActivation(nn.Module):
         passive: Optional[bool] = True,
         count_modes: Optional[int] = 5,
         features: Optional[int] = 1,
+        expected_input_min: Optional[float] = -1.0,
+        expected_input_max: Optional[float] = 1.0,
     ):
         super(DyNAFActivation, self).__init__()
 
         self.passive = passive
         self.count_modes = count_modes
         self.features = features
+        self.expected_input_min = expected_input_min
+        self.expected_input_max = expected_input_max
 
-        modes = torch.empty([self.count_modes, 4, self.features])
-        modes = torch.nn.init.normal_(
-            modes,
+        # Init alphas.
+        alphas = torch.empty([self.count_modes, 1, self.features])
+        alphas = torch.nn.init.normal_(
+            alphas,
             mean=0.0,
-            std=1.0 / self.count_modes,
+            std=math.sqrt(2.0),
         )
-        ranges = torch.arange(
-            start=-1.0,
-            end=1.0,
-            step=2.0 / self.count_modes,
-        ) + (1.0 / self.count_modes)
-        ranges = ranges.reshape([-1, 1, 1]).repeat([1, 1, self.features])
-        modes[:, 2] = ranges[:, 0]
-        self.modes = nn.Parameter(modes)
+
+        # Init betas.
+        betas = torch.empty([self.count_modes, 1, self.features])
+        betas = torch.nn.init.uniform_(
+            betas,
+            a=1.0 / math.sqrt(self.count_modes),
+            b=math.sqrt(self.count_modes),
+        )
+
+        # Init gammas.
+        gammas = torch.empty([self.count_modes, 1, self.features])
+        gammas = torch.nn.init.constant_(
+            gammas,
+            val=math.sqrt(
+                math.fabs(self.expected_input_max - self.expected_input_min)
+                / self.count_modes
+            ),
+        )
+
+        # Init deltas.
+        deltas = torch.arange(
+            start=self.expected_input_min,
+            end=self.expected_input_max,
+            step=(
+                math.fabs(self.expected_input_max - self.expected_input_min)
+                / self.count_modes
+            ),
+        ) + (
+            math.fabs(self.expected_input_max - self.expected_input_min)
+            / self.count_modes
+        )
+        deltas = deltas.reshape([-1, 1, 1]).repeat([1, 1, self.features])
+        deltas_bias = torch.empty_like(deltas)
+        deltas_bias = torch.nn.init.normal_(
+            deltas_bias,
+            mean=0.0,
+            std=(
+                math.fabs(self.expected_input_max - self.expected_input_min)
+                / self.count_modes
+            ),
+        )
+        deltas = deltas + deltas_bias
+
+        self.modes = nn.Parameter(torch.cat([alphas, betas, gammas, deltas], dim=1))
 
         pass
 
