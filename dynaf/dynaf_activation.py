@@ -84,13 +84,12 @@ class DyNAFActivation(nn.Module):
         x_expanded = x_expanded.reshape(
             [*x_expanded.shape[0:-1], 1, x_expanded.shape[-1]]
         )
-        modes_expanded = modes.permute([0, 2, 1, 3])
+        modes_extra_dims = len(modes.shape[1:-3])
+        modes_expanded = modes.permute([0, -2, *range(1, 1 + modes_extra_dims), -3, -1])
         modes_expanded = modes_expanded.reshape(
             [
-                *modes_expanded.shape[0:2],
-                *[1 for _ in range(len(x.shape[1:-1]))],
-                *modes_expanded.shape[-2:-1],
-                modes_expanded.shape[-1],
+                *modes_expanded.shape[0:-2],
+                *modes_expanded.shape[-2:],
             ]
         )
 
@@ -124,8 +123,17 @@ class DyNAFActivation(nn.Module):
     ) -> torch.Tensor:
         if self.passive:
             assert modes is None, "modes must be None in passive mode"
+
+            extra_dims = len(x.shape[1:-1])
             modes = self.modes
             modes = modes.repeat([x.shape[0], *[1 for _ in range(len(modes.shape))]])
+            modes = modes.reshape(
+                [
+                    modes.shape[0],
+                    *[1 for _ in range(extra_dims)],
+                    *modes.shape[1:],
+                ]
+            )
         else:
             assert modes is not None, "modes must be provided in active mode"
 
