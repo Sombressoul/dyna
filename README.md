@@ -14,7 +14,7 @@ This repository contains work-in-progress state of my ongoing research and imple
     - [DyNAF Components](#dynaf-components)
     - [Neuromodulatory Profile and Its Propagation](#neuromodulatory-profile-and-its-propagation)
     - [Interconnections](#interconnections)
-    - [Transform-Modulate-Propagate cycle](#transform-modulate-propagate-cycle)
+    - [Transform-Modulate-Propagate](#transform-modulate-propagate)
   - [DyNAF Activation's Mathematical Background](#dynaf-activations-mathematical-background)
     - [Components](#components)
     - [Nonlinearity](#nonlinearity)
@@ -71,7 +71,9 @@ The interconnections among these concepts are pivotal to the `DyNAF` framework's
 
 This cohesive integration of dynamic activation, neuromodulatory influence, and layer-wise propagation underpins the `DyNAF` framework's ability to mimic the complex, adaptive processes observed in biological neural systems, offering a pathway toward more intelligent and contextually responsive neural network models.
 
-### Transform-Modulate-Propagate cycle
+### Transform-Modulate-Propagate
+
+Below is a diagram for Transform-Modulate-Propagate cycle (TMP-cycle for short). This diagram shows the main steps of signal processing, conceptual components and their interaction in the `DyNAF` framework.
 
 ```mermaid
 sequenceDiagram
@@ -89,7 +91,7 @@ sequenceDiagram
     activate Theta
     Note right of Theta: Context propagation
     rect rgba(0, 0, 255, .1)
-        note left of Transformation: Transform-Modulate-Propagate cycle block
+        note left of Transformation: TMP-cycle block
         Signal->>Transformation: X
         activate Transformation
         Note right of Transformation: Signal transformation
