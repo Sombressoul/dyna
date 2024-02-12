@@ -80,12 +80,17 @@ class DyNAFActivation(nn.Module):
         x: torch.Tensor,
         modes: torch.Tensor,
     ) -> torch.Tensor:
-        x_expanded = x.unsqueeze(0).expand([modes.shape[0], *x.shape])
-        modes_expanded = modes.reshape(
+        x_expanded = x
+        x_expanded = x_expanded.reshape(
+            [*x_expanded.shape[0:-1], 1, x_expanded.shape[-1]]
+        )
+        modes_expanded = modes.permute([0, 2, 1, 3])
+        modes_expanded = modes_expanded.reshape(
             [
-                *modes.shape[0:2],
-                *[1 for _ in range(len(x_expanded.shape) - 2)],
-                x.shape[-1],
+                *modes_expanded.shape[0:2],
+                *[1 for _ in range(len(x.shape[1:-1]))],
+                *modes_expanded.shape[-2:-1],
+                modes_expanded.shape[-1],
             ]
         )
 
@@ -104,8 +109,8 @@ class DyNAFActivation(nn.Module):
             #     / (1 + torch.e ** (torch.abs(betas) * (x - deltas + torch.abs(gammas))))
             # )
             # NOTE: The same sigmoid, but numerically stable. Thanks to PyTorch team!
-            -torch.sigmoid(betas * (x - deltas - torch.abs(gammas)))
-            + torch.sigmoid(betas * (x - deltas + torch.abs(gammas)))
+            -torch.sigmoid(betas * (x_expanded - deltas - torch.abs(gammas)))
+            + torch.sigmoid(betas * (x_expanded - deltas + torch.abs(gammas)))
         )
 
         return transformed
@@ -120,11 +125,12 @@ class DyNAFActivation(nn.Module):
         if self.passive:
             assert modes is None, "modes must be None in passive mode"
             modes = self.modes
+            modes = modes.repeat([x.shape[0], *[1 for _ in range(len(modes.shape))]])
         else:
             assert modes is not None, "modes must be provided in active mode"
 
         components = self._dynaf(x, modes)
-        nonlinearity = components.sum(dim=0) + 1.0
+        nonlinearity = components.sum(dim=-2) + 1.0
         x_transformed = x * nonlinearity
 
         if return_nonlinearity and return_components:

@@ -41,6 +41,7 @@ _, nonlinearity, components = dynaf_activation.forward(
     x, return_components=True, return_nonlinearity=True
 )
 
+components = components.permute([1, 0, 2])
 plt.figure(figsize=(10, 10))
 for i, component in enumerate(components):
     plt.plot(

@@ -13,12 +13,13 @@ params = torch.tensor(
         (+0.20, +6.50, +0.25, +4.50),
         (-1.55, +4.50, +0.15, -2.50),
     ]
-).unsqueeze(-1)
+).unsqueeze(-1).unsqueeze(0)
 
 _, nonlinearity, components = dynaf_activation.forward(
     x, modes=params, return_components=True, return_nonlinearity=True
 )
 
+components = components.permute([1, 0, 2])
 plt.figure(figsize=(10, 10))
 for i, component in enumerate(components):
     plt.plot(
