@@ -6,7 +6,22 @@ from typing import Tuple, Optional
 # IMPORTANT!
 # THIS IMPLEMENTATION IS INCORRECT!
 #
-# In the future, here will be a proper matrix operations. This is just a test.
+# In the future, here will be a proper matrix operations.
+#
+# NOTE:
+# 1. ThetaLinear represents a group of neurons, where each neuron receives an `x` (a signal value from 
+#   the previous layer of neurons) and the components (the NM profile for each particular value of `x`).
+# 2. Thus, each neuron in the ThetaLinear layer shares the same input profile, but the reaction to that 
+#   profile should be individual. So, we could sum the whole input NM profile across neuromodulator 
+#   dimensions to obtain a cumulative value for each type of incoming neuromodulator.
+# 3. To simulate the variable sensitivities of each particular neuron in ThetaLinear to each particular 
+#   neuromodulator, we could introduce for each neuron a weight matrix. That weight matrix will contain 
+#   the multiplicative term of the neuron for the particular neuromodulator.
+# 4. Along with weight matrices, we also need to introduce bias matrices, which represent the neuron's 
+#   own contribution to each type of neuromodulator.
+# 5. Thus, by obtaining a cumulative neuromodulation environment for the group of neurons (summation 
+#   over neuromodulator dimention) and by applying individual (per neuron) weights and bias matrices 
+#   to that cumulative environment, we will obtain an internal "influential matrices" for each neuron in a group.
 #
 class DyNAFThetaLinear(nn.Linear):
     def __init__(
