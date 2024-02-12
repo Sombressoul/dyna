@@ -28,6 +28,7 @@ This repository contains work-in-progress state of my ongoing research and imple
   - [Contributing](#contributing)
   - [License](#license)
 
+---
 
 # Dynamic Neural Activation Functions (DyNAF)
 
