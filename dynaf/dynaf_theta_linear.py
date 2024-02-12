@@ -21,7 +21,7 @@ class DyNAFThetaLinear(nn.Linear):
         self.theta_feautures = out_features if theta_full_features else 1
 
         # Calculate theta io size.
-        self.theta_in = self.theta_modes_in * in_features + out_features
+        self.theta_in = self.theta_modes_in * in_features
         self.theta_out = self.theta_modes_out * self.theta_feautures * 4
 
         # Define an additional linear layer for theta transformation.
@@ -41,14 +41,8 @@ class DyNAFThetaLinear(nn.Linear):
         # Apply the parent class's linear transformation to x.
         x_transformed = super(DyNAFThetaLinear, self).forward(x)
 
-        # Flatten: [batch, <unknown_dims>, components_in, in_features] -> [batch, <unknown_dims>, components_in*in_features]
-        components_flat = components.flatten(-2)
-
-        # Concat x_transformed with input components to form the activation state for Theta-transformation.
-        activation_state = torch.cat([x_transformed, components_flat], dim=-1)
-
         # Apply linear transformation to activation_state to transform it into param_quads.
-        param_quads = self.theta_transformation(activation_state)
+        param_quads = self.theta_transformation(components.flatten(-2))
 
         # Reshape param_quads to match the shape of input modes for DyNAFActivation.
         param_quads_shape = [*x_transformed.shape[:-1], self.theta_modes_out, 4, self.theta_feautures]
