@@ -5,11 +5,6 @@ import math
 from typing import Tuple, Optional
 
 
-# IMPORTANT!
-# THIS IMPLEMENTATION IS INCORRECT!
-#
-# In the future, here will be a proper matrix operations.
-#
 # NOTE:
 # 1. ThetaLinear represents a group of neurons, where each neuron receives an `x` (a signal value from
 #   the previous layer of neurons) and the components (the NM profile for each particular value of `x`).
@@ -55,13 +50,19 @@ class DyNAFThetaLinear(nn.Linear):
 
         # Define per-neuron env sensitivity normalization. It can be loosely
         # analogous to the regulatory mechanisms in biological systems.
-        self.env_norm = nn.LayerNorm([self.in_features, self.theta_modes_in])
+        # self.env_norm = nn.LayerNorm([self.in_features, self.theta_modes_in])
+        self.env_norm = nn.Identity() # Under consideration.
 
         # Define perceptual matrices, which are necessary to calculate a
         # resulting perceptual_x for each neuron.
         perception = torch.empty([self.in_features, self.theta_modes_in, 1])
         perception = self._initializer_perception(perception)
         self.perception = nn.Parameter(perception)
+
+        # Define perceptual_x bias.
+        perceptual_bias = torch.empty([self.in_features])
+        perceptual_bias = self._initializer_perception(perceptual_bias)
+        self.perceptual_bias = nn.Parameter(perceptual_bias)
 
         pass
 
@@ -77,9 +78,9 @@ class DyNAFThetaLinear(nn.Linear):
         self,
         x,
     ) -> torch.Tensor:
-        bound = math.sqrt(3 / self.theta_modes_in)
+        std = math.sqrt(1 / self.theta_modes_in)
         with torch.no_grad():
-            return nn.init.uniform_(x, a=-bound, b=+bound)
+            return nn.init.normal_(x, mean=0.0, std=std)
 
     def forward(
         self,
@@ -98,17 +99,27 @@ class DyNAFThetaLinear(nn.Linear):
         env_normalized = self.env_norm(env_biased)
 
         # We have to modulate incoming signals by calculated per-neuron environmental
-        # influence and then multiply it with per-neuron perceptual matrices to obtain 
-        # the actual perceptual x, which will mirror the environmental contribution of 
+        # influence and then multiply it with per-neuron perceptual matrices to obtain
+        # the actual perceptual x, which will mirror the environmental contribution of
         # each neuromodulator to the perception of incoming x.
         # Thus, we obtain a "perceptual x" per each neuron.
         perceptual_x = x.unsqueeze(-1) * env_normalized
         perceptual_x = torch.einsum("...ij,ijk -> ...ik", perceptual_x, self.perception)
         perceptual_x = perceptual_x.squeeze(-1)
+        perceptual_x = perceptual_x + self.perceptual_bias
+
+        # Transform perceptual x to the output x by fully connected layer (from parent class).
+        transformed_x = super(DyNAFThetaLinear, self).forward(perceptual_x)
 
         print(f"x.shape: {x.shape}")
         print(f"env_normalized.shape: {env_normalized.shape}")
+        print(f"env_normalized min/max: {env_normalized.min()}/{env_normalized.max()}")
         print(f"perceptual_x.shape: {perceptual_x.shape}")
+        print(f"transformed_x.shape: {transformed_x.shape}")
+        # print("perceptual_x values:")
+        # print(perceptual_x[0, 0:32])
+        # print("transformed_x values:")
+        # print(transformed_x[0, 0:32])
         exit()
 
-        return ...
+        return transformed_x
