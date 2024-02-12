@@ -50,24 +50,20 @@ class DyNAFActivation(nn.Module):
         )
 
         # Init deltas.
-        delta_step = (
-            math.fabs(self.expected_input_max - self.expected_input_min)
-            / self.count_modes
-        )
-        deltas = (
-            torch.arange(
-                start=self.expected_input_min,
-                end=self.expected_input_max,
-                step=delta_step,
-            )
-            + delta_step / 2.0
+        deltas = torch.linspace(
+            start=self.expected_input_min,
+            end=self.expected_input_max,
+            steps=self.count_modes,
         )
         deltas = deltas.reshape([-1, 1, 1]).repeat([1, 1, self.features])
         deltas_bias = torch.empty_like(deltas)
         deltas_bias = torch.nn.init.normal_(
             deltas_bias,
             mean=0.0,
-            std=delta_step / 2.0,
+            std=(
+                math.fabs(self.expected_input_max - self.expected_input_min)
+                / (self.count_modes * 2.0)
+            ),
         )
         deltas = deltas + deltas_bias
 
