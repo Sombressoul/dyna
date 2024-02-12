@@ -14,6 +14,7 @@ This repository contains work-in-progress state of my ongoing research and imple
     - [DyNAF Components](#dynaf-components)
     - [Neuromodulatory Profile and Its Propagation](#neuromodulatory-profile-and-its-propagation)
     - [Interconnections](#interconnections)
+    - [Transform-Modulate-Propagate cycle](#transform-modulate-propagate-cycle)
   - [DyNAF Activation's Mathematical Background](#dynaf-activations-mathematical-background)
     - [Components](#components)
     - [Nonlinearity](#nonlinearity)
@@ -69,6 +70,55 @@ The interconnections among these concepts are pivotal to the `DyNAF` framework's
 - The **components** of the `DyNAF` Activation function, influenced by the current neuromodulatory profile, serve as the basis for generating the neuromodulatory profile for subsequent layers, enabling the **propagation** of adaptive behavior throughout the network.
 
 This cohesive integration of dynamic activation, neuromodulatory influence, and layer-wise propagation underpins the `DyNAF` framework's ability to mimic the complex, adaptive processes observed in biological neural systems, offering a pathway toward more intelligent and contextually responsive neural network models.
+
+### Transform-Modulate-Propagate cycle
+
+```mermaid
+sequenceDiagram
+    participant Transformation
+    participant Signal
+    participant Theta
+    participant Activation
+    Signal->>Activation: Signal
+    activate Activation
+    Theta->>Activation: Param-Quads
+    Note right of Activation: Signal modulation
+    Activation->>Signal: Modulated signal
+    Activation->>Theta: Components
+    deactivate Activation
+    activate Theta
+    Note right of Theta: Context propagation
+    rect rgba(0, 0, 255, .1)
+        note left of Transformation: Transform-Modulate-Propagate cycle block
+        Signal->>Transformation: X
+        activate Transformation
+        Note right of Transformation: Signal transformation
+        Transformation->>Signal: X'
+        deactivate Transformation
+        Signal->>Activation: Transformed signal
+        activate Activation
+        Theta->>Activation: Param-Quads
+        deactivate Theta
+        Note right of Activation: Signal modulation
+        Activation->>Signal: Modulated signal
+        Activation->>Theta: Components
+        deactivate Activation
+        activate Theta
+        Note right of Theta: Context propagation
+    end
+        Signal->>Transformation: X
+        activate Transformation
+        Note right of Transformation: Signal transformation
+        Transformation->>Signal: X'
+        deactivate Transformation
+    Signal->>Activation: Transformed signal
+    activate Activation
+    Theta->>Activation: Param-Quads
+    deactivate Theta
+    Note right of Activation: Signal modulation
+    Activation->>Signal: Modulated signal
+    deactivate Activation
+```
 
 ## DyNAF Activation's Mathematical Background
 
