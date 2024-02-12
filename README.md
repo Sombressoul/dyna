@@ -1,3 +1,11 @@
+**Important note**
+
+This repository contains work-in-progress state of my ongoing research and implementation of biologically inspired signal propagation framework `DyNAF`.
+
+---
+
+**Table of contents:**
+
 - [Dynamic Neural Activation Functions (DyNAF)](#dynamic-neural-activation-functions-dynaf)
   - [Overview](#overview)
   - [Key Concepts](#key-concepts)
