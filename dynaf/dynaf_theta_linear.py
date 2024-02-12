@@ -3,7 +3,11 @@ import torch.nn as nn
 
 from typing import Tuple, Optional
 
-
+# IMPORTANT!
+# THIS IMPLEMENTATION IS INCORRECT!
+#
+# In the future, here will be a proper matrix operations. This is just a test.
+#
 class DyNAFThetaLinear(nn.Linear):
     def __init__(
         self,
