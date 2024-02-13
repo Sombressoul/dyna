@@ -11,18 +11,16 @@ class ModulatedActivation(nn.Module):
     def __init__(
         self,
         passive: Optional[bool] = False,
-        count_modes: Optional[int] = 5,
+        count_modes: Optional[int] = 7,
         features: Optional[int] = 1,
-        expected_input_min: Optional[float] = -5.0,
-        expected_input_max: Optional[float] = +5.0,
+        theta_dynamic_range: Optional[float] = 7.5,
     ):
         super(ModulatedActivation, self).__init__()
 
         self.passive = passive
         self.count_modes = count_modes
         self.features = features
-        self.expected_input_min = expected_input_min
-        self.expected_input_max = expected_input_max
+        self.theta_dynamic_range = theta_dynamic_range
 
         # Init alphas.
         alphas = torch.empty([self.count_modes, 1, self.features])
@@ -48,13 +46,13 @@ class ModulatedActivation(nn.Module):
         gammas = torch.nn.init.uniform_(
             gammas,
             a=1.0 / self.count_modes,
-            b=math.fabs(self.expected_input_max - self.expected_input_min) / 2.0,
+            b=self.theta_dynamic_range / 2.0,
         )
 
         # Init deltas.
         deltas = torch.linspace(
-            start=self.expected_input_min,
-            end=self.expected_input_max,
+            start=-self.theta_dynamic_range,
+            end=+self.theta_dynamic_range,
             steps=self.count_modes,
         )
         deltas = deltas.reshape([-1, 1, 1]).repeat([1, 1, self.features])
@@ -62,10 +60,7 @@ class ModulatedActivation(nn.Module):
         deltas_bias = torch.nn.init.normal_(
             deltas_bias,
             mean=0.0,
-            std=(
-                math.fabs(self.expected_input_max - self.expected_input_min)
-                / (self.count_modes * 2.0)
-            ),
+            std=(self.theta_dynamic_range / (self.count_modes * 2.0)),
         )
         deltas = deltas + deltas_bias
 

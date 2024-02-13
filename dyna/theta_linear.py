@@ -6,6 +6,7 @@ from typing import Optional, Union
 
 from dyna.signal import SignalModular, SignalComponential
 
+
 #
 # TODO:
 #   Emission matices (alphas, betas, gammas, deltas) proper initialization.
@@ -15,11 +16,12 @@ class ThetaLinear(nn.Linear):
         self,
         in_features: int,
         out_features: int,
-        theta_components_in: int,
-        theta_modes_out: int,
+        theta_components_in: Optional[int] = 7,
+        theta_modes_out: Optional[int] = 7,
         theta_full_features: Optional[bool] = True,
         theta_normalize_env_input: Optional[bool] = True,
         theta_normalize_env_output: Optional[bool] = True,
+        theta_dynamic_range: Optional[float] = 7.5,
         **kwargs,
     ) -> None:
         super(ThetaLinear, self).__init__(in_features, out_features, **kwargs)
@@ -32,6 +34,7 @@ class ThetaLinear(nn.Linear):
         self.theta_feautures = out_features if theta_full_features else 1
         self.theta_normalize_env_input = theta_normalize_env_input
         self.theta_normalize_env_output = theta_normalize_env_output
+        self.theta_dynamic_range = theta_dynamic_range
 
         # Define per-neuron sesitivity to particular inputs.
         individual_sensetivity = torch.empty([self.out_features, self.in_features, 1])
@@ -81,6 +84,13 @@ class ThetaLinear(nn.Linear):
             ]
         )
         emission = self._initializer_emission(emission)
+        # Scale initial matrices (alphas, betas, gammas and deltas) by modes and dynamic range.
+        b_scale = math.log(self.theta_modes_out, math.sqrt(self.theta_dynamic_range))
+        d_scale = math.sqrt(self.theta_dynamic_range) + math.log(self.theta_modes_out)
+        emission[:, :, 0::4] = emission[:, :, 0::4] * (1.0 + (1.0 / b_scale))
+        emission[:, :, 1::4] = emission[:, :, 1::4] * b_scale
+        emission[:, :, 2::4] = emission[:, :, 2::4] * (1.0 + (1.0 / d_scale))
+        emission[:, :, 3::4] = emission[:, :, 3::4] * d_scale
         self.emission = nn.Parameter(emission)
 
         # Define neuromodulatory emission scale matrices.
@@ -133,10 +143,9 @@ class ThetaLinear(nn.Linear):
         self,
         x,
     ) -> torch.Tensor:
-        fan = torch.nn.init._calculate_correct_fan(x, mode="fan_in")
-        bound = math.sqrt(3.0 / fan)
+        std = 1.0 / (math.sqrt(self.theta_modes_out) + 1)
         with torch.no_grad():
-            return x.uniform_(-bound, bound)
+            return torch.nn.init.normal_(x, mean=0.0, std=std)
 
     def forward(
         self,
