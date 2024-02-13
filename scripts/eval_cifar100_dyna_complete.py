@@ -12,7 +12,7 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 project_dir = os.path.dirname(script_dir)
 sys.path.append(project_dir)
 
-from models import CIFAR100DyNAComplete
+from models import CIFAR100DyNAComplete, CIFAR100DyNACompleteLarge
 
 data_path = f"{project_dir}/data"
 
@@ -128,6 +128,12 @@ def main():
         action="store_true",
         help="plot training loss (default: False) (requires self-projection package)",
     )
+    parser.add_argument(
+        "--large",
+        default=False,
+        action="store_true",
+        help="use large version of the model (default: False)",
+    )
     args = parser.parse_args()
 
     torch.manual_seed(args.seed)
@@ -162,7 +168,11 @@ def main():
     train_loader = torch.utils.data.DataLoader(dataset_train, **train_kwargs)
     test_loader = torch.utils.data.DataLoader(dataset_test, **test_kwargs)
 
-    model = CIFAR100DyNAComplete().to(device)
+    model = (
+        CIFAR100DyNAComplete().to(device)
+        if not args.large
+        else CIFAR100DyNACompleteLarge().to(device)
+    )
 
     total_trainable_params = sum(
         p.numel() for p in model.parameters() if p.requires_grad
