@@ -17,7 +17,7 @@ class CIFAR100DyNAComplete(nn.Module):
         self.a_activation_pre = DyNAActivation(
             passive=True,
             count_modes=count_modes,
-            features=1,
+            features=32,
             expected_input_min=expected_range[0],
             expected_input_max=expected_range[1],
         )
@@ -25,7 +25,7 @@ class CIFAR100DyNAComplete(nn.Module):
         self.a_activation_post = DyNAActivation(
             passive=True,
             count_modes=count_modes,
-            features=1,
+            features=32,
             expected_input_min=expected_range[0],
             expected_input_max=expected_range[1],
         )
@@ -35,7 +35,7 @@ class CIFAR100DyNAComplete(nn.Module):
         self.b_activation_pre = DyNAActivation(
             passive=True,
             count_modes=count_modes,
-            features=1,
+            features=32,
             expected_input_min=expected_range[0],
             expected_input_max=expected_range[1],
         )
@@ -43,7 +43,7 @@ class CIFAR100DyNAComplete(nn.Module):
         self.b_activation_post = DyNAActivation(
             passive=True,
             count_modes=count_modes,
-            features=1,
+            features=32,
             expected_input_min=expected_range[0],
             expected_input_max=expected_range[1],
         )
@@ -53,7 +53,7 @@ class CIFAR100DyNAComplete(nn.Module):
         self.c_activation_pre = DyNAActivation(
             passive=True,
             count_modes=count_modes,
-            features=1,
+            features=32,
             expected_input_min=expected_range[0],
             expected_input_max=expected_range[1],
         )
@@ -61,7 +61,7 @@ class CIFAR100DyNAComplete(nn.Module):
         self.c_activation_post = DyNAActivation(
             passive=True,
             count_modes=count_modes,
-            features=1,
+            features=32,
             expected_input_min=expected_range[0],
             expected_input_max=expected_range[1],
         )
@@ -70,7 +70,7 @@ class CIFAR100DyNAComplete(nn.Module):
         self.d_input_activation = DyNAActivation(
             passive=True,
             count_modes=count_modes,
-            features=1,
+            features=512,
             expected_input_min=expected_range[0],
             expected_input_max=expected_range[1],
         )
@@ -79,7 +79,7 @@ class CIFAR100DyNAComplete(nn.Module):
             out_features=96,
             theta_modes_in=count_modes,
             theta_modes_out=count_modes,
-            theta_full_features=False,
+            theta_full_features=True,
         )
         self.d_activation = DyNAActivation(
             passive=False,
@@ -91,7 +91,7 @@ class CIFAR100DyNAComplete(nn.Module):
             out_features=100,
             theta_modes_in=count_modes,
             theta_modes_out=count_modes,
-            theta_full_features=False,
+            theta_full_features=True,
         )
         self.e_activation = DyNAActivation(
             passive=False,
