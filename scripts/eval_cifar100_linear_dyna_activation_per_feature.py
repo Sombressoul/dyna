@@ -104,9 +104,9 @@ def main():
     parser.add_argument(
         "--wd",
         type=float,
-        default=1.0e-1,
+        default=1.0e-2,
         metavar="WD",
-        help="Weight decay (default: 1.0e-1)",
+        help="Weight decay (default: 1.0e-2)",
     )
     parser.add_argument(
         "--seed",
