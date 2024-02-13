@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import math
 
 from typing import Optional, Union
@@ -21,6 +22,7 @@ class ThetaLinear(nn.Linear):
         theta_full_features: Optional[bool] = True,
         theta_normalize_env_input: Optional[bool] = True,
         theta_normalize_env_output: Optional[bool] = True,
+        theta_dynamic_range: Optional[float] = 7.5,
         **kwargs,
     ) -> None:
         super(ThetaLinear, self).__init__(in_features, out_features, **kwargs)
@@ -33,6 +35,7 @@ class ThetaLinear(nn.Linear):
         self.theta_feautures = out_features if theta_full_features else 1
         self.theta_normalize_env_input = theta_normalize_env_input
         self.theta_normalize_env_output = theta_normalize_env_output
+        self.theta_dynamic_range = theta_dynamic_range
 
         # Define per-neuron sesitivity to particular inputs.
         individual_sensetivity = torch.empty([self.out_features, self.in_features, 1])
@@ -81,13 +84,26 @@ class ThetaLinear(nn.Linear):
                 self.theta_quad_out,
             ]
         )
-        emission = self._initializer_emission(emission)
-        # Scale initial matrices (alphas, betas, gammas and deltas) by modes and dynamic range.
-        # TODO: Scale/initialize an a/b/g/d matrices in a proper way.
-        emission[:, :, 0::4] = emission[:, :, 0::4] * 1.0
-        emission[:, :, 1::4] = emission[:, :, 1::4] * self.theta_modes_out
-        emission[:, :, 2::4] = emission[:, :, 2::4] * 1.0
-        emission[:, :, 3::4] = emission[:, :, 3::4] * self.theta_modes_out
+        alphas = emission[:, :, 0::4]
+        betas = emission[:, :, 1::4]
+        gammas = emission[:, :, 2::4]
+        deltas = emission[:, :, 3::4]
+
+        w = 1 / self.theta_feautures
+        alphas = torch.nn.init.normal_(alphas, mean=0.0, std=1.0) * w
+        betas = torch.nn.init.normal_(betas, mean=0.0, std=1.0) * w
+        gammas = torch.nn.init.normal_(gammas, mean=0.0, std=1.0) * w
+        deltas = torch.nn.init.uniform_(
+            deltas,
+            a=-self.theta_dynamic_range,
+            b=+self.theta_dynamic_range,
+        )
+
+        emission[:, :, 0::4] = alphas
+        emission[:, :, 1::4] = betas
+        emission[:, :, 2::4] = gammas
+        emission[:, :, 3::4] = deltas
+
         self.emission = nn.Parameter(emission)
 
         # Define neuromodulatory emission scale matrices.
