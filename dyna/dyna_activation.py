@@ -5,7 +5,7 @@ import math
 from typing import Optional
 
 
-class DyNAFActivation(nn.Module):
+class DyNAActivation(nn.Module):
     def __init__(
         self,
         passive: Optional[bool] = True,
@@ -14,7 +14,7 @@ class DyNAFActivation(nn.Module):
         expected_input_min: Optional[float] = -5.0,
         expected_input_max: Optional[float] = +5.0,
     ):
-        super(DyNAFActivation, self).__init__()
+        super(DyNAActivation, self).__init__()
 
         self.passive = passive
         self.count_modes = count_modes
@@ -71,7 +71,7 @@ class DyNAFActivation(nn.Module):
 
         pass
 
-    def _dynaf(
+    def _dyna(
         self,
         x: torch.Tensor,
         modes: torch.Tensor,
@@ -133,7 +133,7 @@ class DyNAFActivation(nn.Module):
         else:
             assert modes is not None, "modes must be provided in active mode"
 
-        components = self._dynaf(x, modes)
+        components = self._dyna(x, modes)
         nonlinearity = components.sum(dim=-2) + 1.0
         x_transformed = x * nonlinearity
 

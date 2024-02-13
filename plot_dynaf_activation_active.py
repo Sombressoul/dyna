@@ -1,9 +1,9 @@
 import torch
 import matplotlib.pyplot as plt
 
-from dynaf import DyNAFActivation
+from dyna import DyNAActivation
 
-dynaf_activation = DyNAFActivation(passive=False)
+dyna_activation = DyNAActivation(passive=False)
 x = torch.linspace(-10, 10, 1000).unsqueeze(-1)  # Adding feature dimension
 
 params = torch.tensor(
@@ -15,7 +15,7 @@ params = torch.tensor(
     ]
 ).unsqueeze(-1).unsqueeze(0)
 
-_, nonlinearity, components = dynaf_activation.forward(
+_, nonlinearity, components = dyna_activation.forward(
     x, modes=params, return_components=True, return_nonlinearity=True
 )
 
@@ -27,7 +27,7 @@ for i, component in enumerate(components):
         component.squeeze().numpy(),
         label=f"Set {i}",
     )
-plt.title("DyNAF Components")
+plt.title("DyNA Components")
 plt.xlabel("Input (x)")
 plt.ylabel("Output")
 plt.legend()
@@ -40,7 +40,7 @@ plt.plot(
     nonlinearity.squeeze().numpy(),
     label="Resulting waveform",
 )
-plt.title("DyNAF Nonlinearity")
+plt.title("DyNA Nonlinearity")
 plt.xlabel("Input (x)")
 plt.ylabel("Output")
 plt.legend()
@@ -58,7 +58,7 @@ plt.plot(
     (x * nonlinearity).squeeze().numpy(),
     label="Transformed x",
 )
-plt.title("DyNAF Transformation")
+plt.title("DyNA Transformation")
 plt.xlabel("Input (x)")
 plt.ylabel("Output")
 plt.legend()

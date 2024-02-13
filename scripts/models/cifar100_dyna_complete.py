@@ -1,20 +1,20 @@
 import torch
 import torch.nn as nn
 
-from dynaf import DyNAFActivation, DyNAFThetaLinear
+from dyna import DyNAActivation, DyNAThetaLinear
 
 
-class CIFAR100DyNAFComplete(nn.Module):
+class CIFAR100DyNAComplete(nn.Module):
     def __init__(
         self,
     ):
-        super(CIFAR100DyNAFComplete, self).__init__()
+        super(CIFAR100DyNAComplete, self).__init__()
 
         count_modes = 7
         expected_range = [-5.0, +5.0]
 
         self.a_conv_pre = nn.Conv2d(3, 32, 3, 1, 1)
-        self.a_activation_pre = DyNAFActivation(
+        self.a_activation_pre = DyNAActivation(
             passive=True,
             count_modes=count_modes,
             features=1,
@@ -22,7 +22,7 @@ class CIFAR100DyNAFComplete(nn.Module):
             expected_input_max=expected_range[1],
         )
         self.a_conv_post = nn.Conv2d(32, 32, 3, 2, 1)
-        self.a_activation_post = DyNAFActivation(
+        self.a_activation_post = DyNAActivation(
             passive=True,
             count_modes=count_modes,
             features=1,
@@ -32,7 +32,7 @@ class CIFAR100DyNAFComplete(nn.Module):
         self.a_layer_norm = nn.LayerNorm([16, 16])
 
         self.b_conv_pre = nn.Conv2d(32, 32, 3, 1, 1)
-        self.b_activation_pre = DyNAFActivation(
+        self.b_activation_pre = DyNAActivation(
             passive=True,
             count_modes=count_modes,
             features=1,
@@ -40,7 +40,7 @@ class CIFAR100DyNAFComplete(nn.Module):
             expected_input_max=expected_range[1],
         )
         self.b_conv_post = nn.Conv2d(32, 32, 3, 2, 1)
-        self.b_activation_post = DyNAFActivation(
+        self.b_activation_post = DyNAActivation(
             passive=True,
             count_modes=count_modes,
             features=1,
@@ -50,7 +50,7 @@ class CIFAR100DyNAFComplete(nn.Module):
         self.b_layer_norm = nn.LayerNorm([8, 8])
 
         self.c_conv_pre = nn.Conv2d(32, 32, 3, 1, 1)
-        self.c_activation_pre = DyNAFActivation(
+        self.c_activation_pre = DyNAActivation(
             passive=True,
             count_modes=count_modes,
             features=1,
@@ -58,7 +58,7 @@ class CIFAR100DyNAFComplete(nn.Module):
             expected_input_max=expected_range[1],
         )
         self.c_conv_post = nn.Conv2d(32, 32, 3, 2, 1)
-        self.c_activation_post = DyNAFActivation(
+        self.c_activation_post = DyNAActivation(
             passive=True,
             count_modes=count_modes,
             features=1,
@@ -67,33 +67,33 @@ class CIFAR100DyNAFComplete(nn.Module):
         )
         self.c_layer_norm = nn.LayerNorm([4, 4])
 
-        self.d_input_activation = DyNAFActivation(
+        self.d_input_activation = DyNAActivation(
             passive=True,
             count_modes=count_modes,
             features=1,
             expected_input_min=expected_range[0],
             expected_input_max=expected_range[1],
         )
-        self.d_linear = DyNAFThetaLinear(
+        self.d_linear = DyNAThetaLinear(
             in_features=512,
             out_features=96,
             theta_modes_in=count_modes,
             theta_modes_out=count_modes,
             theta_full_features=False,
         )
-        self.d_activation = DyNAFActivation(
+        self.d_activation = DyNAActivation(
             passive=False,
         )
         self.d_batch_norm = nn.BatchNorm1d(96)
 
-        self.e_linear = DyNAFThetaLinear(
+        self.e_linear = DyNAThetaLinear(
             in_features=96,
             out_features=100,
             theta_modes_in=count_modes,
             theta_modes_out=count_modes,
             theta_full_features=False,
         )
-        self.e_activation = DyNAFActivation(
+        self.e_activation = DyNAActivation(
             passive=False,
         )
         self.e_batch_norm = nn.BatchNorm1d(100)

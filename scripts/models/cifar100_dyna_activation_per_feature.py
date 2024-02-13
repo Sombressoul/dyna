@@ -1,14 +1,14 @@
 import torch
 import torch.nn as nn
 
-from dynaf import DyNAFActivation
+from dyna import DyNAActivation
 
 
-class CIFAR100DyNAFActivationPerFeature(nn.Module):
+class CIFAR100DyNAActivationPerFeature(nn.Module):
     def __init__(
         self,
     ):
-        super(CIFAR100DyNAFActivationPerFeature, self).__init__()
+        super(CIFAR100DyNAActivationPerFeature, self).__init__()
 
         activation_conv = nn.ReLU()
         count_modes = 21
@@ -17,7 +17,7 @@ class CIFAR100DyNAFActivationPerFeature(nn.Module):
         self.a_conv_pre = nn.Conv2d(3, 32, 3, 1, 1)
         self.a_activation_pre = activation_conv
         self.a_linear = nn.Linear(32, 8)
-        self.a_activation_mid = DyNAFActivation(
+        self.a_activation_mid = DyNAActivation(
             passive=True,
             count_modes=count_modes,
             features=8,
@@ -31,7 +31,7 @@ class CIFAR100DyNAFActivationPerFeature(nn.Module):
         self.b_conv_pre = nn.Conv2d(32, 32, 3, 1, 1)
         self.b_activation_pre = activation_conv
         self.b_linear = nn.Linear(32, 8)
-        self.b_activation_mid = DyNAFActivation(
+        self.b_activation_mid = DyNAActivation(
             passive=True,
             count_modes=count_modes,
             features=8,
@@ -45,7 +45,7 @@ class CIFAR100DyNAFActivationPerFeature(nn.Module):
         self.c_conv_pre = nn.Conv2d(32, 32, 3, 1, 1)
         self.c_activation_pre = activation_conv
         self.c_linear = nn.Linear(32, 8)
-        self.c_activation_mid = DyNAFActivation(
+        self.c_activation_mid = DyNAActivation(
             passive=True,
             count_modes=count_modes,
             features=8,
@@ -57,7 +57,7 @@ class CIFAR100DyNAFActivationPerFeature(nn.Module):
         self.c_layer_norm = nn.LayerNorm([4, 4])
 
         self.d_linear = nn.Linear(512, 96)
-        self.d_activation = DyNAFActivation(
+        self.d_activation = DyNAActivation(
             passive=True,
             count_modes=count_modes,
             features=96,
@@ -67,7 +67,7 @@ class CIFAR100DyNAFActivationPerFeature(nn.Module):
         self.d_batch_norm = nn.BatchNorm1d(96)
 
         self.e_linear = nn.Linear(96, 100)
-        self.e_activation = DyNAFActivation(
+        self.e_activation = DyNAActivation(
             passive=True,
             count_modes=count_modes,
             features=100,

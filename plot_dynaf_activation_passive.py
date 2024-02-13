@@ -2,7 +2,7 @@ import torch
 import matplotlib.pyplot as plt
 import argparse
 
-from dynaf import DyNAFActivation
+from dyna import DyNAActivation
 
 parser = argparse.ArgumentParser(description="evaluation")
 parser.add_argument(
@@ -28,7 +28,7 @@ parser.add_argument(
 )
 args = parser.parse_args()
 
-dynaf_activation = DyNAFActivation(
+dyna_activation = DyNAActivation(
     passive=True,
     count_modes=args.count_modes,
     features=1,
@@ -37,7 +37,7 @@ dynaf_activation = DyNAFActivation(
 )
 x = torch.linspace(-10, 10, 1000).unsqueeze(-1)
 
-_, nonlinearity, components = dynaf_activation.forward(
+_, nonlinearity, components = dyna_activation.forward(
     x, return_components=True, return_nonlinearity=True
 )
 
@@ -49,7 +49,7 @@ for i, component in enumerate(components):
         component.detach().squeeze().numpy(),
         label=f"Set {i}",
     )
-plt.title("DyNAF Components")
+plt.title("DyNA Components")
 plt.xlabel("Input (x)")
 plt.ylabel("Output")
 plt.legend()
@@ -62,7 +62,7 @@ plt.plot(
     nonlinearity.detach().squeeze().numpy(),
     label="Resulting waveform",
 )
-plt.title("DyNAF Nonlinearity")
+plt.title("DyNA Nonlinearity")
 plt.xlabel("Input (x)")
 plt.ylabel("Output")
 plt.legend()
@@ -80,7 +80,7 @@ plt.plot(
     (x * nonlinearity).detach().squeeze().numpy(),
     label="Transformed x",
 )
-plt.title("DyNAF Transformation")
+plt.title("DyNA Transformation")
 plt.xlabel("Input (x)")
 plt.ylabel("Output")
 plt.legend()

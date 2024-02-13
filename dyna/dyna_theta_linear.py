@@ -6,7 +6,7 @@ from typing import Tuple, Optional
 
 
 # NOTE: work-in-progress.
-class DyNAFThetaLinear(nn.Linear):
+class DyNAThetaLinear(nn.Linear):
     def __init__(
         self,
         in_features: int,
@@ -17,7 +17,7 @@ class DyNAFThetaLinear(nn.Linear):
         theta_normalization: Optional[bool] = False,
         **kwargs,
     ) -> None:
-        super(DyNAFThetaLinear, self).__init__(in_features, out_features, **kwargs)
+        super(DyNAThetaLinear, self).__init__(in_features, out_features, **kwargs)
 
         self.in_features = in_features
         self.out_features = out_features
@@ -150,7 +150,7 @@ class DyNAFThetaLinear(nn.Linear):
         perceptual_x = torch.einsum("...ij,ijk -> ...ik", perceptual_x, self.perception)
         perceptual_x = perceptual_x.squeeze(-1)
         perceptual_x = perceptual_x + self.perceptual_bias
-        transformed_x = super(DyNAFThetaLinear, self).forward(perceptual_x)
+        transformed_x = super(DyNAThetaLinear, self).forward(perceptual_x)
 
         exit()
         #
