@@ -65,7 +65,6 @@ class CIFAR100DyNAComplete(nn.Module):
             out_features=96,
             theta_components_in=count_modes,
             theta_modes_out=count_modes,
-            theta_dynamic_range=dynamic_range,
         )
         self.d_activation = ModulatedActivation()
         self.d_batch_norm = nn.BatchNorm1d(96)
@@ -75,7 +74,6 @@ class CIFAR100DyNAComplete(nn.Module):
             out_features=100,
             theta_components_in=count_modes,
             theta_modes_out=count_modes,
-            theta_dynamic_range=dynamic_range,
         )
         self.e_activation = ModulatedActivation()
         self.e_batch_norm = nn.BatchNorm1d(100)
