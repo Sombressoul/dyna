@@ -1,7 +1,12 @@
-from dyna.dyna_activation import DyNAActivation
-from dyna.dyna_theta_linear import DyNAThetaLinear
+from dyna.modulated_activation import ModulatedActivation
+from dyna.theta_input import ThetaInput
+from dyna.theta_linear import ThetaLinear
+from dyna.signal import SignalModular, SignalComponential
 
 __all__ = [
-    "DyNAActivation",
-    "DyNAThetaLinear",
+    "ModulatedActivation",
+    "ThetaInput",
+    "ThetaLinear",
+    "SignalModular",
+    "SignalComponential",
 ]

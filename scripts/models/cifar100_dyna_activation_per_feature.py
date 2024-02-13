@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-from dyna import DyNAActivation
+from dyna import ModulatedActivation
 
 
 class CIFAR100DyNAActivationPerFeature(nn.Module):
@@ -17,7 +17,7 @@ class CIFAR100DyNAActivationPerFeature(nn.Module):
         self.a_conv_pre = nn.Conv2d(3, 32, 3, 1, 1)
         self.a_activation_pre = activation_conv
         self.a_linear = nn.Linear(32, 8)
-        self.a_activation_mid = DyNAActivation(
+        self.a_activation_mid = ModulatedActivation(
             passive=True,
             count_modes=count_modes,
             features=8,
@@ -31,7 +31,7 @@ class CIFAR100DyNAActivationPerFeature(nn.Module):
         self.b_conv_pre = nn.Conv2d(32, 32, 3, 1, 1)
         self.b_activation_pre = activation_conv
         self.b_linear = nn.Linear(32, 8)
-        self.b_activation_mid = DyNAActivation(
+        self.b_activation_mid = ModulatedActivation(
             passive=True,
             count_modes=count_modes,
             features=8,
@@ -45,7 +45,7 @@ class CIFAR100DyNAActivationPerFeature(nn.Module):
         self.c_conv_pre = nn.Conv2d(32, 32, 3, 1, 1)
         self.c_activation_pre = activation_conv
         self.c_linear = nn.Linear(32, 8)
-        self.c_activation_mid = DyNAActivation(
+        self.c_activation_mid = ModulatedActivation(
             passive=True,
             count_modes=count_modes,
             features=8,
@@ -57,7 +57,7 @@ class CIFAR100DyNAActivationPerFeature(nn.Module):
         self.c_layer_norm = nn.LayerNorm([4, 4])
 
         self.d_linear = nn.Linear(512, 96)
-        self.d_activation = DyNAActivation(
+        self.d_activation = ModulatedActivation(
             passive=True,
             count_modes=count_modes,
             features=96,
@@ -67,7 +67,7 @@ class CIFAR100DyNAActivationPerFeature(nn.Module):
         self.d_batch_norm = nn.BatchNorm1d(96)
 
         self.e_linear = nn.Linear(96, 100)
-        self.e_activation = DyNAActivation(
+        self.e_activation = ModulatedActivation(
             passive=True,
             count_modes=count_modes,
             features=100,
@@ -92,7 +92,7 @@ class CIFAR100DyNAActivationPerFeature(nn.Module):
         x = self.a_activation_pre(x)
         x = torch.permute(x, [0, 2, 3, 1])
         x = self.a_linear(x)
-        x = self.a_activation_mid(x)
+        x = self.a_activation_mid(x).x
         x = torch.permute(x, [0, 3, 1, 2])
         x = self.a_conv_post(x)
         x = self.a_activation_post(x)
@@ -102,7 +102,7 @@ class CIFAR100DyNAActivationPerFeature(nn.Module):
         x = self.b_activation_pre(x)
         x = torch.permute(x, [0, 2, 3, 1])
         x = self.b_linear(x)
-        x = self.b_activation_mid(x)
+        x = self.b_activation_mid(x).x
         x = torch.permute(x, [0, 3, 1, 2])
         x = self.b_conv_post(x)
         x = self.b_activation_post(x)
@@ -112,7 +112,7 @@ class CIFAR100DyNAActivationPerFeature(nn.Module):
         x = self.c_activation_pre(x)
         x = torch.permute(x, [0, 2, 3, 1])
         x = self.c_linear(x)
-        x = self.c_activation_mid(x)
+        x = self.c_activation_mid(x).x
         x = torch.permute(x, [0, 3, 1, 2])
         x = self.c_conv_post(x)
         x = self.c_activation_post(x)
@@ -122,11 +122,11 @@ class CIFAR100DyNAActivationPerFeature(nn.Module):
         x = self.dropout(x)
 
         x = self.d_linear(x)
-        x = self.d_activation(x)
+        x = self.d_activation(x).x
         x = self.d_batch_norm(x)
 
         x = self.e_linear(x)
-        x = self.e_activation(x)
+        x = self.e_activation(x).x
         x = self.e_batch_norm(x)
 
         x = self.output_linear(x)

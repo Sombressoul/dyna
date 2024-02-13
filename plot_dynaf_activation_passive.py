@@ -2,7 +2,7 @@ import torch
 import matplotlib.pyplot as plt
 import argparse
 
-from dyna import DyNAActivation
+from dyna import ModulatedActivation
 
 parser = argparse.ArgumentParser(description="evaluation")
 parser.add_argument(
@@ -28,20 +28,17 @@ parser.add_argument(
 )
 args = parser.parse_args()
 
-dyna_activation = DyNAActivation(
+x = torch.linspace(-10, 10, 1000).unsqueeze(-1)
+
+signal = ModulatedActivation(
     passive=True,
     count_modes=args.count_modes,
     features=1,
     expected_input_min=args.e_min,
     expected_input_max=args.e_max,
-)
-x = torch.linspace(-10, 10, 1000).unsqueeze(-1)
+)(x)
 
-_, nonlinearity, components = dyna_activation.forward(
-    x, return_components=True, return_nonlinearity=True
-)
-
-components = components.permute([1, 0, 2])
+components = signal.components.permute([1, 0, 2])
 plt.figure(figsize=(10, 10))
 for i, component in enumerate(components):
     plt.plot(
@@ -59,7 +56,7 @@ plt.show()
 plt.figure(figsize=(10, 10))
 plt.plot(
     x.squeeze().numpy(),
-    nonlinearity.detach().squeeze().numpy(),
+    signal.nonlinearity.detach().squeeze().numpy(),
     label="Resulting waveform",
 )
 plt.title("DyNA Nonlinearity")
@@ -77,7 +74,7 @@ plt.plot(
 )
 plt.plot(
     x.squeeze().numpy(),
-    (x * nonlinearity).detach().squeeze().numpy(),
+    (x * signal.nonlinearity).detach().squeeze().numpy(),
     label="Transformed x",
 )
 plt.title("DyNA Transformation")

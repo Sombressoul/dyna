@@ -2,19 +2,21 @@ import torch
 import torch.nn as nn
 import math
 
-from typing import Optional
+from typing import Optional, Union
+
+from dyna.signal import SignalModular, SignalComponential
 
 
-class DyNAActivation(nn.Module):
+class ModulatedActivation(nn.Module):
     def __init__(
         self,
-        passive: Optional[bool] = True,
+        passive: Optional[bool] = False,
         count_modes: Optional[int] = 5,
         features: Optional[int] = 1,
         expected_input_min: Optional[float] = -5.0,
         expected_input_max: Optional[float] = +5.0,
     ):
-        super(DyNAActivation, self).__init__()
+        super(ModulatedActivation, self).__init__()
 
         self.passive = passive
         self.count_modes = count_modes
@@ -73,15 +75,16 @@ class DyNAActivation(nn.Module):
 
     def _dyna(
         self,
-        x: torch.Tensor,
-        modes: torch.Tensor,
+        signal: SignalModular,
     ) -> torch.Tensor:
-        x_expanded = x
+        x_expanded = signal.x
         x_expanded = x_expanded.reshape(
             [*x_expanded.shape[0:-1], 1, x_expanded.shape[-1]]
         )
-        modes_extra_dims = len(modes.shape[1:-3])
-        modes_expanded = modes.permute([0, -2, *range(1, 1 + modes_extra_dims), -3, -1])
+        modes_extra_dims = len(signal.modes.shape[1:-3])
+        modes_expanded = signal.modes.permute(
+            [0, -2, *range(1, 1 + modes_extra_dims), -3, -1]
+        )
         modes_expanded = modes_expanded.reshape(
             [
                 *modes_expanded.shape[0:-2],
@@ -112,13 +115,14 @@ class DyNAActivation(nn.Module):
 
     def forward(
         self,
-        x: torch.Tensor,
+        x: Union[torch.Tensor, SignalModular],
         modes: Optional[torch.Tensor] = None,
-        return_components: Optional[bool] = False,
-        return_nonlinearity: Optional[bool] = False,
     ) -> torch.Tensor:
         if self.passive:
             assert modes is None, "modes must be None in passive mode"
+            assert not isinstance(
+                x, SignalModular
+            ), "x must be a tensor in passive mode"
 
             extra_dims = len(x.shape[1:-1])
             modes = self.modes
@@ -130,18 +134,22 @@ class DyNAActivation(nn.Module):
                     *modes.shape[1:],
                 ]
             )
+            signal = SignalModular(
+                x=x,
+                modes=modes,
+            )
         else:
-            assert modes is not None, "modes must be provided in active mode"
+            assert isinstance(
+                x, SignalModular
+            ), "x must be a SignalModular instance in active mode"
+            signal = x
 
-        components = self._dyna(x, modes)
+        components = self._dyna(signal)
         nonlinearity = components.sum(dim=-2) + 1.0
-        x_transformed = x * nonlinearity
+        x_transformed = signal.x * nonlinearity
 
-        if return_nonlinearity and return_components:
-            return x_transformed, nonlinearity, components
-        elif return_nonlinearity:
-            return x_transformed, nonlinearity
-        elif return_components:
-            return x_transformed, components
-        else:
-            return x_transformed
+        return SignalComponential(
+            x=x_transformed,
+            components=components,
+            nonlinearity=nonlinearity,
+        )

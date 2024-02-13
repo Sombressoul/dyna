@@ -2,27 +2,28 @@ import torch
 import torch.nn as nn
 import math
 
-from typing import Tuple, Optional
+from typing import Optional, Union
+
+from dyna.signal import SignalModular, SignalComponential
 
 
-# NOTE: work-in-progress.
-class DyNAThetaLinear(nn.Linear):
+class ThetaLinear(nn.Linear):
     def __init__(
         self,
         in_features: int,
         out_features: int,
-        theta_modes_in: int,
+        theta_components_in: int,
         theta_modes_out: int,
         theta_full_features: Optional[bool] = True,
         theta_normalize_env_input: Optional[bool] = True,
         theta_normalize_env_output: Optional[bool] = True,
         **kwargs,
     ) -> None:
-        super(DyNAThetaLinear, self).__init__(in_features, out_features, **kwargs)
+        super(ThetaLinear, self).__init__(in_features, out_features, **kwargs)
 
         self.in_features = in_features
         self.out_features = out_features
-        self.theta_modes_in = theta_modes_in
+        self.theta_components_in = theta_components_in
         self.theta_modes_out = theta_modes_out
         self.theta_quad_out = self.theta_modes_out * 4
         self.theta_feautures = out_features if theta_full_features else 1
@@ -35,31 +36,31 @@ class DyNAThetaLinear(nn.Linear):
         self.individual_sensetivity = nn.Parameter(individual_sensetivity)
 
         # Define per-neuron sensetivity to cumulative neuromodulatory environment.
-        env_sensetivity = torch.empty([self.in_features, self.theta_modes_in])
+        env_sensetivity = torch.empty([self.in_features, self.theta_components_in])
         env_sensetivity = self._initializer_env(env_sensetivity)
         self.env_sensetivity = nn.Parameter(env_sensetivity)
 
         # Define per-neuron bias for NM environment (intrinsic contributions).
-        env_bias = torch.empty([self.in_features, self.theta_modes_in])
+        env_bias = torch.empty([self.in_features, self.theta_components_in])
         env_bias = self._initializer_env(env_bias)
         self.env_bias = nn.Parameter(env_bias)
 
         # Define per-neuron env sensitivity normalization. It can be loosely
         # analogous to the regulatory mechanisms in biological systems.
         self.norm_env_input = (
-            nn.LayerNorm([self.in_features, self.theta_modes_in])
+            nn.LayerNorm([self.in_features, self.theta_components_in])
             if self.theta_normalize_env_input
             else nn.Identity()
         )
         self.norm_env_output = (
-            nn.LayerNorm([self.out_features, self.theta_modes_in])
+            nn.LayerNorm([self.out_features, self.theta_components_in])
             if self.theta_normalize_env_output
             else nn.Identity()
         )
 
         # Define perceptual matrices, which are necessary to calculate a
         # resulting perceptual_x for each neuron.
-        perception = torch.empty([self.in_features, self.theta_modes_in, 1])
+        perception = torch.empty([self.in_features, self.theta_components_in, 1])
         perception = self._initializer_perception(perception)
         self.perception = nn.Parameter(perception)
 
@@ -72,7 +73,7 @@ class DyNAThetaLinear(nn.Linear):
         emission = torch.empty(
             [
                 self.theta_feautures,
-                self.theta_modes_in,
+                self.theta_components_in,
                 self.theta_quad_out,
             ]
         )
@@ -103,7 +104,7 @@ class DyNAThetaLinear(nn.Linear):
         self,
         x,
     ) -> torch.Tensor:
-        bound = self.theta_modes_in / self.in_features
+        bound = self.theta_components_in / self.in_features
         with torch.no_grad():
             return nn.init.uniform_(x, a=-bound, b=+bound)
 
@@ -111,7 +112,7 @@ class DyNAThetaLinear(nn.Linear):
         self,
         x,
     ) -> torch.Tensor:
-        std = math.sqrt(1 / self.theta_modes_in)
+        std = math.sqrt(1 / self.theta_components_in)
         with torch.no_grad():
             return nn.init.normal_(x, mean=0.0, std=std)
 
@@ -133,9 +134,23 @@ class DyNAThetaLinear(nn.Linear):
 
     def forward(
         self,
-        x: torch.Tensor,  # [batch, <unknown_dims>, in_features]
-        components: torch.Tensor,  # [batch, <unknown_dims>, components_in, in_features]
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        x: Union[torch.Tensor, SignalComponential],
+        components: Optional[torch.Tensor] = None,
+    ) -> SignalModular:
+        if isinstance(x, SignalComponential):
+            assert (
+                components is None
+            ), "components must be None when x is SignalComponential"
+            signal = x
+        else:
+            assert (
+                components is not None
+            ), "components must be provided when x is not SignalComponential"
+            signal = SignalComponential(
+                x=x,
+                components=components,
+            )
+
         #
         #       ThetaLinear represents a group of neurons, where each neuron receives an `x` (a
         #   signal value from the previous layer of neurons) and the components (the NM profile
@@ -156,9 +171,9 @@ class DyNAThetaLinear(nn.Linear):
         #   weights and bias matrices to that cumulative environment, we will obtain an internal
         #   "influential matrices" for each neuron in a group.
         #
-        extra_dims = [1 for _ in range(len(components.shape[0:-2]))]
-        components_per_input = components.permute(
-            [*range(len(components.shape[:-2])), -1, -2]
+        extra_dims = [1 for _ in range(len(signal.components.shape[0:-2]))]
+        components_per_input = signal.components.permute(
+            [*range(len(signal.components.shape[:-2])), -1, -2]
         )
         components_per_input = components_per_input.unsqueeze(-3)
         #
@@ -168,7 +183,7 @@ class DyNAThetaLinear(nn.Linear):
         individual_sensetivity = (
             self.individual_sensetivity.reshape(
                 [
-                    *[1 for _ in range(len(components.shape[:-2]))],
+                    *[1 for _ in range(len(signal.components.shape[:-2]))],
                     *self.individual_sensetivity.shape,
                 ]
             )
@@ -199,11 +214,11 @@ class DyNAThetaLinear(nn.Linear):
         #       Thus, we obtain a "perceptual x" per each neuron.
         #       Then, we just transform the perceptual x to the output x by fully connected layer.
         #
-        perceptual_x = x.unsqueeze(-1) * env_normalized
+        perceptual_x = signal.x.unsqueeze(-1) * env_normalized
         perceptual_x = torch.einsum("...ij,ijk -> ...ik", perceptual_x, self.perception)
         perceptual_x = perceptual_x.squeeze(-1)
         perceptual_x = perceptual_x + self.perceptual_bias
-        transformed_x = super(DyNAThetaLinear, self).forward(perceptual_x)
+        transformed_x = super(ThetaLinear, self).forward(perceptual_x)
 
         #
         #       Here we could look at the transformed_x as at the neurons action potential, since
@@ -244,8 +259,11 @@ class DyNAThetaLinear(nn.Linear):
                 *[i for i in range(len(param_quads.shape[:-3]))],
                 -2,
                 -1,
-                -3, # Features last.
+                -3,  # Features last.
             ]
         )
 
-        return transformed_x, param_quads
+        return SignalModular(
+            x=transformed_x,
+            modes=param_quads,
+        )

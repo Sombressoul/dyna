@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-from dyna import DyNAActivation, DyNAThetaLinear
+from dyna import ThetaInput, ThetaLinear, ModulatedActivation
 
 
 class CIFAR100DyNAComplete(nn.Module):
@@ -14,7 +14,7 @@ class CIFAR100DyNAComplete(nn.Module):
         expected_range = [-5.0, +5.0]
 
         self.a_conv_pre = nn.Conv2d(3, 32, 3, 1, 1)
-        self.a_activation_pre = DyNAActivation(
+        self.a_activation_pre = ModulatedActivation(
             passive=True,
             count_modes=count_modes,
             features=32,
@@ -22,7 +22,7 @@ class CIFAR100DyNAComplete(nn.Module):
             expected_input_max=expected_range[1],
         )
         self.a_conv_post = nn.Conv2d(32, 32, 3, 2, 1)
-        self.a_activation_post = DyNAActivation(
+        self.a_activation_post = ModulatedActivation(
             passive=True,
             count_modes=count_modes,
             features=32,
@@ -32,7 +32,7 @@ class CIFAR100DyNAComplete(nn.Module):
         self.a_layer_norm = nn.LayerNorm([16, 16])
 
         self.b_conv_pre = nn.Conv2d(32, 32, 3, 1, 1)
-        self.b_activation_pre = DyNAActivation(
+        self.b_activation_pre = ModulatedActivation(
             passive=True,
             count_modes=count_modes,
             features=32,
@@ -40,7 +40,7 @@ class CIFAR100DyNAComplete(nn.Module):
             expected_input_max=expected_range[1],
         )
         self.b_conv_post = nn.Conv2d(32, 32, 3, 2, 1)
-        self.b_activation_post = DyNAActivation(
+        self.b_activation_post = ModulatedActivation(
             passive=True,
             count_modes=count_modes,
             features=32,
@@ -50,7 +50,7 @@ class CIFAR100DyNAComplete(nn.Module):
         self.b_layer_norm = nn.LayerNorm([8, 8])
 
         self.c_conv_pre = nn.Conv2d(32, 32, 3, 1, 1)
-        self.c_activation_pre = DyNAActivation(
+        self.c_activation_pre = ModulatedActivation(
             passive=True,
             count_modes=count_modes,
             features=32,
@@ -58,42 +58,34 @@ class CIFAR100DyNAComplete(nn.Module):
             expected_input_max=expected_range[1],
         )
         self.c_conv_post = nn.Conv2d(32, 32, 3, 2, 1)
-        self.c_activation_post = DyNAActivation(
-            passive=True,
-            count_modes=count_modes,
-            features=32,
-            expected_input_min=expected_range[0],
-            expected_input_max=expected_range[1],
-        )
-        self.c_layer_norm = nn.LayerNorm([4, 4])
 
-        self.d_input_activation = DyNAActivation(
-            passive=True,
-            count_modes=count_modes,
-            features=512,
-            expected_input_min=expected_range[0],
-            expected_input_max=expected_range[1],
-        )
-        self.d_linear = DyNAThetaLinear(
+        self.d_input = ThetaInput(
             in_features=512,
             out_features=96,
-            theta_modes_in=count_modes,
+            theta_modes=count_modes,
+            theta_expected_input_min=expected_range[0],
+            theta_expected_input_max=expected_range[1],
+        )
+        self.d_linear = ThetaLinear(
+            in_features=96,
+            out_features=96,
+            theta_components_in=count_modes,
             theta_modes_out=count_modes,
             theta_full_features=True,
         )
-        self.d_activation = DyNAActivation(
+        self.d_activation = ModulatedActivation(
             passive=False,
         )
         self.d_batch_norm = nn.BatchNorm1d(96)
 
-        self.e_linear = DyNAThetaLinear(
+        self.e_linear = ThetaLinear(
             in_features=96,
             out_features=100,
-            theta_modes_in=count_modes,
+            theta_components_in=count_modes,
             theta_modes_out=count_modes,
             theta_full_features=True,
         )
-        self.e_activation = DyNAActivation(
+        self.e_activation = ModulatedActivation(
             passive=False,
         )
         self.e_batch_norm = nn.BatchNorm1d(100)
@@ -113,45 +105,40 @@ class CIFAR100DyNAComplete(nn.Module):
 
         x = self.a_conv_pre(x)
         x = torch.permute(x, [0, 2, 3, 1])
-        x = self.a_activation_pre(x)
+        x = self.a_activation_pre(x).x
         x = torch.permute(x, [0, 3, 1, 2])
         x = self.a_conv_post(x)
         x = torch.permute(x, [0, 2, 3, 1])
-        x = self.a_activation_post(x)
+        x = self.a_activation_post(x).x
         x = torch.permute(x, [0, 3, 1, 2])
         x = self.a_layer_norm(x)
 
         x = self.b_conv_pre(x)
         x = torch.permute(x, [0, 2, 3, 1])
-        x = self.b_activation_pre(x)
+        x = self.b_activation_pre(x).x
         x = torch.permute(x, [0, 3, 1, 2])
         x = self.b_conv_post(x)
         x = torch.permute(x, [0, 2, 3, 1])
-        x = self.b_activation_post(x)
+        x = self.b_activation_post(x).x
         x = torch.permute(x, [0, 3, 1, 2])
         x = self.b_layer_norm(x)
 
         x = self.c_conv_pre(x)
         x = torch.permute(x, [0, 2, 3, 1])
-        x = self.c_activation_pre(x)
+        x = self.c_activation_pre(x).x
         x = torch.permute(x, [0, 3, 1, 2])
         x = self.c_conv_post(x)
-        x = torch.permute(x, [0, 2, 3, 1])
-        x = self.c_activation_post(x)
-        x = torch.permute(x, [0, 3, 1, 2])
-        x = self.c_layer_norm(x)
 
         x = x.flatten(1)
         x = self.dropout(x)
 
-        x, cmp = self.d_input_activation(x, return_components=True)
-        x, cmp = self.d_linear(x, cmp)
-        x, cmp = self.d_activation(x, cmp, return_components=True)
-        x = self.d_batch_norm(x)
+        signal = self.d_input(x)
+        signal = self.d_linear(signal)
+        signal = self.d_activation(signal)
 
-        x, cmp = self.e_linear(x, cmp)
-        x, cmp = self.e_activation(x, cmp, return_components=True)
-        x = self.e_batch_norm(x)
+        signal = self.e_linear(signal)
+        signal = self.e_activation(signal)
+        x = signal.x
 
         x = self.output_linear(x)
         x = self.log_softmax(x)
