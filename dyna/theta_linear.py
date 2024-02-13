@@ -81,22 +81,36 @@ class ThetaLinear(nn.Linear):
         self.emission = nn.Parameter(emission)
 
         # Define neuromodulatory emission scale matrices.
-        emission_scale = torch.ones(
+        emission_scale = torch.empty(
             [
                 self.out_features,
                 self.theta_quad_out,
             ]
         )
+        emission_scale = self._initializer_emission(emission_scale)
+        emission_scale = emission_scale + 1.0
         self.emission_scale = nn.Parameter(emission_scale)
 
         # Define neuromodulatory emission bias matrices (intrinsic contributions).
-        emission_bias = torch.zeros(
+        emission_bias = torch.empty(
             [
                 self.out_features,
                 self.theta_quad_out,
             ]
         )
+        emission_bias = self._initializer_emission(emission_bias)
         self.emission_bias = nn.Parameter(emission_bias)
+
+        # Define emission base scales to guide the training process.
+        # NOTE: this is a temporary workaround. There should be a better (proper) way.
+        base_scale_a = 1.0
+        base_scale_b = self.theta_modes_out
+        base_scale_g = 1.0
+        base_scale_d = self.theta_modes_out
+        base_scales = torch.tensor(
+            [base_scale_a, base_scale_b, base_scale_g, base_scale_d]
+        ).unsqueeze(-1)
+        self.base_scales = nn.Parameter(base_scales)
 
         pass
 
@@ -260,6 +274,16 @@ class ThetaLinear(nn.Linear):
                 -2,
                 -1,
                 -3,  # Features last.
+            ]
+        )
+
+        #
+        #       Apply base scales to guide the initial training steps.
+        #
+        param_quads = param_quads * self.base_scales.reshape(
+            [
+                *[1 for _ in range(len(param_quads.shape[:-2]))],
+                *self.base_scales.shape,
             ]
         )
 
