@@ -11,7 +11,7 @@ class CIFAR100DyNACompleteLarge(nn.Module):
         super(CIFAR100DyNACompleteLarge, self).__init__()
 
         count_modes = 17
-        expected_range = [-10.0, +10.0]
+        dynamic_range = 10.0
         conv_features_head = 64
         conv_features_tail = 32
 
@@ -20,16 +20,14 @@ class CIFAR100DyNACompleteLarge(nn.Module):
             passive=True,
             count_modes=count_modes,
             features=conv_features_head,
-            expected_input_min=expected_range[0],
-            expected_input_max=expected_range[1],
+            theta_dynamic_range=dynamic_range,
         )
         self.a_conv_post = nn.Conv2d(conv_features_head, conv_features_head, 3, 2, 1)
         self.a_activation_post = ModulatedActivation(
             passive=True,
             count_modes=count_modes,
             features=conv_features_head,
-            expected_input_min=expected_range[0],
-            expected_input_max=expected_range[1],
+            theta_dynamic_range=dynamic_range,
         )
         self.a_layer_norm = nn.LayerNorm([16, 16])
 
@@ -38,16 +36,14 @@ class CIFAR100DyNACompleteLarge(nn.Module):
             passive=True,
             count_modes=count_modes,
             features=conv_features_head,
-            expected_input_min=expected_range[0],
-            expected_input_max=expected_range[1],
+            theta_dynamic_range=dynamic_range,
         )
         self.b_conv_post = nn.Conv2d(conv_features_head, conv_features_head, 3, 2, 1)
         self.b_activation_post = ModulatedActivation(
             passive=True,
             count_modes=count_modes,
             features=conv_features_head,
-            expected_input_min=expected_range[0],
-            expected_input_max=expected_range[1],
+            theta_dynamic_range=dynamic_range,
         )
         self.b_layer_norm = nn.LayerNorm([8, 8])
 
@@ -56,8 +52,7 @@ class CIFAR100DyNACompleteLarge(nn.Module):
             passive=True,
             count_modes=count_modes,
             features=conv_features_head,
-            expected_input_min=expected_range[0],
-            expected_input_max=expected_range[1],
+            theta_dynamic_range=dynamic_range,
         )
         self.c_conv_post = nn.Conv2d(conv_features_head, conv_features_tail, 3, 2, 1)
 
@@ -65,14 +60,14 @@ class CIFAR100DyNACompleteLarge(nn.Module):
             in_features=512,
             out_features=256,
             theta_modes=count_modes,
-            theta_expected_input_min=expected_range[0],
-            theta_expected_input_max=expected_range[1],
+            theta_dynamic_range=dynamic_range,
         )
         self.d_linear = ThetaLinear(
             in_features=256,
             out_features=128,
             theta_components_in=count_modes,
             theta_modes_out=count_modes,
+            theta_dynamic_range=dynamic_range,
         )
         self.d_activation = ModulatedActivation()
         self.d_batch_norm = nn.BatchNorm1d(96)
@@ -82,6 +77,7 @@ class CIFAR100DyNACompleteLarge(nn.Module):
             out_features=128,
             theta_components_in=count_modes,
             theta_modes_out=count_modes,
+            theta_dynamic_range=dynamic_range,
         )
         self.e_activation = ModulatedActivation()
         self.e_batch_norm = nn.BatchNorm1d(100)

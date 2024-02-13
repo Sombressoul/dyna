@@ -13,18 +13,11 @@ parser.add_argument(
     help="wave modes count (default: 7)",
 )
 parser.add_argument(
-    "--e-min",
+    "--dyn-range",
     type=float,
-    default=-2.5,
+    default=7.5,
     metavar="N",
-    help="expected input min (default: -2.5)",
-)
-parser.add_argument(
-    "--e-max",
-    type=float,
-    default=+2.5,
-    metavar="N",
-    help="expected input max (default: +2.5)",
+    help="dynamic range (default: 7.5)",
 )
 args = parser.parse_args()
 
@@ -34,8 +27,7 @@ signal = ModulatedActivation(
     passive=True,
     count_modes=args.count_modes,
     features=1,
-    expected_input_min=args.e_min,
-    expected_input_max=args.e_max,
+    theta_dynamic_range=args.dyn_range,
 )(x)
 
 components = signal.components.permute([1, 0, 2])

@@ -12,7 +12,7 @@ class CIFAR100DyNAActivationPerFeature(nn.Module):
 
         activation_conv = nn.ReLU()
         count_modes = 21
-        expected_range = [-7.5, +7.5]
+        dynamic_range = 7.5
 
         self.a_conv_pre = nn.Conv2d(3, 32, 3, 1, 1)
         self.a_activation_pre = activation_conv
@@ -21,8 +21,7 @@ class CIFAR100DyNAActivationPerFeature(nn.Module):
             passive=True,
             count_modes=count_modes,
             features=8,
-            expected_input_min=expected_range[0],
-            expected_input_max=expected_range[1],
+            theta_dynamic_range=dynamic_range,
         )
         self.a_conv_post = nn.Conv2d(8, 32, 3, 2, 1)
         self.a_activation_post = activation_conv
@@ -35,8 +34,7 @@ class CIFAR100DyNAActivationPerFeature(nn.Module):
             passive=True,
             count_modes=count_modes,
             features=8,
-            expected_input_min=expected_range[0],
-            expected_input_max=expected_range[1],
+            theta_dynamic_range=dynamic_range,
         )
         self.b_conv_post = nn.Conv2d(8, 32, 3, 2, 1)
         self.b_activation_post = activation_conv
@@ -49,8 +47,7 @@ class CIFAR100DyNAActivationPerFeature(nn.Module):
             passive=True,
             count_modes=count_modes,
             features=8,
-            expected_input_min=expected_range[0],
-            expected_input_max=expected_range[1],
+            theta_dynamic_range=dynamic_range,
         )
         self.c_conv_post = nn.Conv2d(8, 32, 3, 2, 1)
         self.c_activation_post = activation_conv
@@ -61,8 +58,7 @@ class CIFAR100DyNAActivationPerFeature(nn.Module):
             passive=True,
             count_modes=count_modes,
             features=96,
-            expected_input_min=expected_range[0],
-            expected_input_max=expected_range[1],
+            theta_dynamic_range=dynamic_range,
         )
         self.d_batch_norm = nn.BatchNorm1d(96)
 
@@ -71,8 +67,7 @@ class CIFAR100DyNAActivationPerFeature(nn.Module):
             passive=True,
             count_modes=count_modes,
             features=100,
-            expected_input_min=expected_range[0],
-            expected_input_max=expected_range[1],
+            theta_dynamic_range=dynamic_range,
         )
         self.e_batch_norm = nn.BatchNorm1d(100)
 
