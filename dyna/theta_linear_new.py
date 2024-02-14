@@ -15,7 +15,6 @@ class ThetaLinear(nn.Linear):
         out_features: int,
         theta_components_in: Optional[int] = 7,
         theta_modes_out: Optional[int] = 7,
-        theta_dynamic_range: Optional[float] = 7.5,
         theta_heterogeneity: Optional[float] = 1.0e-2,
         eps: Optional[float] = 1.0e-5,
         **kwargs,
@@ -26,7 +25,6 @@ class ThetaLinear(nn.Linear):
         self.out_features = out_features
         self.theta_components_in = theta_components_in
         self.theta_modes_out = theta_modes_out
-        self.theta_dynamic_range = theta_dynamic_range
         self.theta_heterogeneity = theta_heterogeneity
         self.eps = eps
 
@@ -504,9 +502,9 @@ class ThetaLinear(nn.Linear):
 
         # Modify modulators to appropriate scales.
         # alphas = alphas # No changes for alphas.
-        betas = betas * math.sqrt(self.theta_modes_out)
+        betas = betas * math.log(self.theta_modes_out)
         # gammas = gammas # No changes for gammas.
-        deltas = deltas * self.theta_dynamic_range
+        # deltas = deltas # No changes for gammas.
 
         # Combine modular output.
         output_modular = torch.cat([alphas, betas, gammas, deltas], dim=-2)
