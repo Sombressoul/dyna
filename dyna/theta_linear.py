@@ -37,19 +37,35 @@ class ThetaLinear(nn.Linear):
         self.theta_normalize_env_output = theta_normalize_env_output
         self.theta_dynamic_range = theta_dynamic_range
 
+        # Magic constants.
+        init_root_base = 3
+
         # Define per-neuron sesitivity to particular inputs.
         individual_sensetivity = torch.empty([self.out_features, self.in_features, 1])
-        individual_sensetivity = self._initializer_individual(individual_sensetivity)
+        individual_sensetivity = torch.nn.init.uniform_(
+            tensor=individual_sensetivity,
+            a=-1.0,
+            b=+1.0,
+        )
+        # individual_sensetivity = individual_sensetivity + 1.0
         self.individual_sensetivity = nn.Parameter(individual_sensetivity)
 
         # Define per-neuron sensetivity to cumulative neuromodulatory environment.
         env_sensetivity = torch.empty([self.in_features, self.theta_components_in])
-        env_sensetivity = self._initializer_env(env_sensetivity)
+        env_sensetivity = torch.nn.init.uniform_(
+            tensor=env_sensetivity,
+            a=-self.theta_components_in / self.in_features,
+            b=+self.theta_components_in / self.in_features,
+        )
         self.env_sensetivity = nn.Parameter(env_sensetivity)
 
         # Define per-neuron bias for NM environment (intrinsic contributions).
         env_bias = torch.empty([self.in_features, self.theta_components_in])
-        env_bias = self._initializer_env(env_bias)
+        env_bias = torch.nn.init.uniform_(
+            tensor=env_bias,
+            a=-1 / self.theta_components_in,
+            b=+1 / self.theta_components_in,
+        )
         self.env_bias = nn.Parameter(env_bias)
 
         # Define per-neuron env sensitivity normalization. It can be loosely
@@ -68,12 +84,20 @@ class ThetaLinear(nn.Linear):
         # Define perceptual matrices, which are necessary to calculate a
         # resulting perceptual_x for each neuron.
         perception = torch.empty([self.in_features, self.theta_components_in, 1])
-        perception = self._initializer_perception(perception)
+        perception = torch.nn.init.uniform_(
+            tensor=perception,
+            a=-math.sqrt(init_root_base / self.theta_components_in),
+            b=+math.sqrt(init_root_base / self.theta_components_in),
+        )
         self.perception = nn.Parameter(perception)
 
         # Define perceptual_x bias.
         perceptual_bias = torch.empty([self.in_features])
-        perceptual_bias = self._initializer_perception(perceptual_bias)
+        perceptual_bias = torch.nn.init.uniform_(
+            tensor=perceptual_bias,
+            a=-1 / self.in_features,
+            b=+1 / self.in_features,
+        )
         self.perceptual_bias = nn.Parameter(perceptual_bias)
 
         # Define neuromodulatory emitting matrices.
@@ -89,15 +113,11 @@ class ThetaLinear(nn.Linear):
         gammas = emission[:, :, 2::4]
         deltas = emission[:, :, 3::4]
 
-        w = 1 / self.theta_feautures
-        alphas = torch.nn.init.normal_(alphas, mean=0.0, std=1.0) * w
-        betas = torch.nn.init.normal_(betas, mean=0.0, std=1.0) * w
-        gammas = torch.nn.init.normal_(gammas, mean=0.0, std=1.0) * w
-        deltas = torch.nn.init.uniform_(
-            deltas,
-            a=-self.theta_dynamic_range,
-            b=+self.theta_dynamic_range,
-        )
+        emission_std = math.sqrt(1 / self.theta_modes_out)
+        alphas = torch.nn.init.normal_(alphas, mean=0.0, std=emission_std)
+        betas = torch.nn.init.normal_(betas, mean=0.0, std=emission_std)
+        gammas = torch.nn.init.normal_(gammas, mean=0.0, std=emission_std)
+        deltas = torch.nn.init.normal_(deltas, mean=0.0, std=emission_std)
 
         emission[:, :, 0::4] = alphas
         emission[:, :, 1::4] = betas
@@ -113,7 +133,11 @@ class ThetaLinear(nn.Linear):
                 self.theta_quad_out,
             ]
         )
-        emission_scale = self._initializer_emission(emission_scale)
+        emission_scale = torch.nn.init.uniform_(
+            tensor=emission_scale,
+            a=-1 / self.theta_quad_out,
+            b=+1 / self.theta_quad_out,
+        )
         emission_scale = emission_scale + 1.0
         self.emission_scale = nn.Parameter(emission_scale)
 
@@ -124,41 +148,14 @@ class ThetaLinear(nn.Linear):
                 self.theta_quad_out,
             ]
         )
-        emission_bias = self._initializer_emission(emission_bias)
+        emission_bias = torch.nn.init.uniform_(
+            tensor=emission_bias,
+            a=-1 / self.theta_quad_out,
+            b=+1 / self.theta_quad_out,
+        )
         self.emission_bias = nn.Parameter(emission_bias)
 
         pass
-
-    def _initializer_env(
-        self,
-        x,
-    ) -> torch.Tensor:
-        bound = self.theta_components_in / self.in_features
-        with torch.no_grad():
-            return nn.init.uniform_(x, a=-bound, b=+bound)
-
-    def _initializer_perception(
-        self,
-        x,
-    ) -> torch.Tensor:
-        std = math.sqrt(1 / self.theta_components_in)
-        with torch.no_grad():
-            return nn.init.normal_(x, mean=0.0, std=std)
-
-    def _initializer_individual(
-        self,
-        x,
-    ) -> torch.Tensor:
-        with torch.no_grad():
-            return nn.init.normal_(x, mean=0.0, std=1.0)
-
-    def _initializer_emission(
-        self,
-        x,
-    ) -> torch.Tensor:
-        std = 1.0 / self.theta_quad_out
-        with torch.no_grad():
-            return torch.nn.init.normal_(x, mean=0.0, std=std)
 
     def forward(
         self,
@@ -264,6 +261,13 @@ class ThetaLinear(nn.Linear):
             modulated_env,
             self.emission,
         )
+        # print(f"{modulated_env.shape=}")
+        # print(f"{self.emission.shape=}")
+        # print(f"{emission_raw.shape=}")
+        # print(f"{modulated_env[0, 0]=}")
+        # print(f"{self.emission[0, 0]=}")
+        # print(f"{emission_raw[0, 0]=}")
+        # exit()
         emission_scaled = torch.einsum(
             "...ij,ij -> ...ij",
             emission_raw,
@@ -290,6 +294,39 @@ class ThetaLinear(nn.Linear):
                 -3,  # Features last.
             ]
         )
+
+        # # Prepare for STE trick.
+        # param_quads_buffer = param_quads.clone()
+        # # Move betas and gammas towards their std as mean.
+        # param_quads_buffer[:, :, 1] = param_quads_buffer[:, :, 1] + param_quads_buffer[:, :, 1].std()
+        # param_quads_buffer[:, :, 2] = param_quads_buffer[:, :, 2] + param_quads_buffer[:, :, 2].std()
+        # # Scale deltas to dynamic range by std.
+        # param_quads_buffer[:, :, 3] = (param_quads_buffer[:, :, 3] / param_quads_buffer[:, :, 3].std()) * self.theta_dynamic_range
+        # # STE.
+        # param_quads = param_quads + (param_quads_buffer - param_quads).detach()
+
+        # print(f"{param_quads.shape=}")
+        # print("-")
+        # print(f"alphas: {param_quads[:, :, 0].mean().item()=}")
+        # print(f"alphas: {param_quads[:, :, 0].std().item()=}")
+        # print(f"alphas: {param_quads[:, :, 0].min().item()=}")
+        # print(f"alphas: {param_quads[:, :, 0].max().item()=}")
+        # print("-")
+        # print(f"betas: {param_quads[:, :, 1].mean().item()=}")
+        # print(f"betas: {param_quads[:, :, 1].std().item()=}")
+        # print(f"betas: {param_quads[:, :, 1].min().item()=}")
+        # print(f"betas: {param_quads[:, :, 1].max().item()=}")
+        # print("-")
+        # print(f"gammas: {param_quads[:, :, 2].mean().item()=}")
+        # print(f"gammas: {param_quads[:, :, 2].std().item()=}")
+        # print(f"gammas: {param_quads[:, :, 2].min().item()=}")
+        # print(f"gammas: {param_quads[:, :, 2].max().item()=}")
+        # print("-")
+        # print(f"deltas: {param_quads[:, :, 3].mean().item()=}")
+        # print(f"deltas: {param_quads[:, :, 3].std().item()=}")
+        # print(f"deltas: {param_quads[:, :, 3].min().item()=}")
+        # print(f"deltas: {param_quads[:, :, 3].max().item()=}")
+        # exit()
 
         return SignalModular(
             x=transformed_x,

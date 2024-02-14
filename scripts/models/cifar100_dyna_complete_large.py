@@ -59,7 +59,7 @@ class CIFAR100DyNACompleteLarge(nn.Module):
         self.d_input = ThetaInput(
             in_features=512,
             out_features=256,
-            theta_modes=count_modes,
+            theta_modes_out=count_modes,
             theta_dynamic_range=dynamic_range,
         )
         self.d_linear = ThetaLinear(
