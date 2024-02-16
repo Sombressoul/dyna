@@ -112,7 +112,7 @@ class ModulatedActivation(nn.Module):
         self,
         x: Union[torch.Tensor, SignalModular],
         modes: Optional[torch.Tensor] = None,
-    ) -> torch.Tensor:
+    ) -> SignalComponential:
         if not self.passive:
             assert modes is None, "modes must be None in active mode"
             assert not isinstance(
