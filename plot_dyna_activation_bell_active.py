@@ -2,7 +2,7 @@ import torch
 import matplotlib.pyplot as plt
 import argparse
 
-from dyna import ModulatedActivation
+from dyna import ModulatedActivationBell
 
 parser = argparse.ArgumentParser(description="evaluation")
 parser.add_argument(
@@ -23,7 +23,7 @@ args = parser.parse_args()
 
 x = torch.linspace(-10, 10, 1000).unsqueeze(-1)
 
-signal = ModulatedActivation(
+signal = ModulatedActivationBell(
     passive=False,
     count_modes=args.count_modes,
     features=1,
@@ -66,7 +66,7 @@ plt.plot(
 )
 plt.plot(
     x.squeeze().numpy(),
-    (x * signal.nonlinearity).detach().squeeze().numpy(),
+    signal.x.detach().squeeze().numpy(),
     label="Transformed x",
 )
 plt.title("DyNA Transformation")

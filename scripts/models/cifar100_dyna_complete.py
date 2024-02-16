@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 
 # from dyna import ThetaInput, ThetaLinear, ModulatedActivation
-from dyna import ThetaInput, ThetaOutput, ModulatedActivation
+from dyna import ThetaInput, ThetaOutput, ModulatedActivationBell
 from dyna.theta_linear_c import ThetaLinear
 
 
@@ -18,14 +18,14 @@ class CIFAR100DyNAComplete(nn.Module):
         self.activation_classic = nn.ReLU # or None
 
         self.a_conv_pre = nn.Conv2d(3, 32, 3, 1, 1)
-        self.a_activation_pre = ModulatedActivation(
+        self.a_activation_pre = ModulatedActivationBell(
             passive=False,
             count_modes=count_modes,
             features=32,
             theta_dynamic_range=dynamic_range,
         ) if self.activation_classic is None else self.activation_classic()
         self.a_conv_post = nn.Conv2d(32, 32, 3, 2, 1)
-        self.a_activation_post = ModulatedActivation(
+        self.a_activation_post = ModulatedActivationBell(
             passive=False,
             count_modes=count_modes,
             features=32,
@@ -34,14 +34,14 @@ class CIFAR100DyNAComplete(nn.Module):
         self.a_layer_norm = nn.LayerNorm([16, 16])
 
         self.b_conv_pre = nn.Conv2d(32, 32, 3, 1, 1)
-        self.b_activation_pre = ModulatedActivation(
+        self.b_activation_pre = ModulatedActivationBell(
             passive=False,
             count_modes=count_modes,
             features=32,
             theta_dynamic_range=dynamic_range,
         ) if self.activation_classic is None else self.activation_classic()
         self.b_conv_post = nn.Conv2d(32, 32, 3, 2, 1)
-        self.b_activation_post = ModulatedActivation(
+        self.b_activation_post = ModulatedActivationBell(
             passive=False,
             count_modes=count_modes,
             features=32,
@@ -50,7 +50,7 @@ class CIFAR100DyNAComplete(nn.Module):
         self.b_layer_norm = nn.LayerNorm([8, 8])
 
         self.c_conv_pre = nn.Conv2d(32, 32, 3, 1, 1)
-        self.c_activation_pre = ModulatedActivation(
+        self.c_activation_pre = ModulatedActivationBell(
             passive=False,
             count_modes=count_modes,
             features=32,
@@ -70,7 +70,7 @@ class CIFAR100DyNAComplete(nn.Module):
             theta_components_in=count_modes,
             theta_modes_out=count_modes,
         )
-        self.d_activation = ModulatedActivation()
+        self.d_activation = ModulatedActivationBell()
 
         self.e_linear = ThetaLinear(
             in_features=96,
@@ -78,7 +78,7 @@ class CIFAR100DyNAComplete(nn.Module):
             theta_components_in=count_modes,
             theta_modes_out=count_modes,
         )
-        self.e_activation = ModulatedActivation()
+        self.e_activation = ModulatedActivationBell()
         self.e_output = ThetaOutput(
             in_features=100,
             theta_components_in=count_modes,

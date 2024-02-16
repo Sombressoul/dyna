@@ -12,7 +12,11 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 project_dir = os.path.dirname(script_dir)
 sys.path.append(project_dir)
 
-from models import CIFAR100DyNAActivationPerFeature
+from models import (
+    CIFAR100DyNAActivationBellPerFeature, 
+    CIFAR100DyNAActivationBellADPerFeature,
+    CIFAR100DyNAActivationSinePerFeature,
+)
 
 data_path = f"{project_dir}/data"
 
@@ -162,7 +166,9 @@ def main():
     train_loader = torch.utils.data.DataLoader(dataset_train, **train_kwargs)
     test_loader = torch.utils.data.DataLoader(dataset_test, **test_kwargs)
 
-    model = CIFAR100DyNAActivationPerFeature().to(device)
+    # model = CIFAR100DyNAActivationPerFeature().to(device)
+    # model = CIFAR100DyNAActivationADPerFeature().to(device)
+    model = CIFAR100DyNAActivationSinePerFeature().to(device)
 
     total_trainable_params = sum(
         p.numel() for p in model.parameters() if p.requires_grad

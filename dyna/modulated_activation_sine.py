@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import math
 
 from typing import Optional, Union
@@ -7,64 +8,39 @@ from typing import Optional, Union
 from dyna.signal import SignalModular, SignalComponential
 
 
-class ModulatedActivation(nn.Module):
+class ModulatedActivationSine(nn.Module):
     def __init__(
         self,
         passive: Optional[bool] = True,
         count_modes: Optional[int] = 7,
         features: Optional[int] = 1,
-        theta_dynamic_range: Optional[float] = 7.5,
+        std: Optional[float] = 0.01,
     ):
-        super(ModulatedActivation, self).__init__()
+        super(ModulatedActivationSine, self).__init__()
 
         self.passive = passive
         self.count_modes = count_modes
         self.features = features
-        self.theta_dynamic_range = theta_dynamic_range
+        self.std = std
 
-        # Init alphas.
-        alphas = torch.empty([self.count_modes, 1, self.features])
-        alphas = torch.nn.init.normal_(
-            alphas,
-            mean=0.0,
-            std=1.0 / self.count_modes,
-        )
+        # Init modes.
+        modes = []
 
-        # Init betas.
-        betas = torch.empty([self.count_modes, 1, self.features])
-        betas = torch.nn.init.uniform_(
-            betas,
-            a=1.0 / math.sqrt(self.count_modes),
-            b=math.log(
-                self.count_modes,
-                math.sqrt(2),
-            ),
-        )
+        for mode_idx in range(self.count_modes):
+            freq = math.pi * (1.0 / (self.count_modes - mode_idx))
+            noise = torch.empty([1, 4, self.features])
+            noise = torch.nn.init.normal_(noise, mean=1.0, std=self.std)
 
-        # Init gammas.
-        gammas = torch.empty([self.count_modes, 1, self.features])
-        gammas = torch.nn.init.uniform_(
-            gammas,
-            a=1.0 / self.count_modes,
-            b=self.theta_dynamic_range / 2.0,
-        )
+            a = torch.ones([1, 1, self.features]) + noise[:, 0, :]
+            b = torch.ones([1, 1, self.features]) * freq * noise[:, 1, :]
+            g = torch.zeros([1, 1, self.features]) + (noise[:, 2, :] - 1.0)
+            d = torch.zeros([1, 1, self.features]) + (noise[:, 3, :] - 1.0)
 
-        # Init deltas.
-        deltas = torch.linspace(
-            start=-self.theta_dynamic_range,
-            end=+self.theta_dynamic_range,
-            steps=self.count_modes,
-        )
-        deltas = deltas.reshape([-1, 1, 1]).repeat([1, 1, self.features])
-        deltas_bias = torch.empty_like(deltas)
-        deltas_bias = torch.nn.init.normal_(
-            deltas_bias,
-            mean=0.0,
-            std=(self.theta_dynamic_range / (self.count_modes * 2.0)),
-        )
-        deltas = deltas + deltas_bias
+            mode = torch.cat([a, b, g, d], dim=-2)
+            modes.append(mode)
 
-        self.modes = nn.Parameter(torch.cat([alphas, betas, gammas, deltas], dim=1))
+        modes = torch.cat(modes, dim=0)
+        self.modes = nn.Parameter(modes)
 
         pass
 
@@ -92,19 +68,7 @@ class ModulatedActivation(nn.Module):
         gammas = modes_expanded[:, 2, :]
         deltas = modes_expanded[:, 3, :]
 
-        transformed = alphas * (
-            # (
-            #     1.0
-            #     / (1 + torch.e ** (torch.abs(betas) * (x - deltas - torch.abs(gammas))))
-            # )
-            # - (
-            #     1.0
-            #     / (1 + torch.e ** (torch.abs(betas) * (x - deltas + torch.abs(gammas))))
-            # )
-            # NOTE: The same sigmoid, but numerically stable. Thanks to PyTorch team!
-            -torch.sigmoid(betas * (x_expanded - deltas - torch.abs(gammas)))
-            + torch.sigmoid(betas * (x_expanded - deltas + torch.abs(gammas)))
-        )
+        transformed = alphas * torch.sin(x_expanded * betas + gammas) + deltas
 
         return transformed
 
@@ -115,9 +79,7 @@ class ModulatedActivation(nn.Module):
     ) -> SignalComponential:
         if not self.passive:
             assert modes is None, "modes must be None in active mode"
-            assert not isinstance(
-                x, SignalModular
-            ), "x must be a tensor in active mode"
+            assert not isinstance(x, SignalModular), "x must be a tensor in active mode"
 
             extra_dims = len(x.shape[1:-1])
             modes = self.modes
@@ -140,7 +102,7 @@ class ModulatedActivation(nn.Module):
             signal = x
 
         components = self._wave_fn(signal)
-        nonlinearity = components.sum(dim=-2) + 1.0
+        nonlinearity = 1.0 + (components.sum(dim=-2) / self.count_modes)
         x_transformed = signal.x * nonlinearity
 
         return SignalComponential(

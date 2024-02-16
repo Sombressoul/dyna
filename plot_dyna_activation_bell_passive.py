@@ -1,7 +1,7 @@
 import torch
 import matplotlib.pyplot as plt
 
-from dyna import ModulatedActivation, SignalModular
+from dyna import ModulatedActivationBell, SignalModular
 
 
 x = torch.linspace(-10, 10, 1000).unsqueeze(-1)
@@ -19,7 +19,7 @@ params = (
 )
 
 signal = SignalModular(x=x, modes=params)
-signal = ModulatedActivation(passive=True)(signal)
+signal = ModulatedActivationBell(passive=True)(signal)
 
 components = signal.components.permute([1, 0, 2])
 plt.figure(figsize=(10, 10))
@@ -57,7 +57,7 @@ plt.plot(
 )
 plt.plot(
     x.squeeze().numpy(),
-    (x * signal.nonlinearity).squeeze().numpy(),
+    signal.x.detach().squeeze().numpy(),
     label="Transformed x",
 )
 plt.title("DyNA Transformation")

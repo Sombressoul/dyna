@@ -8,7 +8,7 @@ from typing import Optional, Union
 from dyna.signal import SignalModular, SignalComponential
 
 
-class ModulatedActivationAD(nn.Module):
+class ModulatedActivationBellAD(nn.Module):
     def __init__(
         self,
         passive: Optional[bool] = True,
@@ -16,7 +16,7 @@ class ModulatedActivationAD(nn.Module):
         count_modes: Optional[int] = 5,
         eps: Optional[float] = 1.0e-5,
     ) -> None:
-        super(ModulatedActivationAD, self).__init__()
+        super(ModulatedActivationBellAD, self).__init__()
 
         self.passive = passive
         self.features = features

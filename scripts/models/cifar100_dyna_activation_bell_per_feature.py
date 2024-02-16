@@ -1,14 +1,14 @@
 import torch
 import torch.nn as nn
 
-from dyna import ModulatedActivation
+from dyna import ModulatedActivationBell
 
 
-class CIFAR100DyNAActivationPerFeature(nn.Module):
+class CIFAR100DyNAActivationBellPerFeature(nn.Module):
     def __init__(
         self,
     ):
-        super(CIFAR100DyNAActivationPerFeature, self).__init__()
+        super(CIFAR100DyNAActivationBellPerFeature, self).__init__()
 
         activation_conv = nn.ReLU()
         count_modes = 21
@@ -17,7 +17,7 @@ class CIFAR100DyNAActivationPerFeature(nn.Module):
         self.a_conv_pre = nn.Conv2d(3, 32, 3, 1, 1)
         self.a_activation_pre = activation_conv
         self.a_linear = nn.Linear(32, 8)
-        self.a_activation_mid = ModulatedActivation(
+        self.a_activation_mid = ModulatedActivationBell(
             passive=False,
             count_modes=count_modes,
             features=8,
@@ -30,7 +30,7 @@ class CIFAR100DyNAActivationPerFeature(nn.Module):
         self.b_conv_pre = nn.Conv2d(32, 32, 3, 1, 1)
         self.b_activation_pre = activation_conv
         self.b_linear = nn.Linear(32, 8)
-        self.b_activation_mid = ModulatedActivation(
+        self.b_activation_mid = ModulatedActivationBell(
             passive=False,
             count_modes=count_modes,
             features=8,
@@ -43,7 +43,7 @@ class CIFAR100DyNAActivationPerFeature(nn.Module):
         self.c_conv_pre = nn.Conv2d(32, 32, 3, 1, 1)
         self.c_activation_pre = activation_conv
         self.c_linear = nn.Linear(32, 8)
-        self.c_activation_mid = ModulatedActivation(
+        self.c_activation_mid = ModulatedActivationBell(
             passive=False,
             count_modes=count_modes,
             features=8,
@@ -54,7 +54,7 @@ class CIFAR100DyNAActivationPerFeature(nn.Module):
         self.c_layer_norm = nn.LayerNorm([4, 4])
 
         self.d_linear = nn.Linear(512, 96)
-        self.d_activation = ModulatedActivation(
+        self.d_activation = ModulatedActivationBell(
             passive=False,
             count_modes=count_modes,
             features=96,
@@ -63,7 +63,7 @@ class CIFAR100DyNAActivationPerFeature(nn.Module):
         self.d_batch_norm = nn.BatchNorm1d(96)
 
         self.e_linear = nn.Linear(96, 100)
-        self.e_activation = ModulatedActivation(
+        self.e_activation = ModulatedActivationBell(
             passive=False,
             count_modes=count_modes,
             features=100,

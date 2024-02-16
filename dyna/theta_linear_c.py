@@ -333,7 +333,7 @@ class ThetaLinear(nn.Linear):
 
         # Modify modulators to appropriate scales.
         # alphas = alphas # No changes for alphas.
-        betas = betas * math.log(self.theta_modes_out)
+        # betas = betas * math.log(self.theta_modes_out)
         # gammas = gammas # No changes for gammas.
         # deltas = deltas # No changes for deltas.
 

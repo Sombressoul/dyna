@@ -4,7 +4,7 @@ import torch.nn as nn
 from typing import Optional
 
 from dyna.signal import SignalComponential
-from dyna.modulated_activation import ModulatedActivation
+from dyna.modulated_activation_bell import ModulatedActivationBell
 
 
 class ThetaInput(nn.Linear):
@@ -19,7 +19,7 @@ class ThetaInput(nn.Linear):
     ) -> None:
         super(ThetaInput, self).__init__(in_features, out_features, **kwargs)
 
-        self.activation = ModulatedActivation(
+        self.activation = ModulatedActivationBell(
             passive=False,
             count_modes=theta_modes_out,
             features=out_features if theta_full_features else 1,
