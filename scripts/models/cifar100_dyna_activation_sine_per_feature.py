@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 from dyna.modulated_activation_sine import ModulatedActivationSine
 
@@ -10,9 +11,11 @@ class CIFAR100DyNAActivationSinePerFeature(nn.Module):
     ):
         super(CIFAR100DyNAActivationSinePerFeature, self).__init__()
 
-        activation_conv = nn.ReLU()
         count_modes = 21
         conv_features = 32
+        # Baseline: 38%
+        # ModulatedSine: 41%
+        self.baseline = False
 
         self.a_conv_pre = nn.Conv2d(3, conv_features, 3, 1, 1)
         self.a_activation_pre = ModulatedActivationSine(
@@ -85,33 +88,51 @@ class CIFAR100DyNAActivationSinePerFeature(nn.Module):
     ) -> torch.Tensor:
 
         x = self.a_conv_pre(x)
-        x = torch.permute(x, [0, 2, 3, 1])
-        x = self.a_activation_pre(x).x
-        x = torch.permute(x, [0, 3, 1, 2])
+        if self.baseline:
+            x = F.tanh(x)
+        else:
+            x = torch.permute(x, [0, 2, 3, 1])
+            x = self.a_activation_pre(x).x
+            x = torch.permute(x, [0, 3, 1, 2])
         x = self.a_conv_post(x)
-        x = torch.permute(x, [0, 2, 3, 1])
-        x = self.a_activation_post(x).x
-        x = torch.permute(x, [0, 3, 1, 2])
+        if self.baseline:
+            x = F.tanh(x)
+        else:
+            x = torch.permute(x, [0, 2, 3, 1])
+            x = self.a_activation_post(x).x
+            x = torch.permute(x, [0, 3, 1, 2])
         x = self.a_layer_norm(x)
 
         x = self.b_conv_pre(x)
-        x = torch.permute(x, [0, 2, 3, 1])
-        x = self.b_activation_pre(x).x
-        x = torch.permute(x, [0, 3, 1, 2])
+        if self.baseline:
+            x = F.tanh(x)
+        else:
+            x = torch.permute(x, [0, 2, 3, 1])
+            x = self.b_activation_pre(x).x
+            x = torch.permute(x, [0, 3, 1, 2])
         x = self.b_conv_post(x)
-        x = torch.permute(x, [0, 2, 3, 1])
-        x = self.b_activation_post(x).x
-        x = torch.permute(x, [0, 3, 1, 2])
+        if self.baseline:
+            x = F.tanh(x)
+        else:
+            x = torch.permute(x, [0, 2, 3, 1])
+            x = self.b_activation_post(x).x
+            x = torch.permute(x, [0, 3, 1, 2])
         x = self.b_layer_norm(x)
 
         x = self.c_conv_pre(x)
-        x = torch.permute(x, [0, 2, 3, 1])
-        x = self.c_activation_pre(x).x
-        x = torch.permute(x, [0, 3, 1, 2])
+        if self.baseline:
+            x = F.tanh(x)
+        else:
+            x = torch.permute(x, [0, 2, 3, 1])
+            x = self.c_activation_pre(x).x
+            x = torch.permute(x, [0, 3, 1, 2])
         x = self.c_conv_post(x)
-        x = torch.permute(x, [0, 2, 3, 1])
-        x = self.c_activation_post(x).x
-        x = torch.permute(x, [0, 3, 1, 2])
+        if self.baseline:
+            x = F.tanh(x)
+        else:
+            x = torch.permute(x, [0, 2, 3, 1])
+            x = self.c_activation_post(x).x
+            x = torch.permute(x, [0, 3, 1, 2])
         x = self.c_layer_norm(x)
 
         x = x.flatten(1)
