@@ -53,7 +53,7 @@ class ModulatedActivationSine(nn.Module):
         )
 
         count_modes = modes_expanded.shape[-2]
-        freq_mul = 1 / self.count_modes
+        freq_mul = 1.0 / self.count_modes
         freq_modes = torch.arange(0, count_modes, 1).to(x_expanded.device)
         freq = math.pi * (freq_mul * (count_modes - freq_modes))
         freq = freq.reshape(
