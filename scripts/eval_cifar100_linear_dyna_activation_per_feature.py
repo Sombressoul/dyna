@@ -5,6 +5,7 @@ import argparse
 import torch
 import torch.nn.functional as F
 import torch.optim as optim
+import time
 from torchvision import datasets, transforms
 from torch.optim.lr_scheduler import StepLR
 
@@ -132,6 +133,13 @@ def main():
         action="store_true",
         help="plot training loss (default: False) (requires self-projection package)",
     )
+    parser.add_argument(
+        "--model",
+        type=int,
+        default=0,
+        metavar="S",
+        help="model to eval: Bell, BellAD, Sine (default: 2 (Sine))",
+    )
     args = parser.parse_args()
 
     torch.manual_seed(args.seed)
@@ -166,9 +174,16 @@ def main():
     train_loader = torch.utils.data.DataLoader(dataset_train, **train_kwargs)
     test_loader = torch.utils.data.DataLoader(dataset_test, **test_kwargs)
 
-    # model = CIFAR100DyNAActivationPerFeature().to(device)
-    # model = CIFAR100DyNAActivationADPerFeature().to(device)
-    model = CIFAR100DyNAActivationSinePerFeature().to(device)
+    if args.model == 0:
+        model_class = CIFAR100DyNAActivationBellPerFeature
+    elif args.model == 1:
+        model_class = CIFAR100DyNAActivationBellADPerFeature
+    elif args.model == 2:
+        model_class = CIFAR100DyNAActivationSinePerFeature
+    else:
+        raise f"Uknown model type: {args.model}"
+
+    model = model_class().to(device)
 
     total_trainable_params = sum(
         p.numel() for p in model.parameters() if p.requires_grad
@@ -187,6 +202,7 @@ def main():
     )
 
     loss_accumulator = []
+    start_time = time.time()
     for epoch in range(1, args.epochs + 1):
         loss_accumulator = loss_accumulator + train(
             model,
@@ -197,6 +213,7 @@ def main():
             args,
         )
         test(model, device, test_loader)
+    print(F"Training time (s): {(time.time() - start_time):_.2f}")
 
     if args.plot_loss:
         try:

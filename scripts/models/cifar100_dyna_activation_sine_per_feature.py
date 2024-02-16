@@ -14,7 +14,8 @@ class CIFAR100DyNAActivationSinePerFeature(nn.Module):
         count_modes = 21
         conv_features = 32
         # Baseline: 38%
-        # ModulatedSine: 41%
+        # ModulatedActivationSine: 42%
+        # Training time (s): 200.55
         self.baseline = False
 
         self.a_conv_pre = nn.Conv2d(3, conv_features, 3, 1, 1)
