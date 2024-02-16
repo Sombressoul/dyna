@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-from dyna import ThetaInput, ThetaLinear, ModulatedActivationBell
+from dyna import ThetaInputBell, ThetaLinear, ModulatedActivationBell
 
 
 class CIFAR100DyNACompleteLarge(nn.Module):
@@ -56,7 +56,7 @@ class CIFAR100DyNACompleteLarge(nn.Module):
         )
         self.c_conv_post = nn.Conv2d(conv_features_head, conv_features_tail, 3, 2, 1)
 
-        self.d_input = ThetaInput(
+        self.d_input = ThetaInputBell(
             in_features=512,
             out_features=256,
             theta_modes_out=count_modes,

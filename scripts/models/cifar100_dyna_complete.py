@@ -1,8 +1,8 @@
 import torch
 import torch.nn as nn
 
-# from dyna import ThetaInput, ThetaLinear, ModulatedActivation
-from dyna import ThetaInput, ThetaOutput, ModulatedActivationBell
+from dyna import ThetaInputBell, ThetaInputSine, ThetaOutput, ModulatedActivationBell
+from dyna.modulated_activation_sine import ModulatedActivationSine
 from dyna.theta_linear_c import ThetaLinear
 
 
@@ -15,54 +15,124 @@ class CIFAR100DyNAComplete(nn.Module):
         count_modes = 7
         dynamic_range = 7.5
 
-        self.activation_classic = nn.ReLU # or None
+        self.activation_classic = nn.ReLU  # or None
 
         self.a_conv_pre = nn.Conv2d(3, 32, 3, 1, 1)
-        self.a_activation_pre = ModulatedActivationBell(
-            passive=False,
-            count_modes=count_modes,
-            features=32,
-            theta_dynamic_range=dynamic_range,
-        ) if self.activation_classic is None else self.activation_classic()
+        # self.a_activation_pre = (
+        #     ModulatedActivationBell(
+        #         passive=False,
+        #         count_modes=count_modes,
+        #         features=32,
+        #         theta_dynamic_range=dynamic_range,
+        #     )
+        #     if self.activation_classic is None
+        #     else self.activation_classic()
+        # )
+        self.a_activation_pre = (
+            ModulatedActivationSine(
+                passive=False,
+                count_modes=count_modes,
+                features=32,
+            )
+            if self.activation_classic is None
+            else self.activation_classic()
+        )
         self.a_conv_post = nn.Conv2d(32, 32, 3, 2, 1)
-        self.a_activation_post = ModulatedActivationBell(
-            passive=False,
-            count_modes=count_modes,
-            features=32,
-            theta_dynamic_range=dynamic_range,
-        ) if self.activation_classic is None else self.activation_classic()
+        # self.a_activation_post = (
+        #     ModulatedActivationBell(
+        #         passive=False,
+        #         count_modes=count_modes,
+        #         features=32,
+        #         theta_dynamic_range=dynamic_range,
+        #     )
+        #     if self.activation_classic is None
+        #     else self.activation_classic()
+        # )
+        self.a_activation_post = (
+            ModulatedActivationSine(
+                passive=False,
+                count_modes=count_modes,
+                features=32,
+            )
+            if self.activation_classic is None
+            else self.activation_classic()
+        )
         self.a_layer_norm = nn.LayerNorm([16, 16])
 
         self.b_conv_pre = nn.Conv2d(32, 32, 3, 1, 1)
-        self.b_activation_pre = ModulatedActivationBell(
-            passive=False,
-            count_modes=count_modes,
-            features=32,
-            theta_dynamic_range=dynamic_range,
-        ) if self.activation_classic is None else self.activation_classic()
+        # self.b_activation_pre = (
+        #     ModulatedActivationBell(
+        #         passive=False,
+        #         count_modes=count_modes,
+        #         features=32,
+        #         theta_dynamic_range=dynamic_range,
+        #     )
+        #     if self.activation_classic is None
+        #     else self.activation_classic()
+        # )
+        self.b_activation_pre = (
+            ModulatedActivationSine(
+                passive=False,
+                count_modes=count_modes,
+                features=32,
+            )
+            if self.activation_classic is None
+            else self.activation_classic()
+        )
         self.b_conv_post = nn.Conv2d(32, 32, 3, 2, 1)
-        self.b_activation_post = ModulatedActivationBell(
-            passive=False,
-            count_modes=count_modes,
-            features=32,
-            theta_dynamic_range=dynamic_range,
-        ) if self.activation_classic is None else self.activation_classic()
+        # self.b_activation_post = (
+        #     ModulatedActivationBell(
+        #         passive=False,
+        #         count_modes=count_modes,
+        #         features=32,
+        #         theta_dynamic_range=dynamic_range,
+        #     )
+        #     if self.activation_classic is None
+        #     else self.activation_classic()
+        # )
+        self.b_activation_post = (
+            ModulatedActivationSine(
+                passive=False,
+                count_modes=count_modes,
+                features=32,
+            )
+            if self.activation_classic is None
+            else self.activation_classic()
+        )
         self.b_layer_norm = nn.LayerNorm([8, 8])
 
         self.c_conv_pre = nn.Conv2d(32, 32, 3, 1, 1)
-        self.c_activation_pre = ModulatedActivationBell(
-            passive=False,
-            count_modes=count_modes,
-            features=32,
-            theta_dynamic_range=dynamic_range,
-        ) if self.activation_classic is None else self.activation_classic()
+        # self.c_activation_pre = (
+        #     ModulatedActivationBell(
+        #         passive=False,
+        #         count_modes=count_modes,
+        #         features=32,
+        #         theta_dynamic_range=dynamic_range,
+        #     )
+        #     if self.activation_classic is None
+        #     else self.activation_classic()
+        # )
+        self.c_activation_pre = (
+            ModulatedActivationSine(
+                passive=False,
+                count_modes=count_modes,
+                features=32,
+            )
+            if self.activation_classic is None
+            else self.activation_classic()
+        )
         self.c_conv_post = nn.Conv2d(32, 32, 3, 2, 1)
 
-        self.d_input = ThetaInput(
+        # self.d_input = ThetaInputBell(
+        #     in_features=512,
+        #     out_features=128,
+        #     theta_modes_out=count_modes,
+        #     theta_dynamic_range=dynamic_range,
+        # )
+        self.d_input = ThetaInputSine(
             in_features=512,
             out_features=128,
             theta_modes_out=count_modes,
-            theta_dynamic_range=dynamic_range,
         )
         self.d_linear = ThetaLinear(
             in_features=128,
@@ -70,7 +140,8 @@ class CIFAR100DyNAComplete(nn.Module):
             theta_components_in=count_modes,
             theta_modes_out=count_modes,
         )
-        self.d_activation = ModulatedActivationBell()
+        # self.d_activation = ModulatedActivationBell()
+        self.d_activation = ModulatedActivationSine()
 
         self.e_linear = ThetaLinear(
             in_features=96,
@@ -78,7 +149,8 @@ class CIFAR100DyNAComplete(nn.Module):
             theta_components_in=count_modes,
             theta_modes_out=count_modes,
         )
-        self.e_activation = ModulatedActivationBell()
+        # self.e_activation = ModulatedActivationBell()
+        self.e_activation = ModulatedActivationSine()
         self.e_output = ThetaOutput(
             in_features=100,
             theta_components_in=count_modes,

@@ -15,6 +15,7 @@ class ThetaLinear(nn.Linear):
         out_features: int,
         theta_components_in: Optional[int] = 7,
         theta_modes_out: Optional[int] = 7,
+        theta_modes_components: Optional[int] = 4,
         theta_heterogeneity: Optional[float] = 1.0e-2,
         eps: Optional[float] = 1.0e-5,
         **kwargs,
@@ -28,6 +29,7 @@ class ThetaLinear(nn.Linear):
         self.out_features = out_features
         self.theta_components_in = theta_components_in
         self.theta_modes_out = theta_modes_out
+        self.theta_modes_components = theta_modes_components
         self.theta_heterogeneity = theta_heterogeneity
         self.eps = eps
 
@@ -148,64 +150,20 @@ class ThetaLinear(nn.Linear):
         self.potential_distortion = nn.Parameter(potential_distortion)
 
         # Define matrices for alphas.
-        alphas = torch.empty(
+        modes = torch.empty(
             [
                 self.out_features,
                 self.theta_components_in,
                 self.theta_modes_out,
+                self.theta_modes_components,
             ]
         )
-        alphas = nn.init.uniform_(
-            tensor=alphas,
+        modes = nn.init.uniform_(
+            tensor=modes,
             a=-math.sqrt(math.pi / self.theta_components_in),
             b=+math.sqrt(math.pi / self.theta_components_in),
         )
-        self.alphas = nn.Parameter(alphas)
-
-        # Define matrices for betas.
-        betas = torch.empty(
-            [
-                self.out_features,
-                self.theta_components_in,
-                self.theta_modes_out,
-            ]
-        )
-        betas = nn.init.uniform_(
-            tensor=betas,
-            a=-math.sqrt(math.pi / self.theta_components_in),
-            b=+math.sqrt(math.pi / self.theta_components_in),
-        )
-        self.betas = nn.Parameter(betas)
-
-        # Define matrices for gammas.
-        gammas = torch.empty(
-            [
-                self.out_features,
-                self.theta_components_in,
-                self.theta_modes_out,
-            ]
-        )
-        gammas = nn.init.uniform_(
-            tensor=gammas,
-            a=-math.sqrt(math.pi / self.theta_components_in),
-            b=+math.sqrt(math.pi / self.theta_components_in),
-        )
-        self.gammas = nn.Parameter(gammas)
-
-        # Define matrices for deltas.
-        deltas = torch.empty(
-            [
-                self.out_features,
-                self.theta_components_in,
-                self.theta_modes_out,
-            ]
-        )
-        deltas = nn.init.uniform_(
-            tensor=deltas,
-            a=-math.sqrt(math.pi / self.theta_components_in),
-            b=+math.sqrt(math.pi / self.theta_components_in),
-        )
-        self.deltas = nn.Parameter(deltas)
+        self.modes = nn.Parameter(modes)
 
         pass
 
@@ -299,51 +257,28 @@ class ThetaLinear(nn.Linear):
         # ================================================================================= #
         # ____________________________> Output: modular.
         # ================================================================================= #
-        # Derive alphas from internal state.
-        alphas = internal_state.unsqueeze(-2)
-        alphas = torch.einsum(
-            "b...ijk,ikl -> b...ijl",
-            alphas,
-            self.alphas,
+        modes = torch.einsum(
+            "b...ij,ikjl -> b...ikl",
+            internal_state,
+            self.modes,
         )
-
-        # Derive betas from internal state.
-        betas = internal_state.unsqueeze(-2)
-        betas = torch.einsum(
-            "b...ijk,ikl -> b...ijl",
-            betas,
-            self.betas,
-        )
-
-        # Derive gammas from internal state.
-        gammas = internal_state.unsqueeze(-2)
-        gammas = torch.einsum(
-            "b...ijk,ikl -> b...ijl",
-            gammas,
-            self.gammas,
-        )
-
-        # Derive deltas from internal state.
-        deltas = internal_state.unsqueeze(-2)
-        deltas = torch.einsum(
-            "b...ijk,ikl -> b...ijl",
-            deltas,
-            self.deltas,
-        )
-
-        # Modify modulators to appropriate scales.
-        # alphas = alphas # No changes for alphas.
-        # betas = betas * math.log(self.theta_modes_out)
-        # gammas = gammas # No changes for gammas.
-        # deltas = deltas # No changes for deltas.
+        # print(f"{internal_state.shape=}")
+        # print(f"{self.modes.shape=}")
+        # print(f"{modes.shape=}")
+        # exit()
+        # modes = internal_state.unsqueeze(-2)
+        # modes = torch.einsum(
+        #     "b...ijk,iklm -> b...ijlm",
+        #     modes,
+        #     self.modes,
+        # ).squeeze(-3)
 
         # Combine modular output.
-        output_modular = torch.cat([alphas, betas, gammas, deltas], dim=-2)
-        output_modular = output_modular.permute(
+        output_modular = modes.permute(
             [
-                *[i for i in range(len(output_modular.shape[:-3]))],
-                -1,
+                *[i for i in range(len(modes.shape[:-3]))],
                 -2,
+                -1,
                 -3,
             ]
         )

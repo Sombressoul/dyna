@@ -14,7 +14,7 @@ class ModulatedActivationSine(nn.Module):
         passive: Optional[bool] = True,
         count_modes: Optional[int] = 7,
         features: Optional[int] = 1,
-        std: Optional[float] = 0.01,
+        std: Optional[float] = 0.5,
     ):
         super(ModulatedActivationSine, self).__init__()
 
@@ -24,22 +24,11 @@ class ModulatedActivationSine(nn.Module):
         self.std = std
 
         # Init modes.
-        modes = []
+        modes = torch.empty([self.count_modes, 4, self.features])
+        modes = nn.init.normal_(modes, mean=0.0, std=self.std)
+        modes[:, 0, :] = modes[:, 0, :] + 1.0  # Alphas
+        modes[:, 1, :] = modes[:, 1, :] + 1.0  # Betas
 
-        for mode_idx in range(self.count_modes):
-            freq = math.pi * (1.0 / (self.count_modes - mode_idx))
-            noise = torch.empty([1, 4, self.features])
-            noise = torch.nn.init.normal_(noise, mean=1.0, std=self.std)
-
-            a = torch.ones([1, 1, self.features]) + noise[:, 0, :]
-            b = torch.ones([1, 1, self.features]) * freq * noise[:, 1, :]
-            g = torch.zeros([1, 1, self.features]) + (noise[:, 2, :] - 1.0)
-            d = torch.zeros([1, 1, self.features]) + (noise[:, 3, :] - 1.0)
-
-            mode = torch.cat([a, b, g, d], dim=-2)
-            modes.append(mode)
-
-        modes = torch.cat(modes, dim=0)
         self.modes = nn.Parameter(modes)
 
         pass
@@ -63,9 +52,21 @@ class ModulatedActivationSine(nn.Module):
             ]
         )
 
+        count_modes = modes_expanded.shape[-2]
+        freq_mul = 1 / self.count_modes
+        freq_modes = torch.arange(0, count_modes, 1).to(x_expanded.device)
+        freq = math.pi * (freq_mul * (count_modes - freq_modes))
+        freq = freq.reshape(
+            [
+                *[1 for _ in range(len(modes_expanded.shape[:-2]) - 1)],
+                count_modes,
+                1,
+            ]
+        )
+
         alphas = modes_expanded[:, 0, :]
-        betas = modes_expanded[:, 1, :]
-        gammas = modes_expanded[:, 2, :]
+        betas = modes_expanded[:, 1, :] * freq
+        gammas = modes_expanded[:, 2, :] * freq
         deltas = modes_expanded[:, 3, :]
 
         transformed = alphas * torch.sin(x_expanded * betas + gammas) + deltas
