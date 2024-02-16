@@ -10,7 +10,7 @@ from dyna.signal import SignalModular, SignalComponential
 class ModulatedActivation(nn.Module):
     def __init__(
         self,
-        passive: Optional[bool] = False,
+        passive: Optional[bool] = True,
         count_modes: Optional[int] = 7,
         features: Optional[int] = 1,
         theta_dynamic_range: Optional[float] = 7.5,
@@ -113,11 +113,11 @@ class ModulatedActivation(nn.Module):
         x: Union[torch.Tensor, SignalModular],
         modes: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
-        if self.passive:
-            assert modes is None, "modes must be None in passive mode"
+        if not self.passive:
+            assert modes is None, "modes must be None in active mode"
             assert not isinstance(
                 x, SignalModular
-            ), "x must be a tensor in passive mode"
+            ), "x must be a tensor in active mode"
 
             extra_dims = len(x.shape[1:-1])
             modes = self.modes
@@ -136,7 +136,7 @@ class ModulatedActivation(nn.Module):
         else:
             assert isinstance(
                 x, SignalModular
-            ), "x must be a SignalModular instance in active mode"
+            ), "x must be a SignalModular instance in passive mode"
             signal = x
 
         components = self._dyna(signal)

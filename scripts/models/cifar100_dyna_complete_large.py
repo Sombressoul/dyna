@@ -17,14 +17,14 @@ class CIFAR100DyNACompleteLarge(nn.Module):
 
         self.a_conv_pre = nn.Conv2d(3, conv_features_head, 3, 1, 1)
         self.a_activation_pre = ModulatedActivation(
-            passive=True,
+            passive=False,
             count_modes=count_modes,
             features=conv_features_head,
             theta_dynamic_range=dynamic_range,
         )
         self.a_conv_post = nn.Conv2d(conv_features_head, conv_features_head, 3, 2, 1)
         self.a_activation_post = ModulatedActivation(
-            passive=True,
+            passive=False,
             count_modes=count_modes,
             features=conv_features_head,
             theta_dynamic_range=dynamic_range,
@@ -33,14 +33,14 @@ class CIFAR100DyNACompleteLarge(nn.Module):
 
         self.b_conv_pre = nn.Conv2d(conv_features_head, conv_features_head, 3, 1, 1)
         self.b_activation_pre = ModulatedActivation(
-            passive=True,
+            passive=False,
             count_modes=count_modes,
             features=conv_features_head,
             theta_dynamic_range=dynamic_range,
         )
         self.b_conv_post = nn.Conv2d(conv_features_head, conv_features_head, 3, 2, 1)
         self.b_activation_post = ModulatedActivation(
-            passive=True,
+            passive=False,
             count_modes=count_modes,
             features=conv_features_head,
             theta_dynamic_range=dynamic_range,
@@ -49,7 +49,7 @@ class CIFAR100DyNACompleteLarge(nn.Module):
 
         self.c_conv_pre = nn.Conv2d(conv_features_head, conv_features_head, 3, 1, 1)
         self.c_activation_pre = ModulatedActivation(
-            passive=True,
+            passive=False,
             count_modes=count_modes,
             features=conv_features_head,
             theta_dynamic_range=dynamic_range,

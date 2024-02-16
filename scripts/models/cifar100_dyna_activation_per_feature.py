@@ -18,7 +18,7 @@ class CIFAR100DyNAActivationPerFeature(nn.Module):
         self.a_activation_pre = activation_conv
         self.a_linear = nn.Linear(32, 8)
         self.a_activation_mid = ModulatedActivation(
-            passive=True,
+            passive=False,
             count_modes=count_modes,
             features=8,
             theta_dynamic_range=dynamic_range,
@@ -31,7 +31,7 @@ class CIFAR100DyNAActivationPerFeature(nn.Module):
         self.b_activation_pre = activation_conv
         self.b_linear = nn.Linear(32, 8)
         self.b_activation_mid = ModulatedActivation(
-            passive=True,
+            passive=False,
             count_modes=count_modes,
             features=8,
             theta_dynamic_range=dynamic_range,
@@ -44,7 +44,7 @@ class CIFAR100DyNAActivationPerFeature(nn.Module):
         self.c_activation_pre = activation_conv
         self.c_linear = nn.Linear(32, 8)
         self.c_activation_mid = ModulatedActivation(
-            passive=True,
+            passive=False,
             count_modes=count_modes,
             features=8,
             theta_dynamic_range=dynamic_range,
@@ -55,7 +55,7 @@ class CIFAR100DyNAActivationPerFeature(nn.Module):
 
         self.d_linear = nn.Linear(512, 96)
         self.d_activation = ModulatedActivation(
-            passive=True,
+            passive=False,
             count_modes=count_modes,
             features=96,
             theta_dynamic_range=dynamic_range,
@@ -64,7 +64,7 @@ class CIFAR100DyNAActivationPerFeature(nn.Module):
 
         self.e_linear = nn.Linear(96, 100)
         self.e_activation = ModulatedActivation(
-            passive=True,
+            passive=False,
             count_modes=count_modes,
             features=100,
             theta_dynamic_range=dynamic_range,
