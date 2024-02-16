@@ -20,7 +20,7 @@ class ThetaInput(nn.Linear):
         super(ThetaInput, self).__init__(in_features, out_features, **kwargs)
 
         self.activation = ModulatedActivation(
-            passive=True,
+            passive=False,
             count_modes=theta_modes_out,
             features=out_features if theta_full_features else 1,
             theta_dynamic_range=theta_dynamic_range,
