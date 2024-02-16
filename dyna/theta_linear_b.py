@@ -504,7 +504,7 @@ class ThetaLinear(nn.Linear):
         # alphas = alphas # No changes for alphas.
         betas = betas * math.log(self.theta_modes_out)
         # gammas = gammas # No changes for gammas.
-        # deltas = deltas # No changes for gammas.
+        # deltas = deltas # No changes for deltas.
 
         # Combine modular output.
         output_modular = torch.cat([alphas, betas, gammas, deltas], dim=-2)
