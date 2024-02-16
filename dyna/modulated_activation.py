@@ -68,7 +68,7 @@ class ModulatedActivation(nn.Module):
 
         pass
 
-    def _dyna(
+    def _wave_fn(
         self,
         signal: SignalModular,
     ) -> torch.Tensor:
@@ -139,7 +139,7 @@ class ModulatedActivation(nn.Module):
             ), "x must be a SignalModular instance in passive mode"
             signal = x
 
-        components = self._dyna(signal)
+        components = self._wave_fn(signal)
         nonlinearity = components.sum(dim=-2) + 1.0
         x_transformed = signal.x * nonlinearity
 
