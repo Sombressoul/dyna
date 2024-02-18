@@ -1,26 +1,22 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 import math
 
 from typing import Optional, Union
 
+from dyna.modulated_activation import ModulatedActivation
 from dyna.signal import SignalModular, SignalComponential
 
 
-class ModulatedActivationSine(nn.Module):
+class ModulatedActivationSine(ModulatedActivation):
     def __init__(
         self,
-        passive: Optional[bool] = True,
-        count_modes: Optional[int] = 7,
-        features: Optional[int] = 1,
         std: Optional[float] = 0.5,
-    ):
-        super(ModulatedActivationSine, self).__init__()
+        **kwargs,
+    ) -> None:
+        super(ModulatedActivationSine, self).__init__(**kwargs)
 
-        self.passive = passive
-        self.count_modes = count_modes
-        self.features = features
+        # Subclass params.
         self.std = std
 
         # Init modes.

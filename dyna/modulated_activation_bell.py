@@ -4,22 +4,19 @@ import math
 
 from typing import Optional, Union
 
+from dyna.modulated_activation import ModulatedActivation
 from dyna.signal import SignalModular, SignalComponential
 
 
-class ModulatedActivationBell(nn.Module):
+class ModulatedActivationBell(ModulatedActivation):
     def __init__(
         self,
-        passive: Optional[bool] = True,
-        count_modes: Optional[int] = 7,
-        features: Optional[int] = 1,
-        theta_dynamic_range: Optional[float] = 7.5,
+        theta_dynamic_range: Optional[float] = 2.5,
+        **kwargs,
     ):
-        super(ModulatedActivationBell, self).__init__()
+        super(ModulatedActivationBell, self).__init__(**kwargs)
 
-        self.passive = passive
-        self.count_modes = count_modes
-        self.features = features
+        # Subclass params.
         self.theta_dynamic_range = theta_dynamic_range
 
         # Init alphas.
@@ -115,9 +112,7 @@ class ModulatedActivationBell(nn.Module):
     ) -> SignalComponential:
         if not self.passive:
             assert modes is None, "modes must be None in active mode"
-            assert not isinstance(
-                x, SignalModular
-            ), "x must be a tensor in active mode"
+            assert not isinstance(x, SignalModular), "x must be a tensor in active mode"
 
             extra_dims = len(x.shape[1:-1])
             modes = self.modes
