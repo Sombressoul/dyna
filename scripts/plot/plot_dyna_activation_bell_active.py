@@ -1,6 +1,12 @@
+import os
+import sys
 import torch
 import matplotlib.pyplot as plt
 import argparse
+
+script_dir = os.path.dirname(os.path.abspath(__file__))
+project_dir = os.path.dirname(os.path.dirname(script_dir))
+sys.path.append(project_dir)
 
 from dyna import ModulatedActivationBell
 
