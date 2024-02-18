@@ -29,7 +29,7 @@ for i, component in enumerate(components):
         component.squeeze().numpy(),
         label=f"Set {i}",
     )
-plt.title("DyNA Components")
+plt.title("Components")
 plt.xlabel("Input (x)")
 plt.ylabel("Output")
 plt.legend()
@@ -42,7 +42,7 @@ plt.plot(
     signal.nonlinearity.squeeze().numpy(),
     label="Resulting waveform",
 )
-plt.title("DyNA Nonlinearity")
+plt.title("Nonlinearity")
 plt.xlabel("Input (x)")
 plt.ylabel("Output")
 plt.legend()
@@ -60,7 +60,7 @@ plt.plot(
     signal.x.detach().squeeze().numpy(),
     label="Transformed x",
 )
-plt.title("DyNA Transformation")
+plt.title("Transformation")
 plt.xlabel("Input (x)")
 plt.ylabel("Output")
 plt.legend()

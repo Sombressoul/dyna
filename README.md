@@ -89,7 +89,7 @@ The whole process can be visually represented by three plots (one per step): Com
 
 ### Components
 
-![Components](./doc/DyNA_Components.png)
+![Components](./doc/Activation_Bell_Components.png)
 
 The first plot displays four distinct `DyNA` waves, each corresponding to a different set of parameters ($\alpha_i$, $\beta_i$, $\gamma_i$, $\delta_i$). These waves represent individual activation functions with unique characteristics:
    - The blue wave (Set 1) has a standard bell shape, centered around zero.
@@ -99,13 +99,13 @@ The first plot displays four distinct `DyNA` waves, each corresponding to a diff
 
 ### Nonlinearity
 
-![Nonlinearity](./doc/DyNA_Nonlinearity.png)
+![Nonlinearity](./doc/Activation_Bell_Nonlinearity.png)
 
 The second plot illustrates the resulting waveform derived from the sum of the initial four `DyNA` waves plus one. This represents the multiplicative term that will be applied to the input data, showcasing the composite effect of combining multiple `DyNA` components. The waveform varies significantly across the input range, indicating a rich, data-driven nonlinearity.
 
 ### Transformation
 
-![Transformation](./doc/DyNA_Transformation.png)
+![Transformation](./doc/Activation_Bell_Transformation.png)
 
 The third plot demonstrates the final transformation applied to the input data. It compares the original input `x` (blue line) with the transformed output (orange line), which is the product of the input and the multiplicative term. This plot highlights the regions where the input is amplified, suppressed, or left unchanged, depicting the targeted, complex nonlinearity introduced by the `DyNA` process.
 
@@ -114,6 +114,11 @@ Together, these plots elucidate the mechanism by which `DyNA` applies a dynamic,
 ## Math Background: Sine Activation
 
 TODO: Add description.
+
+![Components](./doc/Activation_Sine_Components.png)
+![Nonlinearity](./doc/Activation_Sine_Nonlinearity.png)
+![Transformation](./doc/Activation_Sine_Transformation.png)
+
 
 ## Math Background: Theta Linear
 

@@ -12,12 +12,14 @@ class ModulatedActivationSine(ModulatedActivation):
     def __init__(
         self,
         std: Optional[float] = 0.5,
+        frequency_multiplier: Optional[float] = 1.0,
         **kwargs,
     ) -> None:
         super(ModulatedActivationSine, self).__init__(**kwargs)
 
         # Subclass params.
         self.std = std
+        self.frequency_multiplier = frequency_multiplier
 
         # Init modes.
         modes = torch.empty([self.count_modes, 4, self.features])
@@ -52,6 +54,7 @@ class ModulatedActivationSine(ModulatedActivation):
         freq_mul = 1.0 / self.count_modes
         freq_modes = torch.arange(0, count_modes, 1).to(x_expanded.device)
         freq = math.pi * (freq_mul * (count_modes - freq_modes))
+        freq = freq * self.frequency_multiplier
         freq = freq.reshape(
             [
                 *[1 for _ in range(len(modes_expanded.shape[:-2]) - 1)],
