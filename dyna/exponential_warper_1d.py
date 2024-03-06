@@ -5,22 +5,20 @@ import math
 from typing import Optional
 
 
-class LinearSeparator1D(nn.Module):
+class ExponentialWarper1D(nn.Module):
     _DEBUG: bool = False
 
     def __init__(
         self,
         features: int,
-        scale: Optional[int] = 2,
+        scale: int = 2,
         **kwargs,
     ) -> None:
-        super(LinearSeparator1D, self).__init__(**kwargs)
+        super(ExponentialWarper1D, self).__init__(**kwargs)
 
         # ================================================================================= #
         # ____________________________> Initial checks.
         # ================================================================================= #
-        scale = 2 if scale is None else scale
-
         assert (
             type(scale) == int and scale > 1
         ), "Scale must be a positive integer greater than 1."
