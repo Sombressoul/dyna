@@ -59,7 +59,7 @@ class SparseEnsemble(nn.Module):
 
     def _get_cluster_connections(
         self,
-        cluster_shuffle: bool = False,
+        cluster_shuffle: bool = True,
     ) -> torch.Tensor:
         # Group params.
         group_size_base = math.ceil(self.input_dim_i / self.group_count)
