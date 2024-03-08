@@ -150,6 +150,7 @@ class ExponentialWarper1D(nn.Module):
     def forward(
         self,
         x: torch.Tensor,
+        complex_output: bool = True,
     ) -> torch.Tensor:
         self._log_x(x, "Input")
         if x.dtype not in [torch.complex32, torch.complex64, torch.complex128]:
@@ -190,4 +191,4 @@ class ExponentialWarper1D(nn.Module):
         self._log_x(x.real, "Input (complex, downscaled), real")
         self._log_x(x.imag, "Input (complex, downscaled), imag")
 
-        return x.real
+        return x if complex_output else x.real
