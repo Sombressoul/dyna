@@ -6,6 +6,8 @@ from typing import Union
 
 
 class SparseEnsemble(nn.Module):
+    connections: torch.Tensor
+
     def __init__(
         self,
         input_shape: Union[torch.Size, tuple[int, int]],
@@ -13,6 +15,7 @@ class SparseEnsemble(nn.Module):
         group_count: int = 4,
         group_overlap: float = 0.5,
         node_connectivity: float = 0.25,
+        rng_seed: int = 42,
         **kwargs,
     ) -> None:
         super(SparseEnsemble, self).__init__(**kwargs)
@@ -40,6 +43,7 @@ class SparseEnsemble(nn.Module):
         self.group_count = group_count
         self.group_overlap = group_overlap
         self.node_connectivity = node_connectivity
+        self.rng_seed = rng_seed
 
         # Internal variables.
         self.input_dim_i = input_shape[0]
@@ -48,7 +52,12 @@ class SparseEnsemble(nn.Module):
         # ================================================================================= #
         # ____________________________> Connectivity.
         # ================================================================================= #
-        # TODO: implement.
+        connections = [
+            self._get_cluster_connections(seed=self.rng_seed + i).unsqueeze(0)
+            for i in range(self.cluster_count)
+        ]
+        connections = torch.cat(connections, dim=0)
+        self.register_buffer("connections", connections)
 
         # ================================================================================= #
         # ____________________________> Weights.
@@ -59,8 +68,13 @@ class SparseEnsemble(nn.Module):
 
     def _get_cluster_connections(
         self,
+        seed: int,
         cluster_shuffle: bool = True,
     ) -> torch.Tensor:
+        # Deterministic "randomization".
+        generator = torch.Generator()
+        generator = generator.manual_seed(seed)
+
         # Group params.
         group_size_base = math.ceil(self.input_dim_i / self.group_count)
         group_size_overlap = math.ceil(group_size_base * self.group_overlap)
@@ -84,7 +98,10 @@ class SparseEnsemble(nn.Module):
         cluster_indices_base = torch.cat(
             [
                 torch.arange(0, self.input_dim_i, 1),
-                torch.randperm(self.input_dim_i)[0:cluster_size_extra],
+                torch.randperm(
+                    self.input_dim_i,
+                    generator=generator,
+                )[0:cluster_size_extra],
             ],
             dim=0,
         )
@@ -103,7 +120,10 @@ class SparseEnsemble(nn.Module):
         for group_index in range(self.group_count):
             indices_base = cluster_indices_base[
                 (
-                    torch.randperm(cluster_indices_base.shape[0])
+                    torch.randperm(
+                        cluster_indices_base.shape[0],
+                        generator=generator,
+                    )
                     if cluster_shuffle
                     else torch.arange(cluster_indices_base.shape[0])
                 )
@@ -122,7 +142,12 @@ class SparseEnsemble(nn.Module):
                 dim=0,
             )
             group_outer = group_outer_base.clone()
-            group_outer = group_outer[torch.randperm(group_outer.shape[0])]
+            group_outer = group_outer[
+                torch.randperm(
+                    group_outer.shape[0],
+                    generator=generator,
+                )
+            ]
 
             for node_index in range(node_count):
                 node_inner_start = node_index * node_connections_base
@@ -134,7 +159,12 @@ class SparseEnsemble(nn.Module):
                     group_inner = torch.cat(
                         [
                             group_inner,
-                            group_inner_base[torch.randperm(group_inner_base.shape[0])],
+                            group_inner_base[
+                                torch.randperm(
+                                    group_inner_base.shape[0],
+                                    generator=generator,
+                                )
+                            ],
                         ],
                         dim=0,
                     )
@@ -143,7 +173,12 @@ class SparseEnsemble(nn.Module):
                     group_outer = torch.cat(
                         [
                             group_outer,
-                            group_outer_base[torch.randperm(group_outer_base.shape[0])],
+                            group_outer_base[
+                                torch.randperm(
+                                    group_outer_base.shape[0],
+                                    generator=generator,
+                                )
+                            ],
                         ],
                         dim=0,
                     )
