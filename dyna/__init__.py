@@ -7,6 +7,7 @@ from dyna.sparse_ensemble import SparseEnsemble
 from dyna.theta_input import ThetaInput
 from dyna.theta_output import ThetaOutput
 from dyna.theta_linear import ThetaLinear
+from dyna.weights_lib_2d import WeightsLib2D
 
 
 __all__ = [
@@ -20,4 +21,5 @@ __all__ = [
     "ThetaInput",
     "ThetaOutput",
     "ThetaLinear",
+    "WeightsLib2D",
 ]
