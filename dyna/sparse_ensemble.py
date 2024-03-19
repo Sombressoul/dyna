@@ -11,6 +11,7 @@ class SparseEnsemble(nn.Module):
     def __init__(
         self,
         input_shape: Union[torch.Size, tuple[int, int]],
+        node_size: int,
         cluster_count: int = 2,
         group_count: int = 4,
         group_overlap: float = 0.5,
@@ -36,9 +37,10 @@ class SparseEnsemble(nn.Module):
         assert node_connectivity > 0, "Node connectivity must be greater than 0."
 
         # ================================================================================= #
-        # ____________________________> Arguments.
+        # ____________________________> Parameters.
         # ================================================================================= #
         self.input_shape = input_shape
+        self.node_size = node_size
         self.cluster_count = cluster_count
         self.group_count = group_count
         self.group_overlap = group_overlap
@@ -62,7 +64,39 @@ class SparseEnsemble(nn.Module):
         # ================================================================================= #
         # ____________________________> Weights.
         # ================================================================================= #
-        # TODO: implement.
+        weights_shape = [
+            math.prod(connections.shape[:-1]),
+            connections.shape[-1],
+            self.input_shape[-1],
+            self.node_size,
+        ]
+
+        weights_r = torch.empty(weights_shape)
+        weights_r = nn.init.uniform_(
+            tensor=weights_r,
+            a=-math.sqrt(math.pi / (weights_r.shape[-3] * weights_r.shape[-2])),
+            b=+math.sqrt(math.pi / (weights_r.shape[-3] * weights_r.shape[-2])),
+        )
+        weights_i = torch.empty(weights_shape)
+        weights_i = nn.init.normal_(
+            tensor=weights_i,
+            mean=0.0,
+            std=1.0 / (weights_i.shape[-3] * weights_i.shape[-2]),
+        )
+        self.weights = nn.Parameter(
+            data=torch.complex(
+                real=weights_r,
+                imag=weights_i,
+            ),
+        )
+
+        print(f"{weights_shape=}")
+        print(f"{math.prod(weights_shape)=:_d}")
+        print(f"{weights_r.shape=}")
+        print(f"{weights_i.shape=}")
+        print(f"{self.weights.shape=}")
+        print(f"{self.weights[0, 0, 0]=}")
+        exit()
 
         pass
 
