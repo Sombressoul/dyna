@@ -183,7 +183,6 @@ class WeightsLib2D(nn.Module):
         try:
             base_controls = self.get_parameter(weights_name)
         except AttributeError:
-            print(f"Creating new base controls: {weights_name}")
             base_controls = self._create_weights_base_controls()
 
             self.register_parameter(
@@ -204,7 +203,6 @@ class WeightsLib2D(nn.Module):
         try:
             mod_controls = self.get_parameter(weights_name)
         except AttributeError:
-            print(f"Creating new mod controls: {weights_name}")
             mod_controls = self._create_weights_mod_controls()
 
             self.register_parameter(
