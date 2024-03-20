@@ -11,7 +11,7 @@ class WeightsLib2D(nn.Module):
         shape: Union[torch.Size, list[int]],
         rank: int = 8,
         dtype: torch.dtype = torch.float32,
-        complex_result: bool = False,
+        return_as_complex: bool = False,
     ) -> None:
         super().__init__()
 
@@ -32,7 +32,7 @@ class WeightsLib2D(nn.Module):
         self.shape = shape
         self.rank = rank
         self.dtype = dtype
-        self.complex_result = complex_result
+        self.return_as_complex = return_as_complex
 
         # ================================================================================= #
         # ____________________________> Weights.
@@ -50,7 +50,8 @@ class WeightsLib2D(nn.Module):
         self,
         shape: Union[torch.Size, list[int]],
     ) -> torch.Tensor:
-        bound_r = bound_i = 1.0 / math.log(math.sqrt(math.prod(self.shape)), math.e)
+        # TODO: Include rank into equation below.
+        bound_r = bound_i = 1.0 / math.log(math.prod(self.shape), math.e)
 
         base_r = torch.empty(shape, dtype=self.dtype)
         base_r = nn.init.uniform_(
@@ -121,18 +122,31 @@ class WeightsLib2D(nn.Module):
     def _get_controls(
         self,
         name: str,
-        force_create: bool = False,
     ) -> torch.Tensor:
+        weights_name = f"weight_controls_{name}"
+
         try:
-            controls = self.get_parameter(f"weight_controls_{name}")
+            controls = self.get_parameter(weights_name)
         except AttributeError:
             controls = self._create_weights_controls()
-        # TODO: implement.
-        ...
+
+            self.register_parameter(
+                name=weights_name,
+                param=nn.Parameter(
+                    data=controls,
+                ),
+            )
+
+        return controls
 
     def get_weights(
         self,
         name: str,
     ) -> torch.Tensor:
-        # TODO: implement.
-        ...
+        weights = self._get_weights(
+            controls=self._get_controls(
+                name=name,
+            )
+        )
+
+        return weights if self.return_as_complex else weights.real
