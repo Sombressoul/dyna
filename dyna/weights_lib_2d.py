@@ -50,23 +50,24 @@ class WeightsLib2D(nn.Module):
         self,
         shape: Union[torch.Size, list[int]],
     ) -> torch.Tensor:
+        bound_r = bound_i = 1.0 / math.log(math.sqrt(math.prod(self.shape)), math.e)
+
         base_r = torch.empty(shape, dtype=self.dtype)
         base_r = nn.init.uniform_(
             tensor=base_r,
-            a=-math.sqrt(2.0 / nn.init._calculate_correct_fan(base_r, "fan_in")),
-            b=+math.sqrt(2.0 / nn.init._calculate_correct_fan(base_r, "fan_in")),
+            a=-bound_r,
+            b=+bound_r,
         )
         base_i = torch.empty_like(base_r)
         base_i = nn.init.uniform_(
             tensor=base_i,
-            a=-math.sqrt((math.pi * 2) / math.prod(self.shape)),
-            b=+math.sqrt((math.pi * 2) / math.prod(self.shape)),
+            a=-bound_i,
+            b=+bound_i,
         )
         base = torch.complex(
             real=base_r,
             imag=base_i,
-            dtype=torch.complex64 if self.dtype == torch.float32 else torch.complex128,
-        )
+        ).to(torch.complex64 if self.dtype == torch.float32 else torch.complex128)
 
         return base
 
@@ -76,15 +77,20 @@ class WeightsLib2D(nn.Module):
         bias = nn.init.normal_(
             tensor=torch.empty([2, self.rank, 1], dtype=self.dtype),
             mean=0.0,
-            std=1.0 / self.rank,
+            std=math.sqrt(1.0 / math.prod(self.shape)),
         )
         scale = nn.init.normal_(
             tensor=torch.empty([2, self.rank, 1], dtype=self.dtype),
             mean=1.0,
-            std=1.0 / self.rank,
+            std=math.sqrt(1.0 / math.prod(self.shape)),
+        )
+        exponent = nn.init.normal_(
+            tensor=torch.empty([2, self.rank, 1], dtype=self.dtype),
+            mean=1.0,
+            std=math.sqrt(1.0 / math.prod(self.shape)),
         )
 
-        controls_r = torch.cat([bias, scale], dim=-1)
+        controls_r = torch.cat([bias, scale, exponent], dim=-1)
         controls_i = torch.empty_like(controls_r)
         controls_i = nn.init.uniform_(
             tensor=controls_i,
@@ -94,8 +100,7 @@ class WeightsLib2D(nn.Module):
         controls = torch.complex(
             real=controls_r,
             imag=controls_i,
-            dtype=torch.complex64 if self.dtype == torch.float32 else torch.complex128,
-        )
+        ).to(torch.complex64 if self.dtype == torch.float32 else torch.complex128)
 
         return controls
 
@@ -103,12 +108,13 @@ class WeightsLib2D(nn.Module):
         self,
         controls: torch.Tensor,
     ) -> torch.Tensor:
-        weights_i = (self.weights_i + controls[0, ..., 0].unsqueeze(-1)) * controls[
-            0, ..., 1
-        ].unsqueeze(-1)
-        weights_j = (self.weights_j + controls[1, ..., 0].unsqueeze(-1)) * controls[
-            1, ..., 1
-        ].unsqueeze(-1)
+        # w_i/j: bias -> scale -> exp.
+        weights_i = self.weights_i + controls[0, ..., 0].unsqueeze(-1)
+        weights_i = weights_i * controls[0, ..., 1].unsqueeze(-1)
+        weights_i = weights_i ** controls[0, ..., 2].unsqueeze(-1)
+        weights_j = self.weights_j + controls[1, ..., 0].unsqueeze(-1)
+        weights_j = weights_j * controls[1, ..., 1].unsqueeze(-1)
+        weights_j = weights_j ** controls[1, ..., 2].unsqueeze(-1)
 
         return torch.einsum("ki,kj->ij", weights_i, weights_j)
 
