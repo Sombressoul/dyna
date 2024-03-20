@@ -98,7 +98,7 @@ class WeightsLib2D(nn.Module):
         mod = torch.complex(
             real=mod_r,
             imag=mod_i,
-        ).to(self.dtype_c)
+        ).to(dtype=self.dtype_c, device=self.weights_base.device)
 
         return mod
 
@@ -126,7 +126,7 @@ class WeightsLib2D(nn.Module):
         base_controls = torch.complex(
             real=base_controls_r,
             imag=base_controls_i,
-        ).to(self.dtype_c)
+        ).to(dtype=self.dtype_c, device=self.weights_base.device)
 
         return base_controls
 
@@ -154,7 +154,7 @@ class WeightsLib2D(nn.Module):
         mod_controls = torch.complex(
             real=mod_controls_r,
             imag=mod_controls_i,
-        ).to(self.dtype_c)
+        ).to(dtype=self.dtype_c, device=self.weights_base.device)
 
         return mod_controls
 
@@ -183,6 +183,7 @@ class WeightsLib2D(nn.Module):
         try:
             base_controls = self.get_parameter(weights_name)
         except AttributeError:
+            print(f"Creating new base controls: {weights_name}")
             base_controls = self._create_weights_base_controls()
 
             self.register_parameter(
@@ -203,6 +204,7 @@ class WeightsLib2D(nn.Module):
         try:
             mod_controls = self.get_parameter(weights_name)
         except AttributeError:
+            print(f"Creating new mod controls: {weights_name}")
             mod_controls = self._create_weights_mod_controls()
 
             self.register_parameter(
