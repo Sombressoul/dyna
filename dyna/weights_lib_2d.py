@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import math
 
 from typing import Union
 
@@ -10,6 +11,7 @@ class WeightsLib2D(nn.Module):
         shape: Union[torch.Size, list[int]],
         rank: int = 8,
         dtype: torch.dtype = torch.float32,
+        complex_result: bool = False,
     ) -> None:
         super().__init__()
 
@@ -30,6 +32,7 @@ class WeightsLib2D(nn.Module):
         self.shape = shape
         self.rank = rank
         self.dtype = dtype
+        self.complex_result = complex_result
 
         # ================================================================================= #
         # ____________________________> Weights.
@@ -47,11 +50,25 @@ class WeightsLib2D(nn.Module):
         self,
         shape: Union[torch.Size, list[int]],
     ) -> torch.Tensor:
-        return nn.init.normal_(
-            tensor=torch.empty(shape, dtype=self.dtype),
-            mean=0.0,
-            std=1.0,
+        base_r = torch.empty(shape, dtype=self.dtype)
+        base_r = nn.init.uniform_(
+            tensor=base_r,
+            a=-math.sqrt(2.0 / nn.init._calculate_correct_fan(base_r, "fan_in")),
+            b=+math.sqrt(2.0 / nn.init._calculate_correct_fan(base_r, "fan_in")),
         )
+        base_i = torch.empty_like(base_r)
+        base_i = nn.init.uniform_(
+            tensor=base_i,
+            a=-math.sqrt((math.pi * 2) / math.prod(self.shape)),
+            b=+math.sqrt((math.pi * 2) / math.prod(self.shape)),
+        )
+        base = torch.complex(
+            real=base_r,
+            imag=base_i,
+            dtype=torch.complex64 if self.dtype == torch.float32 else torch.complex128,
+        )
+
+        return base
 
     def _create_weights_controls(
         self,
@@ -67,9 +84,22 @@ class WeightsLib2D(nn.Module):
             std=1.0 / self.rank,
         )
 
-        return torch.cat([bias, scale], dim=-1)
+        controls_r = torch.cat([bias, scale], dim=-1)
+        controls_i = torch.empty_like(controls_r)
+        controls_i = nn.init.uniform_(
+            tensor=controls_i,
+            a=-math.sqrt((math.pi * 2) / math.prod(self.shape)),
+            b=+math.sqrt((math.pi * 2) / math.prod(self.shape)),
+        )
+        controls = torch.complex(
+            real=controls_r,
+            imag=controls_i,
+            dtype=torch.complex64 if self.dtype == torch.float32 else torch.complex128,
+        )
 
-    def get_weights(
+        return controls
+
+    def _get_weights(
         self,
         controls: torch.Tensor,
     ) -> torch.Tensor:
@@ -81,3 +111,22 @@ class WeightsLib2D(nn.Module):
         ].unsqueeze(-1)
 
         return torch.einsum("ki,kj->ij", weights_i, weights_j)
+
+    def _get_controls(
+        self,
+        name: str,
+        force_create: bool = False,
+    ) -> torch.Tensor:
+        try:
+            controls = self.get_parameter(f"weight_controls_{name}")
+        except AttributeError:
+            controls = self._create_weights_controls()
+        # TODO: implement.
+        ...
+
+    def get_weights(
+        self,
+        name: str,
+    ) -> torch.Tensor:
+        # TODO: implement.
+        ...
