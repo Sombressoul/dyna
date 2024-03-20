@@ -117,7 +117,7 @@ class WeightsLib2D(nn.Module):
         weights_j = weights_j * controls[1, ..., 1].unsqueeze(-1)
         weights_j = weights_j ** controls[1, ..., 2].unsqueeze(-1)
 
-        return torch.einsum("ki,kj->ij", weights_i, weights_j)
+        return weights_i.permute([-1, -2]) @ weights_j
 
     def _get_controls(
         self,
