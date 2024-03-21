@@ -2,15 +2,15 @@ import torch
 import torch.nn as nn
 import math
 
-from typing import Union
+from typing import Union, Optional
 
 
 class WeightsLib2D(nn.Module):
     def __init__(
         self,
         shape: Union[torch.Size, list[int]],
-        rank_mod: int = 8, # best: 1/4 * sqrt(prod(shape))
-        rank_deltas: int = 4, # best: 1/16 * sqrt(prod(shape))
+        rank_mod: Optional[int] = None,
+        rank_deltas: int = 1,
         dtype: torch.dtype = torch.float32,
         return_as_complex: bool = False,
     ) -> None:
@@ -24,7 +24,6 @@ class WeightsLib2D(nn.Module):
         dtype_c = torch.complex64 if dtype_r == torch.float32 else torch.complex128
 
         assert len(shape) == 2, "Shape must be 2D."
-        assert rank_mod > 0, "Rank must be greater than 0."
         assert rank_deltas > 0, "Rank must be greater than 0."
         assert dtype in [
             torch.float32,
@@ -35,7 +34,11 @@ class WeightsLib2D(nn.Module):
         # ____________________________> Parameters.
         # ================================================================================= #
         self.shape = shape
-        self.rank_mod = rank_mod
+        self.rank_mod = (
+            int(max(rank_mod, 1))
+            if rank_mod is not None
+            else int(math.sqrt(math.prod([*shape])))
+        )
         self.rank_deltas = rank_deltas
         self.dtype_r = dtype_r
         self.dtype_c = dtype_c
