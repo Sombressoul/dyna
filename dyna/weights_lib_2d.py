@@ -9,7 +9,8 @@ class WeightsLib2D(nn.Module):
     def __init__(
         self,
         shape: Union[torch.Size, list[int]],
-        rank: int = 8,
+        rank_mod: int = 8,
+        rank_deltas: int = 4,
         dtype: torch.dtype = torch.float32,
         return_as_complex: bool = False,
     ) -> None:
@@ -23,7 +24,8 @@ class WeightsLib2D(nn.Module):
         dtype_c = torch.complex64 if dtype_r == torch.float32 else torch.complex128
 
         assert len(shape) == 2, "Shape must be 2D."
-        assert rank > 0, "Rank must be greater than 0."
+        assert rank_mod > 0, "Rank must be greater than 0."
+        assert rank_deltas > 0, "Rank must be greater than 0."
         assert dtype in [
             torch.float32,
             torch.float64,
@@ -33,7 +35,8 @@ class WeightsLib2D(nn.Module):
         # ____________________________> Parameters.
         # ================================================================================= #
         self.shape = shape
-        self.rank = rank
+        self.rank_mod = rank_mod
+        self.rank_deltas = rank_deltas
         self.dtype_r = dtype_r
         self.dtype_c = dtype_c
         self.return_as_complex = return_as_complex
@@ -45,10 +48,10 @@ class WeightsLib2D(nn.Module):
             data=self._create_weights_base(),
         )
         self.weights_mod_i = nn.Parameter(
-            data=self._create_weights_mod([self.rank, self.shape[0]]),
+            data=self._create_weights_mod([self.rank_mod, self.shape[0]]),
         )
         self.weights_mod_j = nn.Parameter(
-            data=self._create_weights_mod([self.rank, self.shape[1]]),
+            data=self._create_weights_mod([self.rank_mod, self.shape[1]]),
         )
 
         pass
@@ -134,14 +137,14 @@ class WeightsLib2D(nn.Module):
         self,
     ) -> torch.Tensor:
         bias = nn.init.normal_(
-            tensor=torch.empty([2, self.rank, 1], dtype=self.dtype_r),
+            tensor=torch.empty([2, self.rank_mod, 1], dtype=self.dtype_r),
             mean=0.0,
-            std=math.sqrt(1.0 / self.rank),
+            std=math.sqrt(1.0 / self.rank_mod),
         )
         scale = nn.init.normal_(
-            tensor=torch.empty([2, self.rank, 1], dtype=self.dtype_r),
+            tensor=torch.empty([2, self.rank_mod, 1], dtype=self.dtype_r),
             mean=1.0,
-            std=math.sqrt(1.0 / self.rank),
+            std=math.sqrt(1.0 / self.rank_mod),
         )
 
         mod_controls_r = torch.cat([bias, scale], dim=-1)
@@ -149,7 +152,7 @@ class WeightsLib2D(nn.Module):
         mod_controls_i = nn.init.normal_(
             tensor=mod_controls_i,
             mean=0.0,
-            std=math.sqrt(1.0 / self.rank),
+            std=math.sqrt(1.0 / self.rank_mod),
         )
         mod_controls = torch.complex(
             real=mod_controls_r,
@@ -158,21 +161,46 @@ class WeightsLib2D(nn.Module):
 
         return mod_controls
 
-    def _get_weights(
+    def _create_deltas(
         self,
-        base_controls: torch.Tensor,
-        mod_controls: torch.Tensor,
-    ) -> torch.Tensor:
-        weights_base = self.weights_base + base_controls[0]
-        weights_base = (weights_base**2) * base_controls[1]
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        bound = math.sqrt((math.pi * 2) / (self.rank_deltas**2))
 
-        weights_mod_i = self.weights_mod_i + mod_controls[0, ..., 0].unsqueeze(-1)
-        weights_mod_i = (weights_mod_i**2) * mod_controls[0, ..., 1].unsqueeze(-1)
-        weights_mod_j = self.weights_mod_j + mod_controls[1, ..., 0].unsqueeze(-1)
-        weights_mod_j = (weights_mod_j**2) * mod_controls[1, ..., 1].unsqueeze(-1)
-        weights_mod = weights_mod_i.permute([-1, -2]) @ weights_mod_j
+        delta_a_r = torch.empty([self.shape[-1], self.rank_deltas], dtype=self.dtype_r)
+        delta_a_r = nn.init.uniform_(
+            tensor=delta_a_r,
+            a=-bound,
+            b=+bound,
+        )
+        delta_a_i = torch.empty_like(delta_a_r)
+        delta_a_i = nn.init.uniform_(
+            tensor=delta_a_i,
+            a=-bound,
+            b=+bound,
+        )
+        delta_a = torch.complex(
+            real=delta_a_r,
+            imag=delta_a_i,
+        ).to(dtype=self.dtype_c, device=self.weights_base.device)
 
-        return weights_base * weights_mod
+        delta_b_r = torch.empty([self.shape[-2], self.rank_deltas], dtype=self.dtype_r)
+        delta_b_r = nn.init.uniform_(
+            tensor=delta_b_r,
+            a=-bound,
+            b=+bound,
+        )
+        delta_b_i = torch.empty_like(delta_b_r)
+        delta_b_i = nn.init.uniform_(
+            tensor=delta_b_i,
+            a=-bound,
+            b=+bound,
+        )
+        delta_b = torch.complex(
+            real=delta_b_r,
+            imag=delta_b_i,
+        ).to(dtype=self.dtype_c, device=self.weights_base.device)
+
+        return delta_a, delta_b
 
     def _get_base_controls(
         self,
@@ -214,6 +242,60 @@ class WeightsLib2D(nn.Module):
 
         return mod_controls
 
+    def _get_deltas(
+        self,
+        name: str,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        weights_name = f"weight_deltas_{name}"
+
+        try:
+            delta_a = self.get_parameter(f"{weights_name}_a")
+            delta_b = self.get_parameter(f"{weights_name}_b")
+        except AttributeError:
+            delta_a, delta_b = self._create_deltas()
+
+            self.register_parameter(
+                name=f"{weights_name}_a",
+                param=nn.Parameter(
+                    data=delta_a,
+                ),
+            )
+            self.register_parameter(
+                name=f"{weights_name}_b",
+                param=nn.Parameter(
+                    data=delta_b,
+                ),
+            )
+
+        return delta_a, delta_b
+
+    def _get_weights(
+        self,
+        base_controls: torch.Tensor,
+        mod_controls: torch.Tensor,
+        deltas: tuple[torch.Tensor, torch.Tensor],
+    ) -> torch.Tensor:
+        weights_base = self.weights_base + base_controls[0]
+        weights_base = (weights_base**2) * base_controls[1]
+
+        weights_mod_i = self.weights_mod_i + mod_controls[0, ..., 0].unsqueeze(-1)
+        weights_mod_i = (weights_mod_i**2) * mod_controls[0, ..., 1].unsqueeze(-1)
+        weights_mod_j = self.weights_mod_j + mod_controls[1, ..., 0].unsqueeze(-1)
+        weights_mod_j = (weights_mod_j**2) * mod_controls[1, ..., 1].unsqueeze(-1)
+        weights_mod = weights_mod_i.permute([-1, -2]) @ weights_mod_j
+
+        base_mod = weights_base * weights_mod
+
+        delta_a = base_mod @ deltas[0]
+        delta_a = delta_a**2
+        delta_b = (base_mod.permute([-1, -2]) @ deltas[1]).permute([-1, -2])
+        delta_b = delta_b**2
+        deltas = delta_a @ delta_b
+
+        base_deltas = weights_base * deltas
+
+        return base_mod + base_deltas
+
     def get_weights(
         self,
         name: str,
@@ -223,6 +305,9 @@ class WeightsLib2D(nn.Module):
                 name=name,
             ),
             mod_controls=self._get_mod_controls(
+                name=name,
+            ),
+            deltas=self._get_deltas(
                 name=name,
             ),
         )
