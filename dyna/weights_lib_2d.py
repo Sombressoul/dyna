@@ -9,8 +9,8 @@ class WeightsLib2D(nn.Module):
     def __init__(
         self,
         shape: Union[torch.Size, list[int]],
-        rank_mod: int = 8,
-        rank_deltas: int = 4,
+        rank_mod: int = 8, # best: 1/4 * sqrt(prod(shape))
+        rank_deltas: int = 4, # best: 1/16 * sqrt(prod(shape))
         dtype: torch.dtype = torch.float32,
         return_as_complex: bool = False,
     ) -> None:
