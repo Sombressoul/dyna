@@ -366,4 +366,4 @@ class WeightsLib2D(nn.Module):
             ),
         )
 
-        return weights if self.complex_output else weights.real
+        return weights.real if not self.complex_output else weights
