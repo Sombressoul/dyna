@@ -11,24 +11,44 @@ class WeightsLib2D(nn.Module):
         shape: Union[torch.Size, list[int]],
         rank_mod: Optional[int] = None,
         rank_deltas: int = 1,
+        use_deltas: bool = True,
+        complex: bool = True,
+        complex_output: bool = True,
         dtype: torch.dtype = torch.float32,
-        return_as_complex: bool = False,
     ) -> None:
         super().__init__()
-
+        
         # ================================================================================= #
         # ____________________________> Initial checks.
         # ================================================================================= #
         shape = torch.Size(shape) if type(shape) == list else shape
         dtype_r = dtype
-        dtype_c = torch.complex64 if dtype_r == torch.float32 else torch.complex128
+        
+        if dtype_r == torch.float32:
+            dtype_c = torch.complex64
+        elif dtype_r == torch.float64:
+            dtype_c = torch.complex128
+        else:
+            raise ValueError(f"Unsupported dtype: {dtype_r}.")
 
         assert len(shape) == 2, "Shape must be 2D."
         assert rank_deltas > 0, "Rank must be greater than 0."
-        assert dtype in [
-            torch.float32,
-            torch.float64,
-        ], "dtype must be float32 or float64."
+        
+        if complex_output:
+            assert complex, "Complex output is only supported in complex mode."
+
+        if complex:
+            assert dtype in [
+                torch.float32,
+                torch.float64,
+            ], "dtype must be float32 or float64 in complex mode."
+        else:
+            assert dtype in [
+                torch.bfloat16,
+                torch.float16,
+                torch.float32,
+                torch.float64,
+            ], "dtype must be bfloat16, float16, float32 or float64 in real mode."
 
         # ================================================================================= #
         # ____________________________> Parameters.
@@ -40,9 +60,11 @@ class WeightsLib2D(nn.Module):
             else int(math.sqrt(math.prod([*shape])))
         )
         self.rank_deltas = rank_deltas
-        self.dtype_r = dtype_r
-        self.dtype_c = dtype_c
-        self.return_as_complex = return_as_complex
+        self.use_deltas = use_deltas
+        self.complex = complex
+        self.complex_output = complex_output
+        self.dtype_real = dtype_r
+        self.dtype_complex = dtype_c
 
         # ================================================================================= #
         # ____________________________> Weights.
@@ -64,22 +86,26 @@ class WeightsLib2D(nn.Module):
     ) -> torch.Tensor:
         std = 1.0 / math.log(math.prod(self.shape), math.e)
 
-        base_r = torch.empty(self.shape, dtype=self.dtype_r)
+        base_r = torch.empty(self.shape, dtype=self.dtype_real)
         base_r = nn.init.normal_(
             tensor=base_r,
             mean=0.0,
             std=std,
         )
-        base_i = torch.empty_like(base_r)
-        base_i = nn.init.normal_(
-            tensor=base_i,
-            mean=0.0,
-            std=std,
-        )
-        base = torch.complex(
-            real=base_r,
-            imag=base_i,
-        ).to(self.dtype_c)
+
+        if self.complex:
+            base_i = torch.empty_like(base_r)
+            base_i = nn.init.normal_(
+                tensor=base_i,
+                mean=0.0,
+                std=std,
+            )
+            base = torch.complex(
+                real=base_r,
+                imag=base_i,
+            ).to(self.dtype_complex)
+        else:
+            base = base_r.to(self.dtype_real)
 
         return base
 
@@ -89,22 +115,26 @@ class WeightsLib2D(nn.Module):
     ) -> torch.Tensor:
         bound_r = bound_i = 1.0 / math.log(math.prod(self.shape), math.e)
 
-        mod_r = torch.empty(shape, dtype=self.dtype_r)
+        mod_r = torch.empty(shape, dtype=self.dtype_real)
         mod_r = nn.init.uniform_(
             tensor=mod_r,
             a=-bound_r,
             b=+bound_r,
         )
-        mod_i = torch.empty_like(mod_r)
-        mod_i = nn.init.uniform_(
-            tensor=mod_i,
-            a=-bound_i,
-            b=+bound_i,
-        )
-        mod = torch.complex(
-            real=mod_r,
-            imag=mod_i,
-        ).to(dtype=self.dtype_c, device=self.weights_base.device)
+
+        if self.complex:
+            mod_i = torch.empty_like(mod_r)
+            mod_i = nn.init.uniform_(
+                tensor=mod_i,
+                a=-bound_i,
+                b=+bound_i,
+            )
+            mod = torch.complex(
+                real=mod_r,
+                imag=mod_i,
+            ).to(dtype=self.dtype_complex, device=self.weights_base.device)
+        else:
+            mod = mod_r.to(dtype=self.dtype_real, device=self.weights_base.device)
 
         return mod
 
@@ -112,27 +142,31 @@ class WeightsLib2D(nn.Module):
         self,
     ) -> torch.Tensor:
         bias = nn.init.normal_(
-            tensor=torch.empty([1], dtype=self.dtype_r),
+            tensor=torch.empty([1], dtype=self.dtype_real),
             mean=0.0,
             std=math.sqrt(1.0 / math.sqrt(math.prod(self.shape))),
         )
         scale = nn.init.normal_(
-            tensor=torch.empty([1], dtype=self.dtype_r),
+            tensor=torch.empty([1], dtype=self.dtype_real),
             mean=1.0,
             std=math.sqrt(1.0 / math.sqrt(math.prod(self.shape))),
         )
 
         base_controls_r = torch.cat([bias, scale], dim=0)
-        base_controls_i = torch.empty_like(base_controls_r)
-        base_controls_i = nn.init.uniform_(
-            tensor=base_controls_i,
-            a=-math.sqrt((math.pi * 2) / math.sqrt(math.prod(self.shape))),
-            b=+math.sqrt((math.pi * 2) / math.sqrt(math.prod(self.shape))),
-        )
-        base_controls = torch.complex(
-            real=base_controls_r,
-            imag=base_controls_i,
-        ).to(dtype=self.dtype_c, device=self.weights_base.device)
+
+        if self.complex:
+            base_controls_i = torch.empty_like(base_controls_r)
+            base_controls_i = nn.init.uniform_(
+                tensor=base_controls_i,
+                a=-math.sqrt((math.pi * 2) / math.sqrt(math.prod(self.shape))),
+                b=+math.sqrt((math.pi * 2) / math.sqrt(math.prod(self.shape))),
+            )
+            base_controls = torch.complex(
+                real=base_controls_r,
+                imag=base_controls_i,
+            ).to(dtype=self.dtype_complex, device=self.weights_base.device)
+        else:
+            base_controls = base_controls_r.to(dtype=self.dtype_real, device=self.weights_base.device)
 
         return base_controls
 
@@ -140,27 +174,31 @@ class WeightsLib2D(nn.Module):
         self,
     ) -> torch.Tensor:
         bias = nn.init.normal_(
-            tensor=torch.empty([2, self.rank_mod, 1], dtype=self.dtype_r),
+            tensor=torch.empty([2, self.rank_mod, 1], dtype=self.dtype_real),
             mean=0.0,
             std=math.sqrt(1.0 / self.rank_mod),
         )
         scale = nn.init.normal_(
-            tensor=torch.empty([2, self.rank_mod, 1], dtype=self.dtype_r),
+            tensor=torch.empty([2, self.rank_mod, 1], dtype=self.dtype_real),
             mean=1.0,
             std=math.sqrt(1.0 / self.rank_mod),
         )
 
         mod_controls_r = torch.cat([bias, scale], dim=-1)
-        mod_controls_i = torch.empty_like(mod_controls_r)
-        mod_controls_i = nn.init.normal_(
-            tensor=mod_controls_i,
-            mean=0.0,
-            std=math.sqrt(1.0 / self.rank_mod),
-        )
-        mod_controls = torch.complex(
-            real=mod_controls_r,
-            imag=mod_controls_i,
-        ).to(dtype=self.dtype_c, device=self.weights_base.device)
+
+        if self.complex:
+            mod_controls_i = torch.empty_like(mod_controls_r)
+            mod_controls_i = nn.init.normal_(
+                tensor=mod_controls_i,
+                mean=0.0,
+                std=math.sqrt(1.0 / self.rank_mod),
+            )
+            mod_controls = torch.complex(
+                real=mod_controls_r,
+                imag=mod_controls_i,
+            ).to(dtype=self.dtype_complex, device=self.weights_base.device)
+        else:
+            mod_controls = mod_controls_r.to(dtype=self.dtype_real, device=self.weights_base.device)
 
         return mod_controls
 
@@ -169,39 +207,47 @@ class WeightsLib2D(nn.Module):
     ) -> tuple[torch.Tensor, torch.Tensor]:
         bound = math.sqrt((math.pi * 2) / (self.rank_deltas**2))
 
-        delta_a_r = torch.empty([self.shape[-1], self.rank_deltas], dtype=self.dtype_r)
+        delta_a_r = torch.empty([self.shape[-1], self.rank_deltas], dtype=self.dtype_real)
         delta_a_r = nn.init.uniform_(
             tensor=delta_a_r,
             a=-bound,
             b=+bound,
         )
-        delta_a_i = torch.empty_like(delta_a_r)
-        delta_a_i = nn.init.uniform_(
-            tensor=delta_a_i,
-            a=-bound,
-            b=+bound,
-        )
-        delta_a = torch.complex(
-            real=delta_a_r,
-            imag=delta_a_i,
-        ).to(dtype=self.dtype_c, device=self.weights_base.device)
 
-        delta_b_r = torch.empty([self.shape[-2], self.rank_deltas], dtype=self.dtype_r)
+        if self.complex:            
+            delta_a_i = torch.empty_like(delta_a_r)
+            delta_a_i = nn.init.uniform_(
+                tensor=delta_a_i,
+                a=-bound,
+                b=+bound,
+            )
+            delta_a = torch.complex(
+                real=delta_a_r,
+                imag=delta_a_i,
+            ).to(dtype=self.dtype_complex, device=self.weights_base.device)
+        else:
+            delta_a = delta_a_r.to(dtype=self.dtype_real, device=self.weights_base.device)
+
+        delta_b_r = torch.empty([self.shape[-2], self.rank_deltas], dtype=self.dtype_real)
         delta_b_r = nn.init.uniform_(
             tensor=delta_b_r,
             a=-bound,
             b=+bound,
         )
-        delta_b_i = torch.empty_like(delta_b_r)
-        delta_b_i = nn.init.uniform_(
-            tensor=delta_b_i,
-            a=-bound,
-            b=+bound,
-        )
-        delta_b = torch.complex(
-            real=delta_b_r,
-            imag=delta_b_i,
-        ).to(dtype=self.dtype_c, device=self.weights_base.device)
+
+        if self.complex:
+            delta_b_i = torch.empty_like(delta_b_r)
+            delta_b_i = nn.init.uniform_(
+                tensor=delta_b_i,
+                a=-bound,
+                b=+bound,
+            )
+            delta_b = torch.complex(
+                real=delta_b_r,
+                imag=delta_b_i,
+            ).to(dtype=self.dtype_complex, device=self.weights_base.device)
+        else:
+            delta_b = delta_b_r.to(dtype=self.dtype_real, device=self.weights_base.device)
 
         return delta_a, delta_b
 
@@ -289,15 +335,20 @@ class WeightsLib2D(nn.Module):
 
         base_mod = weights_base * weights_mod
 
-        delta_a = base_mod @ deltas[0]
-        delta_a = delta_a**2
-        delta_b = (base_mod.permute([-1, -2]) @ deltas[1]).permute([-1, -2])
-        delta_b = delta_b**2
-        deltas = delta_a @ delta_b
+        if self.use_deltas:
+            delta_a = base_mod @ deltas[0]
+            delta_a = delta_a**2
+            delta_b = (base_mod.permute([-1, -2]) @ deltas[1]).permute([-1, -2])
+            delta_b = delta_b**2
+            deltas = delta_a @ delta_b
 
-        base_deltas = weights_base * deltas
+            base_deltas = weights_base * deltas
 
-        return base_mod + base_deltas
+            weights = base_mod + base_deltas
+        else:
+            weights = base_mod
+
+        return weights
 
     def get_weights(
         self,
@@ -315,4 +366,4 @@ class WeightsLib2D(nn.Module):
             ),
         )
 
-        return weights if self.return_as_complex else weights.real
+        return weights if self.complex_output else weights.real
