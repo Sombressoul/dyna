@@ -176,13 +176,13 @@ class ExponentialWarper1D(nn.Module):
         self._log_x(x.real, "Input (complex, upscaled), real")
         self._log_x(x.imag, "Input (complex, upscaled), imag")
 
-        x = x ** torch.reshape(
+        x = torch.reshape(
             self.mat_exp,
             [
                 *[1 for _ in range(x.ndim - 1)],
                 self.mat_exp.shape[-1],
             ],
-        ).expand_as(x)
+        ).expand_as(x) ** x
         self._log_x(x.real, "Input (complex, upscaled, exponentiated), real")
         self._log_x(x.imag, "Input (complex, upscaled, exponentiated), imag")
 
