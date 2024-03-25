@@ -10,8 +10,9 @@ class ExponentialWarper1D(nn.Module):
 
     def __init__(
         self,
-        features: int,
-        scale: int = 2,
+        features_in: int,
+        features_hidden: Optional[int] = None,
+        features_out: Optional[int] = None,
         **kwargs,
     ) -> None:
         super(ExponentialWarper1D, self).__init__(**kwargs)
@@ -19,15 +20,19 @@ class ExponentialWarper1D(nn.Module):
         # ================================================================================= #
         # ____________________________> Initial checks.
         # ================================================================================= #
-        assert (
-            type(scale) == int and scale > 1
-        ), "Scale must be a positive integer greater than 1."
+        features_hidden = features_hidden if features_hidden is not None else features_in * 2
+        features_out = features_out if features_out is not None else features_in
+
+        assert type(features_in) == int and features_in > 0, "Features in must be a positive integer."
+        assert type(features_hidden) == int and features_hidden > 0, "Features hidden must be a positive integer."
+        assert type(features_out) == int and features_out > 0, "Features out must be a positive integer."
 
         # ================================================================================= #
         # ____________________________> Arguments.
         # ================================================================================= #
-        self.features = features
-        self.scale = scale
+        self.features_in = features_in
+        self.features_hidden = features_hidden
+        self.features_out = features_out
 
         # ================================================================================= #
         # ____________________________> Weights.
@@ -35,8 +40,8 @@ class ExponentialWarper1D(nn.Module):
         # Upscale matrix.
         mat_up_r = torch.empty(
             [
-                self.features,
-                self.features * self.scale,
+                self.features_in,
+                self.features_hidden,
             ],
             dtype=torch.float32,
         )
@@ -47,8 +52,8 @@ class ExponentialWarper1D(nn.Module):
         )
         mat_up_i = torch.empty(
             [
-                self.features,
-                self.features * self.scale,
+                self.features_in,
+                self.features_hidden,
             ],
             dtype=torch.float32,
         )
@@ -67,8 +72,8 @@ class ExponentialWarper1D(nn.Module):
         # Downscale matrix.
         mat_down_r = torch.empty(
             [
-                self.features * self.scale,
-                self.features,
+                self.features_hidden,
+                self.features_out,
             ],
             dtype=torch.float32,
         )
@@ -79,8 +84,8 @@ class ExponentialWarper1D(nn.Module):
         )
         mat_down_i = torch.empty(
             [
-                self.features * self.scale,
-                self.features,
+                self.features_hidden,
+                self.features_out,
             ],
             dtype=torch.float32,
         )
@@ -99,7 +104,7 @@ class ExponentialWarper1D(nn.Module):
         # Exponentiation matrix.
         mat_exp_r = torch.empty(
             [
-                self.features * self.scale,
+                self.features_hidden,
             ],
             dtype=torch.float32,
         )
@@ -110,7 +115,7 @@ class ExponentialWarper1D(nn.Module):
         )
         mat_exp_i = torch.empty(
             [
-                self.features * self.scale,
+                self.features_hidden,
             ],
             dtype=torch.float32,
         )
