@@ -417,7 +417,7 @@ class WeightsLib2D(nn.Module):
         weights_mod_i = weights_mod_i + mod_controls_i_bias
         weights_mod_i = (weights_mod_i**2) * mod_controls_i_scale
 
-        # i-dim: cast mod base and mod controls to match weights mod.
+        # j-dim: cast mod base and mod controls to match weights mod.
         weights_mod_j = self.weights_mod_j.unsqueeze(0).repeat(
             [mod_controls.shape[0], 1, 1]
         )
