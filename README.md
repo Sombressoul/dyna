@@ -2,6 +2,26 @@
 
 This repository contains work-in-progress state of my ongoing research and implementation of biologically inspired signal propagation framework `DyNA`.
 
+**What is this repository about and what is it for?**
+
+I see some fundamental problems in the conventional approaches to work with complex sequential data and this project is my attempt to workaround some of such problems.
+
+Key feature of the DyNA approach and the main principle could be described as follows:
+> _Any transformation (linear or nonlinear) applied to the data should be derived from the data semantics itself._
+
+
+**Fronts of research and development:**
+- Dynamic weight matrices. 
+  - **Done:** 
+    - dyna/weights_lib_2d.py: main concept.
+    - dyna/exponential_warper_1d.py: deriving of weights coefficients.
+- Dynamic activations. 
+  - **Partially done:** 
+    - dyna/modulated_activation_bell.py: "bell"-shaped activation.
+    - dyna/modulated_activation_sine.py: sinusoidal, Fourier-series like activation.
+- Dynamic routing. 
+  - **Work in progress**
+
 ---
 
 **Table of contents:**
