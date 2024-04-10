@@ -14,6 +14,13 @@ class WeightsLib2D(nn.Module):
         use_deltas: bool = True,
         complex: bool = True,
         complex_output: bool = True,
+        use_exponentiation: bool = False,
+        trainable_exponents_base: bool = True,
+        trainable_exponents_mod: bool = True,
+        trainable_exponents_deltas: bool = True,
+        exponents_initial_value_real: float = 1.0,
+        exponents_initial_value_imag: float = 0.0,
+        asymmetry: float = 1e-3,
         dtype: torch.dtype = torch.float32,
     ) -> None:
         super().__init__()
@@ -23,6 +30,11 @@ class WeightsLib2D(nn.Module):
         # ================================================================================= #
         shape = torch.Size(shape) if type(shape) == list else shape
         dtype_r = dtype
+
+        if trainable_exponents_deltas:
+            assert (
+                use_deltas
+            ), "Trainable deltas exponents are only supported in use_deltas mode."
 
         if not complex:
             dtype_c = None
@@ -38,6 +50,9 @@ class WeightsLib2D(nn.Module):
 
         if complex_output:
             assert complex, "Complex output is only supported in complex mode."
+
+        if use_exponentiation:
+            assert complex, "Exponentiation is only supported in complex mode."
 
         if complex:
             assert dtype in [
@@ -65,6 +80,13 @@ class WeightsLib2D(nn.Module):
         self.use_deltas = use_deltas
         self.complex = complex
         self.complex_output = complex_output
+        self.use_exponentiation = use_exponentiation
+        self.trainable_exponents_base = trainable_exponents_base
+        self.trainable_exponents_mod = trainable_exponents_mod
+        self.trainable_exponents_deltas = trainable_exponents_deltas
+        self.exponents_initial_value_real = exponents_initial_value_real
+        self.exponents_initial_value_imag = exponents_initial_value_imag
+        self.asymmetry = asymmetry
         self.dtype_real = dtype_r
         self.dtype_complex = dtype_c
 
@@ -367,13 +389,256 @@ class WeightsLib2D(nn.Module):
 
         return deltas_a, deltas_b
 
+    def _create_exponents_base(
+        self,
+    ) -> torch.Tensor:
+        exponents_r = nn.init.normal_(
+            tensor=torch.empty([1], dtype=self.dtype_real),
+            mean=self.exponents_initial_value_real,
+            std=self.asymmetry,
+        )
+
+        if self.complex:
+            exponents_i = nn.init.normal_(
+                tensor=torch.empty([1], dtype=self.dtype_real),
+                mean=self.exponents_initial_value_imag,
+                std=self.asymmetry,
+            )
+            exponents = torch.complex(
+                real=exponents_r,
+                imag=exponents_i,
+            ).to(dtype=self.dtype_complex, device=self.weights_base.device)
+        else:
+            exponents = exponents_r.to(
+                dtype=self.dtype_real, device=self.weights_base.device
+            )
+
+        return exponents
+
+    def _get_exponents_base(
+        self,
+        name: str,
+    ) -> torch.Tensor:
+        exponents_name = f"exponents_base_{name}"
+
+        if self.trainable_exponents_base:
+            try:
+                exponents_base = self.get_parameter(exponents_name)
+            except AttributeError:
+                exponents_base = self._create_exponents_base()
+
+                self.register_parameter(
+                    name=exponents_name,
+                    param=nn.Parameter(
+                        data=exponents_base,
+                    ),
+                )
+        else:
+            exponents_base = (
+                torch.complex(
+                    real=torch.tensor(self.exponents_initial_value_real),
+                    imag=torch.tensor(self.exponents_initial_value_imag),
+                ).to(
+                    dtype=self.dtype_complex,
+                    device=self.weights_base.device,
+                )
+                if self.complex
+                else torch.tensor(self.exponents_initial_value_real).to(
+                    dtype=self.dtype_real,
+                    device=self.weights_base.device,
+                )
+            )
+            exponents_base = exponents_base.requires_grad_(False)
+
+        return exponents_base
+
+    def _get_exponents_base_list(
+        self,
+        names: Union[str, list[str]],
+    ) -> torch.Tensor:
+        names = names if isinstance(names, list) else [names]
+
+        exponents_list = [self._get_exponents_base(name).unsqueeze(0) for name in names]
+        exponents = torch.cat(exponents_list, dim=0)
+
+        return exponents
+
+    def _create_exponents_mod(
+        self,
+    ) -> torch.Tensor:
+        exponents_r = nn.init.normal_(
+            tensor=torch.empty([2, self.rank_mod, 1], dtype=self.dtype_real),
+            mean=self.exponents_initial_value_real,
+            std=self.asymmetry,
+        )
+
+        if self.complex:
+            exponents_i = nn.init.normal_(
+                tensor=torch.empty([2, self.rank_mod, 1], dtype=self.dtype_real),
+                mean=self.exponents_initial_value_imag,
+                std=self.asymmetry,
+            )
+            exponents = torch.complex(
+                real=exponents_r,
+                imag=exponents_i,
+            ).to(dtype=self.dtype_complex, device=self.weights_base.device)
+        else:
+            exponents = exponents_r.to(
+                dtype=self.dtype_real, device=self.weights_base.device
+            )
+
+        return exponents
+
+    def _get_exponents_mod(
+        self,
+        name: str,
+    ) -> torch.Tensor:
+        exponents_name = f"exponents_mod_{name}"
+
+        if self.trainable_exponents_mod:
+            try:
+                exponents_mod = self.get_parameter(exponents_name)
+            except AttributeError:
+                exponents_mod = self._create_exponents_mod()
+
+                self.register_parameter(
+                    name=exponents_name,
+                    param=nn.Parameter(
+                        data=exponents_mod,
+                    ),
+                )
+        else:
+            exponents_mod = (
+                torch.complex(
+                    real=torch.tensor(self.exponents_initial_value_real),
+                    imag=torch.tensor(self.exponents_initial_value_imag),
+                ).to(
+                    dtype=self.dtype_complex,
+                    device=self.weights_base.device,
+                )
+                if self.complex
+                else torch.tensor(self.exponents_initial_value_real).to(
+                    dtype=self.dtype_real,
+                    device=self.weights_base.device,
+                )
+            )
+            exponents_mod = exponents_mod.reshape([1, 1, 1])
+            exponents_mod = exponents_mod.repeat([2, self.rank_mod, 1])
+            exponents_mod = exponents_mod.requires_grad_(False)
+
+        return exponents_mod
+
+    def _get_exponents_mod_list(
+        self,
+        names: Union[str, list[str]],
+    ) -> torch.Tensor:
+        names = names if isinstance(names, list) else [names]
+
+        exponents_list = [self._get_exponents_mod(name).unsqueeze(0) for name in names]
+        exponents = torch.cat(exponents_list, dim=0)
+
+        return exponents
+
+    def _create_exponents_deltas(
+        self,
+    ) -> torch.Tensor:
+        exponents = (
+            torch.complex(
+                real=nn.init.normal_(
+                    tensor=torch.empty([2, 1], dtype=self.dtype_real),
+                    mean=self.exponents_initial_value_real,
+                    std=self.asymmetry,
+                ),
+                imag=nn.init.normal_(
+                    tensor=torch.empty([2, 1], dtype=self.dtype_real),
+                    mean=self.exponents_initial_value_imag,
+                    std=self.asymmetry,
+                ),
+            ).to(
+                dtype=self.dtype_complex,
+                device=self.weights_base.device,
+            )
+            if self.complex
+            else nn.init.normal_(
+                tensor=torch.empty([2, 1], dtype=self.dtype_real),
+                mean=self.exponents_initial_value_real,
+                std=self.asymmetry,
+            ).to(
+                dtype=self.dtype_real,
+                device=self.weights_base.device,
+            )
+        )
+
+        return exponents
+
+    def _get_exponents_deltas(
+        self,
+        name: str,
+    ) -> torch.Tensor:
+        exponents_name = f"exponents_deltas_{name}"
+
+        if self.trainable_exponents_deltas:
+            try:
+                exponents_deltas = self.get_parameter(exponents_name)
+            except AttributeError:
+                exponents_deltas = self._create_exponents_deltas()
+
+                self.register_parameter(
+                    name=exponents_name,
+                    param=nn.Parameter(
+                        data=exponents_deltas,
+                    ),
+                )
+        else:
+            exponents_deltas = (
+                torch.complex(
+                    real=nn.init.constant_(
+                        tensor=torch.empty([2, 1], dtype=self.dtype_real),
+                        val=self.exponents_initial_value_real,
+                    ),
+                    imag=nn.init.constant_(
+                        tensor=torch.empty([2, 1], dtype=self.dtype_real),
+                        val=self.exponents_initial_value_imag,
+                    ),
+                ).to(
+                    dtype=self.dtype_complex,
+                    device=self.weights_base.device,
+                )
+                if self.complex
+                else nn.init.constant_(
+                    tensor=torch.empty([2, 1], dtype=self.dtype_real),
+                    val=self.exponents_initial_value_real,
+                ).to(
+                    dtype=self.dtype_real,
+                    device=self.weights_base.device,
+                )
+            ).requires_grad_(False)
+
+        return exponents_deltas
+
+    def _get_exponents_deltas_list(
+        self,
+        names: Union[str, list[str]],
+    ) -> torch.Tensor:
+        names = names if isinstance(names, list) else [names]
+
+        exponents_list = [
+            self._get_exponents_deltas(name).unsqueeze(0) for name in names
+        ]
+        exponents = torch.cat(exponents_list, dim=0)
+
+        return exponents
+
     def _get_weights(
         self,
         base_controls: torch.Tensor,
         mod_controls: torch.Tensor,
         deltas: tuple[torch.Tensor, torch.Tensor],
+        exponents_base: Optional[torch.Tensor] = None,  # [n, 1]
+        exponents_mod: Optional[torch.Tensor] = None,  # [n, 2, mod_rank, 1]
+        exponents_deltas: Optional[torch.Tensor] = None,  # [n, 2, 1]
     ) -> torch.Tensor:
-        # Cast base and base controls to match weights base.
+        # Cast base, base controls and base exponents to match weights base.
         weights_base = self.weights_base.unsqueeze(0).repeat(
             [base_controls.shape[0], 1, 1]
         )
@@ -400,7 +665,18 @@ class WeightsLib2D(nn.Module):
 
         # Apply base controls.
         weights_base = weights_base + base_controls_bias
-        weights_base = (weights_base**2) * base_controls_scale
+        weights_base = (
+            weights_base.pow(
+                exponents_base.reshape(
+                    [
+                        base_controls.shape[0],
+                        *[1 for _ in range(len(weights_base.shape) - 1)],
+                    ]
+                )
+            ).mul(base_controls_scale)
+            if self.use_exponentiation
+            else weights_base.mul(base_controls_scale)
+        )
 
         # i-dim: cast mod base and mod controls to match weights mod.
         weights_mod_i = self.weights_mod_i.unsqueeze(0).repeat(
@@ -415,7 +691,11 @@ class WeightsLib2D(nn.Module):
 
         # i-dim: apply mod controls.
         weights_mod_i = weights_mod_i + mod_controls_i_bias
-        weights_mod_i = (weights_mod_i**2) * mod_controls_i_scale
+        weights_mod_i = (
+            weights_mod_i.pow(exponents_mod[:, 0, ...]).mul(mod_controls_i_scale)
+            if self.use_exponentiation
+            else weights_mod_i.mul(mod_controls_i_scale)
+        )
 
         # j-dim: cast mod base and mod controls to match weights mod.
         weights_mod_j = self.weights_mod_j.unsqueeze(0).repeat(
@@ -430,7 +710,11 @@ class WeightsLib2D(nn.Module):
 
         # j-dim: apply mod controls.
         weights_mod_j = weights_mod_j + mod_controls_j_bias
-        weights_mod_j = (weights_mod_j**2) * mod_controls_j_scale
+        weights_mod_j = (
+            weights_mod_j.pow(exponents_mod[:, 1, ...]).mul(mod_controls_j_scale)
+            if self.use_exponentiation
+            else weights_mod_j.mul(mod_controls_j_scale)
+        )
 
         # Apply mod controls.
         weights_mod = weights_mod_i.permute([0, -1, -2]) @ weights_mod_j
@@ -439,14 +723,36 @@ class WeightsLib2D(nn.Module):
         # Apply deltas.
         if self.use_deltas:
             delta_a = base_mod @ deltas[0]
-            delta_a = delta_a**2
+            delta_a = (
+                delta_a.pow(
+                    exponents_deltas[:, 0, ...].reshape(
+                        [
+                            exponents_deltas.shape[0],
+                            *[1 for _ in range(len(delta_a.shape) - 1)],
+                        ]
+                    )
+                )
+                if self.use_exponentiation
+                else delta_a
+            )
             delta_b = (base_mod.permute([0, -1, -2]) @ deltas[1]).permute([0, -1, -2])
-            delta_b = delta_b**2
+            delta_b = (
+                delta_b.pow(
+                    exponents_deltas[:, 1, ...].reshape(
+                        [
+                            exponents_deltas.shape[0],
+                            *[1 for _ in range(len(delta_b.shape) - 1)],
+                        ]
+                    )
+                )
+                if self.use_exponentiation
+                else delta_b
+            )
+
             deltas = delta_a @ delta_b
+            deltas = weights_base * deltas
 
-            base_deltas = weights_base * deltas
-
-            weights = base_mod + base_deltas
+            weights = base_mod + deltas
         else:
             weights = base_mod
 
@@ -467,6 +773,27 @@ class WeightsLib2D(nn.Module):
             ),
             deltas=self._get_deltas_list(
                 names=names,
+            ),
+            exponents_base=(
+                self._get_exponents_base_list(
+                    names=names,
+                )
+                if self.use_exponentiation
+                else None
+            ),
+            exponents_mod=(
+                self._get_exponents_mod_list(
+                    names=names,
+                )
+                if self.use_exponentiation
+                else None
+            ),
+            exponents_deltas=(
+                self._get_exponents_deltas_list(
+                    names=names,
+                )
+                if self.use_exponentiation
+                else None
             ),
         )
 
