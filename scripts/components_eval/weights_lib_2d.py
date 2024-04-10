@@ -12,6 +12,9 @@ sys.path.append(project_dir)
 from dyna import WeightsLib2D
 
 
+model = None
+
+
 class Model(nn.Module):
     def __init__(
         self,
@@ -20,11 +23,20 @@ class Model(nn.Module):
         rank_deltas: int = 4,
         complex: bool = True,
         complex_output: bool = True,
+        use_exponentiation: bool = True,
+        trainable_exponents_base: bool = True,
+        trainable_exponents_mod: bool = True,
+        trainable_exponents_deltas: bool = True,
+        exponents_initial_value_real: float = 2.0,
+        exponents_initial_value_imag: float = 0.0,
+        asymmetry: float = 1e-2,
         dtype: torch.dtype = torch.bfloat16,
     ) -> None:
         super().__init__()
 
         self.shape = shape
+
+        print(f"{use_exponentiation=}")
 
         self.weights = WeightsLib2D(
             shape=shape,
@@ -32,6 +44,13 @@ class Model(nn.Module):
             rank_deltas=rank_deltas,
             complex=complex,
             complex_output=complex_output,
+            use_exponentiation=use_exponentiation,
+            trainable_exponents_base=trainable_exponents_base,
+            trainable_exponents_mod=trainable_exponents_mod,
+            trainable_exponents_deltas=trainable_exponents_deltas,
+            exponents_initial_value_real=exponents_initial_value_real,
+            exponents_initial_value_imag=exponents_initial_value_imag,
+            asymmetry=asymmetry,
             dtype=dtype,
         )
 
@@ -99,6 +118,8 @@ def train(
 
 
 def main():
+    global model
+
     parser = argparse.ArgumentParser(description="evaluation")
     parser.add_argument(
         "--mat-shape",
@@ -142,6 +163,48 @@ def main():
         default=False,
         action="store_true",
         help="use complex numbers for the output (default: False)",
+    )
+    parser.add_argument(
+        "--use-exponentiation",
+        default=True,
+        action="store_false",
+        help="use exponentiation (default: False)",
+    )
+    parser.add_argument(
+        "--no-trainable-exponents-base",
+        default=False,
+        action="store_true",
+        help="do not train the base exponents (default: False)",
+    )
+    parser.add_argument(
+        "--no-trainable-exponents-mod",
+        default=False,
+        action="store_true",
+        help="do not train the mod exponents (default: False)",
+    )
+    parser.add_argument(
+        "--no-trainable-exponents-deltas",
+        default=False,
+        action="store_true",
+        help="do not train the deltas exponents (default: False)",
+    )
+    parser.add_argument(
+        "--exponents-initial-value-real",
+        type=float,
+        default=1.0,
+        help="initial value for the real part of the exponents (default: 1.0)",
+    )
+    parser.add_argument(
+        "--exponents-initial-value-imag",
+        type=float,
+        default=0.0,
+        help="initial value for the imaginary part of the exponents (default: 0.0)",
+    )
+    parser.add_argument(
+        "--asymmetry",
+        type=float,
+        default=1e-3,
+        help="asymmetry (default: 1e-3)",
     )
     parser.add_argument(
         "--iterations",
@@ -205,6 +268,13 @@ def main():
         rank_deltas=args.lib_rank_delta,
         complex=not args.no_complex,
         complex_output=args.complex_output,
+        use_exponentiation=not args.use_exponentiation,
+        trainable_exponents_base=not args.no_trainable_exponents_base,
+        trainable_exponents_mod=not args.no_trainable_exponents_mod,
+        trainable_exponents_deltas=not args.no_trainable_exponents_deltas,
+        exponents_initial_value_real=args.exponents_initial_value_real,
+        exponents_initial_value_imag=args.exponents_initial_value_imag,
+        asymmetry=args.asymmetry,
         dtype=dtype,
     ).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=1.0e-3)
