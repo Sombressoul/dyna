@@ -36,8 +36,6 @@ class Model(nn.Module):
 
         self.shape = shape
 
-        print(f"{use_exponentiation=}")
-
         self.weights = WeightsLib2D(
             shape=shape,
             rank_mod=rank_mod,
@@ -166,8 +164,8 @@ def main():
     )
     parser.add_argument(
         "--use-exponentiation",
-        default=True,
-        action="store_false",
+        default=False,
+        action="store_true",
         help="use exponentiation (default: False)",
     )
     parser.add_argument(
@@ -268,7 +266,7 @@ def main():
         rank_deltas=args.lib_rank_delta,
         complex=not args.no_complex,
         complex_output=args.complex_output,
-        use_exponentiation=not args.use_exponentiation,
+        use_exponentiation=args.use_exponentiation,
         trainable_exponents_base=not args.no_trainable_exponents_base,
         trainable_exponents_mod=not args.no_trainable_exponents_mod,
         trainable_exponents_deltas=not args.no_trainable_exponents_deltas,
