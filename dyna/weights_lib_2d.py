@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import math
 
-from typing import Union, Optional
+from typing import Union, Optional, Callable
 
 
 class WeightsLib2D(nn.Module):
@@ -21,6 +21,7 @@ class WeightsLib2D(nn.Module):
         exponents_initial_value_real: float = 1.0,
         exponents_initial_value_imag: float = 0.0,
         asymmetry: float = 1e-3,
+        activation: Optional[Union[str, Callable]] = "cardioid",
         dtype: torch.dtype = torch.float32,
     ) -> None:
         super().__init__()
@@ -87,6 +88,7 @@ class WeightsLib2D(nn.Module):
         self.exponents_initial_value_real = exponents_initial_value_real
         self.exponents_initial_value_imag = exponents_initial_value_imag
         self.asymmetry = asymmetry
+        self.activation = self._get_activation(activation)
         self.dtype_real = dtype_r
         self.dtype_complex = dtype_c
 
@@ -104,6 +106,28 @@ class WeightsLib2D(nn.Module):
         )
 
         pass
+
+    def _get_activation(
+        self,
+        activation: Optional[Union[str, Callable]],
+    ) -> Callable:
+        if type(activation) == str:
+            if activation == "cardioid":
+                activation = self._activation_cardioid
+            else:
+                raise ValueError(f"Unsupported activation: {activation}.")
+        elif activation is None:
+            activation = lambda x: x
+        else:
+            assert callable(activation), "Activation must be callable."
+
+        return activation
+
+    def _activation_cardioid(
+        self,
+        x: torch.Tensor,
+    ) -> torch.Tensor:
+        return 0.5 * (1.0 + torch.cos(torch.angle(x))) * x
 
     def _create_weights_base(
         self,
@@ -675,8 +699,9 @@ class WeightsLib2D(nn.Module):
                 )
             ).mul(base_controls_scale)
             if self.use_exponentiation
-            else weights_base.mul(base_controls_scale)
+            else weights_base
         )
+        weights_base = weights_base.mul(base_controls_scale)
 
         # i-dim: cast mod base and mod controls to match weights mod.
         weights_mod_i = self.weights_mod_i.unsqueeze(0).repeat(
@@ -694,8 +719,10 @@ class WeightsLib2D(nn.Module):
         weights_mod_i = (
             weights_mod_i.pow(exponents_mod[:, 0, ...]).mul(mod_controls_i_scale)
             if self.use_exponentiation
-            else weights_mod_i.mul(mod_controls_i_scale)
+            else weights_mod_i
         )
+        weights_mod_i = self.activation(weights_mod_i)
+        weights_mod_i = weights_mod_i.mul(mod_controls_i_scale)
 
         # j-dim: cast mod base and mod controls to match weights mod.
         weights_mod_j = self.weights_mod_j.unsqueeze(0).repeat(
@@ -713,11 +740,14 @@ class WeightsLib2D(nn.Module):
         weights_mod_j = (
             weights_mod_j.pow(exponents_mod[:, 1, ...]).mul(mod_controls_j_scale)
             if self.use_exponentiation
-            else weights_mod_j.mul(mod_controls_j_scale)
+            else weights_mod_j
         )
+        weights_mod_j = self.activation(weights_mod_j)
+        weights_mod_j = weights_mod_j.mul(mod_controls_j_scale)
 
         # Apply mod controls.
         weights_mod = weights_mod_i.permute([0, -1, -2]) @ weights_mod_j
+        weights_mod = self.activation(weights_mod)
         base_mod = weights_base * weights_mod
 
         # Apply deltas.
@@ -735,6 +765,8 @@ class WeightsLib2D(nn.Module):
                 if self.use_exponentiation
                 else delta_a
             )
+            delta_a = self.activation(delta_a)
+            
             delta_b = (base_mod.permute([0, -1, -2]) @ deltas[1]).permute([0, -1, -2])
             delta_b = (
                 delta_b.pow(
@@ -748,9 +780,12 @@ class WeightsLib2D(nn.Module):
                 if self.use_exponentiation
                 else delta_b
             )
+            delta_b = self.activation(delta_b)
 
             deltas = delta_a @ delta_b
+            deltas = self.activation(deltas)
             deltas = weights_base * deltas
+            deltas = self.activation(deltas)
 
             weights = base_mod + deltas
         else:
