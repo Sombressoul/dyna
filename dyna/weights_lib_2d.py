@@ -95,6 +95,16 @@ class WeightsLib2D(nn.Module):
         # ================================================================================= #
         # ____________________________> Weights.
         # ================================================================================= #
+        self.weights_main_i = nn.Parameter(
+            data=self._create_weights_base(
+                shape=torch.Size([self.shape[0], self.shape[0]]),
+            ),
+        )
+        self.weights_main_j = nn.Parameter(
+            data=self._create_weights_base(
+                shape=torch.Size([self.shape[1], self.shape[1]]),
+            ),
+        )
         self.weights_base = nn.Parameter(
             data=self._create_weights_base(),
         )
@@ -131,10 +141,13 @@ class WeightsLib2D(nn.Module):
 
     def _create_weights_base(
         self,
+        shape: torch.Size = None,
     ) -> torch.Tensor:
-        std = 1.0 / math.log(math.prod(self.shape), math.e)
+        shape = shape if shape is not None else self.shape
 
-        base_r = torch.empty(self.shape, dtype=self.dtype_real)
+        std = 1.0 / math.log(math.prod(shape), math.e)
+
+        base_r = torch.empty(shape, dtype=self.dtype_real)
         base_r = nn.init.normal_(
             tensor=base_r,
             mean=0.0,
@@ -662,10 +675,18 @@ class WeightsLib2D(nn.Module):
         exponents_mod: Optional[torch.Tensor] = None,  # [n, 2, mod_rank, 1]
         exponents_deltas: Optional[torch.Tensor] = None,  # [n, 2, 1]
     ) -> torch.Tensor:
-        # Cast base, base controls and base exponents to match weights base.
+        # Cast main weights.
+        weights_main_i = self.weights_main_i.unsqueeze(0).repeat(
+            [base_controls.shape[0], 1, 1]
+        )
+        weights_main_j = self.weights_main_j.unsqueeze(0).repeat(
+            [base_controls.shape[0], 1, 1]
+        )
         weights_base = self.weights_base.unsqueeze(0).repeat(
             [base_controls.shape[0], 1, 1]
         )
+
+        # Cast base controls and base exponents to match target weights.
         base_controls_bias = (
             base_controls[:, 0]
             .reshape(
@@ -697,7 +718,7 @@ class WeightsLib2D(nn.Module):
                         *[1 for _ in range(len(weights_base.shape) - 1)],
                     ]
                 )
-            ).mul(base_controls_scale)
+            )
             if self.use_exponentiation
             else weights_base
         )
@@ -748,7 +769,8 @@ class WeightsLib2D(nn.Module):
         # Apply mod controls.
         weights_mod = weights_mod_i.permute([0, -1, -2]) @ weights_mod_j
         weights_mod = self.activation(weights_mod)
-        base_mod = weights_base * weights_mod
+        weights_mod = weights_mod * math.log(self.rank_mod)
+        base_mod = weights_base + (weights_base * weights_mod)
 
         # Apply deltas.
         if self.use_deltas:
@@ -766,7 +788,7 @@ class WeightsLib2D(nn.Module):
                 else delta_a
             )
             delta_a = self.activation(delta_a)
-            
+
             delta_b = (base_mod.permute([0, -1, -2]) @ deltas[1]).permute([0, -1, -2])
             delta_b = (
                 delta_b.pow(
@@ -787,9 +809,13 @@ class WeightsLib2D(nn.Module):
             deltas = weights_base * deltas
             deltas = self.activation(deltas)
 
-            weights = base_mod + deltas
+            weights_dynamic = base_mod + deltas
         else:
-            weights = base_mod
+            weights_dynamic = base_mod
+
+        weights = weights_main_i @ weights_dynamic
+        weights = self.activation(weights)
+        weights = weights @ weights_main_j
 
         return weights
 
