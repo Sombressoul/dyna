@@ -144,12 +144,24 @@ def generate_data_random(
     return base
 
 
+def sample_results(
+    target: torch.Tensor,
+    output: torch.Tensor,
+    count_samples: int,
+) -> None:
+    for i in range(count_samples):
+        print(f"\nMat #{i} samples:")
+        print(f"Target: {target[i, 0, 0:16].cpu().detach().numpy().tolist()}")
+        print(f"Output: {output[i, 0, 0:16].cpu().detach().numpy().tolist()}")
+
+
 def train(
     data: torch.Tensor,
     model: Model,
     optimizer: torch.optim.Optimizer,
     iterations: int,
     log_nth_iteration: int,
+    results_sample_count: int,
 ) -> None:
     preheat_output = model()  # Preheat.
     params_model = sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -174,11 +186,11 @@ def train(
         if (i + 1) % log_nth_iteration == 0:
             print(f"Iteration #{i+1:<10d}: Loss: {loss.item()}")
 
-    print(f"{data[0, 0, 0:16]=}")
-    print(f"{output[0, 0, 0:16]=}")
-
-    params_model = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    params_data = data.numel()
+    sample_results(
+        target=data,
+        output=output,
+        count_samples=min(model.count_weights_variations, results_sample_count),
+    )
 
     pass
 
@@ -326,6 +338,12 @@ def main():
         default=1,
         help="random seed (default: 1)",
     )
+    parser.add_argument(
+        "--results-sample-count",
+        type=int,
+        default=4,
+        help="how many results to sample (default: 4)",
+    )
     args = parser.parse_args()
 
     print(f"Running with arguments:")
@@ -387,6 +405,7 @@ def main():
         optimizer=optimizer,
         iterations=args.iterations,
         log_nth_iteration=args.log_nth_iteration,
+        results_sample_count=args.results_sample_count,
     )
 
 
