@@ -4,14 +4,16 @@ import math
 
 from typing import Union, Optional, Callable
 
-
+# Best with:
+#   - no deltas, no exponentiation, complex
+#   - deltas with trainable exponents, complex
 class WeightsLib2D(nn.Module):
     def __init__(
         self,
         shape: Union[torch.Size, list[int]],
         rank_mod: Optional[int] = None,
         rank_deltas: int = 1,
-        use_deltas: bool = True,
+        use_deltas: bool = False,
         complex: bool = True,
         complex_output: bool = True,
         use_exponentiation: bool = False,
@@ -32,7 +34,7 @@ class WeightsLib2D(nn.Module):
         shape = torch.Size(shape) if type(shape) == list else shape
         dtype_r = dtype
 
-        if trainable_exponents_deltas:
+        if use_exponentiation and trainable_exponents_deltas:
             assert (
                 use_deltas
             ), "Trainable deltas exponents are only supported in use_deltas mode."
@@ -136,8 +138,37 @@ class WeightsLib2D(nn.Module):
     def _activation_cardioid(
         self,
         x: torch.Tensor,
+        operand_name: str,
     ) -> torch.Tensor:
-        return 0.5 * (1.0 + torch.cos(torch.angle(x))) * x
+        alpha_weight_name = f"activation_alpha_{operand_name}"
+
+        try:
+            alpha = getattr(self, alpha_weight_name)
+        except AttributeError:
+            alpha = torch.complex(
+                real=torch.nn.init.normal_(
+                    tensor=torch.empty([1], dtype=self.dtype_real),
+                    mean=1.0,
+                    std=self.asymmetry,
+                ),
+                imag=torch.nn.init.normal_(
+                    tensor=torch.empty([1], dtype=self.dtype_real),
+                    mean=0.0,
+                    std=self.asymmetry,
+                ),
+            ).to(dtype=self.dtype_complex, device=self.weights_base.device)
+
+            self.register_parameter(
+                name=alpha_weight_name,
+                param=nn.Parameter(
+                    data=alpha,
+                ),
+            )
+
+        cos_arg = torch.angle(x) + torch.angle(alpha)
+        fx = 0.5 * (1.0 + torch.cos(cos_arg)) * x
+
+        return fx
 
     def _create_weights_base(
         self,
@@ -675,6 +706,9 @@ class WeightsLib2D(nn.Module):
         exponents_mod: Optional[torch.Tensor] = None,  # [n, 2, mod_rank, 1]
         exponents_deltas: Optional[torch.Tensor] = None,  # [n, 2, 1]
     ) -> torch.Tensor:
+        # Various functions.
+        normalize = lambda x: (x - x.mean(dim=-1, keepdim=True)) / x.std(dim=0, keepdim=True)
+
         # Cast main weights.
         weights_main_i = self.weights_main_i.unsqueeze(0).repeat(
             [base_controls.shape[0], 1, 1]
@@ -742,7 +776,7 @@ class WeightsLib2D(nn.Module):
             if self.use_exponentiation
             else weights_mod_i
         )
-        weights_mod_i = self.activation(weights_mod_i)
+        weights_mod_i = self.activation(weights_mod_i, "weights_mod_i")
         weights_mod_i = weights_mod_i.mul(mod_controls_i_scale)
 
         # j-dim: cast mod base and mod controls to match weights mod.
@@ -763,13 +797,13 @@ class WeightsLib2D(nn.Module):
             if self.use_exponentiation
             else weights_mod_j
         )
-        weights_mod_j = self.activation(weights_mod_j)
+        weights_mod_j = self.activation(weights_mod_j, "weights_mod_j")
         weights_mod_j = weights_mod_j.mul(mod_controls_j_scale)
 
         # Apply mod controls.
         weights_mod = weights_mod_i.permute([0, -1, -2]) @ weights_mod_j
-        weights_mod = self.activation(weights_mod)
-        weights_mod = weights_mod * math.log(self.rank_mod)
+        weights_mod = self.activation(weights_mod, "weights_mod")
+        weights_mod = normalize(weights_mod) + 1.0
         base_mod = weights_base + (weights_base * weights_mod)
 
         # Apply deltas.
@@ -787,7 +821,7 @@ class WeightsLib2D(nn.Module):
                 if self.use_exponentiation
                 else delta_a
             )
-            delta_a = self.activation(delta_a)
+            delta_a = self.activation(delta_a, "delta_a")
 
             delta_b = (base_mod.permute([0, -1, -2]) @ deltas[1]).permute([0, -1, -2])
             delta_b = (
@@ -802,19 +836,19 @@ class WeightsLib2D(nn.Module):
                 if self.use_exponentiation
                 else delta_b
             )
-            delta_b = self.activation(delta_b)
+            delta_b = self.activation(delta_b, "delta_b")
 
-            deltas = delta_a @ delta_b
-            deltas = self.activation(deltas)
-            deltas = weights_base * deltas
-            deltas = self.activation(deltas)
+            deltas_combined = delta_a @ delta_b
+            deltas_combined = self.activation(deltas_combined, "deltas_combined")
+            deltas_weighted = base_mod * deltas_combined
+            deltas_weighted = self.activation(deltas_weighted, "deltas_weighted")
 
-            weights_dynamic = base_mod + deltas
+            weights_dynamic = base_mod + deltas_weighted
         else:
             weights_dynamic = base_mod
 
         weights = weights_main_i @ weights_dynamic
-        weights = self.activation(weights)
+        weights = self.activation(weights, "weights")
         weights = weights @ weights_main_j
 
         return weights

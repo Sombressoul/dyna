@@ -23,6 +23,7 @@ class Model(nn.Module):
         count_weights_components: int = 16,
         complex_components: bool = True,
         rank_mod: int = 8,
+        use_deltas: bool = True,
         rank_deltas: int = 4,
         complex: bool = True,
         complex_output: bool = True,
@@ -60,6 +61,7 @@ class Model(nn.Module):
         self.weights = WeightsLib2D(
             shape=shape,
             rank_mod=rank_mod,
+            use_deltas=use_deltas,
             rank_deltas=rank_deltas,
             complex=complex,
             complex_output=complex_components,
@@ -229,6 +231,12 @@ def main():
         help="mod rank of the library matrices (default: None (auto-select))",
     )
     parser.add_argument(
+        "--no-deltas",
+        default=False,
+        action="store_true",
+        help="do not use deltas (default: False)",
+    )
+    parser.add_argument(
         "--lib-rank-delta",
         type=int,
         default=16,
@@ -358,6 +366,7 @@ def main():
         count_weights_components=args.weights_count_components,
         complex_components=not args.no_complex_components,
         rank_mod=args.lib_rank_mod,
+        use_deltas=not args.no_deltas,
         rank_deltas=args.lib_rank_delta,
         complex=not args.no_complex,
         complex_output=args.complex_output,
