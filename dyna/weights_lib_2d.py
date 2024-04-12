@@ -4,9 +4,11 @@ import math
 
 from typing import Union, Optional, Callable
 
-# Best with:
-#   - no deltas, no exponentiation, complex
-#   - deltas with trainable exponents, complex
+# Notes:
+#   Combo #1: no deltas, no exponentiation, complex
+#       - fastest, good performance
+#   Combo #2: deltas with trainable exponents, complex
+#       - more diverse on long-range training
 class WeightsLib2D(nn.Module):
     def __init__(
         self,

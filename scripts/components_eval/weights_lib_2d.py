@@ -231,10 +231,10 @@ def main():
         help="mod rank of the library matrices (default: None (auto-select))",
     )
     parser.add_argument(
-        "--no-deltas",
+        "--use-deltas",
         default=False,
         action="store_true",
-        help="do not use deltas (default: False)",
+        help="use deltas (default: False)",
     )
     parser.add_argument(
         "--lib-rank-delta",
@@ -366,7 +366,7 @@ def main():
         count_weights_components=args.weights_count_components,
         complex_components=not args.no_complex_components,
         rank_mod=args.lib_rank_mod,
-        use_deltas=not args.no_deltas,
+        use_deltas=args.use_deltas,
         rank_deltas=args.lib_rank_delta,
         complex=not args.no_complex,
         complex_output=args.complex_output,
