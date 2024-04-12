@@ -4,6 +4,7 @@ import math
 
 from typing import Union, Optional, Callable
 
+
 # Notes:
 #   Combo #1: no deltas, no exponentiation, complex
 #       - fastest, good performance
@@ -24,6 +25,8 @@ class WeightsLib2D(nn.Module):
         trainable_exponents_deltas: bool = True,
         exponents_initial_value_real: float = 1.0,
         exponents_initial_value_imag: float = 0.0,
+        use_bias: bool = True,
+        use_scale: bool = True,
         asymmetry: float = 1e-3,
         activation: Optional[Union[str, Callable]] = "cardioid",
         dtype: torch.dtype = torch.float32,
@@ -93,6 +96,8 @@ class WeightsLib2D(nn.Module):
         self.exponents_initial_value_imag = exponents_initial_value_imag
         self.asymmetry = asymmetry
         self.activation = self._get_activation(activation)
+        self.use_bias = use_bias
+        self.use_scale = use_scale
         self.dtype_real = dtype_r
         self.dtype_complex = dtype_c
 
@@ -699,6 +704,132 @@ class WeightsLib2D(nn.Module):
 
         return exponents
 
+    def _create_bias(
+        self,
+    ) -> torch.Tensor:
+        bias = (
+            torch.complex(
+                real=nn.init.normal_(
+                    tensor=torch.empty([1], dtype=self.dtype_real),
+                    mean=0.0,
+                    std=self.asymmetry,
+                ),
+                imag=nn.init.normal_(
+                    tensor=torch.empty([1], dtype=self.dtype_real),
+                    mean=0.0,
+                    std=self.asymmetry,
+                ),
+            ).to(
+                dtype=self.dtype_complex,
+                device=self.weights_base.device,
+            )
+            if self.complex
+            else nn.init.normal_(
+                tensor=torch.empty([1], dtype=self.dtype_real),
+                mean=0.0,
+                std=self.asymmetry,
+            ).to(
+                dtype=self.dtype_real,
+                device=self.weights_base.device,
+            )
+        )
+
+        return bias
+
+    def _get_bias(
+        self,
+        name: str,
+    ) -> torch.Tensor:
+        bias_name = f"main_bias_{name}"
+
+        try:
+            bias = self.get_parameter(bias_name)
+        except AttributeError:
+            bias = self._create_bias()
+
+            self.register_parameter(
+                name=bias_name,
+                param=nn.Parameter(
+                    data=bias,
+                ),
+            )
+
+        return bias
+
+    def _get_bias_list(
+        self,
+        names: Union[str, list[str]],
+    ) -> torch.Tensor:
+        names = names if isinstance(names, list) else [names]
+
+        bias_list = [self._get_bias(name).unsqueeze(0) for name in names]
+        bias = torch.cat(bias_list, dim=0)
+
+        return bias
+
+    def _create_scale(
+        self,
+    ) -> torch.Tensor:
+        scale = (
+            torch.complex(
+                real=nn.init.normal_(
+                    tensor=torch.empty([1], dtype=self.dtype_real),
+                    mean=0.0,
+                    std=self.asymmetry,
+                ),
+                imag=nn.init.normal_(
+                    tensor=torch.empty([1], dtype=self.dtype_real),
+                    mean=0.0,
+                    std=self.asymmetry,
+                ),
+            ).to(
+                dtype=self.dtype_complex,
+                device=self.weights_base.device,
+            )
+            if self.complex
+            else nn.init.normal_(
+                tensor=torch.empty([1], dtype=self.dtype_real),
+                mean=1.0,
+                std=self.asymmetry,
+            ).to(
+                dtype=self.dtype_real,
+                device=self.weights_base.device,
+            )
+        )
+
+        return scale
+
+    def _get_scale(
+        self,
+        name: str,
+    ) -> torch.Tensor:
+        scale_name = f"main_scale_{name}"
+
+        try:
+            scale = self.get_parameter(scale_name)
+        except AttributeError:
+            scale = self._create_scale()
+
+            self.register_parameter(
+                name=scale_name,
+                param=nn.Parameter(
+                    data=scale,
+                ),
+            )
+
+        return scale
+
+    def _get_scale_list(
+        self,
+        names: Union[str, list[str]],
+    ) -> torch.Tensor:
+        names = names if isinstance(names, list) else [names]
+
+        scale_list = [self._get_scale(name).unsqueeze(0) for name in names]
+        scale = torch.cat(scale_list, dim=0)
+
+        return scale
+
     def _get_weights(
         self,
         base_controls: torch.Tensor,
@@ -707,9 +838,20 @@ class WeightsLib2D(nn.Module):
         exponents_base: Optional[torch.Tensor] = None,  # [n, 1]
         exponents_mod: Optional[torch.Tensor] = None,  # [n, 2, mod_rank, 1]
         exponents_deltas: Optional[torch.Tensor] = None,  # [n, 2, 1]
+        bias: Optional[torch.Tensor] = None,  # [n, 1]
+        scale: Optional[torch.Tensor] = None,  # [n, 1]
     ) -> torch.Tensor:
         # Various functions.
-        normalize = lambda x: (x - x.mean(dim=-1, keepdim=True)) / x.std(dim=0, keepdim=True)
+        normalize = lambda x: (
+            x
+            - x.mean(
+                dim=[-1, -2],
+                keepdim=True,
+            )
+        ) / x.std(
+            dim=[-1, -2],
+            keepdim=True,
+        )
 
         # Cast main weights.
         weights_main_i = self.weights_main_i.unsqueeze(0).repeat(
@@ -853,6 +995,31 @@ class WeightsLib2D(nn.Module):
         weights = self.activation(weights, "weights")
         weights = weights @ weights_main_j
 
+        weights = (
+            weights.add(
+                bias.reshape(
+                    [
+                        bias.shape[0],
+                        *[1 for _ in range(len(weights.shape) - 1)],
+                    ]
+                )
+            )
+            if self.use_bias
+            else weights
+        )
+        weights = (
+            weights.mul(
+                scale.reshape(
+                    [
+                        scale.shape[0],
+                        *[1 for _ in range(len(weights.shape) - 1)],
+                    ]
+                )
+            )
+            if self.use_scale
+            else weights
+        )
+
         return weights
 
     def get_weights(
@@ -890,6 +1057,20 @@ class WeightsLib2D(nn.Module):
                     names=names,
                 )
                 if self.use_exponentiation
+                else None
+            ),
+            bias=(
+                self._get_bias_list(
+                    names=names,
+                )
+                if self.use_bias
+                else None
+            ),
+            scale=(
+                self._get_scale_list(
+                    names=names,
+                )
+                if self.use_scale
                 else None
             ),
         )

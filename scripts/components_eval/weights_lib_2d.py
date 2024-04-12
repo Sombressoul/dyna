@@ -33,6 +33,8 @@ class Model(nn.Module):
         trainable_exponents_deltas: bool = True,
         exponents_initial_value_real: float = 2.0,
         exponents_initial_value_imag: float = 0.0,
+        use_bias: bool = True,
+        use_scale: bool = True,
         asymmetry: float = 1e-2,
         dtype: torch.dtype = torch.bfloat16,
     ) -> None:
@@ -71,6 +73,8 @@ class Model(nn.Module):
             trainable_exponents_deltas=trainable_exponents_deltas,
             exponents_initial_value_real=exponents_initial_value_real,
             exponents_initial_value_imag=exponents_initial_value_imag,
+            use_bias=use_bias,
+            use_scale=use_scale,
             asymmetry=asymmetry,
             dtype=dtype,
         )
@@ -303,6 +307,18 @@ def main():
         help="initial value for the imaginary part of the exponents (default: 0.0)",
     )
     parser.add_argument(
+        "--no-bias",
+        default=False,
+        action="store_true",
+        help="do not use bias (default: False)",
+    )
+    parser.add_argument(
+        "--no-scale",
+        default=False,
+        action="store_true",
+        help="do not use scale (default: False)",
+    )
+    parser.add_argument(
         "--asymmetry",
         type=float,
         default=1e-3,
@@ -394,6 +410,8 @@ def main():
         trainable_exponents_deltas=not args.no_trainable_exponents_deltas,
         exponents_initial_value_real=args.exponents_initial_value_real,
         exponents_initial_value_imag=args.exponents_initial_value_imag,
+        use_bias=not args.no_bias,
+        use_scale=not args.no_scale,
         asymmetry=args.asymmetry,
         dtype=dtype,
     ).to(device)
