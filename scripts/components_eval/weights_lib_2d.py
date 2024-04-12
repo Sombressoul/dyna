@@ -121,7 +121,6 @@ class Model(nn.Module):
         components_names = [f"x_{i}" for i in range(self.count_weights_components)]
         components_weights = self.weights.get_weights(components_names).unsqueeze(0)
         weights = components_weights.mul(self.coefficients)
-        # weights = torch.sigmoid(torch.log(weights))
         weights = weights.sum(dim=1, keepdim=False)
         weights = weights if self.complex_output else weights.real
 
@@ -134,8 +133,16 @@ def generate_data_deviative(
     mat_deviation: float,
     dtype: torch.dtype,
 ) -> torch.Tensor:
-    base = torch.randn(1, *shape)
-    mods = torch.randn(mat_count, *shape) * mat_deviation
+    base = torch.nn.init.uniform_(
+        tensor=torch.empty([1, *shape]),
+        a=-1.0,
+        b=+1.0,
+    )
+    mods = torch.nn.init.uniform_(
+        tensor=torch.empty([mat_count, *shape]),
+        a=-1.0,
+        b=+1.0,
+    ) * mat_deviation
     return (base.expand_as(mods) + mods).to(dtype)
 
 
@@ -144,7 +151,11 @@ def generate_data_random(
     mat_count: int,
     dtype: torch.dtype,
 ) -> torch.Tensor:
-    base = torch.randn(mat_count, *shape).to(dtype)
+    base = torch.nn.init.uniform_(
+        tensor=torch.empty([mat_count, *shape]),
+        a=-1.0,
+        b=+1.0,
+    ).to(dtype)
     return base
 
 
@@ -171,6 +182,7 @@ def train(
     params_model = sum(p.numel() for p in model.parameters() if p.requires_grad)
     params_data = data.numel()
 
+    print("\n# --------------------------------------------------- #\n")
     print(f"Model parameters: {params_model}")
     print(f"Data parameters: {params_data}")
     print(f"Ratio: {params_model / params_data}")
@@ -180,16 +192,20 @@ def train(
     print(f"{model.weights.weights_mod_j.dtype=}")
     print(f"Model output data type: {preheat_output.dtype}")
 
+    print("\n# --------------------------------------------------- #\n")
     for i in range(iterations):
         optimizer.zero_grad()
         output = model()
-        loss = (data - output).std()
+        loss = (data - output).std().sqrt()
         loss.backward()
         optimizer.step()
 
         if (i + 1) % log_nth_iteration == 0:
-            print(f"Iteration #{i+1:<10d}: Loss: {loss.item()}")
+            print(
+                f"Iteration #{i+1}: \nLoss: {loss.item()}\nStdR: {(data - output).std()}"
+            )
 
+    print("\n# --------------------------------------------------- #\n")
     sample_results(
         target=data,
         output=output,
@@ -362,6 +378,7 @@ def main():
     )
     args = parser.parse_args()
 
+    print("\n# --------------------------------------------------- #\n")
     print(f"Running with arguments:")
     print(" ".join(f"\t{k}={v}\n" for k, v in vars(args).items()))
 
@@ -394,6 +411,14 @@ def main():
             dtype=dtype,
         ).to(device)
     )
+    
+    print("\n# --------------------------------------------------- #\n")
+    print("Generated data specs:")
+    print(f"{data.min()=}")
+    print(f"{data.max()=}")
+    print(f"{data.mean()=}")
+    print(f"{data.std()=}")
+
     model = Model(
         shape=args.mat_shape,
         count_weights_variations=args.mat_count,
