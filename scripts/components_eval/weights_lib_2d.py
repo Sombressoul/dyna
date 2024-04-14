@@ -269,7 +269,7 @@ def main():
         help="use deltas (default: False)",
     )
     parser.add_argument(
-        "--lib-rank-delta",
+        "--lib-rank-deltas",
         type=int,
         default=16,
         help="deltas rank of the library matrices (default: 16)",
@@ -426,7 +426,7 @@ def main():
         complex_components=not args.no_complex_components,
         rank_mod=args.lib_rank_mod,
         use_deltas=args.use_deltas,
-        rank_deltas=args.lib_rank_delta,
+        rank_deltas=args.lib_rank_deltas,
         complex=not args.no_complex,
         complex_output=args.complex_output,
         use_exponentiation=args.use_exponentiation,
