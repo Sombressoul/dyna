@@ -892,6 +892,46 @@ class WeightsLib2D(nn.Module):
 
         return scale
 
+    def _normalize_real(
+        self,
+        x: torch.Tensor,
+    ) -> torch.Tensor:
+        num = x - x.mean(dim=[-1, -2], keepdim=True)
+        denom = x.std(dim=[-1, -2], keepdim=True)
+        return num / denom
+
+    def _normalize_polar(
+        self,
+        x: torch.Tensor,
+    ) -> torch.Tensor:
+        if torch.is_complex(x):
+            real = (x.abs() / x.abs().max()) * x.angle().cos()
+            imag = (x.abs() / x.abs().max()) * x.angle().sin()
+            x = torch.complex(
+                real=real,
+                imag=imag,
+            ).to(dtype=self.dtype_complex, device=x.device)
+        else:
+            x = self._normalize_real(x)
+
+        return x
+
+    def _normalize_partial(
+        self,
+        x: torch.Tensor,
+    ) -> torch.Tensor:
+        if torch.is_complex(x):
+            real = self._normalize_real(x.real)
+            imag = x.imag
+            x = torch.complex(
+                real=real,
+                imag=imag,
+            ).to(dtype=self.dtype_complex, device=x.device)
+        else:
+            x = self._normalize_real(x)
+
+        return x
+
     def _get_weights(
         self,
         base_controls: torch.Tensor,
@@ -903,24 +943,6 @@ class WeightsLib2D(nn.Module):
         bias: Optional[torch.Tensor] = None,  # [n, 1]
         scale: Optional[torch.Tensor] = None,  # [n, 1]
     ) -> torch.Tensor:
-        # Some kind of partial normalization.
-        normalize = lambda x: torch.complex(
-            real=(
-                (
-                    x.real
-                    - x.real.mean(
-                        dim=[-1, -2],
-                        keepdim=True,
-                    )
-                )
-                / x.real.std(
-                    dim=[-1, -2],
-                    keepdim=True,
-                )
-            ),
-            imag=x.imag,
-        ).to(dtype=self.dtype_complex, device=x.device)
-
         # Cast main weights.
         weights_main_i = self.weights_main_i.unsqueeze(0).repeat(
             [base_controls.shape[0], 1, 1]
@@ -1029,7 +1051,7 @@ class WeightsLib2D(nn.Module):
             weights_mod = weights_mod_i.permute([0, -1, -2]) @ weights_mod_j
         elif self.transformation_type == TransformationType.INVERSION:
             weights_mod = weights_mod_i.permute([0, -1, -2]) @ (1.0 / weights_mod_j)
-            weights_mod = normalize(weights_mod)
+            weights_mod = self._normalize_partial(weights_mod)
         else:
             raise ValueError(
                 f"Unknown transformation type: {self.transformation_type}."
@@ -1045,7 +1067,7 @@ class WeightsLib2D(nn.Module):
                 params=None,  # NOTE: temporary placeholder.
             ),
         )
-        weights_mod = normalize(weights_mod) + 1.0
+        weights_mod = self._normalize_partial(weights_mod) + 1.0
         base_mod = weights_base + (weights_base * weights_mod)
 
         # Apply deltas.
