@@ -3,6 +3,10 @@ import sys
 import argparse
 import torch
 import torch.nn as nn
+import torchvision
+import torchvision.transforms as transforms
+
+from PIL import Image
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 evals_dir = os.path.dirname(script_dir)
@@ -10,6 +14,7 @@ project_dir = os.path.dirname(evals_dir)
 sys.path.append(project_dir)
 
 from dyna import WeightsLib2D
+import os
 
 
 model = None
@@ -138,11 +143,14 @@ def generate_data_deviative(
         a=-1.0,
         b=+1.0,
     )
-    mods = torch.nn.init.uniform_(
-        tensor=torch.empty([mat_count, *shape]),
-        a=-1.0,
-        b=+1.0,
-    ) * mat_deviation
+    mods = (
+        torch.nn.init.uniform_(
+            tensor=torch.empty([mat_count, *shape]),
+            a=-1.0,
+            b=+1.0,
+        )
+        * mat_deviation
+    )
     return (base.expand_as(mods) + mods).to(dtype)
 
 
@@ -157,6 +165,44 @@ def generate_data_random(
         b=+1.0,
     ).to(dtype)
     return base
+
+
+def generate_data_from_images(
+    shape: list[int],
+    images_path_src: str,
+    mat_count: int,
+    dtype: torch.dtype,
+) -> torch.Tensor:
+    data = torch.empty([mat_count, *shape], dtype=dtype)
+    dir_contents = os.listdir(images_path_src)
+
+    for i in range(mat_count):
+        image_name = dir_contents[i]
+        image_path = os.path.join(images_path_src, image_name)
+        image = Image.open(image_path)
+        image = image.resize([shape[1], shape[0]], Image.LANCZOS)
+        image = transforms.ToTensor()(image).mean(dim=0, keepdim=False)
+        image = image.unsqueeze(0)
+        image = (image - image.min()) / (image.max() - image.min())
+        image = (image - 0.5) * 2.0
+        data[i] = image
+
+    return data
+
+
+def generate_images_from_data(
+    data: torch.Tensor,
+    images_path_dst: str,
+    prefix: str,
+) -> None:
+    for i in range(data.shape[0]):
+        image = data[i].squeeze(0)
+        image = (image - image.min()) / (image.max() - image.min())
+        image = transforms.ToPILImage()(image)
+        image_name = f"{prefix}_mat_{i}.png"
+        image_path = os.path.join(images_path_dst, image_name)
+        image.save(image_path)
+    pass
 
 
 def sample_results(
@@ -177,6 +223,8 @@ def train(
     iterations: int,
     log_nth_iteration: int,
     results_sample_count: int,
+    mode: str = "matrix",
+    images_path_dst: str = None,
 ) -> None:
     preheat_output = model()  # Preheat.
     params_model = sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -204,6 +252,12 @@ def train(
             print(
                 f"Iteration #{i+1}: \nLoss: {loss.item()}\nStdR: {(data - output).std()}"
             )
+            if mode == "images":
+                generate_images_from_data(
+                    data=output,
+                    images_path_dst=images_path_dst,
+                    prefix=f"output_i{i+1}",
+                )
 
     print("\n# --------------------------------------------------- #\n")
     sample_results(
@@ -212,6 +266,13 @@ def train(
         count_samples=min(model.count_weights_variations, results_sample_count),
     )
 
+    if mode == "images":
+        generate_images_from_data(
+            data=output,
+            images_path_dst=images_path_dst,
+            prefix=f"output_final_i{i+1}",
+        )
+
     pass
 
 
@@ -219,6 +280,25 @@ def main():
     global model
 
     parser = argparse.ArgumentParser(description="evaluation")
+    parser.add_argument(
+        "--mode",
+        type=str,
+        default="matrix",
+        choices=["matrix", "images"],
+        help="mode (default: matrix)",
+    )
+    parser.add_argument(
+        "--images-path-src",
+        type=str,
+        default=None,
+        help="path to source images (default: None)",
+    )
+    parser.add_argument(
+        "--images-path-dst",
+        type=str,
+        default=None,
+        help="path to reconstructed images (default: None)",
+    )
     parser.add_argument(
         "--mat-shape",
         nargs=2,
@@ -378,6 +458,20 @@ def main():
     )
     args = parser.parse_args()
 
+    if args.mode == "images":
+        assert (
+            args.images_path_src is not None
+        ), "Path to source images must be specified."
+        assert (
+            args.images_path_dst is not None
+        ), "Path to reconstructed images must be specified."
+        assert os.path.isdir(
+            args.images_path_src
+        ), "Path to source images must be a directory."
+        assert os.path.isdir(
+            args.images_path_dst
+        ), "Path to reconstructed images must be a directory."
+
     print("\n# --------------------------------------------------- #\n")
     print(f"Running with arguments:")
     print(" ".join(f"\t{k}={v}\n" for k, v in vars(args).items()))
@@ -397,21 +491,31 @@ def main():
     else:
         raise ValueError(f"Unsupported dtype: {args.dtype}")
 
-    data = (
-        generate_data_deviative(
+    if args.mode == "matrix":
+        data = (
+            generate_data_deviative(
+                shape=args.mat_shape,
+                mat_count=args.mat_count,
+                mat_deviation=args.mat_deviation,
+                dtype=dtype,
+            ).to(device)
+            if not args.random_data
+            else generate_data_random(
+                shape=args.mat_shape,
+                mat_count=args.mat_count,
+                dtype=dtype,
+            ).to(device)
+        )
+    elif args.mode == "images":
+        data = generate_data_from_images(
             shape=args.mat_shape,
+            images_path_src=args.images_path_src,
             mat_count=args.mat_count,
-            mat_deviation=args.mat_deviation,
             dtype=dtype,
         ).to(device)
-        if not args.random_data
-        else generate_data_random(
-            shape=args.mat_shape,
-            mat_count=args.mat_count,
-            dtype=dtype,
-        ).to(device)
-    )
-    
+    else:
+        raise ValueError(f"Unsupported mode: {args.mode}")
+
     print("\n# --------------------------------------------------- #\n")
     print("Generated data specs:")
     print(f"{data.min()=}")
@@ -449,6 +553,8 @@ def main():
         iterations=args.iterations,
         log_nth_iteration=args.log_nth_iteration,
         results_sample_count=args.results_sample_count,
+        mode=args.mode,
+        images_path_dst=args.images_path_dst,
     )
 
 
