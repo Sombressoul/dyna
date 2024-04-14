@@ -15,6 +15,11 @@ class ActivationType(Enum):
     MOBIUS = "mobius"
 
 
+class TransformationType(Enum):
+    TRANSLATION = "translation"
+    INVERSION = "inversion"
+
+
 @dataclass
 class ActivationParams:
     operand_name: str
@@ -22,9 +27,9 @@ class ActivationParams:
 
 
 # Notes:
-#   Combo #1: no deltas, no exponentiation, complex
-#       - fastest, good performance
-#   Combo #2: deltas with trainable exponents, complex
+#   Combo #1: no deltas, no exponentiation, no activation, inversive transformation, complex
+#       - fast, great performance
+#   Combo #2: deltas with trainable exponents, cardiod activation, translative transformation, complex
 #       - more diverse on long-range training
 class WeightsLib2D(nn.Module):
     def __init__(
@@ -44,8 +49,11 @@ class WeightsLib2D(nn.Module):
         use_bias: bool = True,
         use_scale: bool = True,
         asymmetry: float = 1e-3,
-        activation_type: ActivationType = ActivationType.IDENTITY,
+        activation_type: Union[str, ActivationType] = ActivationType.IDENTITY,
         activation_fn: Optional[Callable] = None,
+        transformation_type: Union[
+            str, TransformationType
+        ] = TransformationType.INVERSION,
         dtype: torch.dtype = torch.float32,
     ) -> None:
         super().__init__()
@@ -55,6 +63,16 @@ class WeightsLib2D(nn.Module):
         # ================================================================================= #
         shape = torch.Size(shape) if type(shape) == list else shape
         dtype_r = dtype
+        activation_type = (
+            activation_type
+            if type(activation_type) == ActivationType
+            else ActivationType(activation_type)
+        )
+        transformation_type = (
+            transformation_type
+            if type(transformation_type) == TransformationType
+            else TransformationType(transformation_type)
+        )
 
         if activation_fn is not None and activation_type != ActivationType.CUSTOM:
             raise ValueError(
@@ -67,6 +85,17 @@ class WeightsLib2D(nn.Module):
             assert (
                 use_deltas
             ), "Trainable deltas exponents are only supported in use_deltas mode."
+
+        if transformation_type == TransformationType.INVERSION:
+            if activation_type == ActivationType.CARDIOID:
+                raise ValueError(
+                    " ".join(
+                        [
+                            "Cardioid activation is incompatible with inversive",
+                            "transformation mode due to the gradient explosions.",
+                        ]
+                    )
+                )
 
         if not complex:
             dtype_c = None
@@ -125,6 +154,7 @@ class WeightsLib2D(nn.Module):
             if activation_type == ActivationType.CUSTOM
             else self._get_activation()
         )
+        self.transformation_type = transformation_type
         self.use_bias = use_bias
         self.use_scale = use_scale
         self.dtype_real = dtype_r
@@ -873,17 +903,23 @@ class WeightsLib2D(nn.Module):
         bias: Optional[torch.Tensor] = None,  # [n, 1]
         scale: Optional[torch.Tensor] = None,  # [n, 1]
     ) -> torch.Tensor:
-        # Various functions.
-        normalize = lambda x: (
-            x
-            - x.mean(
-                dim=[-1, -2],
-                keepdim=True,
-            )
-        ) / x.std(
-            dim=[-1, -2],
-            keepdim=True,
-        )
+        # Some kind of partial normalization.
+        normalize = lambda x: torch.complex(
+            real=(
+                (
+                    x.real
+                    - x.real.mean(
+                        dim=[-1, -2],
+                        keepdim=True,
+                    )
+                )
+                / x.real.std(
+                    dim=[-1, -2],
+                    keepdim=True,
+                )
+            ),
+            imag=x.imag,
+        ).to(dtype=self.dtype_complex, device=x.device)
 
         # Cast main weights.
         weights_main_i = self.weights_main_i.unsqueeze(0).repeat(
@@ -989,7 +1025,19 @@ class WeightsLib2D(nn.Module):
         weights_mod_j = weights_mod_j.mul(mod_controls_j_scale)
 
         # Apply mod controls.
-        weights_mod = weights_mod_i.permute([0, -1, -2]) @ weights_mod_j
+        if self.transformation_type == TransformationType.TRANSLATION:
+            weights_mod = weights_mod_i.permute([0, -1, -2]) @ weights_mod_j
+        elif self.transformation_type == TransformationType.INVERSION:
+            weights_mod = weights_mod_i.permute([0, -1, -2]) @ (1.0 / weights_mod_j)
+            weights_mod = normalize(weights_mod)
+        else:
+            raise ValueError(
+                f"Unknown transformation type: {self.transformation_type}."
+            )
+
+        if torch.isnan(weights_mod).any() or torch.isinf(weights_mod).any():
+            raise ValueError("weights_mod has NaN or Inf elements.")
+
         weights_mod = self.activation_fn(
             weights_mod,
             ActivationParams(

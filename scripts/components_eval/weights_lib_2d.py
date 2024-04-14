@@ -41,6 +41,8 @@ class Model(nn.Module):
         use_bias: bool = True,
         use_scale: bool = True,
         asymmetry: float = 1e-2,
+        activation_type: str = "identity",
+        transformation_type: str = "inversion",
         dtype: torch.dtype = torch.bfloat16,
     ) -> None:
         super().__init__()
@@ -81,6 +83,8 @@ class Model(nn.Module):
             use_bias=use_bias,
             use_scale=use_scale,
             asymmetry=asymmetry,
+            activation_type=activation_type,
+            transformation_type=transformation_type,
             dtype=dtype,
         )
 
@@ -421,6 +425,20 @@ def main():
         help="asymmetry (default: 1e-3)",
     )
     parser.add_argument(
+        "--transformation-type",
+        type=str,
+        default="inversion",
+        choices=["inversion", "translation"],
+        help="transformation type (default: inversion)",
+    )
+    parser.add_argument(
+        "--activation-type",
+        type=str,
+        default="identity",
+        choices=["identity", "cardioid"],
+        help="internal activation type (default: identity)",
+    )
+    parser.add_argument(
         "--iterations",
         type=int,
         default=5_000,
@@ -455,6 +473,12 @@ def main():
         type=int,
         default=4,
         help="how many results to sample (default: 4)",
+    )
+    parser.add_argument(
+        "--lr",
+        type=float,
+        default=1.0e-3,
+        help="learning rate (default: 1.0e-3)",
     )
     args = parser.parse_args()
 
@@ -542,9 +566,11 @@ def main():
         use_bias=not args.no_bias,
         use_scale=not args.no_scale,
         asymmetry=args.asymmetry,
+        activation_type=args.activation_type,
+        transformation_type=args.transformation_type,
         dtype=dtype,
     ).to(device)
-    optimizer = torch.optim.AdamW(model.parameters(), lr=1.0e-3)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr)
 
     train(
         data=data,
