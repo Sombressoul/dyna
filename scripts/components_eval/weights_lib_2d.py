@@ -425,18 +425,18 @@ def main():
         help="asymmetry (default: 1e-3)",
     )
     parser.add_argument(
-        "--transformation-type",
-        type=str,
-        default="inversion",
-        choices=["inversion", "translation"],
-        help="transformation type (default: inversion)",
-    )
-    parser.add_argument(
         "--activation-type",
         type=str,
         default="identity",
         choices=["identity", "cardioid"],
         help="internal activation type (default: identity)",
+    )
+    parser.add_argument(
+        "--transformation-type",
+        type=str,
+        default="inversion",
+        choices=["inversion", "translation"],
+        help="transformation type (default: inversion)",
     )
     parser.add_argument(
         "--iterations",
