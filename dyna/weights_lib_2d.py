@@ -2,7 +2,23 @@ import torch
 import torch.nn as nn
 import math
 
-from typing import Union, Optional, Callable
+from enum import Enum
+from dataclasses import dataclass
+
+from typing import Union, Optional, Callable, List, Dict
+
+
+class ActivationType(Enum):
+    CUSTOM = "custom"
+    IDENTITY = "identity"
+    CARDIOID = "cardioid"
+    MOBIUS = "mobius"
+
+
+@dataclass
+class ActivationParams:
+    operand_name: str
+    params: Union[torch.Tensor, List[torch.Tensor], Dict[str, torch.Tensor]]
 
 
 # Notes:
@@ -13,7 +29,7 @@ from typing import Union, Optional, Callable
 class WeightsLib2D(nn.Module):
     def __init__(
         self,
-        shape: Union[torch.Size, list[int]],
+        shape: Union[torch.Size, List[int]],
         rank_mod: Optional[int] = None,
         rank_deltas: int = 1,
         use_deltas: bool = False,
@@ -28,7 +44,8 @@ class WeightsLib2D(nn.Module):
         use_bias: bool = True,
         use_scale: bool = True,
         asymmetry: float = 1e-3,
-        activation: Optional[Union[str, Callable]] = "cardioid",
+        activation_type: ActivationType = ActivationType.IDENTITY,
+        activation_fn: Optional[Callable] = None,
         dtype: torch.dtype = torch.float32,
     ) -> None:
         super().__init__()
@@ -38,6 +55,13 @@ class WeightsLib2D(nn.Module):
         # ================================================================================= #
         shape = torch.Size(shape) if type(shape) == list else shape
         dtype_r = dtype
+
+        if activation_fn is not None and activation_type != ActivationType.CUSTOM:
+            raise ValueError(
+                "activation_fn is only supported in custom activation mode."
+            )
+        if activation_type == ActivationType.CUSTOM and activation_fn is None:
+            raise ValueError("activation_fn is required in custom activation mode.")
 
         if use_exponentiation and trainable_exponents_deltas:
             assert (
@@ -95,7 +119,12 @@ class WeightsLib2D(nn.Module):
         self.exponents_initial_value_real = exponents_initial_value_real
         self.exponents_initial_value_imag = exponents_initial_value_imag
         self.asymmetry = asymmetry
-        self.activation = self._get_activation(activation)
+        self.activation_type = activation_type
+        self.activation_fn = (
+            activation_fn
+            if activation_type == ActivationType.CUSTOM
+            else self._get_activation()
+        )
         self.use_bias = use_bias
         self.use_scale = use_scale
         self.dtype_real = dtype_r
@@ -128,26 +157,29 @@ class WeightsLib2D(nn.Module):
 
     def _get_activation(
         self,
-        activation: Optional[Union[str, Callable]],
     ) -> Callable:
-        if type(activation) == str:
-            if activation == "cardioid":
-                activation = self._activation_cardioid
-            else:
-                raise ValueError(f"Unsupported activation: {activation}.")
-        elif activation is None:
-            activation = lambda x: x
-        else:
-            assert callable(activation), "Activation must be callable."
+        if self.activation_type == ActivationType.IDENTITY:
+            return lambda x, _: x
+        elif self.activation_type == ActivationType.CARDIOID:
+            return self._activation_cardioid
+        elif self.activation_type == ActivationType.MOBIUS:
+            return self._activation_mobius
 
-        return activation
+        raise ValueError(f"Unsupported activation type: {self.activation_type}.")
 
-    def _activation_cardioid(
+    def _activation_mobius(
         self,
         x: torch.Tensor,
         operand_name: str,
     ) -> torch.Tensor:
-        alpha_weight_name = f"activation_alpha_{operand_name}"
+        raise NotImplementedError()
+
+    def _activation_cardioid(
+        self,
+        x: torch.Tensor,
+        params: ActivationParams,
+    ) -> torch.Tensor:
+        alpha_weight_name = f"activation_alpha_{params.operand_name}"
 
         try:
             alpha = getattr(self, alpha_weight_name)
@@ -210,7 +242,7 @@ class WeightsLib2D(nn.Module):
 
     def _create_weights_mod(
         self,
-        shape: Union[torch.Size, list[int]],
+        shape: Union[torch.Size, List[int]],
     ) -> torch.Tensor:
         bound_r = bound_i = 1.0 / math.log(math.prod(self.shape), math.e)
 
@@ -384,7 +416,7 @@ class WeightsLib2D(nn.Module):
 
     def _get_base_controls_list(
         self,
-        names: Union[str, list[str]],
+        names: Union[str, List[str]],
     ) -> torch.Tensor:
         names = names if isinstance(names, list) else [names]
 
@@ -414,7 +446,7 @@ class WeightsLib2D(nn.Module):
 
     def _get_mod_controls_list(
         self,
-        names: Union[str, list[str]],
+        names: Union[str, List[str]],
     ) -> torch.Tensor:
         names = names if isinstance(names, list) else [names]
 
@@ -451,7 +483,7 @@ class WeightsLib2D(nn.Module):
 
     def _get_deltas_list(
         self,
-        names: Union[str, list[str]],
+        names: Union[str, List[str]],
     ) -> torch.Tensor:
         names = names if isinstance(names, list) else [names]
 
@@ -529,7 +561,7 @@ class WeightsLib2D(nn.Module):
 
     def _get_exponents_base_list(
         self,
-        names: Union[str, list[str]],
+        names: Union[str, List[str]],
     ) -> torch.Tensor:
         names = names if isinstance(names, list) else [names]
 
@@ -605,7 +637,7 @@ class WeightsLib2D(nn.Module):
 
     def _get_exponents_mod_list(
         self,
-        names: Union[str, list[str]],
+        names: Union[str, List[str]],
     ) -> torch.Tensor:
         names = names if isinstance(names, list) else [names]
 
@@ -693,7 +725,7 @@ class WeightsLib2D(nn.Module):
 
     def _get_exponents_deltas_list(
         self,
-        names: Union[str, list[str]],
+        names: Union[str, List[str]],
     ) -> torch.Tensor:
         names = names if isinstance(names, list) else [names]
 
@@ -758,7 +790,7 @@ class WeightsLib2D(nn.Module):
 
     def _get_bias_list(
         self,
-        names: Union[str, list[str]],
+        names: Union[str, List[str]],
     ) -> torch.Tensor:
         names = names if isinstance(names, list) else [names]
 
@@ -821,7 +853,7 @@ class WeightsLib2D(nn.Module):
 
     def _get_scale_list(
         self,
-        names: Union[str, list[str]],
+        names: Union[str, List[str]],
     ) -> torch.Tensor:
         names = names if isinstance(names, list) else [names]
 
@@ -920,7 +952,13 @@ class WeightsLib2D(nn.Module):
             if self.use_exponentiation
             else weights_mod_i
         )
-        weights_mod_i = self.activation(weights_mod_i, "weights_mod_i")
+        weights_mod_i = self.activation_fn(
+            weights_mod_i,
+            ActivationParams(
+                operand_name="weights_mod_i",
+                params=None,  # NOTE: temporary placeholder.
+            ),
+        )
         weights_mod_i = weights_mod_i.mul(mod_controls_i_scale)
 
         # j-dim: cast mod base and mod controls to match weights mod.
@@ -941,12 +979,24 @@ class WeightsLib2D(nn.Module):
             if self.use_exponentiation
             else weights_mod_j
         )
-        weights_mod_j = self.activation(weights_mod_j, "weights_mod_j")
+        weights_mod_j = self.activation_fn(
+            weights_mod_j,
+            ActivationParams(
+                operand_name="weights_mod_j",
+                params=None,  # NOTE: temporary placeholder.
+            ),
+        )
         weights_mod_j = weights_mod_j.mul(mod_controls_j_scale)
 
         # Apply mod controls.
         weights_mod = weights_mod_i.permute([0, -1, -2]) @ weights_mod_j
-        weights_mod = self.activation(weights_mod, "weights_mod")
+        weights_mod = self.activation_fn(
+            weights_mod,
+            ActivationParams(
+                operand_name="weights_mod",
+                params=None,  # NOTE: temporary placeholder.
+            ),
+        )
         weights_mod = normalize(weights_mod) + 1.0
         base_mod = weights_base + (weights_base * weights_mod)
 
@@ -965,7 +1015,13 @@ class WeightsLib2D(nn.Module):
                 if self.use_exponentiation
                 else delta_a
             )
-            delta_a = self.activation(delta_a, "delta_a")
+            delta_a = self.activation_fn(
+                delta_a,
+                ActivationParams(
+                    operand_name="delta_a",
+                    params=None,  # NOTE: temporary placeholder.
+                ),
+            )
 
             delta_b = (base_mod.permute([0, -1, -2]) @ deltas[1]).permute([0, -1, -2])
             delta_b = (
@@ -980,19 +1036,43 @@ class WeightsLib2D(nn.Module):
                 if self.use_exponentiation
                 else delta_b
             )
-            delta_b = self.activation(delta_b, "delta_b")
+            delta_b = self.activation_fn(
+                delta_b,
+                ActivationParams(
+                    operand_name="delta_b",
+                    params=None,  # NOTE: temporary placeholder.
+                ),
+            )
 
             deltas_combined = delta_a @ delta_b
-            deltas_combined = self.activation(deltas_combined, "deltas_combined")
+            deltas_combined = self.activation_fn(
+                deltas_combined,
+                ActivationParams(
+                    operand_name="deltas_combined",
+                    params=None,  # NOTE: temporary placeholder.
+                ),
+            )
             deltas_weighted = base_mod * deltas_combined
-            deltas_weighted = self.activation(deltas_weighted, "deltas_weighted")
+            deltas_weighted = self.activation_fn(
+                deltas_weighted,
+                ActivationParams(
+                    operand_name="deltas_weighted",
+                    params=None,  # NOTE: temporary placeholder.
+                ),
+            )
 
             weights_dynamic = base_mod + deltas_weighted
         else:
             weights_dynamic = base_mod
 
         weights = weights_main_i @ weights_dynamic
-        weights = self.activation(weights, "weights")
+        weights = self.activation_fn(
+            weights,
+            ActivationParams(
+                operand_name="weights",
+                params=None,  # NOTE: temporary placeholder.
+            ),
+        )
         weights = weights @ weights_main_j
 
         weights = (
