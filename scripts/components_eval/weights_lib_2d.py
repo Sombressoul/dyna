@@ -43,6 +43,7 @@ class Model(nn.Module):
         asymmetry: float = 1e-2,
         activation_type: str = "identity",
         transformation_type: str = "inversion",
+        preserve_i: bool = False,
         dtype: torch.dtype = torch.bfloat16,
     ) -> None:
         super().__init__()
@@ -60,7 +61,7 @@ class Model(nn.Module):
         # ================================================================================= #
         self.count_weights_variations = count_weights_variations
         self.count_weights_components = count_weights_components
-        self.complex_output = complex_output
+        self.preserve_i = preserve_i
         self.shape = shape
 
         # ================================================================================= #
@@ -73,7 +74,7 @@ class Model(nn.Module):
             use_deltas=use_deltas,
             rank_deltas=rank_deltas,
             complex=complex,
-            complex_output=complex_components,
+            complex_output=complex_output,
             use_exponentiation=use_exponentiation,
             trainable_exponents_base=trainable_exponents_base,
             trainable_exponents_mod=trainable_exponents_mod,
@@ -131,7 +132,7 @@ class Model(nn.Module):
         components_weights = self.weights.get_weights(components_names).unsqueeze(0)
         weights = components_weights.mul(self.coefficients)
         weights = weights.sum(dim=1, keepdim=False)
-        weights = weights if self.complex_output else weights.real
+        weights = weights if self.preserve_i else weights.real
 
         return weights
 
@@ -365,10 +366,10 @@ def main():
         help="do not use complex numbers (default: False)",
     )
     parser.add_argument(
-        "--complex-output",
+        "--no-complex-output",
         default=False,
         action="store_true",
-        help="use complex numbers for the model output (default: False)",
+        help="do not use complex numbers for the model output (default: False)",
     )
     parser.add_argument(
         "--use-exponentiation",
@@ -437,6 +438,12 @@ def main():
         default="inversion",
         choices=["inversion", "translation"],
         help="transformation type (default: inversion)",
+    )
+    parser.add_argument(
+        "--preserve-i",
+        default=False,
+        action="store_true",
+        help="preserve imaginary part of the model output (default: False)",
     )
     parser.add_argument(
         "--iterations",
@@ -556,7 +563,7 @@ def main():
         use_deltas=args.use_deltas,
         rank_deltas=args.lib_rank_deltas,
         complex=not args.no_complex,
-        complex_output=args.complex_output,
+        complex_output=not args.no_complex_output,
         use_exponentiation=args.use_exponentiation,
         trainable_exponents_base=not args.no_trainable_exponents_base,
         trainable_exponents_mod=not args.no_trainable_exponents_mod,
@@ -568,6 +575,7 @@ def main():
         asymmetry=args.asymmetry,
         activation_type=args.activation_type,
         transformation_type=args.transformation_type,
+        preserve_i=args.preserve_i,
         dtype=dtype,
     ).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr)
