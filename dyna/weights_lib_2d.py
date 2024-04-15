@@ -892,6 +892,66 @@ class WeightsLib2D(nn.Module):
 
         return scale
 
+    def _create_inversions(
+        self,
+    ) -> torch.Tensor:
+        inversions = (
+            torch.complex(
+                real=nn.init.constant_(
+                    tensor=torch.empty([1, 1], dtype=self.dtype_real),
+                    val=-1.0,
+                ),
+                imag=nn.init.constant_(
+                    tensor=torch.empty([1, 1], dtype=self.dtype_real),
+                    val=+1.0,
+                ),
+            ).to(
+                dtype=self.dtype_complex,
+                device=self.weights_base.device,
+            )
+            if self.complex
+            else nn.init.constant_(
+                tensor=torch.empty([1, 1], dtype=self.dtype_real),
+                val=1.0,
+            ).to(
+                dtype=self.dtype_real,
+                device=self.weights_base.device,
+            )
+        )
+
+        return inversions
+
+    def _get_inversions(
+        self,
+        name: str,
+    ) -> torch.Tensor:
+        inversions_name = f"inversions_{name}"
+
+        try:
+            inversions = self.get_parameter(inversions_name)
+        except AttributeError:
+            inversions = self._create_inversions()
+
+            self.register_parameter(
+                name=inversions_name,
+                param=nn.Parameter(
+                    data=inversions,
+                ),
+            )
+
+        return inversions
+
+    def _get_inversions_list(
+        self,
+        names: Union[str, List[str]],
+    ) -> torch.Tensor:
+        names = names if isinstance(names, list) else [names]
+
+        inversions_list = [self._get_inversions(name).unsqueeze(0) for name in names]
+        inversions = torch.cat(inversions_list, dim=0)
+
+        return inversions
+
     def _normalize_real(
         self,
         x: torch.Tensor,
@@ -942,6 +1002,7 @@ class WeightsLib2D(nn.Module):
         exponents_deltas: Optional[torch.Tensor] = None,  # [n, 2, 1]
         bias: Optional[torch.Tensor] = None,  # [n, 1]
         scale: Optional[torch.Tensor] = None,  # [n, 1]
+        inversions: Optional[torch.Tensor] = None,  # [n, 1, 1]
     ) -> torch.Tensor:
         # Cast main weights.
         weights_main_i = self.weights_main_i.unsqueeze(0).repeat(
@@ -1050,13 +1111,15 @@ class WeightsLib2D(nn.Module):
         if self.transformation_type == TransformationType.TRANSLATION:
             weights_mod = weights_mod_i.permute([0, -1, -2]) @ weights_mod_j
         elif self.transformation_type == TransformationType.INVERSION:
-            weights_mod = weights_mod_i.permute([0, -1, -2]) @ (1.0 / weights_mod_j)
+            weights_mod = weights_mod_i.permute([0, -1, -2]) @ (
+                inversions / weights_mod_j
+            )
             weights_mod = self._normalize_partial(weights_mod)
         else:
             raise ValueError(
                 f"Unknown transformation type: {self.transformation_type}."
             )
-
+        
         if torch.isnan(weights_mod).any() or torch.isinf(weights_mod).any():
             raise ValueError("weights_mod has NaN or Inf elements.")
 
@@ -1221,6 +1284,13 @@ class WeightsLib2D(nn.Module):
                     names=names,
                 )
                 if self.use_scale
+                else None
+            ),
+            inversions=(
+                self._get_inversions_list(
+                    names=names,
+                )
+                if self.transformation_type == TransformationType.INVERSION
                 else None
             ),
         )
