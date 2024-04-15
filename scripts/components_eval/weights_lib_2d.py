@@ -40,7 +40,7 @@ class Model(nn.Module):
         exponents_initial_value_imag: float = 0.0,
         use_bias: bool = True,
         use_scale: bool = True,
-        asymmetry: float = 1e-2,
+        asymmetry: float = 1e-3,
         activation_type: str = "identity",
         transformation_type: str = "inversion",
         preserve_i: bool = False,
