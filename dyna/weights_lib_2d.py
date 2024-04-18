@@ -992,6 +992,45 @@ class WeightsLib2D(nn.Module):
 
         return x
 
+    def _log_var(
+        self,
+        x: torch.Tensor,
+        name: str,
+        is_breakpoint: bool = False,
+    ) -> None:
+        if name is not None:
+            print(f"\n# =====> {name}:")
+
+        if torch.is_complex(x):
+            real = x.real
+            imag = x.imag
+            abs = x.abs()
+
+            print(f"{x.shape=}")
+            print(f"{real.min()=}")
+            print(f"{real.max()=}")
+            print(f"{real.mean()=}")
+            print(f"{real.std()=}")
+            print(f"{imag.min()=}")
+            print(f"{imag.max()=}")
+            print(f"{imag.mean()=}")
+            print(f"{imag.std()=}")
+            print(f"{abs.min()=}")
+            print(f"{abs.max()=}")
+            print(f"{abs.mean()=}")
+            print(f"{abs.std()=}")
+        else:
+            print(f"{x.shape=}")
+            print(f"{x.min()=}")
+            print(f"{x.max()=}")
+            print(f"{x.mean()=}")
+            print(f"{x.std()=}")
+
+        if is_breakpoint:
+            exit()
+
+        pass
+
     def _get_weights(
         self,
         base_controls: torch.Tensor,
@@ -1111,7 +1150,7 @@ class WeightsLib2D(nn.Module):
         if self.transformation_type == TransformationType.TRANSLATION:
             weights_mod = weights_mod_i.permute([0, -1, -2]) @ weights_mod_j
         elif self.transformation_type == TransformationType.INVERSION:
-            weights_mod = weights_mod_i.permute([0, -1, -2]) @ (
+            weights_mod = (inversions * weights_mod_i.permute([0, -1, -2])) @ (
                 inversions / weights_mod_j
             )
             weights_mod = self._normalize_partial(weights_mod)
@@ -1119,7 +1158,7 @@ class WeightsLib2D(nn.Module):
             raise ValueError(
                 f"Unknown transformation type: {self.transformation_type}."
             )
-        
+
         if torch.isnan(weights_mod).any() or torch.isinf(weights_mod).any():
             raise ValueError("weights_mod has NaN or Inf elements.")
 
