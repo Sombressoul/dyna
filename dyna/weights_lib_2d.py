@@ -1162,14 +1162,16 @@ class WeightsLib2D(nn.Module):
         if torch.isnan(weights_mod).any() or torch.isinf(weights_mod).any():
             raise ValueError("weights_mod has NaN or Inf elements.")
 
-        weights_mod = self.activation_fn(
-            weights_mod,
-            ActivationParams(
-                operand_name="weights_mod",
-                params=None,  # NOTE: temporary placeholder.
-            ),
-        )
-        weights_mod = self._normalize_partial(weights_mod) + 1.0
+        if self.activation_type != ActivationType.IDENTITY:
+            weights_mod = self.activation_fn(
+                weights_mod,
+                ActivationParams(
+                    operand_name="weights_mod",
+                    params=None,  # NOTE: temporary placeholder.
+                ),
+            )
+            weights_mod = self._normalize_partial(weights_mod) + 1.0
+
         base_mod = weights_base + (weights_base * weights_mod)
 
         # Apply deltas.
