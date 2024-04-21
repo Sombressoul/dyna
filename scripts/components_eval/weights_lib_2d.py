@@ -14,7 +14,6 @@ project_dir = os.path.dirname(evals_dir)
 sys.path.append(project_dir)
 
 from dyna import WeightsLib2D
-import os
 
 
 model = None
