@@ -274,7 +274,7 @@ class WeightsLib2D(nn.Module):
         self,
         shape: Union[torch.Size, List[int]],
     ) -> torch.Tensor:
-        bound_r = bound_i = 1.0 / math.log(math.prod(self.shape), math.e)
+        bound_r = 1.0 / math.log(math.prod(self.shape), math.e)
 
         mod_r = torch.empty(shape, dtype=self.dtype_real)
         mod_r = nn.init.uniform_(
@@ -285,10 +285,10 @@ class WeightsLib2D(nn.Module):
 
         if self.complex:
             mod_i = torch.empty_like(mod_r)
-            mod_i = nn.init.uniform_(
+            mod_i = nn.init.normal_(
                 tensor=mod_i,
-                a=-bound_i,
-                b=+bound_i,
+                mean=0.0,
+                std=self.asymmetry,
             )
             mod = torch.complex(
                 real=mod_r,
