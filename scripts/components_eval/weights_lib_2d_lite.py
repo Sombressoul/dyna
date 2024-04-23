@@ -59,8 +59,8 @@ class Model(nn.Module):
                 ],
                 dtype=self.weights.dtype_weights,
             ),
-            a=-2.0,
-            b=+2.0,
+            a=-1.0,
+            b=+1.0,
         )
 
         self.coefficients = nn.Parameter(coefficients)
@@ -81,7 +81,7 @@ def generate_data_deviative(
 ) -> torch.Tensor:
     base = torch.nn.init.uniform_(
         tensor=torch.empty([1, *shape]),
-        a=-1.0,
+        a=+0.0,
         b=+1.0,
     )
     mods = (
@@ -102,7 +102,7 @@ def generate_data_random(
 ) -> torch.Tensor:
     base = torch.nn.init.uniform_(
         tensor=torch.empty([mat_count, *shape]),
-        a=-1.0,
+        a=+0.0,
         b=+1.0,
     ).to(dtype)
     return base
@@ -125,7 +125,6 @@ def generate_data_from_images(
         image = transforms.ToTensor()(image).mean(dim=0, keepdim=False)
         image = image.unsqueeze(0)
         image = (image - image.min()) / (image.max() - image.min())
-        image = (image - 0.5) * 2.0
         data[i] = image
 
     return data

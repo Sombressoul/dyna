@@ -336,7 +336,10 @@ class WeightsLib2DLite(nn.Module):
         )  # [n, (i_translate|i_rotate|j_translate|j_rotate), self.components_count, 1, 1, 2]
 
         mod_i = self.mod_i.repeat(
-            [transforms.shape[0], *[1 for _ in range(len(self.mod_i.shape) - 1)]]
+            [
+                transforms.shape[0],
+                *[1 for _ in range(len(self.mod_i.shape) - 1)],
+            ]
         )
         mod_i = mod_i + transforms[::, 0, ...]
         z = transforms[::, 1, ...]
@@ -345,7 +348,10 @@ class WeightsLib2DLite(nn.Module):
         mod_i = torch.cat([r, i], dim=-1)
 
         mod_j = self.mod_j.repeat(
-            [transforms.shape[0], *[1 for _ in range(len(self.mod_j.shape) - 1)]]
+            [
+                transforms.shape[0],
+                *[1 for _ in range(len(self.mod_j.shape) - 1)],
+            ]
         )
         mod_j = mod_j + transforms[::, 2, ...]
         z = transforms[::, 3, ...]
@@ -400,10 +406,12 @@ class WeightsLib2DLite(nn.Module):
         weights_dynamic = torch.einsum("...ijlm,...jkml ->...ikl", A, B)
 
         weights_dynamic = weights_dynamic + self.translate_dynamic
-        r = (weights_dynamic * self.rotate_dynamic).diff(dim=-1)
-        i = (weights_dynamic * self.rotate_dynamic[..., [1, 0]]).sum(
-            dim=-1, keepdim=True
-        )
-        weights_dynamic = torch.cat([r, i], dim=-1).sum(dim=1)[..., 0]  # Real only.
+        r = weights_dynamic * self.rotate_dynamic
+        r = r.diff(dim=-1)
+        i = weights_dynamic * self.rotate_dynamic[..., [1, 0]]
+        i = i.sum(dim=-1, keepdim=True)
+        weights_dynamic = torch.cat([r, i], dim=-1).sum(dim=1)
+        weights_dynamic = weights_dynamic[..., 0] ** 2 + weights_dynamic[..., 1] ** 2
+        weights_dynamic = torch.sqrt(weights_dynamic)
 
         return weights_dynamic
