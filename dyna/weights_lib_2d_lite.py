@@ -284,7 +284,7 @@ class WeightsLib2DLite(nn.Module):
 
         pass
 
-    def forward(
+    def forward_complex_custom(
         self,
         x: torch.Tensor,
     ) -> torch.Tensor:
@@ -356,11 +356,13 @@ class WeightsLib2DLite(nn.Module):
         r = (mod_i * self.inversions).diff(dim=-1)
         i = (mod_i * self.inversions[..., [1, 0]]).sum(dim=-1, keepdim=True)
         mod_i = torch.cat([r, i], dim=-1).contiguous()
+        mod_i = mod_i.sum(dim=1, keepdim=True)
 
         denom = (mod_j * mod_j).sum(dim=-1, keepdim=True)
         r = (self.inversions * mod_j).sum(dim=-1, keepdim=True) / denom
         i = (self.inversions[..., [1, 0]] * mod_j).diff(dim=-1) / denom
         mod_j = torch.cat([r, i], dim=-1).contiguous()
+        mod_j = mod_j.sum(dim=1, keepdim=True)
 
         A = mod_i.permute([0, 1, 3, 2, 4])
         A = A.unsqueeze(-2)
@@ -402,3 +404,90 @@ class WeightsLib2DLite(nn.Module):
         weights_dynamic = torch.cat([r, i], dim=-1).sum(dim=1)[..., 0]  # Real only.
 
         return weights_dynamic.contiguous()
+
+    def forward_complex_native(
+        self,
+        x: torch.Tensor,
+    ) -> torch.Tensor:
+        # ================================================================================= #
+        # ____________________________> Initial checks.
+        # ================================================================================= #
+        assert not torch.is_complex(x), f"Input must be real. Got: {x.dtype}."
+        assert len(x.shape) == 2, f"Input must be 2D. Got: {x.shape}."
+        assert x.shape[1] == self.count_components, " ".join(
+            [
+                f"Input shape should match the number of weights",
+                f"components: [batch_dim, {self.count_components}]. Got: {x.shape}",
+            ]
+        )
+
+        # ================================================================================= #
+        # ____________________________> Casting.
+        # ================================================================================= #
+        x = x.to(dtype=self.dtype_weights)
+
+        # ================================================================================= #
+        # ____________________________> Dynamic weights computation.
+        # ================================================================================= #
+        weights = self.weights_base.repeat([1, self.translate_base.shape[1], 1, 1, 1])
+        translate_base = self.translate_base.expand_as(weights)
+        translate_base = torch.view_as_complex(translate_base.to(dtype=torch.float32))
+        rotate_base = torch.view_as_complex(self.rotate_base.to(dtype=torch.float32))
+        weights = torch.view_as_complex(weights.to(dtype=torch.float32))
+        weights = (weights + translate_base) * rotate_base
+
+        transforms = torch.einsum("ij,kjl -> ikl", x, self.mod_transforms).contiguous()
+        transforms = transforms.view(
+            [*transforms.shape[0:-1], transforms.shape[-1] // 2, 1, 1, 2]
+        )  # [n, (i_translate|i_rotate|j_translate|j_rotate), self.components_count, 1, 1, 2]
+        transforms = torch.view_as_complex(transforms.to(dtype=torch.float32))
+
+        mod_i = torch.view_as_complex(self.mod_i.to(dtype=torch.float32))
+        mod_i = mod_i.repeat(
+            [transforms.shape[0], *[1 for _ in range(len(mod_i.shape) - 1)]]
+        )
+        mod_i = (mod_i + transforms[::, 0, ...]) * transforms[::, 1, ...]
+
+        mod_j = torch.view_as_complex(self.mod_j.to(dtype=torch.float32))
+        mod_j = mod_j.repeat(
+            [transforms.shape[0], *[1 for _ in range(len(mod_j.shape) - 1)]]
+        )
+        mod_j = (mod_j + transforms[::, 2, ...]) * transforms[::, 3, ...]
+
+        inversions = torch.view_as_complex(self.inversions.to(dtype=torch.float32))
+        mod_i = (inversions * mod_i).sum(dim=1, keepdim=True)
+        mod_j = (inversions / mod_j).sum(dim=1, keepdim=True)
+        mod = mod_i.permute([0, 1, 3, 2]) @ mod_j
+
+        r_num = mod.real - mod.real.mean(dim=[-1, -2], keepdim=True)
+        r_denom = mod.real.std(dim=[-1, -2], keepdim=True)
+        mod = torch.complex(real=(r_num / r_denom), imag=mod.imag)
+        weights_base = torch.view_as_complex(self.weights_base.to(dtype=torch.float32))
+        weights_dynamic = weights_base + (weights_base * mod)
+
+        weights_i = torch.view_as_complex(self.weights_i.to(dtype=torch.float32))
+        weights_j = torch.view_as_complex(self.weights_j.to(dtype=torch.float32))
+        weights_dynamic = weights_i @ weights_dynamic
+        weights_dynamic = weights_dynamic @ weights_j
+
+        translate_dynamic = torch.view_as_complex(
+            self.translate_dynamic.to(dtype=torch.float32)
+        )
+        rotate_dynamic = torch.view_as_complex(
+            self.rotate_dynamic.to(dtype=torch.float32)
+        )
+        weights_dynamic = (weights_dynamic + translate_dynamic) * rotate_dynamic
+        weights_dynamic = weights_dynamic.real.sum(dim=1)
+        weights_dynamic = weights_dynamic.to(dtype=self.dtype_weights).contiguous()
+
+        return weights_dynamic
+
+    def forward(
+        self,
+        x: torch.Tensor,
+        native: bool = False,
+    ) -> torch.Tensor:
+        if native:
+            return self.forward_complex_native(x)
+        else:
+            return self.forward_complex_custom(x)
