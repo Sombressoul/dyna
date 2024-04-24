@@ -37,67 +37,61 @@ class WeightsLib2DLite(nn.Module):
         # ================================================================================= #
         # Init: weights_i
         self.weights_i = nn.Parameter(
-            data=torch.nn.init.normal_(
+            data=torch.nn.init.xavier_uniform_(
                 tensor=torch.empty(
                     [1, 1, self.output_shape[0], self.output_shape[0], 2],
                     dtype=self.dtype_weights,
                 ),
-                mean=0.0,
-                std=1.0 / math.log(self.output_shape[0] ** 2, math.e),
             ).contiguous(),
         )
         # Init: weights_j
         self.weights_j = nn.Parameter(
-            data=torch.nn.init.normal_(
+            data=torch.nn.init.xavier_uniform_(
                 tensor=torch.empty(
                     [1, 1, self.output_shape[1], self.output_shape[1], 2],
                     dtype=self.dtype_weights,
                 ),
-                mean=0.0,
-                std=1.0 / math.log(self.output_shape[1] ** 2, math.e),
             ).contiguous(),
         )
         # Init: weights_base
         self.weights_base = nn.Parameter(
-            data=torch.nn.init.normal_(
+            data=torch.nn.init.xavier_uniform_(
                 tensor=torch.empty(
                     [1, 1, *self.output_shape, 2],
                     dtype=self.dtype_weights,
                 ),
-                mean=0.0,
-                std=1.0 / math.log(math.prod(self.output_shape), math.e),
             ).contiguous(),
         )
         # Init: bias
         self.translate_base = nn.Parameter(
-            data=torch.nn.init.normal_(
+            data=torch.nn.init.uniform_(
                 tensor=torch.empty(
                     [1, self.count_components, 1, 1, 2],
                     dtype=self.dtype_weights,
                 ),
-                mean=0.0,
-                std=self.asymmetry,
+                a=-1.0,
+                b=+1.0,
             ).contiguous(),
         )
         # Init: scale
         self.rotate_base = nn.Parameter(
             data=torch.cat(
                 [
-                    torch.nn.init.normal_(
+                    torch.nn.init.uniform_(
                         tensor=torch.empty(
                             [1, self.count_components, 1, 1, 1],
                             dtype=self.dtype_weights,
                         ),
-                        mean=1.0,
-                        std=self.asymmetry,
+                        a=-1.0,
+                        b=+1.0,
                     ),
-                    torch.nn.init.normal_(
+                    torch.nn.init.uniform_(
                         tensor=torch.empty(
                             [1, self.count_components, 1, 1, 1],
                             dtype=self.dtype_weights,
                         ),
-                        mean=0.0,
-                        std=self.asymmetry,
+                        a=-1.0,
+                        b=+1.0,
                     ),
                 ],
                 dim=-1,
@@ -105,42 +99,40 @@ class WeightsLib2DLite(nn.Module):
         )
         # Init: bias
         self.translate_dynamic = nn.Parameter(
-            data=torch.nn.init.normal_(
+            data=torch.nn.init.uniform_(
                 tensor=torch.empty(
                     [1, 1, 1, 2],
                     dtype=self.dtype_weights,
                 ),
-                mean=0.0,
-                std=self.asymmetry,
+                a=-1.0,
+                b=+1.0,
             ).contiguous(),
         )
         # Init: scale
         self.rotate_dynamic = nn.Parameter(
             data=torch.cat(
                 [
-                    torch.nn.init.normal_(
+                    torch.nn.init.uniform_(
                         tensor=torch.empty(
                             [1, 1, 1, 1],
                             dtype=self.dtype_weights,
                         ),
-                        mean=1.0,
-                        std=self.asymmetry,
+                        a=-1.0,
+                        b=+1.0,
                     ),
-                    torch.nn.init.normal_(
+                    torch.nn.init.uniform_(
                         tensor=torch.empty(
                             [1, 1, 1, 1],
                             dtype=self.dtype_weights,
                         ),
-                        mean=0.0,
-                        std=self.asymmetry,
+                        a=-1.0,
+                        b=+1.0,
                     ),
                 ],
                 dim=-1,
             ).contiguous(),
         )
         # Init: mod_i
-        mod_i_bounds = 1.0 / math.log(self.mod_rank * self.output_shape[0], math.e)
-        mod_i_std = self.asymmetry
         self.mod_i = nn.Parameter(
             data=torch.cat(
                 [
@@ -155,10 +147,10 @@ class WeightsLib2DLite(nn.Module):
                             ],
                             dtype=self.dtype_weights,
                         ),
-                        a=-mod_i_bounds,
-                        b=+mod_i_bounds,
+                        a=-1.0,
+                        b=+1.0,
                     ),
-                    torch.nn.init.normal_(
+                    torch.nn.init.uniform_(
                         tensor=torch.empty(
                             [
                                 1,
@@ -169,16 +161,14 @@ class WeightsLib2DLite(nn.Module):
                             ],
                             dtype=self.dtype_weights,
                         ),
-                        mean=0.0,
-                        std=mod_i_std,
+                        a=-1.0,
+                        b=+1.0,
                     ),
                 ],
                 dim=-1,
             ).contiguous(),
         )
         # Init: mod_j
-        mod_j_bounds = 1.0 / math.log(self.mod_rank * self.output_shape[0], math.e)
-        mod_j_std = self.asymmetry
         self.mod_j = nn.Parameter(
             data=torch.cat(
                 [
@@ -193,10 +183,10 @@ class WeightsLib2DLite(nn.Module):
                             ],
                             dtype=self.dtype_weights,
                         ),
-                        a=-mod_j_bounds,
-                        b=+mod_j_bounds,
+                        a=-1.0,
+                        b=+1.0,
                     ),
-                    torch.nn.init.normal_(
+                    torch.nn.init.uniform_(
                         tensor=torch.empty(
                             [
                                 1,
@@ -207,8 +197,8 @@ class WeightsLib2DLite(nn.Module):
                             ],
                             dtype=self.dtype_weights,
                         ),
-                        mean=0.0,
-                        std=mod_j_std,
+                        a=-1.0,
+                        b=+1.0,
                     ),
                 ],
                 dim=-1,
@@ -216,13 +206,13 @@ class WeightsLib2DLite(nn.Module):
         )
         # Init: inversions
         self.inversions = nn.Parameter(
-            data=torch.nn.init.normal_(
+            data=torch.nn.init.uniform_(
                 tensor=torch.empty(
                     [1, self.count_components, 1, 1, 2],
                     dtype=self.dtype_weights,
                 ),
-                mean=0.0,
-                std=self.asymmetry,
+                a=-1.0,
+                b=+1.0,
             ).contiguous(),
         )
         # Init: mod_i_transforms
@@ -294,7 +284,6 @@ class WeightsLib2DLite(nn.Module):
         i = (h * a.sin()).unsqueeze(-1)
         x = torch.cat([r, i], dim=-1)
         return x
-
 
     def forward(
         self,
@@ -392,7 +381,8 @@ class WeightsLib2DLite(nn.Module):
         B = mod_j.unsqueeze(-2)
         B = torch.cat([B, B[..., [1, 0]]], dim=-2)  # [[c, d], [d, c]]
         mod = torch.einsum("...ijlm,...jkml ->...ikl", A, B)
-        mod = self.norm_polar(mod)
+        # mod = self.norm_polar(mod)
+        # self._log_var(mod, "mod", True)
 
         if torch.isnan(mod).any() or torch.isinf(mod).any():
             self._log_var(self.weights_base, "self.weights_base", False)
@@ -402,7 +392,6 @@ class WeightsLib2DLite(nn.Module):
             self._log_var(self.mod_i, "self.mod_i", False)
             self._log_var(self.mod_j, "self.mod_j", False)
             self._log_var(self.inversions, "self.inversions", False)
-            exit()
             raise ValueError("mod has NaN or Inf elements.")
 
         mod_r = mod[..., 0]
@@ -438,5 +427,6 @@ class WeightsLib2DLite(nn.Module):
         weights_dynamic = torch.cat([r, i], dim=-1)
         weights_dynamic = weights_dynamic[..., 0] ** 2 + weights_dynamic[..., 1] ** 2
         weights_dynamic = torch.sqrt(weights_dynamic)
+        # self._log_var(weights_dynamic, "weights_dynamic", True)
 
         return weights_dynamic
