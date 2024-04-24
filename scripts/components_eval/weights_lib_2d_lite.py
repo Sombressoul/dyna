@@ -3,10 +3,10 @@ import sys
 import argparse
 import torch
 import torch.nn as nn
-import torchvision
 import torchvision.transforms as transforms
 
 from PIL import Image
+from madgrad import MADGRAD
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 evals_dir = os.path.dirname(script_dir)
@@ -324,8 +324,20 @@ def main():
     parser.add_argument(
         "--lr",
         type=float,
-        default=1.0e-3,
-        help="learning rate (default: 1.0e-3)",
+        default=1.0e-2,
+        help="learning rate (default: 1.0e-2)",
+    )
+    parser.add_argument(
+        "--mm",
+        type=float,
+        default=0.9,
+        help="momentum (default: 0.9)",
+    )
+    parser.add_argument(
+        "--wd",
+        type=float,
+        default=0.0,
+        help="weight decay (default: 0.0)",
     )
     args = parser.parse_args()
 
@@ -402,7 +414,7 @@ def main():
         asymmetry=args.asymmetry,
         dtype_weights=dtype_weights,
     ).to(device)
-    optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr)
+    optimizer = MADGRAD(model.parameters(), lr=args.lr, momentum=args.mm, weight_decay=args.wd)
 
     train(
         data=data,

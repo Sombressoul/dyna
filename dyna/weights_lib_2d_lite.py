@@ -6,6 +6,8 @@ from typing import Union, List
 
 
 class WeightsLib2DLite(nn.Module):
+    output_shape_size: torch.Tensor
+
     def __init__(
         self,
         output_shape: Union[torch.Size, List[int]],
@@ -31,6 +33,19 @@ class WeightsLib2DLite(nn.Module):
         self.mod_rank = mod_rank
         self.asymmetry = asymmetry
         self.dtype_weights = dtype_weights
+
+        # ================================================================================= #
+        # ____________________________> Constants/Buffers.
+        # ================================================================================= #
+        output_shape_size = torch.tensor(
+            math.prod(self.output_shape),
+            dtype=self.dtype_weights,
+            requires_grad=False,
+        )
+        self.register_buffer(
+            name="output_shape_size",
+            tensor=output_shape_size,
+        )
 
         # ================================================================================= #
         # ____________________________> Weights.
@@ -139,6 +154,8 @@ class WeightsLib2DLite(nn.Module):
             ).contiguous(),
         )
         # Init: mod_i
+        mod_i_bounds = 1.0 / math.log(self.mod_rank * self.output_shape[0], math.e)
+        mod_i_std = self.asymmetry
         self.mod_i = nn.Parameter(
             data=torch.cat(
                 [
@@ -153,12 +170,8 @@ class WeightsLib2DLite(nn.Module):
                             ],
                             dtype=self.dtype_weights,
                         ),
-                        a=-(
-                            1.0 / math.log(self.mod_rank * self.output_shape[0], math.e)
-                        ),
-                        b=+(
-                            1.0 / math.log(self.mod_rank * self.output_shape[0], math.e)
-                        ),
+                        a=-mod_i_bounds,
+                        b=+mod_i_bounds,
                     ),
                     torch.nn.init.normal_(
                         tensor=torch.empty(
@@ -172,13 +185,15 @@ class WeightsLib2DLite(nn.Module):
                             dtype=self.dtype_weights,
                         ),
                         mean=0.0,
-                        std=self.asymmetry,
+                        std=mod_i_std,
                     ),
                 ],
                 dim=-1,
             ).contiguous(),
         )
         # Init: mod_j
+        mod_j_bounds = 1.0 / math.log(self.mod_rank * self.output_shape[0], math.e)
+        mod_j_std = self.asymmetry
         self.mod_j = nn.Parameter(
             data=torch.cat(
                 [
@@ -193,8 +208,8 @@ class WeightsLib2DLite(nn.Module):
                             ],
                             dtype=self.dtype_weights,
                         ),
-                        a=-(self.mod_rank * self.output_shape[1]),
-                        b=+(self.mod_rank * self.output_shape[1]),
+                        a=-mod_j_bounds,
+                        b=+mod_j_bounds,
                     ),
                     torch.nn.init.normal_(
                         tensor=torch.empty(
@@ -208,7 +223,7 @@ class WeightsLib2DLite(nn.Module):
                             dtype=self.dtype_weights,
                         ),
                         mean=0.0,
-                        std=math.log(self.mod_rank * self.output_shape[1], math.e),
+                        std=mod_j_std,
                     ),
                 ],
                 dim=-1,
@@ -234,7 +249,6 @@ class WeightsLib2DLite(nn.Module):
                 ),
             ).contiguous(),
         )
-        torch.nn.init._calculate_correct_fan
 
         pass
 
@@ -356,6 +370,8 @@ class WeightsLib2DLite(nn.Module):
         mod_j = mod_j + transforms[::, 2, ...]
         z = transforms[::, 3, ...]
         r = (mod_j * z).diff(dim=-1)
+        r[torch.where((r > -self.asymmetry) & (r <= 0))] = self.asymmetry
+        r[torch.where((r >= 0) & (r < self.asymmetry))] = -self.asymmetry
         i = (mod_j * z[..., [1, 0]]).sum(dim=-1, keepdim=True)
         mod_j = torch.cat([r, i], dim=-1)
 
@@ -364,7 +380,7 @@ class WeightsLib2DLite(nn.Module):
         mod_i = torch.cat([r, i], dim=-1).contiguous()
         mod_i = mod_i.sum(dim=1, keepdim=True)
 
-        denom = (mod_j * mod_j).sum(dim=-1, keepdim=True)
+        denom = (mod_j * mod_j).sum(dim=-1, keepdim=True).mul(self.output_shape_size)
         r = (self.inversions * mod_j).sum(dim=-1, keepdim=True) / denom
         i = (self.inversions[..., [1, 0]] * mod_j).diff(dim=-1) / denom
         mod_j = torch.cat([r, i], dim=-1).contiguous()
