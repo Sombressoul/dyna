@@ -6,8 +6,6 @@ from typing import Union, List
 
 
 class WeightsLib2DLite(nn.Module):
-    output_shape_size: torch.Tensor
-
     def __init__(
         self,
         output_shape: Union[torch.Size, List[int]],
@@ -33,19 +31,6 @@ class WeightsLib2DLite(nn.Module):
         self.mod_rank = mod_rank
         self.asymmetry = asymmetry
         self.dtype_weights = dtype_weights
-
-        # ================================================================================= #
-        # ____________________________> Constants/Buffers.
-        # ================================================================================= #
-        output_shape_size = torch.tensor(
-            math.prod(self.output_shape),
-            dtype=self.dtype_weights,
-            requires_grad=False,
-        )
-        self.register_buffer(
-            name="output_shape_size",
-            tensor=output_shape_size,
-        )
 
         # ================================================================================= #
         # ____________________________> Weights.
@@ -122,7 +107,7 @@ class WeightsLib2DLite(nn.Module):
         self.translate_dynamic = nn.Parameter(
             data=torch.nn.init.normal_(
                 tensor=torch.empty(
-                    [1, self.count_components, 1, 1, 2],
+                    [1, 1, 1, 2],
                     dtype=self.dtype_weights,
                 ),
                 mean=0.0,
@@ -135,7 +120,7 @@ class WeightsLib2DLite(nn.Module):
                 [
                     torch.nn.init.normal_(
                         tensor=torch.empty(
-                            [1, self.count_components, 1, 1, 1],
+                            [1, 1, 1, 1],
                             dtype=self.dtype_weights,
                         ),
                         mean=1.0,
@@ -143,7 +128,7 @@ class WeightsLib2DLite(nn.Module):
                     ),
                     torch.nn.init.normal_(
                         tensor=torch.empty(
-                            [1, self.count_components, 1, 1, 1],
+                            [1, 1, 1, 1],
                             dtype=self.dtype_weights,
                         ),
                         mean=0.0,
@@ -236,7 +221,7 @@ class WeightsLib2DLite(nn.Module):
                     [1, self.count_components, 1, 1, 2],
                     dtype=self.dtype_weights,
                 ),
-                mean=-1.0,
+                mean=0.0,
                 std=self.asymmetry,
             ).contiguous(),
         )
@@ -297,6 +282,19 @@ class WeightsLib2DLite(nn.Module):
             exit()
 
         pass
+
+    def norm_polar(
+        self,
+        x: torch.Tensor,
+    ) -> torch.Tensor:
+        x_abs = torch.sqrt(x[..., 0] ** 2 + x[..., 1] ** 2)
+        a = torch.atan2(x[..., 1], x[..., 0])
+        h = x_abs / x_abs.max()  # normalize per whole batch
+        r = (h * a.cos()).unsqueeze(-1)
+        i = (h * a.sin()).unsqueeze(-1)
+        x = torch.cat([r, i], dim=-1)
+        return x
+
 
     def forward(
         self,
@@ -370,21 +368,22 @@ class WeightsLib2DLite(nn.Module):
         mod_j = mod_j + transforms[::, 2, ...]
         z = transforms[::, 3, ...]
         r = (mod_j * z).diff(dim=-1)
-        r[torch.where((r > -self.asymmetry) & (r <= 0))] = self.asymmetry
-        r[torch.where((r >= 0) & (r < self.asymmetry))] = -self.asymmetry
         i = (mod_j * z[..., [1, 0]]).sum(dim=-1, keepdim=True)
         mod_j = torch.cat([r, i], dim=-1)
 
         r = (mod_i * self.inversions).diff(dim=-1)
         i = (mod_i * self.inversions[..., [1, 0]]).sum(dim=-1, keepdim=True)
-        mod_i = torch.cat([r, i], dim=-1).contiguous()
-        mod_i = mod_i.sum(dim=1, keepdim=True)
+        mod_i = torch.cat([r, i], dim=-1)
+        mod_i = mod_i.sum(dim=1, keepdim=True).contiguous()
 
-        denom = (mod_j * mod_j).sum(dim=-1, keepdim=True).mul(self.output_shape_size)
-        r = (self.inversions * mod_j).sum(dim=-1, keepdim=True) / denom
-        i = (self.inversions[..., [1, 0]] * mod_j).diff(dim=-1) / denom
-        mod_j = torch.cat([r, i], dim=-1).contiguous()
-        mod_j = mod_j.sum(dim=1, keepdim=True)
+        denom = (mod_j * mod_j).sum(dim=-1, keepdim=True)
+        # avoiding division by zero ->
+        denom[torch.where(denom < self.asymmetry)] = self.asymmetry
+        # <- avoiding division by zero
+        r = (self.inversions * mod_j).sum(dim=-1, keepdim=True).mul(1.0 / denom)
+        i = (self.inversions[..., [1, 0]] * mod_j).diff(dim=-1).mul(1.0 / denom)
+        mod_j = torch.cat([r, i], dim=-1)
+        mod_j = mod_j.sum(dim=1, keepdim=True).contiguous()
 
         A = mod_i.permute([0, 1, 3, 2, 4])
         A = A.unsqueeze(-2)
@@ -393,8 +392,17 @@ class WeightsLib2DLite(nn.Module):
         B = mod_j.unsqueeze(-2)
         B = torch.cat([B, B[..., [1, 0]]], dim=-2)  # [[c, d], [d, c]]
         mod = torch.einsum("...ijlm,...jkml ->...ikl", A, B)
+        mod = self.norm_polar(mod)
 
         if torch.isnan(mod).any() or torch.isinf(mod).any():
+            self._log_var(self.weights_base, "self.weights_base", False)
+            self._log_var(self.translate_base, "self.translate_base", False)
+            self._log_var(self.rotate_base, "self.rotate_base", False)
+            self._log_var(self.mod_transforms, "self.mod_transforms", False)
+            self._log_var(self.mod_i, "self.mod_i", False)
+            self._log_var(self.mod_j, "self.mod_j", False)
+            self._log_var(self.inversions, "self.inversions", False)
+            exit()
             raise ValueError("mod has NaN or Inf elements.")
 
         mod_r = mod[..., 0]
@@ -421,12 +429,13 @@ class WeightsLib2DLite(nn.Module):
         B = torch.cat([B, B[..., [1, 0]]], dim=-2)
         weights_dynamic = torch.einsum("...ijlm,...jkml ->...ikl", A, B)
 
+        weights_dynamic = weights_dynamic.squeeze(1)
         weights_dynamic = weights_dynamic + self.translate_dynamic
         r = weights_dynamic * self.rotate_dynamic
         r = r.diff(dim=-1)
         i = weights_dynamic * self.rotate_dynamic[..., [1, 0]]
         i = i.sum(dim=-1, keepdim=True)
-        weights_dynamic = torch.cat([r, i], dim=-1).sum(dim=1)
+        weights_dynamic = torch.cat([r, i], dim=-1)
         weights_dynamic = weights_dynamic[..., 0] ** 2 + weights_dynamic[..., 1] ** 2
         weights_dynamic = torch.sqrt(weights_dynamic)
 

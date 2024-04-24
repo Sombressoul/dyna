@@ -57,7 +57,7 @@ class Model(nn.Module):
                     self.mat_count,
                     self.components_count,
                 ],
-                dtype=self.weights.dtype_weights,
+                dtype=dtype_weights,
             ),
             a=-1.0,
             b=+1.0,
@@ -82,6 +82,7 @@ def generate_data_deviative(
     base = torch.nn.init.uniform_(
         tensor=torch.empty([1, *shape]),
         a=+0.0,
+        # a=-1.0,
         b=+1.0,
     )
     mods = (
@@ -103,6 +104,7 @@ def generate_data_random(
     base = torch.nn.init.uniform_(
         tensor=torch.empty([mat_count, *shape]),
         a=+0.0,
+        # a=-1.0,
         b=+1.0,
     ).to(dtype)
     return base
@@ -124,7 +126,8 @@ def generate_data_from_images(
         image = image.resize([shape[1], shape[0]], Image.LANCZOS)
         image = transforms.ToTensor()(image).mean(dim=0, keepdim=False)
         image = image.unsqueeze(0)
-        image = (image - image.min()) / (image.max() - image.min())
+        image = (image - image.min() + 1.0e-2) / (image.max() - image.min() + 2.0e-2)
+        # image = (image - 0.5) * 2.0
         data[i] = image
 
     return data
@@ -192,9 +195,15 @@ def train(
         optimizer.step()
 
         if (i + 1) % log_nth_iteration == 0:
+        # if ((i + 1) % log_nth_iteration == 0) or (i > 2900 and (i + 1) % 10 == 0):
             print(
                 f"Iteration #{i+1}: \nLoss: {loss.item()}\nStdR: {(data - output).std()}"
             )
+            # print(f"\n# ===================================================================== {i+1}\n")
+            # model.weights._log_var(model.weights.inversions, "self.inversions", False)
+            # model.weights._log_var(model.weights.mod_i, "mod_i", False)
+            # model.weights._log_var(model.weights.mod_j, "mod_j", False)
+            # print("\n# ===================================================================== #\n")
             if mode == "images":
                 generate_images_from_data(
                     data=output,
