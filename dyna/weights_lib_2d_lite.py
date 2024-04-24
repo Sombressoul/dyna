@@ -381,8 +381,7 @@ class WeightsLib2DLite(nn.Module):
         B = mod_j.unsqueeze(-2)
         B = torch.cat([B, B[..., [1, 0]]], dim=-2)  # [[c, d], [d, c]]
         mod = torch.einsum("...ijlm,...jkml ->...ikl", A, B)
-        # mod = self.norm_polar(mod)
-        # self._log_var(mod, "mod", True)
+        mod = self.norm_polar(mod)
 
         if torch.isnan(mod).any() or torch.isinf(mod).any():
             self._log_var(self.weights_base, "self.weights_base", False)
@@ -427,6 +426,5 @@ class WeightsLib2DLite(nn.Module):
         weights_dynamic = torch.cat([r, i], dim=-1)
         weights_dynamic = weights_dynamic[..., 0] ** 2 + weights_dynamic[..., 1] ** 2
         weights_dynamic = torch.sqrt(weights_dynamic)
-        # self._log_var(weights_dynamic, "weights_dynamic", True)
 
         return weights_dynamic
