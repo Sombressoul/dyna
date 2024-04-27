@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import math
 
-from typing import Union, List
+from typing import Union, List, Optional
 
 from dyna.weights_lib_2d_lite import WeightsLib2DLite
 
@@ -27,6 +27,8 @@ class DynamicConv2D(nn.Module):
         padding: Union[int, List[int]] = [0, 0],
         dilation: Union[int, List[int]] = [1, 1],
         bias: bool = True,
+        transpose: bool = False,
+        output_padding: Optional[Union[int, List[int]]] = None,
         asymmetry: float = 1.0e-3,
         dtype_weights: torch.dtype = torch.bfloat16,
     ) -> None:
@@ -41,27 +43,46 @@ class DynamicConv2D(nn.Module):
             stride = [stride, stride]
         if type(padding) == int:
             padding = [padding, padding]
+        if type(output_padding) == int:
+            output_padding = [output_padding, output_padding]
         if type(dilation) == int:
             dilation = [dilation, dilation]
 
-        assert context_length > 0, "context_length must be greater than 0"
-        assert mod_rank > 0, "mod_rank must be greater than 0"
-        assert len(kernel_size) == 2, "kernel_size must be an int or a 2-element tuple"
-        assert len(stride) == 2, "stride must be an int or a 2-element tuple"
-        assert len(padding) == 2, "padding must be an int or a 2-element tuple"
-        assert len(dilation) == 2, "dilation must be an int or a 2-element tuple"
+        assert context_length > 0, "context_length must be greater than 0."
+        assert mod_rank > 0, "mod_rank must be greater than 0."
+        assert len(kernel_size) == 2, "kernel_size must be an int or a 2-element tuple."
+        assert len(stride) == 2, "stride must be an int or a 2-element tuple."
+        assert len(padding) == 2, "padding must be an int or a 2-element tuple."
+        assert len(dilation) == 2, "dilation must be an int or a 2-element tuple."
         assert (
             in_channels > 0
             and out_channels > 0
             and kernel_size[0] > 0
             and kernel_size[1] > 0
-        ), "in_channels, out_channels, and kernel_size must be greater than 0"
-        assert stride[0] > 0 and stride[1] > 0, "stride must be greater than 0"
+        ), "in_channels, out_channels, and kernel_size must be greater than 0."
+        assert stride[0] > 0 and stride[1] > 0, "stride must be greater than 0."
         assert (
             padding[0] >= 0 and padding[1] >= 0
-        ), "padding must be greater than or equal to 0"
-        assert dilation[0] > 0 and dilation[1] > 0, "dilation must be greater than 0"
-        assert dtype_weights in self.dtypes, f"dtype must be one of {self.dtypes}"
+        ), "padding must be greater than or equal to 0."
+        assert dilation[0] > 0 and dilation[1] > 0, "dilation must be greater than 0."
+        assert (
+            dtype_weights in self.dtypes
+        ), f"dtype_weights must be one of {self.dtypes}."
+
+        if transpose:
+            assert (
+                output_padding is not None
+            ), "output_padding must be specified if transposed."
+            assert (
+                len(output_padding) == 2
+            ), "output_padding must be an int or a 2-element tuple."
+            assert (
+                output_padding[0] >= 0 and output_padding[1] >= 0
+            ), "output_padding must be greater than or equal to 0."
+        else:
+            assert (
+                output_padding is None
+            ), "output_padding must be None if not transposed."
 
         # ================================================================================= #
         # ____________________________> Parameters.
@@ -73,8 +94,10 @@ class DynamicConv2D(nn.Module):
         self.kernel_size = kernel_size
         self.stride = stride
         self.padding = padding
+        self.output_padding = output_padding
         self.dilation = dilation
         self.use_bias = bias
+        self.transpose = transpose
         self.asymmetry = asymmetry
         self.dtype_weights = dtype_weights
 
@@ -149,11 +172,11 @@ class DynamicConv2D(nn.Module):
         self,
         shape: List[int],
     ) -> List[int]:
-        assert len(shape) == 2, "Shape must be a 2-element tuple"
+        assert len(shape) == 2, "Shape must be a 2-element tuple."
         assert shape[0] > 0 and shape[1] > 0, " ".join(
             [
                 "Shape elements must be greater than 0.",
-                f"Got: {shape}",
+                f"Got: {shape}.",
             ]
         )
 
@@ -223,7 +246,7 @@ class DynamicConv2D(nn.Module):
                 " ".join(
                     [
                         "context.shape[0] must be equal to 1 or x.shape[0].",
-                        f"Got: {context.shape[0]=} and {x.shape[0]=}",
+                        f"Got: {context.shape[0]=} and {x.shape[0]=}.",
                     ]
                 )
             )
@@ -267,16 +290,29 @@ class DynamicConv2D(nn.Module):
         )
         conv_weights = dynamic_weights.reshape([x.shape[0], *self.conv_weights_shape])
 
-        wrapped_conv = lambda x, w: F.conv2d(
-            input=x,
-            weight=w,
-            bias=self.bias_conv,
-            stride=self.stride,
-            padding=self.padding,
-            dilation=self.dilation,
-        )
-        batched_conv = torch.vmap(wrapped_conv)
-        x = batched_conv(x.unsqueeze(1), conv_weights)
+        if self.transpose:
+            conv_weights = conv_weights.transpose(1, 2)
+            wrapped_fn = lambda x, w: F.conv_transpose2d(
+                input=x,
+                weight=w,
+                bias=self.bias_conv,
+                stride=self.stride,
+                padding=self.padding,
+                output_padding=self.output_padding,
+                dilation=self.dilation,
+            )
+        else:
+            wrapped_fn = lambda x, w: F.conv2d(
+                input=x,
+                weight=w,
+                bias=self.bias_conv,
+                stride=self.stride,
+                padding=self.padding,
+                dilation=self.dilation,
+            )
+
+        batched_fn = torch.vmap(wrapped_fn)
+        x = batched_fn(x.unsqueeze(1), conv_weights)
         x = x.squeeze(1)
 
         return x
