@@ -114,16 +114,29 @@ class DynamicConv2D(nn.Module):
             asymmetry=self.asymmetry,
             dtype_weights=self.dtype_weights,
         )
-        bias_bounds = math.sqrt(1 / (self.in_channels * math.prod(self.kernel_size)))
-        self.bias = (
+        self.bias_dynamic = (
             nn.Parameter(
                 data=nn.init.uniform_(
                     tensor=torch.empty(
                         [1, *self.dynamic_weights_shape],
                         dtype=self.dtype_weights,
                     ),
-                    a=-bias_bounds,
-                    b=+bias_bounds,
+                    a=-self.asymmetry,
+                    b=+self.asymmetry,
+                )
+            )
+            if self.use_bias
+            else None
+        )
+        self.bias_conv = (
+            nn.Parameter(
+                data=nn.init.uniform_(
+                    tensor=torch.empty(
+                        [self.out_channels],
+                        dtype=self.dtype_weights,
+                    ),
+                    a=-math.sqrt(1 / (self.in_channels * math.prod(self.kernel_size))),
+                    b=+math.sqrt(1 / (self.in_channels * math.prod(self.kernel_size))),
                 )
             )
             if self.use_bias
@@ -234,7 +247,7 @@ class DynamicConv2D(nn.Module):
 
         dynamic_weights = self.weights_lib(context)
         dynamic_weights = (
-            dynamic_weights + self.bias.unsqueeze(0)
+            dynamic_weights + self.bias_dynamic.unsqueeze(0)
             if self.use_bias
             else dynamic_weights
         )
@@ -257,7 +270,7 @@ class DynamicConv2D(nn.Module):
         wrapped_conv = lambda x, w: F.conv2d(
             input=x,
             weight=w,
-            bias=None,
+            bias=self.bias_conv,
             stride=self.stride,
             padding=self.padding,
             dilation=self.dilation,
