@@ -1,3 +1,4 @@
+from dyna.dynamic_conv2d import DynamicConv2D
 from dyna.exponential_warper_1d import ExponentialWarper1D
 from dyna.modulated_activation import ModulatedActivation
 from dyna.modulated_activation_bell import ModulatedActivationBell
@@ -12,6 +13,7 @@ from dyna.weights_lib_2d_lite import WeightsLib2DLite
 
 
 __all__ = [
+    "DynamicConv2D",
     "ExponentialWarper1D",
     "ModulatedActivation",
     "ModulatedActivationBell",
