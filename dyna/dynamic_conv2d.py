@@ -252,6 +252,9 @@ class DynamicConv2D(nn.Module):
             )
 
         with torch.no_grad():
+            if self.dynamic_weights_index.device != x.device:
+                self.dynamic_weights_index = self.dynamic_weights_index.to(x.device)
+            
             dynamic_weights_index = self.dynamic_weights_index
             dynamic_weights_index = dynamic_weights_index.unsqueeze(0).repeat(
                 [
@@ -263,6 +266,7 @@ class DynamicConv2D(nn.Module):
                 0,
                 self.dynamic_weights_index.numel() * x.shape[0],
                 self.dynamic_weights_index.numel(),
+                device=x.device,
             ).reshape(
                 [x.shape[0], *[1 for _ in range(len(dynamic_weights_index.shape) - 1)]]
             )
