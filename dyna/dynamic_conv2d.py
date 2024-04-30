@@ -9,7 +9,7 @@ from dyna.weights_lib_2d_lite import WeightsLib2DLite
 
 
 class DynamicConv2D(nn.Module):
-    static_bias_buffer: torch.Tensor
+    bias_static_buffer: torch.Tensor
     dtypes: List[torch.dtype] = [
         torch.bfloat16,
         torch.float16,
@@ -27,11 +27,11 @@ class DynamicConv2D(nn.Module):
         stride: Union[int, List[int]] = [1, 1],
         padding: Union[int, List[int]] = [0, 0],
         dilation: Union[int, List[int]] = [1, 1],
-        bias: bool = True,
+        bias_dynamic: bool = True,
+        bias_static: Optional[float] = None,
         transpose: bool = False,
         output_padding: Optional[Union[int, List[int]]] = None,
         asymmetry: float = 1.0e-3,
-        static_bias: Optional[float] = None,
         dtype_weights: torch.dtype = torch.bfloat16,
     ) -> None:
         super().__init__()
@@ -49,7 +49,13 @@ class DynamicConv2D(nn.Module):
             output_padding = [output_padding, output_padding]
         if type(dilation) == int:
             dilation = [dilation, dilation]
+        if type(bias_dynamic) is not bool:
+            bias_dynamic = bool(bias_dynamic)
 
+        assert type(bias_static) in [
+            type(None),
+            float,
+        ], "bias_static must be a float or None."
         assert context_length > 0, "context_length must be greater than 0."
         assert mod_rank > 0, "mod_rank must be greater than 0."
         assert len(kernel_size) == 2, "kernel_size must be an int or a 2-element tuple."
@@ -98,10 +104,10 @@ class DynamicConv2D(nn.Module):
         self.padding = padding
         self.output_padding = output_padding
         self.dilation = dilation
-        self.use_bias = bias
+        self.bias_dynamic = bool(bias_dynamic)
+        self.bias_static = bias_static
         self.transpose = transpose
         self.asymmetry = asymmetry
-        self.static_bias = static_bias
         self.dtype_weights = dtype_weights
 
         # ================================================================================= #
@@ -133,11 +139,11 @@ class DynamicConv2D(nn.Module):
         # ================================================================================= #
         # ____________________________> Init submodules and additional weights.
         # ================================================================================= #
-        if self.static_bias is not None:
+        if self.bias_static is not None:
             self.register_buffer(
-                "static_bias_buffer",
+                "bias_static_buffer",
                 torch.tensor(
-                    [self.static_bias],
+                    [self.bias_static],
                     dtype=self.dtype_weights,
                 ),
             )
@@ -149,7 +155,7 @@ class DynamicConv2D(nn.Module):
             asymmetry=self.asymmetry,
             dtype_weights=self.dtype_weights,
         )
-        self.bias_dynamic = (
+        self.bias_dynamic_weights_lib = (
             nn.Parameter(
                 data=nn.init.uniform_(
                     tensor=torch.empty(
@@ -160,10 +166,10 @@ class DynamicConv2D(nn.Module):
                     b=+self.asymmetry,
                 )
             )
-            if self.use_bias
+            if self.bias_dynamic
             else None
         )
-        self.bias_conv = (
+        self.bias_dynamic_conv = (
             nn.Parameter(
                 data=nn.init.uniform_(
                     tensor=torch.empty(
@@ -174,7 +180,7 @@ class DynamicConv2D(nn.Module):
                     b=+math.sqrt(1 / (self.in_channels * math.prod(self.kernel_size))),
                 )
             )
-            if self.use_bias
+            if self.bias_dynamic
             else None
         )
 
@@ -286,8 +292,8 @@ class DynamicConv2D(nn.Module):
 
         dynamic_weights = self.weights_lib(context)
         dynamic_weights = (
-            dynamic_weights + self.bias_dynamic.unsqueeze(0)
-            if self.use_bias
+            dynamic_weights + self.bias_dynamic_weights_lib.unsqueeze(0)
+            if self.bias_dynamic
             else dynamic_weights
         )
         dynamic_weights = (
@@ -311,7 +317,7 @@ class DynamicConv2D(nn.Module):
             wrapped_fn = lambda x, w: F.conv_transpose2d(
                 input=x,
                 weight=w,
-                bias=self.bias_conv,
+                bias=self.bias_dynamic_conv if self.bias_dynamic else None,
                 stride=self.stride,
                 padding=self.padding,
                 output_padding=self.output_padding,
@@ -321,7 +327,7 @@ class DynamicConv2D(nn.Module):
             wrapped_fn = lambda x, w: F.conv2d(
                 input=x,
                 weight=w,
-                bias=self.bias_conv,
+                bias=self.bias_dynamic_conv if self.bias_dynamic else None,
                 stride=self.stride,
                 padding=self.padding,
                 dilation=self.dilation,
@@ -331,7 +337,7 @@ class DynamicConv2D(nn.Module):
         x = batched_fn(x.unsqueeze(1), conv_weights)
         x = x.squeeze(1)
 
-        if self.static_bias is not None:
-            x = x + self.static_bias_buffer
+        if self.bias_static is not None:
+            x = x + self.bias_static_buffer
 
         return x
