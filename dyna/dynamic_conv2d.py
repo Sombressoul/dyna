@@ -9,6 +9,7 @@ from dyna.weights_lib_2d_lite import WeightsLib2DLite
 
 
 class DynamicConv2D(nn.Module):
+    static_bias_buffer: torch.Tensor
     dtypes: List[torch.dtype] = [
         torch.bfloat16,
         torch.float16,
@@ -30,6 +31,7 @@ class DynamicConv2D(nn.Module):
         transpose: bool = False,
         output_padding: Optional[Union[int, List[int]]] = None,
         asymmetry: float = 1.0e-3,
+        static_bias: Optional[float] = None,
         dtype_weights: torch.dtype = torch.bfloat16,
     ) -> None:
         super().__init__()
@@ -99,6 +101,7 @@ class DynamicConv2D(nn.Module):
         self.use_bias = bias
         self.transpose = transpose
         self.asymmetry = asymmetry
+        self.static_bias = static_bias
         self.dtype_weights = dtype_weights
 
         # ================================================================================= #
@@ -130,6 +133,15 @@ class DynamicConv2D(nn.Module):
         # ================================================================================= #
         # ____________________________> Init submodules and additional weights.
         # ================================================================================= #
+        if self.static_bias is not None:
+            self.register_buffer(
+                "static_bias_buffer",
+                torch.tensor(
+                    [self.static_bias],
+                    dtype=self.dtype_weights,
+                ),
+            )
+
         self.weights_lib = WeightsLib2DLite(
             output_shape=self.dynamic_weights_shape,
             components_count=self.context_length,
@@ -254,7 +266,7 @@ class DynamicConv2D(nn.Module):
         with torch.no_grad():
             if self.dynamic_weights_index.device != x.device:
                 self.dynamic_weights_index = self.dynamic_weights_index.to(x.device)
-            
+
             dynamic_weights_index = self.dynamic_weights_index
             dynamic_weights_index = dynamic_weights_index.unsqueeze(0).repeat(
                 [
@@ -318,5 +330,8 @@ class DynamicConv2D(nn.Module):
         batched_fn = torch.vmap(wrapped_fn)
         x = batched_fn(x.unsqueeze(1), conv_weights)
         x = x.squeeze(1)
+
+        if self.static_bias is not None:
+            x = x + self.static_bias_buffer
 
         return x
