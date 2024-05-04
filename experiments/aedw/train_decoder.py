@@ -17,10 +17,9 @@ project_dir = os.path.dirname(evals_dir)
 sys.path.append(project_dir)
 
 from dyna import DynamicConv2D
-from time import sleep
 
 
-class ExperimentalModel(nn.Module):
+class DecoderOnlyModel(nn.Module):
     def __init__(
         self,
         data_cache_ctx_len: int = None,
@@ -35,7 +34,7 @@ class ExperimentalModel(nn.Module):
         self.data_cache_latents_shape = data_cache_latents_shape
         self.use_bias = True
         self.bias_static = 0.0
-        self.context_length = 32
+        self.context_length = 64
         self.mod_rank = 16
 
         self.kernel_size_t = [4, 4]
@@ -43,7 +42,8 @@ class ExperimentalModel(nn.Module):
         self.kernel_size_m = [5, 5]
 
         self.eps = 1.0e-2
-        self.q_levels = 100
+        self.q_levels = 32
+        self.q_scale = math.pi / 2
 
         self.channels_io = 3
         self.channels_dynamic_levels = [8, 8, 8, 8, 8]
@@ -296,10 +296,13 @@ class ExperimentalModel(nn.Module):
     ) -> torch.Tensor:
         with torch.no_grad():
             l = self.q_levels
+            s = self.q_scale
             shift = 1.0 / (l * 2)
-            x_q = (x * l).clamp(-l, +l)
+            x_q = x / s
+            x_q = (x_q * l).clamp(-l, +l)
             x_q = (x_q // 1.0).to(dtype=x.dtype, device=x.device)
             x_q = (x_q / l) + shift
+            x_q = x_q * s
         x = x + (x_q - x).detach()
         return x
 
@@ -341,6 +344,8 @@ class ExperimentalModel(nn.Module):
         x_mul = self.conv_up_04_m(x_mul, context)
         x_mul = self.doubleLogNorm(x_mul)
         x = (x_pos + x_neg) * x_mul
+        x = torch.arctan(x)
+        x = self.quantizer(x)
 
         x_pos, x_neg, x_mul = x, -x, x.abs().add(1.0).log()
         x_pos = self.conv_up_03_r(x_pos, context)
@@ -352,6 +357,8 @@ class ExperimentalModel(nn.Module):
         x_mul = self.conv_up_03_m(x_mul, context)
         x_mul = self.doubleLogNorm(x_mul)
         x = (x_pos + x_neg) * x_mul
+        x = torch.arctan(x)
+        x = self.quantizer(x)
 
         x_pos, x_neg, x_mul = x, -x, x.abs().add(1.0).log()
         x_pos = self.conv_up_02_r(x_pos, context)
@@ -363,6 +370,8 @@ class ExperimentalModel(nn.Module):
         x_mul = self.conv_up_02_m(x_mul, context)
         x_mul = self.doubleLogNorm(x_mul)
         x = (x_pos + x_neg) * x_mul
+        x = torch.arctan(x)
+        x = self.quantizer(x)
 
         x_pos, x_neg, x_mul = x, -x, x.abs().add(1.0).log()
         x_pos = self.conv_up_01_r(x_pos, context)
@@ -374,6 +383,8 @@ class ExperimentalModel(nn.Module):
         x_mul = self.conv_up_01_m(x_mul, context)
         x_mul = self.doubleLogNorm(x_mul)
         x = (x_pos + x_neg) * x_mul
+        x = torch.arctan(x)
+        x = self.quantizer(x)
 
         x = self.conv_out(x, context)
         x = F.sigmoid(x)
@@ -457,16 +468,6 @@ def data_lab_to_rgb(
     return rgb
 
 
-def fn_loss(inputs, targets) -> torch.Tensor:
-    sq_diff = (inputs**2 - targets**2).abs()
-    diff_min = sq_diff.min()
-    diff_max = sq_diff.max()
-    mult = 1.5 - ((sq_diff - diff_min) / (diff_max - diff_min))
-    loss = (inputs - targets).mul(mult).std().sqrt()
-    loss = loss.mean()
-    return loss
-
-
 def train(
     data: torch.Tensor,
     total_steps: int,
@@ -477,8 +478,10 @@ def train(
     regularization_alpha_model: float,
     regularization_alpha_ctx: float,
     regularization_alpha_latents: float,
-    regularization_low_weights_bound: float,
-    regularization_low_weights_alpha: float,
+    regularization_low_weights_model_bound: float,
+    regularization_low_weights_model_alpha: float,
+    weights_hysteresis_loop_zero_bound: float,
+    weights_hysteresis_loop_zero_jump: float,
     model: nn.Module,
     optimizer: torch.optim.Optimizer,
     log_nth_iteration: int,
@@ -513,9 +516,7 @@ def train(
     for step_idx in range(total_steps):
         if len(epoch_ids) - 1 < batch_size:
             epoch_idx = epoch_idx + 1
-            print(
-                f"\n# ==================================================> New epoch: #{epoch_idx}"
-            )
+            print(f"\n# ==============> New epoch: #{epoch_idx}")
             epoch_ids = torch.randperm(data_lab.shape[0])
 
         batch_ids = epoch_ids[0:batch_size]
@@ -529,9 +530,11 @@ def train(
 
         loss_base_decoded = torch.einsum("ijkl,j->ijkl", decoded, loss_channels_weights)
         loss_base_targets = torch.einsum("ijkl,j->ijkl", sample, loss_channels_weights)
+
+        # Var 3
         loss = F.l1_loss(loss_base_decoded, loss_base_targets)
 
-        # Regularizers
+        # Regularizations
         reg_term_model = get_regularization_term_model(
             model=model,
             alpha=regularization_alpha_model,
@@ -544,18 +547,18 @@ def train(
             model=model,
             alpha=regularization_alpha_latents,
         )
-        reg_term_low_weights = get_regularization_term_low_weights(
-            model=model,
-            bound=regularization_low_weights_bound,
-            alpha=regularization_low_weights_alpha,
-        )
+        # reg_term_low_weights_model = get_regularization_term_low_weights_model(
+        #     model=model,
+        #     bound=regularization_low_weights_model_bound,
+        #     alpha=regularization_low_weights_model_alpha,
+        # )
 
         loss = (
             loss
             + reg_term_model
             + reg_term_ctx
             + reg_term_latents
-            + reg_term_low_weights
+            # + reg_term_low_weights_model # replaced by hysteresis loop
         )
 
         if accumulation_step == grad_accumulation_steps:
@@ -567,6 +570,13 @@ def train(
             optimizer.zero_grad()
             loss_accumulator.backward()
             optimizer.step()
+
+            with torch.no_grad():
+                weights_hysteresis_loop_zero(
+                    model=model,
+                    bound=weights_hysteresis_loop_zero_bound,
+                    jump=weights_hysteresis_loop_zero_jump,
+                )
 
             loss_accumulator = 0
         elif loss_accumulator == 0:
@@ -612,45 +622,45 @@ def train(
     pass
 
 
-def on_model_load(model: ExperimentalModel) -> None:
+def on_model_load(model: DecoderOnlyModel) -> None:
     # for param in model.parameters():
-    #     param.requires_grad = True
+    #     param.requires_grad = False
 
     # model.data_cache_ctx.requires_grad = True
     # model.data_cache_latents.requires_grad = True
 
-    device = model.data_cache_ctx.device
+    # device = model.data_cache_ctx.device
 
-    model.data_cache_ctx = nn.Parameter(
-        torch.nn.init.normal_(
-            torch.empty(
-                [
-                    model.data_cache_ctx.shape[0] * 2,
-                    *model.data_cache_ctx.shape[1:],
-                ],
-                device=device,
-            ),
-            mean=0.0,
-            std=1.0e-1,
-        )
-    ).to(
-        dtype=model.data_cache_ctx.dtype,
-    )
-    model.data_cache_latents = nn.Parameter(
-        torch.nn.init.normal_(
-            torch.empty(
-                [
-                    model.data_cache_latents.shape[0] * 2,
-                    *model.data_cache_latents.shape[1:],
-                ],
-                device=device,
-            ),
-            mean=0.0,
-            std=1.0e-1,
-        ),
-    ).to(
-        dtype=model.data_cache_latents.dtype,
-    )
+    # model.data_cache_ctx = nn.Parameter(
+    #     torch.nn.init.normal_(
+    #         torch.empty(
+    #             [
+    #                 model.data_cache_ctx.shape[0] * 2,
+    #                 *model.data_cache_ctx.shape[1:],
+    #             ],
+    #             device=device,
+    #         ),
+    #         mean=0.0,
+    #         std=1.0e-1,
+    #     )
+    # ).to(
+    #     dtype=model.data_cache_ctx.dtype,
+    # )
+    # model.data_cache_latents = nn.Parameter(
+    #     torch.nn.init.normal_(
+    #         torch.empty(
+    #             [
+    #                 model.data_cache_latents.shape[0] * 2,
+    #                 *model.data_cache_latents.shape[1:],
+    #             ],
+    #             device=device,
+    #         ),
+    #         mean=0.0,
+    #         std=1.0e-1,
+    #     ),
+    # ).to(
+    #     dtype=model.data_cache_latents.dtype,
+    # )
     pass
 
 
@@ -689,36 +699,99 @@ def get_regularization_term_latents(
     return alpha * (sum / model.data_cache_latents.shape[0])
 
 
-def get_regularization_term_low_weights(
+def get_regularization_term_low_weights_model(
     model: nn.Module,
     bound: float,
     alpha: float,
 ) -> torch.Tensor:
     sum = 0.0
-    for param in model.parameters():
+    for name, param in model.named_parameters():
+        if "data_cache" in name:
+            continue
         vars = param.abs().clamp(0.0, bound).sub(bound).abs()
         sum = sum + vars.sum()
     return alpha * sum
 
 
+def weights_hysteresis_loop_zero(
+    model: nn.Module,
+    bound: float,
+    jump: float,
+) -> None:
+    for name, param in model.named_parameters():
+        if "data_cache" in name:
+            continue
+        cond_to_neg = (param > -0.0) & (param < +bound)
+        cond_to_pos = (param < +0.0) & (param > -bound)
+        if cond_to_neg.any():
+            param[cond_to_neg] = param[cond_to_neg] - jump
+        if cond_to_pos.any():
+            param[cond_to_pos] = param[cond_to_pos] + jump
+
+
+def count_vals(
+    model: nn.Module,
+    target: float,
+    excl: str = None,
+    incl: str = None,
+    abs: bool = True,
+    mode: str = "gt",
+) -> int:
+    assert mode in ["gt", "lt", "eq"], f"mode must be 'gt' or 'lt', got {mode}"
+    cnt_fn = (
+        lambda x, acc: acc
+        + x[
+            torch.where(
+                ((x.abs() if abs else x) < target)
+                if mode == "lt"
+                else (
+                    ((x.abs() if abs else x) > target)
+                    if mode == "gt"
+                    else ((x.abs() if abs else x) == target)
+                )
+            )
+        ].numel()
+    )
+    cnt = 0
+    for name, param in model.named_parameters():
+        if excl is not None and excl in name:
+            continue
+        if incl is not None:
+            cnt = cnt_fn(param, cnt) if incl in name else cnt
+        else:
+            cnt = cnt_fn(param, cnt)
+    return cnt
+
+
+def count_params(
+    model: nn.Module,
+) -> int:
+    sum = 0
+    for name, param in model.named_parameters():
+        if "data_cache" in name:
+            continue
+        sum = sum + param.numel()
+    return sum
+
+
 if __name__ == "__main__":
     train_mode = True
 
-    load_model = True
-    load_optim = True
+    load_model = False
+    load_optim = False
     drop_ctx_cache = False
     drop_latents_cache = False
     onload = None
 
-    path_prefix_load = "/mnt/f/git_AIResearch/dyna/data/models/aedw/decoder_model"
-    path_prefix_save = "/mnt/f/git_AIResearch/dyna/data/models/aedw/decoder_model"
-    load_path_model = f"{path_prefix_load}/decoder_model_s1.200000.pth"
-    load_path_optim = f"{path_prefix_load}/decoder_optim_s1.200000.pth"
-    save_path_model = f"{path_prefix_save}/test_model"
-    save_path_optim = f"{path_prefix_save}/test_model"
+    path_prefix_load = "/mnt/f/git_AIResearch/dyna/data/models/dw_decoder"
+    path_prefix_save = "/mnt/f/git_AIResearch/dyna/data/models/dw_decoder"
+    load_path_model = f"{path_prefix_load}/"
+    load_path_optim = f"{path_prefix_load}/"
+    save_path_model = f"{path_prefix_save}/test_model_GAMMA"
+    save_path_optim = f"{path_prefix_save}/test_optim_GAMMA"
     save_model = True
     save_optim = True
-    save_nth_step = 10000
+    save_nth_step = 12800  # =100 epochs
     log_nth_iteration = 100
 
     learning_rate = 1.0e-2
@@ -728,28 +801,30 @@ if __name__ == "__main__":
     regularization_alpha_model = 2.5e-7
     regularization_alpha_ctx = 2.5e-4
     regularization_alpha_latents = 2.0e-6
-    regularization_low_weights_bound = 1.0e-3
-    regularization_low_weights_alpha = 1.0e-3
+    regularization_low_weights_model_bound = 1.0e-3
+    regularization_low_weights_model_alpha = 1.0e-3
+    weights_hysteresis_loop_zero_bound = 1.0e-3
+    weights_hysteresis_loop_zero_jump = 2.5e-3
 
     data_cache_ctx_len = 4096
     data_cache_latents_len = 4096
     data_cache_latents_shape = [8, 32, 32]
 
-    total_steps = 200_000
-    batch_size = 64
+    total_steps = 12800  # =100 epochs
+    batch_size = 32
     sliding_batch = False
     grad_accumulation_steps = 1
-    loss_channels_weights = [2.0, 1.0, 1.0]
+    loss_channels_weights = [1.5, 0.75, 0.75]
 
     images_sample_count = 4096
-    starting_from = 1024 * 8
+    starting_from = 8192
     images_path_src = "/mnt/f/Datasets/Images_512x512/dataset_01"
     images_path_dst = "/mnt/f/git_AIResearch/dyna/data/img_dst"
     output_shape = [512, 512]
     dtype_weights = torch.float32
     device = torch.device("cuda")
 
-    model = ExperimentalModel(
+    model = DecoderOnlyModel(
         data_cache_ctx_len=data_cache_ctx_len,
         data_cache_latents_len=data_cache_latents_len,
         data_cache_latents_shape=data_cache_latents_shape,
@@ -828,8 +903,10 @@ if __name__ == "__main__":
             regularization_alpha_model=regularization_alpha_model,
             regularization_alpha_ctx=regularization_alpha_ctx,
             regularization_alpha_latents=regularization_alpha_latents,
-            regularization_low_weights_bound=regularization_low_weights_bound,
-            regularization_low_weights_alpha=regularization_low_weights_alpha,
+            regularization_low_weights_model_bound=regularization_low_weights_model_bound,
+            regularization_low_weights_model_alpha=regularization_low_weights_model_alpha,
+            weights_hysteresis_loop_zero_bound=weights_hysteresis_loop_zero_bound,
+            weights_hysteresis_loop_zero_jump=weights_hysteresis_loop_zero_jump,
             model=model,
             optimizer=optimizer,
             log_nth_iteration=log_nth_iteration,
