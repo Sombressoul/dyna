@@ -94,7 +94,7 @@ class DWDecoder(nn.Module):
         # ____________________________> Block submodules.
         # ================================================================================= #
         # TODO: create decoder blocks.
-        self.create_decoder()
+        self._create_decoder()
 
         # ================================================================================= #
         # ____________________________> Additional parameters.
@@ -122,8 +122,72 @@ class DWDecoder(nn.Module):
 
         pass
 
-    def create_decoder(self) -> None:
+    def _create_decoder(self) -> None:
+        # self.conv_up_04_t = DynamicConv2D(
+        #     in_channels=self.channels_dynamic_levels[4],
+        #     out_channels=self.channels_dynamic_levels[3],
+        #     context_length=self.context_length,
+        #     mod_rank=self.mod_rank,
+        #     kernel_size=self.kernel_size_t,
+        #     stride=[2, 2],
+        #     padding=[1, 1],
+        #     dilation=[1, 1],
+        #     bias_dynamic=self.use_bias,
+        #     bias_static=self.bias_static,
+        #     transpose=True,
+        #     output_padding=[0, 0],
+        #     asymmetry=1.0e-3,
+        #     dtype_weights=self.dtype_weights,
+        # )
+        # self.conv_up_04_r = DynamicConv2D(
+        #     in_channels=self.channels_dynamic_levels[4],
+        #     out_channels=self.channels_dynamic_levels[3],
+        #     context_length=self.context_length,
+        #     mod_rank=self.mod_rank,
+        #     kernel_size=self.kernel_size_r,
+        #     stride=[1, 1],
+        #     padding=[1, 1],
+        #     dilation=[1, 1],
+        #     bias_dynamic=self.use_bias,
+        #     bias_static=self.bias_static,
+        #     transpose=False,
+        #     output_padding=None,
+        #     asymmetry=1.0e-3,
+        #     dtype_weights=self.dtype_weights,
+        # )
+        # self.conv_up_04_m = DynamicConv2D(
+        #     in_channels=self.channels_dynamic_levels[4],
+        #     out_channels=self.channels_dynamic_levels[3],
+        #     context_length=self.context_length,
+        #     mod_rank=self.mod_rank,
+        #     kernel_size=self.kernel_size_m,
+        #     stride=[1, 1],
+        #     padding=[2, 2],
+        #     dilation=[1, 1],
+        #     bias_dynamic=self.use_bias,
+        #     bias_static=self.bias_static,
+        #     transpose=False,
+        #     output_padding=None,
+        #     asymmetry=1.0e-3,
+        #     dtype_weights=self.dtype_weights,
+        # )
         raise NotImplementedError("TODO: transfer implementation from the test code.")
+    
+    def _block_process(self) -> torch.Tensor:
+        # x_pos, x_neg, x_mul = x, -x, x.abs().add(1.0).log()
+        # x_pos = self.conv_up_04_r(x_pos, context)
+        # x_pos = self.doubleLogNorm(x_pos)
+        # x_pos = self.upsample_nearest(x_pos)
+        # x_neg = self.conv_up_04_t(x_neg, context)
+        # x_neg = self.doubleLogNorm(x_neg)
+        # x_mul = self.upsample_bilinear(x_mul)
+        # x_mul = self.conv_up_04_m(x_mul, context)
+        # x_mul = self.doubleLogNorm(x_mul)
+        # x = (x_pos + x_neg) * x_mul
+        # x = torch.arctan(x)
+        # x = self.quantizer(x)
+        raise NotImplementedError("TODO: transfer implementation from the test code.")
+
 
     def get_regterm_model(
         self,
@@ -273,18 +337,17 @@ class DWDecoder(nn.Module):
         # x_n = DynamicConv_A(-x, context)
         # x = self.doubleLogNorm(x_p - x_n)
         # x = self.quantizer(x)
-
         # x_p = DynamicConv_B(+x, context)
         # x_n = DynamicConv_B(-x, context)
         # x = self.doubleLogNorm(x_p - x_n)
         # x = self.quantizer(x)
-
         # x_p = DynamicConv_C(+x, context)
         # x_n = DynamicConv_C(-x, context)
         # x = self.doubleLogNorm(x_p - x_n)
         # x_p = DynamicConv_D(+x, context)
         # x_n = DynamicConv_D(-x, context)
         # x = self.doubleLogNorm((x_p - x_n).abs())
+        #
         # ########################################################## #
 
         raise NotImplementedError("TODO: transfer implementation from the test code.")
