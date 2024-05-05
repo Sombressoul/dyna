@@ -6,6 +6,7 @@ import torch.nn.functional as F
 import torchvision.transforms as transforms
 import kornia
 import math
+import gc
 
 from PIL import Image
 from madgrad import MADGRAD
@@ -15,265 +16,276 @@ evals_dir = os.path.dirname(script_dir)
 project_dir = os.path.dirname(evals_dir)
 sys.path.append(project_dir)
 
-from model import AEDW
 from dyna import DynamicConv2D
 
 
-class TestModel(nn.Module):
+class DecoderOnlyModel(nn.Module):
     def __init__(
         self,
-        data_len: int,
-        drop_context: bool = False,
+        data_cache_ctx_len: int = None,
+        data_cache_latents_len: int = None,
+        data_cache_latents_shape: list[int] = None,
+        dropout_rate: float = 0.01,
         dtype_weights: torch.dtype = torch.float32,
     ):
         super().__init__()
 
-        self.drop_context = drop_context
-        self.data_len = data_len
-        self.dtype_weights = dtype_weights
+        self.data_cache_ctx_len = data_cache_ctx_len
+        self.data_cache_latents_len = data_cache_latents_len
+        self.data_cache_latents_shape = data_cache_latents_shape
+        self.dropout_rate = dropout_rate
         self.use_bias = True
         self.bias_static = 0.0
-        self.context_length = 16
-        self.mod_rank = 8
+        self.context_length = 64
+        self.mod_rank = 16
+
+        self.kernel_size_t = [4, 4]
+        self.kernel_size_r = [3, 3]
+        self.kernel_size_m = [5, 5]
 
         self.eps = 1.0e-2
-        self.q_levels = 100
+        self.q_levels = 32
+        self.q_scale = math.pi / 2
 
         self.channels_io = 3
-        self.channels_pre_output = 4
-        self.channels_dynamic_levels = [8, 8, 8, 8, 8, 8]
+        self.channels_dynamic_levels = [8, 8, 8, 8, 8]
 
-        self.context = nn.Parameter(
-            data=self._init_context(device=torch.device("cuda")),
-        )
+        self.dtype_weights = dtype_weights
 
-        self.down_01 = DynamicConv2D(
-            in_channels=self.channels_io,
-            out_channels=self.channels_dynamic_levels[0],
-            context_length=self.context_length,
-            mod_rank=self.mod_rank,
-            kernel_size=[3, 3],
-            stride=[2, 2],
-            padding=[0, 0],
-            dilation=[1, 1],
-            bias_dynamic=self.use_bias,
-            bias_static=self.bias_static,
-            transpose=False,
-            output_padding=None,
-            asymmetry=1.0e-3,
-            dtype_weights=self.dtype_weights,
-        )
-        self.down_02 = DynamicConv2D(
-            in_channels=self.channels_dynamic_levels[0],
-            out_channels=self.channels_dynamic_levels[1],
-            context_length=self.context_length,
-            mod_rank=self.mod_rank,
-            kernel_size=[3, 3],
-            stride=[2, 2],
-            padding=[0, 0],
-            dilation=[1, 1],
-            bias_dynamic=self.use_bias,
-            bias_static=self.bias_static,
-            transpose=False,
-            output_padding=None,
-            asymmetry=1.0e-3,
-            dtype_weights=self.dtype_weights,
-        )
-        self.down_03 = DynamicConv2D(
-            in_channels=self.channels_dynamic_levels[1],
-            out_channels=self.channels_dynamic_levels[2],
-            context_length=self.context_length,
-            mod_rank=self.mod_rank,
-            kernel_size=[3, 3],
-            stride=[2, 2],
-            padding=[0, 0],
-            dilation=[1, 1],
-            bias_dynamic=self.use_bias,
-            bias_static=self.bias_static,
-            transpose=False,
-            output_padding=None,
-            asymmetry=1.0e-3,
-            dtype_weights=self.dtype_weights,
-        )
-        self.down_04 = DynamicConv2D(
-            in_channels=self.channels_dynamic_levels[2],
+        self.dropout = nn.Dropout(p=self.dropout_rate)
+        self.upsample_nearest = nn.Upsample(scale_factor=2, mode="nearest")
+        self.upsample_bilinear = nn.Upsample(scale_factor=2, mode="bilinear")
+        self.conv_up_04_t = DynamicConv2D(
+            in_channels=self.channels_dynamic_levels[4],
             out_channels=self.channels_dynamic_levels[3],
             context_length=self.context_length,
             mod_rank=self.mod_rank,
-            kernel_size=[3, 3],
+            kernel_size=self.kernel_size_t,
             stride=[2, 2],
-            padding=[0, 0],
+            padding=[1, 1],
             dilation=[1, 1],
             bias_dynamic=self.use_bias,
             bias_static=self.bias_static,
-            transpose=False,
-            output_padding=None,
+            transpose=True,
+            output_padding=[0, 0],
             asymmetry=1.0e-3,
             dtype_weights=self.dtype_weights,
         )
-        self.down_05 = DynamicConv2D(
-            in_channels=self.channels_dynamic_levels[3],
-            out_channels=self.channels_dynamic_levels[4],
-            context_length=self.context_length,
-            mod_rank=self.mod_rank,
-            kernel_size=[3, 3],
-            stride=[2, 2],
-            padding=[0, 0],
-            dilation=[1, 1],
-            bias_dynamic=self.use_bias,
-            bias_static=self.bias_static,
-            transpose=False,
-            output_padding=None,
-            asymmetry=1.0e-3,
-            dtype_weights=self.dtype_weights,
-        )
-
-        self.middle = DynamicConv2D(
+        self.conv_up_04_r = DynamicConv2D(
             in_channels=self.channels_dynamic_levels[4],
-            out_channels=self.channels_dynamic_levels[5],
+            out_channels=self.channels_dynamic_levels[3],
             context_length=self.context_length,
             mod_rank=self.mod_rank,
-            kernel_size=[2, 2],
+            kernel_size=self.kernel_size_r,
+            stride=[1, 1],
+            padding=[1, 1],
+            dilation=[1, 1],
+            bias_dynamic=self.use_bias,
+            bias_static=self.bias_static,
+            transpose=False,
+            output_padding=None,
+            asymmetry=1.0e-3,
+            dtype_weights=self.dtype_weights,
+        )
+        self.conv_up_04_m = DynamicConv2D(
+            in_channels=self.channels_dynamic_levels[4],
+            out_channels=self.channels_dynamic_levels[3],
+            context_length=self.context_length,
+            mod_rank=self.mod_rank,
+            kernel_size=self.kernel_size_m,
+            stride=[1, 1],
+            padding=[2, 2],
+            dilation=[1, 1],
+            bias_dynamic=self.use_bias,
+            bias_static=self.bias_static,
+            transpose=False,
+            output_padding=None,
+            asymmetry=1.0e-3,
+            dtype_weights=self.dtype_weights,
+        )
+        self.conv_up_03_t = DynamicConv2D(
+            in_channels=self.channels_dynamic_levels[3],
+            out_channels=self.channels_dynamic_levels[2],
+            context_length=self.context_length,
+            mod_rank=self.mod_rank,
+            kernel_size=self.kernel_size_t,
+            stride=[2, 2],
+            padding=[1, 1],
+            dilation=[1, 1],
+            bias_dynamic=self.use_bias,
+            bias_static=self.bias_static,
+            transpose=True,
+            output_padding=[0, 0],
+            asymmetry=1.0e-3,
+            dtype_weights=self.dtype_weights,
+        )
+        self.conv_up_03_r = DynamicConv2D(
+            in_channels=self.channels_dynamic_levels[3],
+            out_channels=self.channels_dynamic_levels[2],
+            context_length=self.context_length,
+            mod_rank=self.mod_rank,
+            kernel_size=self.kernel_size_r,
+            stride=[1, 1],
+            padding=[1, 1],
+            dilation=[1, 1],
+            bias_dynamic=self.use_bias,
+            bias_static=self.bias_static,
+            transpose=False,
+            output_padding=None,
+            asymmetry=1.0e-3,
+            dtype_weights=self.dtype_weights,
+        )
+        self.conv_up_03_m = DynamicConv2D(
+            in_channels=self.channels_dynamic_levels[3],
+            out_channels=self.channels_dynamic_levels[2],
+            context_length=self.context_length,
+            mod_rank=self.mod_rank,
+            kernel_size=self.kernel_size_m,
+            stride=[1, 1],
+            padding=[2, 2],
+            dilation=[1, 1],
+            bias_dynamic=self.use_bias,
+            bias_static=self.bias_static,
+            transpose=False,
+            output_padding=None,
+            asymmetry=1.0e-3,
+            dtype_weights=self.dtype_weights,
+        )
+        self.conv_up_02_t = DynamicConv2D(
+            in_channels=self.channels_dynamic_levels[2],
+            out_channels=self.channels_dynamic_levels[1],
+            context_length=self.context_length,
+            mod_rank=self.mod_rank,
+            kernel_size=self.kernel_size_t,
+            stride=[2, 2],
+            padding=[1, 1],
+            dilation=[1, 1],
+            bias_dynamic=self.use_bias,
+            bias_static=self.bias_static,
+            transpose=True,
+            output_padding=[0, 0],
+            asymmetry=1.0e-3,
+            dtype_weights=self.dtype_weights,
+        )
+        self.conv_up_02_r = DynamicConv2D(
+            in_channels=self.channels_dynamic_levels[2],
+            out_channels=self.channels_dynamic_levels[1],
+            context_length=self.context_length,
+            mod_rank=self.mod_rank,
+            kernel_size=self.kernel_size_r,
+            stride=[1, 1],
+            padding=[1, 1],
+            dilation=[1, 1],
+            bias_dynamic=self.use_bias,
+            bias_static=self.bias_static,
+            transpose=False,
+            output_padding=None,
+            asymmetry=1.0e-3,
+            dtype_weights=self.dtype_weights,
+        )
+        self.conv_up_02_m = DynamicConv2D(
+            in_channels=self.channels_dynamic_levels[2],
+            out_channels=self.channels_dynamic_levels[1],
+            context_length=self.context_length,
+            mod_rank=self.mod_rank,
+            kernel_size=self.kernel_size_m,
+            stride=[1, 1],
+            padding=[2, 2],
+            dilation=[1, 1],
+            bias_dynamic=self.use_bias,
+            bias_static=self.bias_static,
+            transpose=False,
+            output_padding=None,
+            asymmetry=1.0e-3,
+            dtype_weights=self.dtype_weights,
+        )
+        self.conv_up_01_t = DynamicConv2D(
+            in_channels=self.channels_dynamic_levels[1],
+            out_channels=self.channels_dynamic_levels[0],
+            context_length=self.context_length,
+            mod_rank=self.mod_rank,
+            kernel_size=self.kernel_size_t,
+            stride=[2, 2],
+            padding=[1, 1],
+            dilation=[1, 1],
+            bias_dynamic=self.use_bias,
+            bias_static=self.bias_static,
+            transpose=True,
+            output_padding=[0, 0],
+            asymmetry=1.0e-3,
+            dtype_weights=self.dtype_weights,
+        )
+        self.conv_up_01_r = DynamicConv2D(
+            in_channels=self.channels_dynamic_levels[1],
+            out_channels=self.channels_dynamic_levels[0],
+            context_length=self.context_length,
+            mod_rank=self.mod_rank,
+            kernel_size=self.kernel_size_r,
+            stride=[1, 1],
+            padding=[1, 1],
+            dilation=[1, 1],
+            bias_dynamic=self.use_bias,
+            bias_static=self.bias_static,
+            transpose=False,
+            output_padding=None,
+            asymmetry=1.0e-3,
+            dtype_weights=self.dtype_weights,
+        )
+        self.conv_up_01_m = DynamicConv2D(
+            in_channels=self.channels_dynamic_levels[1],
+            out_channels=self.channels_dynamic_levels[0],
+            context_length=self.context_length,
+            mod_rank=self.mod_rank,
+            kernel_size=self.kernel_size_m,
+            stride=[1, 1],
+            padding=[2, 2],
+            dilation=[1, 1],
+            bias_dynamic=self.use_bias,
+            bias_static=self.bias_static,
+            transpose=False,
+            output_padding=None,
+            asymmetry=1.0e-3,
+            dtype_weights=self.dtype_weights,
+        )
+        self.conv_out = DynamicConv2D(
+            in_channels=self.channels_dynamic_levels[0],
+            out_channels=self.channels_io,
+            context_length=self.context_length,
+            mod_rank=self.mod_rank,
+            kernel_size=[1, 1],
             stride=[1, 1],
             padding=[0, 0],
             dilation=[1, 1],
             bias_dynamic=self.use_bias,
             bias_static=self.bias_static,
-            transpose=True,
-            output_padding=[0, 0],
-            asymmetry=1.0e-3,
-            dtype_weights=self.dtype_weights,
-        )
-
-        self.up_05 = DynamicConv2D(
-            in_channels=self.channels_dynamic_levels[5],
-            out_channels=self.channels_dynamic_levels[4],
-            context_length=self.context_length,
-            mod_rank=self.mod_rank,
-            kernel_size=[4, 4],
-            stride=[2, 2],
-            padding=[1, 1],
-            dilation=[1, 1],
-            bias_dynamic=self.use_bias,
-            bias_static=self.bias_static,
-            transpose=True,
-            output_padding=[0, 0],
-            asymmetry=1.0e-3,
-            dtype_weights=self.dtype_weights,
-        )
-        self.up_04 = DynamicConv2D(
-            in_channels=self.channels_dynamic_levels[4],
-            out_channels=self.channels_dynamic_levels[3],
-            context_length=self.context_length,
-            mod_rank=self.mod_rank,
-            kernel_size=[4, 4],
-            stride=[2, 2],
-            padding=[1, 1],
-            dilation=[1, 1],
-            bias_dynamic=self.use_bias,
-            bias_static=self.bias_static,
-            transpose=True,
-            output_padding=[0, 0],
-            asymmetry=1.0e-3,
-            dtype_weights=self.dtype_weights,
-        )
-        self.up_03 = DynamicConv2D(
-            in_channels=self.channels_dynamic_levels[3],
-            out_channels=self.channels_dynamic_levels[2],
-            context_length=self.context_length,
-            mod_rank=self.mod_rank,
-            kernel_size=[4, 4],
-            stride=[2, 2],
-            padding=[1, 1],
-            dilation=[1, 1],
-            bias_dynamic=self.use_bias,
-            bias_static=self.bias_static,
-            transpose=True,
-            output_padding=[0, 0],
-            asymmetry=1.0e-3,
-            dtype_weights=self.dtype_weights,
-        )
-        self.up_02 = DynamicConv2D(
-            in_channels=self.channels_dynamic_levels[2],
-            out_channels=self.channels_dynamic_levels[1],
-            context_length=self.context_length,
-            mod_rank=self.mod_rank,
-            kernel_size=[4, 4],
-            stride=[2, 2],
-            padding=[1, 1],
-            dilation=[1, 1],
-            bias_dynamic=self.use_bias,
-            bias_static=self.bias_static,
-            transpose=True,
-            output_padding=[0, 0],
-            asymmetry=1.0e-3,
-            dtype_weights=self.dtype_weights,
-        )
-        self.up_01 = DynamicConv2D(
-            in_channels=self.channels_dynamic_levels[1],
-            out_channels=self.channels_dynamic_levels[0],
-            context_length=self.context_length,
-            mod_rank=self.mod_rank,
-            kernel_size=[4, 4],
-            stride=[2, 2],
-            padding=[1, 1],
-            dilation=[1, 1],
-            bias_dynamic=self.use_bias,
-            bias_static=self.bias_static,
-            transpose=True,
-            output_padding=[0, 0],
-            asymmetry=1.0e-3,
-            dtype_weights=self.dtype_weights,
-        )
-
-        self.out_up_conv = DynamicConv2D(
-            in_channels=self.channels_dynamic_levels[0],
-            out_channels=self.channels_pre_output,
-            context_length=self.context_length,
-            mod_rank=self.mod_rank,
-            kernel_size=[4, 4],
-            stride=[2, 2],
-            padding=[1, 1],
-            dilation=[1, 1],
-            bias_dynamic=self.use_bias,
-            bias_static=self.bias_static,
-            transpose=True,
-            output_padding=[0, 0],
-            asymmetry=1.0e-3,
-            dtype_weights=self.dtype_weights,
-        )
-
-        self.out_down_conv = DynamicConv2D(
-            in_channels=self.channels_pre_output,
-            out_channels=self.channels_io,
-            context_length=self.context_length,
-            mod_rank=self.mod_rank,
-            kernel_size=[3, 3],
-            stride=[2, 2],
-            padding=[1, 1],
-            dilation=[1, 1],
-            bias_dynamic=self.use_bias,
-            bias_static=self.bias_static,
             transpose=False,
             output_padding=None,
             asymmetry=1.0e-3,
             dtype_weights=self.dtype_weights,
         )
 
-        pass
-
-    def _init_context(self, device: torch.device) -> torch.Tensor:
-        # uniform: -0.01...+0.01
-        new_context = torch.nn.init.normal_(
-            tensor=torch.empty(
-                [self.data_len, self.context_length],
-                dtype=self.dtype_weights,
-                device=device,
+        self.data_cache_ctx = nn.Parameter(
+            data=torch.nn.init.normal_(
+                tensor=torch.empty(
+                    [self.data_cache_ctx_len, self.context_length],
+                    dtype=self.dtype_weights,
+                ),
+                mean=0.0,
+                std=1.0e-2,
             ),
-            mean=0.0,
-            std=1.0e-2,
         )
-        return new_context
+        self.data_cache_latents = nn.Parameter(
+            data=torch.nn.init.normal_(
+                tensor=torch.empty(
+                    [self.data_cache_latents_len, *self.data_cache_latents_shape],
+                    dtype=self.dtype_weights,
+                ),
+                mean=0.0,
+                std=1.0e-2,
+            ),
+        )
+
+        pass
 
     def quantizer(
         self,
@@ -281,14 +293,17 @@ class TestModel(nn.Module):
     ) -> torch.Tensor:
         with torch.no_grad():
             l = self.q_levels
-            shift = 1.0 / (self.q_levels * 2)
-            x_q = (x * l).clamp(-l, +l)
+            s = self.q_scale
+            shift = 1.0 / (l * 2)
+            x_q = x / s
+            x_q = (x_q * l).clamp(-l, +l)
             x_q = (x_q // 1.0).to(dtype=x.dtype, device=x.device)
             x_q = (x_q / l) + shift
+            x_q = x_q * s
         x = x + (x_q - x).detach()
         return x
 
-    def logActivationAbs(
+    def doubleLogNormAbs(
         self,
         x: torch.Tensor,
     ) -> torch.Tensor:
@@ -297,7 +312,7 @@ class TestModel(nn.Module):
         x = x.add(torch.e).log().add(self.eps).log()
         return x
 
-    def logActivation(
+    def doubleLogNorm(
         self,
         x: torch.Tensor,
     ) -> torch.Tensor:
@@ -310,93 +325,76 @@ class TestModel(nn.Module):
 
     def forward(
         self,
-        x: torch.Tensor,
         ids: torch.Tensor,
     ) -> torch.Tensor:
-        src_dtype = x.dtype
-        x = x.to(dtype=self.dtype_weights)
+        ids = ids.to(device=self.data_cache_latents.device, dtype=torch.int32)
+        context = self.data_cache_ctx[ids]
+        x = self.data_cache_latents[ids]
 
-        act_fn = self.logActivationAbs
-
-        try:
-            context = self.context[ids]
-
-            if self.drop_context:
-                print(
-                    "\n".join(
-                        [
-                            "WARNING: Context is being dropped.",
-                            "         This is a temporary workaround.",
-                            "         It will be removed in the future.",
-                        ]
-                    )
-                )
-                self.drop_context = False
-                raise AttributeError()
-        except AttributeError:
-            self.context.data = nn.Parameter(
-                data=self._init_context(device=x.device),
-            )
-            context = self.context[ids]
-
-        x = self.down_01(x, context)  # 256 (x2)
-        x = act_fn(x)
-        # x = self.quantizer(x)
-        # print(f"down_01.shape: {x.shape}")
-        x = self.down_02(x, context)  # 128 (x4)
-        x = act_fn(x)
-        # x = self.quantizer(x)
-        # print(f"down_02.shape: {x.shape}")
-        x = self.down_03(x, context)  # 64 (x8)
-        x = act_fn(x)
-        # x = self.quantizer(x)
-        # print(f"down_03.shape: {x.shape}")
-        x = self.down_04(x, context) # 32 (x16)
-        x = act_fn(x)
-        # x = self.quantizer(x)
-        # print(f"down_04.shape: {x.shape}")
-        # x = self.down_05(x, context) # 16 (x32)
-        # x = act_fn(x)
-        # x = self.quantizer(x)
-        # print(f"down_05.shape: {x.shape}")
-
-        x = self.middle(x, context)
-        x = act_fn(x)
-        # x = self.quantizer(x)
-        # print(f"middle.shape: {x.shape}")
-
-        # x = self.up_05(x, context)
-        # x = act_fn(x)
-        # x = self.quantizer(x)
-        # print(f"up_05.shape: {x.shape}")
-        x = self.up_04(x, context)
-        x = act_fn(x)
-        # x = self.quantizer(x)
-        # print(f"up_04.shape: {x.shape}")
-        x = self.up_03(x, context)
-        x = act_fn(x)
+        x_pos = self.dropout(x)
+        x_neg = self.dropout(-x)
+        x_mul = self.dropout(x.abs().add(1.0).log())
+        x_pos = self.conv_up_04_r(x_pos, context)
+        x_pos = self.doubleLogNorm(x_pos)
+        x_pos = self.upsample_nearest(x_pos)
+        x_neg = self.conv_up_04_t(x_neg, context)
+        x_neg = self.doubleLogNorm(x_neg)
+        x_mul = self.upsample_bilinear(x_mul)
+        x_mul = self.conv_up_04_m(x_mul, context)
+        x_mul = self.doubleLogNorm(x_mul)
+        x = (x_pos + x_neg) * x_mul
+        x = torch.arctan(x)
         x = self.quantizer(x)
-        # print(f"up_03.shape: {x.shape}")
-        x = self.up_02(x, context)
-        x = act_fn(x)
-        x = self.quantizer(x)
-        # print(f"up_02.shape: {x.shape}")
-        x = self.up_01(x, context)
-        x = act_fn(x)
-        x = self.quantizer(x)
-        # print(f"up_01.shape: {x.shape}")
 
-        x = self.out_up_conv(x, context)
-        x = act_fn(x)
-        # x = self.quantizer(x)
-        # print(f"out_up_conv.shape: {x.shape}")
-        x = self.out_down_conv(x, context)
-        x = act_fn(x)
-        x = x.to(dtype=src_dtype)
-        # print(f"out_down_conv.shape: {x.shape}")
-        # exit()
+        x_pos = self.dropout(x)
+        x_neg = self.dropout(-x)
+        x_mul = self.dropout(x.abs().add(1.0).log())
+        x_pos = self.conv_up_03_r(x_pos, context)
+        x_pos = self.doubleLogNorm(x_pos)
+        x_pos = self.upsample_nearest(x_pos)
+        x_neg = self.conv_up_03_t(x_neg, context)
+        x_neg = self.doubleLogNorm(x_neg)
+        x_mul = self.upsample_bilinear(x_mul)
+        x_mul = self.conv_up_03_m(x_mul, context)
+        x_mul = self.doubleLogNorm(x_mul)
+        x = (x_pos + x_neg) * x_mul
+        x = torch.arctan(x)
+        x = self.quantizer(x)
 
-        return x, None, None
+        x_pos = self.dropout(x)
+        x_neg = self.dropout(-x)
+        x_mul = self.dropout(x.abs().add(1.0).log())
+        x_pos = self.conv_up_02_r(x_pos, context)
+        x_pos = self.doubleLogNorm(x_pos)
+        x_pos = self.upsample_nearest(x_pos)
+        x_neg = self.conv_up_02_t(x_neg, context)
+        x_neg = self.doubleLogNorm(x_neg)
+        x_mul = self.upsample_bilinear(x_mul)
+        x_mul = self.conv_up_02_m(x_mul, context)
+        x_mul = self.doubleLogNorm(x_mul)
+        x = (x_pos + x_neg) * x_mul
+        x = torch.arctan(x)
+        x = self.quantizer(x)
+
+        x_pos = self.dropout(x)
+        x_neg = self.dropout(-x)
+        x_mul = self.dropout(x.abs().add(1.0).log())
+        x_pos = self.conv_up_01_r(x_pos, context)
+        x_pos = self.doubleLogNorm(x_pos)
+        x_pos = self.upsample_nearest(x_pos)
+        x_neg = self.conv_up_01_t(x_neg, context)
+        x_neg = self.doubleLogNorm(x_neg)
+        x_mul = self.upsample_bilinear(x_mul)
+        x_mul = self.conv_up_01_m(x_mul, context)
+        x_mul = self.doubleLogNorm(x_mul)
+        x = (x_pos + x_neg) * x_mul
+        x = torch.arctan(x)
+        x = self.quantizer(x)
+
+        x = self.conv_out(x, context)
+        x = F.sigmoid(x)
+
+        return x
 
 
 def generate_data_from_images(
@@ -419,7 +417,13 @@ def generate_data_from_images(
     for i in range(images_sample_count):
         image_name = dir_contents[starting_from + i]
         image_path = os.path.join(images_path_src, image_name)
-        image = Image.open(image_path)
+
+        try:
+            image = Image.open(image_path)
+        except ValueError:
+            print(f"Failed to load image '{image_path}'.")
+            exit()
+
         image = image.resize([shape[1], shape[0]], Image.LANCZOS)
         image = transforms.ToTensor()(image)
         image = image.unsqueeze(0) * 255.0
@@ -471,130 +475,385 @@ def data_lab_to_rgb(
 
 def train(
     data: torch.Tensor,
-    samples_per_step: int,
-    model: AEDW,
+    total_steps: int,
+    batch_size: int,
+    grad_accumulation_steps: int,
+    sliding_batch: bool,
+    loss_channels_weights: torch.Tensor,
+    regularization_alpha_model: float,
+    regularization_alpha_ctx: float,
+    regularization_alpha_latents: float,
+    regularization_low_weights_model_bound: float,
+    regularization_low_weights_model_alpha: float,
+    weights_hysteresis_loop: bool,
+    weights_hysteresis_loop_zero_bound: float,
+    weights_hysteresis_loop_zero_jump: float,
+    model: nn.Module,
     optimizer: torch.optim.Optimizer,
-    iterations: int,
     log_nth_iteration: int,
-    results_sample_count: int,
     images_path_dst: str = None,
     save_nth_step: int = 100,
     savers: list = [],
     to_save: list[bool] = [],
 ) -> None:
+    var_logger = model.conv_out.weights_lib._log_var
     params_model = sum(p.numel() for p in model.parameters() if p.requires_grad)
 
     print("\n# --------------------------------------------------- #\n")
     print(f"Model type: {type(model)}")
     print(f"Model parameters: {params_model}")
-
     print("\n# --------------------------------------------------- #\n")
-    for i in range(iterations):
-        ids = torch.randperm(data.shape[0])[0:samples_per_step]
-        sample = data[ids].to(dtype=model.dtype_weights)
 
-        with torch.no_grad():
-            sample = sample.mul(1.0 / 255.0)
-            sample = data_rgb_to_lab(sample)
+    with torch.no_grad():
+        data_lab = data.cpu().to(dtype=model.dtype_weights)
+        data_lab = data_lab / 255.0
+        data_lab = data_rgb_to_lab(data_lab)
+        data_lab = data_lab.to(dtype=torch.float16, device=data.device)
+        data = data.cpu().detach()
+        gc.collect()
 
-        optimizer.zero_grad()
-        decoded, encoded, context = model(sample, ids)
-        loss = (sample - decoded).std().sqrt()
-        # loss = F.mse_loss(decoded, sample)
-        print(f"step loss: {loss.item()}")
-        loss.backward()
-        # torch.nn.utils.clip_grad_value_(model.parameters(), 1.0e-5)
-        optimizer.step()
+    loss_channels_weights = loss_channels_weights.to(data_lab.device)
+    accumulation_step = 0
+    loss_accumulator = 0
+    epoch_ids = torch.randperm(data_lab.shape[0])
+    epoch_idx = 0
+    print(f"Starting training. Epoch #{epoch_idx}")
+    for step_idx in range(total_steps):
+        if len(epoch_ids) - 1 < batch_size:
+            epoch_idx = epoch_idx + 1
+            print(f"\n# ==============> New epoch: #{epoch_idx}")
+            epoch_ids = torch.randperm(data_lab.shape[0])
 
-        if (i + 1) % log_nth_iteration == 0:
+        batch_ids = epoch_ids[0:batch_size]
+        epoch_ids = epoch_ids[(1 if sliding_batch else batch_size) :]
+
+        sample = data_lab[batch_ids]
+        sample = sample.to(dtype=model.dtype_weights)
+
+        accumulation_step = accumulation_step + 1
+        decoded = model(batch_ids)
+
+        loss_channels_weights = loss_channels_weights.reshape([1, 3, 1, 1])
+        loss_base_decoded = decoded * loss_channels_weights
+        loss_base_targets = sample * loss_channels_weights
+
+        # Loss B
+        loss = F.l1_loss(loss_base_decoded, loss_base_targets)
+
+        # Regularizations
+        reg_term_model = get_regularization_term_model(
+            model=model,
+            alpha=regularization_alpha_model,
+        )
+        reg_term_ctx = get_regularization_term_ctx(
+            model=model,
+            alpha=regularization_alpha_ctx,
+        )
+        reg_term_latents = get_regularization_term_latents(
+            model=model,
+            alpha=regularization_alpha_latents,
+        )
+        reg_term_low_weights_model = get_regularization_term_low_weights_model_alpha(
+            model=model,
+            bound=regularization_low_weights_model_bound,
+            alpha=regularization_low_weights_model_alpha,
+        )
+
+        loss = (
+            loss
+            + reg_term_model
+            + reg_term_ctx
+            + reg_term_latents
+            + reg_term_low_weights_model  # replaced by hysteresis loop
+        )
+
+        if accumulation_step == grad_accumulation_steps:
+            accumulation_step = 0
+
+            loss_accumulator = loss_accumulator + loss
+            loss_accumulator = loss_accumulator / grad_accumulation_steps
+
+            optimizer.zero_grad()
+            loss_accumulator.backward()
+            optimizer.step()
+
+            if weights_hysteresis_loop:
+                weights_hysteresis_loop_zero(
+                    model=model,
+                    bound=weights_hysteresis_loop_zero_bound,
+                    jump=weights_hysteresis_loop_zero_jump,
+                )
+
+            loss_accumulator = 0
+        elif loss_accumulator == 0:
+            loss_accumulator = loss
+        else:
+            loss_accumulator = loss_accumulator + loss
+
+        # print(f"step loss: {loss.item()}")
+
+        if (step_idx + 1) % log_nth_iteration == 0:
             print(
-                "\n# ==============> #"
+                "\n# ==============> "
                 + "\n".join(
                     [
-                        f"Iteration #{i+1}:",
+                        f"Iteration #{step_idx+1}:",
                         f"Loss: {loss.item()}",
                         f"StdR: {(sample - decoded).std()}",
                     ]
                 )
-                + "\n# <============== #"
+                + "\n# <=============="
             )
-            model.down_01.weights_lib._log_var(model.context, "model.context", False)
+            # var_logger(model.data_cache_ctx, "model.data_cache_ctx", False)
+            # var_logger(model.data_cache_latents, "model.data_cache_latents", False)
             generate_images_from_data(
-                data=data_lab_to_rgb(decoded[0:results_sample_count]),
+                data=data_lab_to_rgb(decoded[-1].unsqueeze(0)),
                 images_path_dst=images_path_dst,
-                prefix=f"output_i{i+1}",
+                prefix=f"output_e{epoch_idx:0>4d}_i{(step_idx+1):0>7d}",
             )
-        if (i + 1) % save_nth_step == 0:
+        if (step_idx + 1) % save_nth_step == 0:
             for j, saver in enumerate(savers):
                 if to_save[j]:
-                    saver()
+                    saver(step_idx + 1)
             pass
 
     print("\n# --------------------------------------------------- #\n")
 
     generate_images_from_data(
-        data=data_lab_to_rgb(decoded[0:results_sample_count]),
+        data=data_lab_to_rgb(decoded[-1].unsqueeze(0)),
         images_path_dst=images_path_dst,
-        prefix=f"output_final_i{i+1}",
+        prefix=f"output_final_i{step_idx+1}",
     )
 
     pass
 
 
+def get_regularization_term_model(
+    model: nn.Module,
+    alpha: float,
+) -> torch.Tensor:
+    sum = 0.0
+    for name, param in model.named_parameters():
+        if "data_cache" in name:
+            continue
+        else:
+            sum = sum + (param**2).sum()
+    return alpha * sum
+
+
+def get_regularization_term_ctx(
+    model: nn.Module,
+    alpha: float,
+) -> torch.Tensor:
+    sum = 0.0
+    for name, param in model.named_parameters():
+        if "data_cache_ctx" in name:
+            sum = sum + (param**2).sum()
+    return alpha * (sum / model.data_cache_ctx.shape[0])
+
+
+def get_regularization_term_latents(
+    model: nn.Module,
+    alpha: float,
+) -> torch.Tensor:
+    sum = 0.0
+    for name, param in model.named_parameters():
+        if "data_cache_latents" in name:
+            sum = sum + (param**2).sum()
+    return alpha * (sum / model.data_cache_latents.shape[0])
+
+
+def get_regularization_term_low_weights_model_alpha(
+    model: nn.Module,
+    bound: float,
+    alpha: float,
+) -> torch.Tensor:
+    sum = 0.0
+    for name, param in model.named_parameters():
+        if "data_cache" in name:
+            continue
+        vars = param.abs().clamp(0.0, bound).sub(bound).abs()
+        sum = sum + vars.sum()
+    return alpha * sum
+
+
+def get_regularization_term_low_weights_model_beta(
+    model: nn.Module,
+    bound: float,
+    alpha: float,
+) -> torch.Tensor:
+    sum = 0.0
+    for name, param in model.named_parameters():
+        if "data_cache" in name:
+            continue
+        vars = param.abs().clamp(0.0, bound).sub(bound).abs()
+        varsum = vars.mul(1.0 / bound).sqrt()
+        varsum = varsum / ((varsum[varsum > 0.0]).numel() + 1.0)
+        varsum = varsum.sum()
+        sum = sum + varsum
+    return alpha * sum
+
+
+def weights_hysteresis_loop_zero(
+    model: nn.Module,
+    bound: float,
+    jump: float,
+) -> None:
+    with torch.no_grad():
+        for name, param in model.named_parameters():
+            if "data_cache" in name:
+                continue
+            cond_to_neg = (param > -0.0) & (param < +bound)
+            cond_to_pos = (param < +0.0) & (param > -bound)
+            if cond_to_neg.any():
+                param[cond_to_neg] = param[cond_to_neg] - jump
+            if cond_to_pos.any():
+                param[cond_to_pos] = param[cond_to_pos] + jump
+
+
+def count_vals(
+    model: nn.Module,
+    target: float,
+    excl: str = None,
+    incl: str = None,
+    abs: bool = True,
+    mode: str = "gt",
+) -> int:
+    assert mode in ["gt", "lt", "eq"], f"mode must be 'gt' or 'lt', got {mode}"
+    with torch.no_grad():
+        cond_fn = lambda x: torch.where(
+            ((x.abs() if abs else x) < target)
+            if mode == "lt"
+            else (
+                ((x.abs() if abs else x) > target)
+                if mode == "gt"
+                else ((x.abs() if abs else x) == target)
+            )
+        )
+        cnt_fn = lambda x, acc, cond: acc + x[cond].numel()
+        sum_fn = lambda x, acc, cond: acc + (
+            x[cond].abs().sum() if abs else x[cond].sum()
+        )
+        cnt = 0
+        sum = 0
+        cond = None
+        for name, param in model.named_parameters():
+            if excl is not None and excl in name:
+                continue
+            else:
+                cond = cond_fn(param)
+            if incl is not None:
+                cnt = cnt_fn(param, cnt, cond) if incl in name else cnt
+                sum = sum_fn(param, sum, cond) if incl in name else sum
+            else:
+                cnt = cnt_fn(param, cnt, cond)
+                sum = sum_fn(param, sum, cond)
+    return dict(cnt=cnt, sum=sum)
+
+
+def count_params(
+    model: nn.Module,
+) -> int:
+    sum = 0
+    with torch.no_grad():
+        for name, param in model.named_parameters():
+            if "data_cache" in name:
+                continue
+            sum = sum + param.numel()
+    return sum
+
+
 if __name__ == "__main__":
-    train_mode = False
+    train_mode = True
 
     load_model = False
     load_optim = False
+    drop_ctx_cache = False
+    drop_latents_cache = False
+    onload_fn = None
 
-    path_prefix = "/mnt/f/git_AIResearch/dyna/data/models/aedw"
-    load_path_model = f"{path_prefix}/last_model.pth"
-    load_path_optim = f"{path_prefix}/last_optim.pth"
-    save_path_model = f"{path_prefix}/last_model.pth"
-    save_path_optim = f"{path_prefix}/last_optim.pth"
+    path_prefix_load = "/mnt/f/git_AIResearch/dyna/data/models/dw_decoder"
+    path_prefix_save = "/mnt/f/git_AIResearch/dyna/data/models/dw_decoder"
+    load_path_model = f"{path_prefix_load}/__decoder_gamma_model_PREPARED.pth"
+    load_path_optim = f"{path_prefix_load}/__decoder_gamma_optim_PREPARED.pth"
+    save_path_model = f"{path_prefix_save}/decoder_gamma_model"
+    save_path_optim = f"{path_prefix_save}/decoder_gamma_optim"
     save_model = True
     save_optim = True
-    save_nth_step = 1000
-    drop_context = False
-
-    iterations = 50_000
+    save_nth_step = 10000
     log_nth_iteration = 10
-    results_sample_count = 1
 
     learning_rate = 1.0e-2
     momentum = 0.9
     weight_decay = 0.0
-    eps = 1.0e-3
+    eps = 1.0e-5
+    regularization_alpha_model = 2.5e-7
+    regularization_alpha_ctx = 2.5e-4
+    regularization_alpha_latents = 2.0e-6
+    regularization_low_weights_model_bound = 1.0e-3
+    regularization_low_weights_model_alpha = 1.0e-3
+    weights_hysteresis_loop = False
+    weights_hysteresis_loop_zero_bound = 1.0e-3
+    weights_hysteresis_loop_zero_jump = 2.5e-3
 
-    images_sample_count = 8192
-    starting_from = 0
-    samples_per_step = 64
+    data_cache_ctx_len = 4096
+    data_cache_latents_len = 4096
+    data_cache_latents_shape = [8, 32, 32]
+    dropout_rate = 0.025
+
+    total_steps = 10000
+    batch_size = 64
+    sliding_batch = False
+    grad_accumulation_steps = 1
+    loss_channels_weights = [2.0, 1.0, 1.0]
+
+    images_sample_count = 4096  # 4096
+    starting_from = 8192
     images_path_src = "/mnt/f/Datasets/Images_512x512/dataset_01"
     images_path_dst = "/mnt/f/git_AIResearch/dyna/data/img_dst"
     output_shape = [512, 512]
-    dtype_weights = torch.float32
+    dtype_weights = torch.bfloat16
     device = torch.device("cuda")
 
-    # model = AEDW(
-    #     shape_base=output_shape,
-    #     channels_io=3,
-    #     depth=5,
-    #     context_length=16,
-    #     channels_base=16,
-    #     channels_dynamic=32,
-    #     channels_multiplier=2,
-    #     eps=eps,
-    #     dtype_weights=dtype_weights,
-    # ).to(device=device, dtype=dtype_weights)
-    model = TestModel(
-        data_len=images_sample_count,
+    model = DecoderOnlyModel(
+        data_cache_ctx_len=data_cache_ctx_len,
+        data_cache_latents_len=data_cache_latents_len,
+        data_cache_latents_shape=data_cache_latents_shape,
         dtype_weights=dtype_weights,
-        drop_context=drop_context,
+        dropout_rate=dropout_rate,
     ).to(device=device, dtype=dtype_weights)
 
     if load_model:
-        model.load_state_dict(torch.load(load_path_model))
+        inconsistent_keys = model.load_state_dict(
+            torch.load(load_path_model),
+            strict=False,
+        )
         print(f"Model loaded from {load_path_model}")
+
+    if onload_fn is not None and callable(onload_fn):
+        onload_fn(model)
+
+    if drop_ctx_cache:
+        model.data_cache_ctx = nn.Parameter(
+            torch.nn.init.normal_(
+                model.data_cache_ctx,
+                mean=0.0,
+                std=1.0e-2,
+            ).to(
+                dtype=dtype_weights,
+            )
+        )
+
+    if drop_latents_cache:
+        model.data_cache_latents = nn.Parameter(
+            torch.nn.init.normal_(
+                model.data_cache_latents,
+                mean=0.0,
+                std=1.0e-2,
+            ).to(
+                dtype=dtype_weights,
+            )
+        )
 
     optimizer = MADGRAD(
         model.parameters(),
@@ -606,6 +865,7 @@ if __name__ == "__main__":
 
     if load_optim:
         optimizer.load_state_dict(torch.load(load_path_optim))
+        print(f"Optimizer loaded from {load_path_optim}")
 
     with torch.no_grad():
         data = generate_data_from_images(
@@ -615,32 +875,34 @@ if __name__ == "__main__":
             starting_from=starting_from,
         ).to(device)
 
-    # generate_images_from_data(
-    #     data=data[torch.randperm(data.shape[0])[0 : min(4, data.shape[0])]],
-    #     images_path_dst=images_path_dst,
-    #     prefix=f"__data_sample__",
-    # )
-
     print("Generated data specs:")
     print(f"{data.min()=}")
     print(f"{data.max()=}")
-    # print(f"{data.mean()=}")
-    # print(f"{data.std()=}")
 
     savers = [
-        lambda: torch.save(model.state_dict(), save_path_model),
-        lambda: torch.save(optimizer.state_dict(), save_path_optim),
+        lambda p: torch.save(model.state_dict(), f"{save_path_model}.{p}.pth"),
+        lambda p: torch.save(optimizer.state_dict(), f"{save_path_optim}.{p}.pth"),
     ]
 
     if train_mode:
         train(
             data=data,
-            samples_per_step=samples_per_step,
+            total_steps=total_steps,
+            batch_size=batch_size,
+            grad_accumulation_steps=grad_accumulation_steps,
+            sliding_batch=sliding_batch,
+            loss_channels_weights=torch.tensor(loss_channels_weights),
+            regularization_alpha_model=regularization_alpha_model,
+            regularization_alpha_ctx=regularization_alpha_ctx,
+            regularization_alpha_latents=regularization_alpha_latents,
+            regularization_low_weights_model_bound=regularization_low_weights_model_bound,
+            regularization_low_weights_model_alpha=regularization_low_weights_model_alpha,
+            weights_hysteresis_loop=weights_hysteresis_loop,
+            weights_hysteresis_loop_zero_bound=weights_hysteresis_loop_zero_bound,
+            weights_hysteresis_loop_zero_jump=weights_hysteresis_loop_zero_jump,
             model=model,
             optimizer=optimizer,
-            iterations=iterations,
             log_nth_iteration=log_nth_iteration,
-            results_sample_count=results_sample_count,
             images_path_dst=images_path_dst,
             save_nth_step=save_nth_step,
             savers=savers,
