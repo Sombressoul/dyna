@@ -45,8 +45,8 @@ class DecoderOnlyModel(nn.Module):
         self.kernel_size_r = [3, 3]
         self.kernel_size_m = [5, 5]
 
-        self.eps = 1.0e-2
-        self.q_levels = 32
+        self.eps = 1.0e-3
+        self.q_levels = 16
         self.q_scale = math.pi / 2
 
         self.channels_io = 3
@@ -57,6 +57,12 @@ class DecoderOnlyModel(nn.Module):
         self.dropout = nn.Dropout(p=self.dropout_rate)
         self.upsample_nearest = nn.Upsample(scale_factor=2, mode="nearest")
         self.upsample_bilinear = nn.Upsample(scale_factor=2, mode="bilinear")
+        self.linear_ctx_04 = nn.Linear(
+            in_features=self.context_length,
+            out_features=self.context_length,
+            bias=False,
+            dtype=self.dtype_weights,
+        )
         self.conv_up_04_t = DynamicConv2D(
             in_channels=self.channels_dynamic_levels[4],
             out_channels=self.channels_dynamic_levels[3],
@@ -104,6 +110,12 @@ class DecoderOnlyModel(nn.Module):
             output_padding=None,
             asymmetry=1.0e-3,
             dtype_weights=self.dtype_weights,
+        )
+        self.linear_ctx_03 = nn.Linear(
+            in_features=self.context_length,
+            out_features=self.context_length,
+            bias=False,
+            dtype=self.dtype_weights,
         )
         self.conv_up_03_t = DynamicConv2D(
             in_channels=self.channels_dynamic_levels[3],
@@ -153,6 +165,12 @@ class DecoderOnlyModel(nn.Module):
             asymmetry=1.0e-3,
             dtype_weights=self.dtype_weights,
         )
+        self.linear_ctx_02 = nn.Linear(
+            in_features=self.context_length,
+            out_features=self.context_length,
+            bias=False,
+            dtype=self.dtype_weights,
+        )
         self.conv_up_02_t = DynamicConv2D(
             in_channels=self.channels_dynamic_levels[2],
             out_channels=self.channels_dynamic_levels[1],
@@ -201,6 +219,12 @@ class DecoderOnlyModel(nn.Module):
             asymmetry=1.0e-3,
             dtype_weights=self.dtype_weights,
         )
+        self.linear_ctx_01 = nn.Linear(
+            in_features=self.context_length,
+            out_features=self.context_length,
+            bias=False,
+            dtype=self.dtype_weights,
+        )
         self.conv_up_01_t = DynamicConv2D(
             in_channels=self.channels_dynamic_levels[1],
             out_channels=self.channels_dynamic_levels[0],
@@ -248,6 +272,12 @@ class DecoderOnlyModel(nn.Module):
             output_padding=None,
             asymmetry=1.0e-3,
             dtype_weights=self.dtype_weights,
+        )
+        self.linear_ctx_out = nn.Linear(
+            in_features=self.context_length,
+            out_features=self.context_length,
+            bias=False,
+            dtype=self.dtype_weights,
         )
         self.conv_out = DynamicConv2D(
             in_channels=self.channels_dynamic_levels[0],
@@ -333,67 +363,82 @@ class DecoderOnlyModel(nn.Module):
         context = self.data_cache_ctx[ids]
         x = self.data_cache_latents[ids]
 
+        ctx = self.dropout(context)
+        ctx = self.linear_ctx_04(ctx)
+        ctx = torch.arctan(ctx)
         x_pos = self.dropout(x)
         x_neg = self.dropout(-x)
         x_mul = self.dropout(x.abs().add(1.0).log())
-        x_pos = self.conv_up_04_r(x_pos, context)
+        x_pos = self.conv_up_04_r(x_pos, ctx)
         x_pos = self.doubleLogNorm(x_pos)
         x_pos = self.upsample_nearest(x_pos)
-        x_neg = self.conv_up_04_t(x_neg, context)
+        x_neg = self.conv_up_04_t(x_neg, ctx)
         x_neg = self.doubleLogNorm(x_neg)
         x_mul = self.upsample_bilinear(x_mul)
-        x_mul = self.conv_up_04_m(x_mul, context)
+        x_mul = self.conv_up_04_m(x_mul, ctx)
         x_mul = self.doubleLogNorm(x_mul)
         x = (x_pos + x_neg) * x_mul
         x = torch.arctan(x)
         x = self.quantizer(x)
 
+        ctx = self.dropout(context)
+        ctx = self.linear_ctx_03(ctx)
+        ctx = torch.arctan(ctx)
         x_pos = self.dropout(x)
         x_neg = self.dropout(-x)
         x_mul = self.dropout(x.abs().add(1.0).log())
-        x_pos = self.conv_up_03_r(x_pos, context)
+        x_pos = self.conv_up_03_r(x_pos, ctx)
         x_pos = self.doubleLogNorm(x_pos)
         x_pos = self.upsample_nearest(x_pos)
-        x_neg = self.conv_up_03_t(x_neg, context)
+        x_neg = self.conv_up_03_t(x_neg, ctx)
         x_neg = self.doubleLogNorm(x_neg)
         x_mul = self.upsample_bilinear(x_mul)
-        x_mul = self.conv_up_03_m(x_mul, context)
+        x_mul = self.conv_up_03_m(x_mul, ctx)
         x_mul = self.doubleLogNorm(x_mul)
         x = (x_pos + x_neg) * x_mul
         x = torch.arctan(x)
         x = self.quantizer(x)
 
+        ctx = self.dropout(context)
+        ctx = self.linear_ctx_02(ctx)
+        ctx = torch.arctan(ctx)
         x_pos = self.dropout(x)
         x_neg = self.dropout(-x)
         x_mul = self.dropout(x.abs().add(1.0).log())
-        x_pos = self.conv_up_02_r(x_pos, context)
+        x_pos = self.conv_up_02_r(x_pos, ctx)
         x_pos = self.doubleLogNorm(x_pos)
         x_pos = self.upsample_nearest(x_pos)
-        x_neg = self.conv_up_02_t(x_neg, context)
+        x_neg = self.conv_up_02_t(x_neg, ctx)
         x_neg = self.doubleLogNorm(x_neg)
         x_mul = self.upsample_bilinear(x_mul)
-        x_mul = self.conv_up_02_m(x_mul, context)
+        x_mul = self.conv_up_02_m(x_mul, ctx)
         x_mul = self.doubleLogNorm(x_mul)
         x = (x_pos + x_neg) * x_mul
         x = torch.arctan(x)
         x = self.quantizer(x)
 
+        ctx = self.dropout(context)
+        ctx = self.linear_ctx_01(ctx)
+        ctx = torch.arctan(ctx)
         x_pos = self.dropout(x)
         x_neg = self.dropout(-x)
         x_mul = self.dropout(x.abs().add(1.0).log())
-        x_pos = self.conv_up_01_r(x_pos, context)
+        x_pos = self.conv_up_01_r(x_pos, ctx)
         x_pos = self.doubleLogNorm(x_pos)
         x_pos = self.upsample_nearest(x_pos)
-        x_neg = self.conv_up_01_t(x_neg, context)
+        x_neg = self.conv_up_01_t(x_neg, ctx)
         x_neg = self.doubleLogNorm(x_neg)
         x_mul = self.upsample_bilinear(x_mul)
-        x_mul = self.conv_up_01_m(x_mul, context)
+        x_mul = self.conv_up_01_m(x_mul, ctx)
         x_mul = self.doubleLogNorm(x_mul)
         x = (x_pos + x_neg) * x_mul
         x = torch.arctan(x)
         x = self.quantizer(x)
 
-        x = self.conv_out(x, context)
+        ctx = self.dropout(context)
+        ctx = self.linear_ctx_out(ctx)
+        ctx = torch.arctan(ctx)
+        x = self.conv_out(x, ctx)
         x = F.sigmoid(x)
 
         return x
@@ -691,7 +736,11 @@ def get_regularization_term_low_weights_model_alpha(
 ) -> torch.Tensor:
     sum = 0.0
     for name, param in model.named_parameters():
-        if "data_cache" in name:
+        if any([
+            "data_cache" in name,
+            # "weights_lib.mod_i" in name,
+            # "weights_lib.mod_j" in name,
+        ]):
             continue
         vars = param.abs().clamp(0.0, bound).sub(bound).abs()
         sum = sum + vars.sum()
@@ -705,7 +754,11 @@ def get_regularization_term_low_weights_model_beta(
 ) -> torch.Tensor:
     sum = 0.0
     for name, param in model.named_parameters():
-        if "data_cache" in name:
+        if any([
+            "data_cache" in name,
+            # "weights_lib.mod_i" in name,
+            # "weights_lib.mod_j" in name,
+        ]):
             continue
         vars = param.abs().clamp(0.0, bound).sub(bound).abs()
         varsum = vars.mul(1.0 / bound).sqrt()
@@ -801,16 +854,16 @@ if __name__ == "__main__":
     save_path_optim = f"{path_prefix_save}/decoder_gamma_optim_X"
     save_model = True
     save_optim = True
-    save_nth_step = 10000
+    save_nth_step = 1000
     log_nth_iteration = 10
 
     learning_rate = 1.0e-2
     momentum = 0.9
     weight_decay = 0.0
     eps = 1.0e-5
-    regularization_alpha_model = 2.5e-7
-    regularization_alpha_ctx = 2.5e-4
-    regularization_alpha_latents = 2.0e-6
+    regularization_alpha_model = 2.0e-7
+    regularization_alpha_ctx = 2.0e-4
+    regularization_alpha_latents = 1.5e-6
     regularization_low_weights_model_bound = [
         1.0e-2,
         1.0e-4,
@@ -819,19 +872,20 @@ if __name__ == "__main__":
         2.5e-6,
         1.0e-3,
     ]
-    regularization_low_weights_fn = [
-        get_regularization_term_low_weights_model_alpha,
-        get_regularization_term_low_weights_model_beta,
-    ]
+    # regularization_low_weights_fn = [
+    #     get_regularization_term_low_weights_model_alpha,
+    #     get_regularization_term_low_weights_model_beta,
+    # ]
+    regularization_low_weights_fn = None
     weights_hysteresis_loop = False
     weights_hysteresis_loop_zero_bound = 1.0e-3
-    weights_hysteresis_loop_zero_jump = 2.5e-3
-    loss_weights_main_vs_reg = 0.75
+    weights_hysteresis_loop_zero_jump = 2.0e-3
+    loss_weights_main_vs_reg = 0.8
 
-    data_cache_ctx_len = 4096
-    data_cache_latents_len = 4096
+    data_cache_ctx_len = 1024
+    data_cache_latents_len = 1024
     data_cache_latents_shape = [8, 32, 32]
-    dropout_rate = 0.025
+    dropout_rate = 0.10
 
     total_steps = 10000
     batch_size = 64
@@ -839,8 +893,8 @@ if __name__ == "__main__":
     grad_accumulation_steps = 1
     loss_channels_weights = [1.5, 1.0, 1.0]
 
-    images_sample_count = 4096
-    starting_from = 1024 * 16
+    images_sample_count = 1024
+    starting_from = 1024 * 8
     images_path_src = "/mnt/f/Datasets/Images_512x512/dataset_01"
     images_path_dst = "/mnt/f/git_AIResearch/dyna/data/img_dst"
     output_shape = [512, 512]
