@@ -152,270 +152,7 @@ class AEDW(nn.Module):
         # ================================================================================= #
         # ____________________________> Init submodules.
         # ================================================================================= #
-        # self._create_context_extractor()
-        self._create_encoder()
-        self._create_decoder()
-
-        pass
-
-    def _create_context_extractor(
-        self,
-    ) -> None:
-        self.extractor_head = nn.Sequential(
-            *nn.ModuleList(
-                [
-                    nn.Conv2d(
-                        in_channels=self.channels_io,
-                        out_channels=self.channels_base,
-                        kernel_size=3,
-                        stride=1,
-                        padding=1,
-                        dtype=self.dtype_weights,
-                    ),
-                    nn.PReLU(
-                        num_parameters=self.channels_base,
-                        init=2.5e-1,
-                        dtype=self.dtype_weights,
-                    ),
-                    nn.BatchNorm2d(
-                        num_features=self.channels_base,
-                        momentum=0.1,
-                        affine=True,
-                        eps=self.eps,
-                        dtype=self.dtype_weights,
-                    ),
-                    *[
-                        self._create_context_extractor_head_block(
-                            channels_in=self.extractor_channels[i],
-                            channels_out=self.extractor_channels[i + 1],
-                        )
-                        for i in range(self.depth)
-                    ],
-                ]
-            )
-        )
-
-        self.extractor_body_01_linear = nn.Linear(
-            in_features=self.shape_bottleneck[0],
-            out_features=self.context_length,
-            dtype=self.dtype_weights,
-        )
-        self.extractor_body_01_activation = nn.PReLU(
-            num_parameters=self.context_length,
-            init=2.5e-1,
-            dtype=self.dtype_weights,
-        )
-        self.extractor_body_02_linear = nn.Linear(
-            in_features=self.shape_bottleneck[0] + self.context_length,
-            out_features=self.context_length,
-            dtype=self.dtype_weights,
-        )
-        self.extractor_body_02_activation = nn.PReLU(
-            num_parameters=self.context_length,
-            init=2.5e-1,
-            dtype=self.dtype_weights,
-        )
-        self.extractor_body_03_linear = nn.Linear(
-            in_features=self.shape_bottleneck[0],
-            out_features=self.context_length,
-            dtype=self.dtype_weights,
-        )
-        self.extractor_body_03_activation = nn.Tanh()
-        self.extractor_body_03_norm = nn.LayerNorm(
-            normalized_shape=math.prod(self.shape_bottleneck[-2:]),
-            dtype=self.dtype_weights,
-        )
-
-        context_numel = self.context_length * self.depth * 2 + (self.context_length * 2)
-        self.extractor_tail = nn.Sequential(
-            *nn.ModuleList(
-                [
-                    nn.Linear(
-                        in_features=math.prod(self.shape_bottleneck[-2:]),
-                        out_features=context_numel,
-                        dtype=self.dtype_weights,
-                    ),
-                    nn.PReLU(
-                        num_parameters=context_numel,
-                        init=2.5e-1,
-                        dtype=self.dtype_weights,
-                    ),
-                    nn.Dropout1d(
-                        p=self.dropout_rate,
-                    ),
-                    nn.Linear(
-                        in_features=context_numel,
-                        out_features=context_numel,
-                        dtype=self.dtype_weights,
-                    ),
-                    nn.Tanh(),
-                    nn.LayerNorm(
-                        normalized_shape=context_numel,
-                        dtype=self.dtype_weights,
-                    ),
-                ]
-            )
-        )
-
-        pass
-
-    def _create_context_extractor_head_block(
-        self,
-        channels_in: int,
-        channels_out: int,
-    ) -> nn.Module:
-        block = nn.Sequential(
-            *nn.ModuleList(
-                [
-                    nn.Conv2d(
-                        in_channels=channels_in,
-                        out_channels=channels_out,
-                        kernel_size=3,
-                        stride=1,
-                        padding=1,
-                        bias=True,
-                        dtype=self.dtype_weights,
-                    ),
-                    nn.PReLU(
-                        num_parameters=channels_out,
-                        init=2.5e-1,
-                        dtype=self.dtype_weights,
-                    ),
-                    nn.BatchNorm2d(
-                        num_features=channels_out,
-                        momentum=0.1,
-                        affine=True,
-                        eps=self.eps,
-                        dtype=self.dtype_weights,
-                    ),
-                    nn.Conv2d(
-                        in_channels=channels_out,
-                        out_channels=channels_out,
-                        kernel_size=3,
-                        stride=2,
-                        padding=1,
-                        bias=True,
-                        dtype=self.dtype_weights,
-                    ),
-                    nn.PReLU(
-                        num_parameters=channels_out,
-                        init=2.5e-1,
-                        dtype=self.dtype_weights,
-                    ),
-                    nn.BatchNorm2d(
-                        num_features=channels_out,
-                        momentum=0.1,
-                        affine=True,
-                        eps=self.eps,
-                        dtype=self.dtype_weights,
-                    ),
-                ]
-            ),
-        )
-        return block
-
-    def _create_encoder(
-        self,
-    ) -> None:
-        self.encoder_head_conv = DynamicConv2D(
-            in_channels=self.channels_io,
-            out_channels=self.channels_dynamic,
-            context_length=self.context_length,
-            mod_rank=self.mod_rank,
-            kernel_size=[3, 3],
-            stride=[1, 1],
-            padding=[1, 1],
-            dilation=[1, 1],
-            bias_dynamic=True,
-            transpose=False,
-            output_padding=None,
-            asymmetry=self.asymmetry,
-            dtype_weights=self.dtype_weights,
-        )
-        self.encoder_head_norm = nn.BatchNorm2d(
-            num_features=self.channels_dynamic,
-            momentum=0.1,
-            affine=True,
-            eps=self.eps,
-            dtype=self.dtype_weights,
-        )
-
-        for layer_index in range(self.depth):
-            name = f"encoder_level_{layer_index:02d}"
-
-            self.register_module(
-                name=f"{name}_conv",
-                module=DynamicConv2D(
-                    in_channels=self.channels_dynamic,
-                    out_channels=self.channels_dynamic,
-                    context_length=self.context_length,
-                    mod_rank=self.mod_rank,
-                    kernel_size=[3, 3],
-                    stride=[2, 2],
-                    padding=[1, 1],
-                    dilation=[1, 1],
-                    bias_dynamic=True,
-                    transpose=False,
-                    output_padding=None,
-                    asymmetry=self.asymmetry,
-                    dtype_weights=self.dtype_weights,
-                ),
-            )
-            self.register_module(
-                name=f"{name}_norm",
-                module=nn.BatchNorm2d(
-                    num_features=self.channels_dynamic,
-                    momentum=0.1,
-                    affine=True,
-                    eps=self.eps,
-                    dtype=self.dtype_weights,
-                ),
-            )
-        pass
-
-    def _create_decoder(
-        self,
-    ) -> None:
-        for layer_index in range(self.depth):
-            name = f"decoder_level_{layer_index:02d}"
-
-            self.register_module(
-                name=f"{name}_conv",
-                module=DynamicConv2D(
-                    in_channels=self.channels_dynamic,
-                    out_channels=self.channels_dynamic,
-                    context_length=self.context_length,
-                    mod_rank=self.mod_rank,
-                    kernel_size=[3, 3],
-                    stride=[2, 2],
-                    padding=[1, 1],
-                    dilation=[1, 1],
-                    bias_dynamic=True,
-                    transpose=True,
-                    output_padding=[1, 1],
-                    asymmetry=self.asymmetry,
-                    dtype_weights=self.dtype_weights,
-                ),
-            )
-            self.register_module(
-                name=f"{name}_norm",
-                module=nn.BatchNorm2d(
-                    num_features=self.channels_dynamic,
-                    momentum=0.1,
-                    affine=True,
-                    eps=self.eps,
-                    dtype=self.dtype_weights,
-                ),
-            )
-
-        self.decoder_tail_conv = nn.Conv2d(
-            in_channels=self.channels_dynamic,
-            out_channels=self.channels_io,
-            kernel_size=1,
-            stride=1,
-            padding=0,
-            dtype=self.dtype_weights,
-        )
+        # TODO: ...
 
         pass
 
@@ -423,36 +160,7 @@ class AEDW(nn.Module):
         self,
         x: torch.Tensor,
     ) -> torch.Tensor:
-        x = self.extractor_head(x)
-        x = x.permute([0, 2, 3, 1])
-
-        x_a = self.extractor_body_01_linear(x)
-        x_a = x_a.permute([0, 3, 1, 2])
-        x_a = self.extractor_body_01_activation(x_a)
-        x_a = x_a.permute([0, 2, 3, 1])
-        x_a = torch.cat([x, x_a], dim=-1)
-        x_a = self.extractor_body_02_linear(x_a)
-        x_a = x_a.permute([0, 3, 1, 2])
-        x_a = self.extractor_body_02_activation(x_a)
-        x_a = x_a.flatten(-2)
-        x_a = F.softmax(x_a, dim=-1, dtype=self.dtype_weights)
-        x_a = x_a.permute([0, 2, 1])
-
-        x_b = self.extractor_body_03_linear(x)
-        x_b = x_b.permute([0, 3, 1, 2])
-        x_b = self.extractor_body_03_activation(x_b)
-        x_b = x_b.flatten(-2)
-        x_b = self.extractor_body_03_norm(x_b)
-        x_b = x_b.permute([0, 2, 1])
-
-        x_c = x_a * x_b
-        x_c = x_c.permute([0, 2, 1])
-        x_c = F.softmax(x_c, dim=-1, dtype=self.dtype_weights)
-        x_c = x_c.permute([0, 2, 1])
-        x_c = x_c.sum(-1)
-
-        x = self.extractor_tail(x_c)
-        x = x.reshape(x.shape[0], 2, self.depth + 1, self.context_length)
+        # TODO: ...
         return x
 
     def encode(
@@ -460,13 +168,7 @@ class AEDW(nn.Module):
         x: torch.Tensor,
         context: torch.Tensor,
     ) -> torch.Tensor:
-        x = self.encoder_head_conv(x, context[:, 0, -1, :])
-        x = self.encoder_head_norm(x)
-
-        for layer_index in range(self.depth):
-            name = f"encoder_level_{layer_index:02d}"
-            x = getattr(self, name + "_conv")(x, context[:, 0, layer_index, :])
-            x = getattr(self, name + "_norm")(x)
+        # TODO: ...
         return x
 
     def decode(
@@ -474,12 +176,7 @@ class AEDW(nn.Module):
         x: torch.Tensor,
         context: torch.Tensor,
     ) -> torch.Tensor:
-        for layer_index in range(self.depth):
-            name = f"decoder_level_{layer_index:02d}"
-            x = getattr(self, name + "_conv")(x, context[:, 1, layer_index, :])
-            x = getattr(self, name + "_norm")(x)
-
-        x = self.decoder_tail_conv(x)
+        # TODO: ...
         return x
 
     def _log_var(
@@ -511,52 +208,8 @@ class AEDW(nn.Module):
         self,
         x: torch.Tensor,
     ) -> torch.Tensor:
-        # ================================================================================= #
-        # ____________________________> Initial checks.
-        # ================================================================================= #
-        assert x.shape[2::] == self.shape_base, " ".join(
-            [
-                f"Wrong input shape.",
-                f"Expected: {torch.Size([1, self.channels_io, *self.shape_base])}.",
-                f"Got: {x.shape}.",
-            ]
-        )
-
-        # ================================================================================= #
-        # ____________________________> Casting.
-        # ================================================================================= #
-        x = x.to(dtype=self.dtype_weights)
-
-        # ================================================================================= #
-        # ____________________________> Processing.
-        # ================================================================================= #
-        # context = self.extract_context(x)
-        try:
-            context = self.context
-        except AttributeError:
-            self.context = nn.Parameter(
-                data=torch.randn(
-                    [x.shape[0], 2, self.depth + 1, self.context_length],
-                    dtype=self.dtype_weights,
-                    device=x.device,
-                ),
-            )
-            context = self.context
-
-        if torch.isnan(context).any() or torch.isinf(context).any():
-            self._log_var(context, "context")
-            raise ValueError("context has NaN or Inf elements.")
-
-        encoded = self.encode(x, context)
-
-        if torch.isnan(encoded).any() or torch.isinf(encoded).any():
-            self._log_var(encoded, "encoded")
-            raise ValueError("encoded has NaN or Inf elements.")
-
-        decoded = self.decode(encoded, context)
-
-        if torch.isnan(decoded).any() or torch.isinf(decoded).any():
-            self._log_var(decoded, "decoded")
-            raise ValueError("decoded has NaN or Inf elements.")
-
+        context = ...
+        encoded = ...
+        decoded = ...
+        
         return decoded, encoded, context
