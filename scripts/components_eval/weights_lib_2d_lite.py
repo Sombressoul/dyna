@@ -190,7 +190,7 @@ def train(
     for i in range(iterations):
         optimizer.zero_grad()
         output = model()
-        loss = (data - output).std().sqrt()
+        loss = torch.nn.functional.l1_loss(output, data)
         loss.backward()
         optimizer.step()
 
