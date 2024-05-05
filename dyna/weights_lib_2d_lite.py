@@ -229,7 +229,7 @@ class WeightsLib2DLite(nn.Module):
         self.projections = nn.Parameter(
             data=torch.nn.init.normal_(
                 tensor=torch.empty(
-                    [1, self.output_shape[0], self.output_shape[0], 2],
+                    [1, *self.output_shape, 2],
                     dtype=self.dtype_weights,
                 ),
                 mean=0.0,
