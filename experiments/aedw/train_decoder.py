@@ -11,7 +11,7 @@ import gc
 from PIL import Image
 from madgrad import MADGRAD
 
-from typing import Callable
+from typing import Union, Callable, List
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 evals_dir = os.path.dirname(script_dir)
@@ -485,12 +485,13 @@ def train(
     regularization_alpha_model: float,
     regularization_alpha_ctx: float,
     regularization_alpha_latents: float,
-    regularization_low_weights_model_bound: float,
-    regularization_low_weights_model_alpha: float,
-    regularization_low_weights_fn: Callable,
+    regularization_low_weights_model_bound: Union[float, List[float]],
+    regularization_low_weights_model_alpha: Union[float, List[float]],
+    regularization_low_weights_fn: Union[Callable, List[Callable]],
     weights_hysteresis_loop: bool,
     weights_hysteresis_loop_zero_bound: float,
     weights_hysteresis_loop_zero_jump: float,
+    loss_weights_main_vs_reg: float,
     model: nn.Module,
     optimizer: torch.optim.Optimizer,
     log_nth_iteration: int,
@@ -541,7 +542,7 @@ def train(
         loss_base_targets = sample * loss_channels_weights
 
         # Loss B
-        loss = F.l1_loss(loss_base_decoded, loss_base_targets)
+        loss_main = F.l1_loss(loss_base_decoded, loss_base_targets)
 
         # Regularizations
         reg_term_model = get_regularization_term_model(
@@ -556,18 +557,35 @@ def train(
             model=model,
             alpha=regularization_alpha_latents,
         )
-        reg_term_low_weights_model = regularization_low_weights_fn(
-            model=model,
-            bound=regularization_low_weights_model_bound,
-            alpha=regularization_low_weights_model_alpha,
-        )
 
-        loss = (
-            loss
-            + reg_term_model
+        if regularization_low_weights_fn is not None:
+            if type(regularization_low_weights_fn) == list:
+                reg_sum = 0.0
+                for fn, bound, alpha in zip(
+                    regularization_low_weights_fn,
+                    regularization_low_weights_model_bound,
+                    regularization_low_weights_model_alpha,
+                ):
+                    reg_sum = reg_sum + fn(model, bound, alpha)
+                reg_term_low_weights_model = reg_sum
+            else:
+                reg_term_low_weights_model = regularization_low_weights_fn(
+                    model=model,
+                    bound=regularization_low_weights_model_bound,
+                    alpha=regularization_low_weights_model_alpha,
+                )
+        else:
+            reg_term_low_weights_model = 0.0
+
+        loss_reg = (
+            reg_term_model
             + reg_term_ctx
             + reg_term_latents
-            + reg_term_low_weights_model  # replaced by hysteresis loop
+            + reg_term_low_weights_model
+        )
+
+        loss = loss_main * loss_weights_main_vs_reg + loss_reg * (
+            1.0 - loss_weights_main_vs_reg
         )
 
         if accumulation_step == grad_accumulation_steps:
@@ -777,10 +795,10 @@ if __name__ == "__main__":
 
     path_prefix_load = "/mnt/f/git_AIResearch/dyna/data/models/dw_decoder"
     path_prefix_save = "/mnt/f/git_AIResearch/dyna/data/models/dw_decoder"
-    load_path_model = f"{path_prefix_load}/__decoder_gamma_model_PREPARED.pth"
-    load_path_optim = f"{path_prefix_load}/__decoder_gamma_optim_PREPARED.pth"
-    save_path_model = f"{path_prefix_save}/decoder_gamma_model"
-    save_path_optim = f"{path_prefix_save}/decoder_gamma_optim"
+    load_path_model = f"{path_prefix_load}/decoder_gamma_model.10000.pth"
+    load_path_optim = f"{path_prefix_load}/decoder_gamma_optim.10000.pth"
+    save_path_model = f"{path_prefix_save}/decoder_gamma_model_X"
+    save_path_optim = f"{path_prefix_save}/decoder_gamma_optim_X"
     save_model = True
     save_optim = True
     save_nth_step = 10000
@@ -793,12 +811,22 @@ if __name__ == "__main__":
     regularization_alpha_model = 2.5e-7
     regularization_alpha_ctx = 2.5e-4
     regularization_alpha_latents = 2.0e-6
-    regularization_low_weights_model_bound = 1.0e-4
-    regularization_low_weights_model_alpha = 1.0e-2
-    regularization_low_weights_fn = get_regularization_term_low_weights_model_beta
+    regularization_low_weights_model_bound = [
+        1.0e-2,
+        1.0e-4,
+    ]
+    regularization_low_weights_model_alpha = [
+        2.5e-6,
+        1.0e-3,
+    ]
+    regularization_low_weights_fn = [
+        get_regularization_term_low_weights_model_alpha,
+        get_regularization_term_low_weights_model_beta,
+    ]
     weights_hysteresis_loop = False
     weights_hysteresis_loop_zero_bound = 1.0e-3
     weights_hysteresis_loop_zero_jump = 2.5e-3
+    loss_weights_main_vs_reg = 0.75
 
     data_cache_ctx_len = 4096
     data_cache_latents_len = 4096
@@ -809,10 +837,10 @@ if __name__ == "__main__":
     batch_size = 64
     sliding_batch = False
     grad_accumulation_steps = 1
-    loss_channels_weights = [2.0, 1.0, 1.0]
+    loss_channels_weights = [1.5, 1.0, 1.0]
 
     images_sample_count = 4096
-    starting_from = 8192
+    starting_from = 1024 * 16
     images_path_src = "/mnt/f/Datasets/Images_512x512/dataset_01"
     images_path_dst = "/mnt/f/git_AIResearch/dyna/data/img_dst"
     output_shape = [512, 512]
@@ -905,6 +933,7 @@ if __name__ == "__main__":
             weights_hysteresis_loop=weights_hysteresis_loop,
             weights_hysteresis_loop_zero_bound=weights_hysteresis_loop_zero_bound,
             weights_hysteresis_loop_zero_jump=weights_hysteresis_loop_zero_jump,
+            loss_weights_main_vs_reg=loss_weights_main_vs_reg,
             model=model,
             optimizer=optimizer,
             log_nth_iteration=log_nth_iteration,
