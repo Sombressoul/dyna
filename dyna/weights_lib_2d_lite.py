@@ -11,6 +11,7 @@ class WeightsLib2DLite(nn.Module):
         components_count: int = 16,
         mod_rank: int = 16,
         asymmetry: float = 1e-3,
+        eps: float = 1.0e-5,
         dtype_weights: torch.dtype = torch.bfloat16,
     ) -> None:
         super().__init__()
@@ -29,6 +30,7 @@ class WeightsLib2DLite(nn.Module):
         self.count_components = components_count
         self.mod_rank = mod_rank
         self.asymmetry = asymmetry
+        self.eps = eps
         self.dtype_weights = dtype_weights
 
         # ================================================================================= #
@@ -221,6 +223,17 @@ class WeightsLib2DLite(nn.Module):
                     [4, self.count_components, self.count_components * 2],
                     dtype=self.dtype_weights,
                 ),
+            ).contiguous(),
+        )
+        # Init: projections
+        self.projections = nn.Parameter(
+            data=torch.nn.init.normal_(
+                tensor=torch.empty(
+                    [1, self.output_shape[0], self.output_shape[0], 2],
+                    dtype=self.dtype_weights,
+                ),
+                mean=0.0,
+                std=self.asymmetry,
             ).contiguous(),
         )
 
@@ -435,7 +448,10 @@ class WeightsLib2DLite(nn.Module):
         i = weights_dynamic * self.rotate_dynamic[..., [1, 0]]
         i = i.sum(dim=-1, keepdim=True)
         weights_dynamic = torch.cat([r, i], dim=-1)
-        weights_dynamic = weights_dynamic[..., 0] ** 2 + weights_dynamic[..., 1] ** 2
-        weights_dynamic = torch.sqrt(weights_dynamic)
+
+        projection_denom = torch.sqrt(self.projections[..., 0]**2 + self.projections[..., 1]**2 + self.eps)
+        theta_cos = self.projections[..., 0] / projection_denom
+        theta_sin = self.projections[..., 1] / projection_denom
+        weights_dynamic = weights_dynamic[..., 0] * theta_cos + weights_dynamic[..., 1] * theta_sin
 
         return weights_dynamic
