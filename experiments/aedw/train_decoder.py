@@ -736,11 +736,13 @@ def get_regularization_term_low_weights_model_alpha(
 ) -> torch.Tensor:
     sum = 0.0
     for name, param in model.named_parameters():
-        if any([
-            "data_cache" in name,
-            # "weights_lib.mod_i" in name,
-            # "weights_lib.mod_j" in name,
-        ]):
+        if any(
+            [
+                "data_cache" in name,
+                "weights_lib.mod_i" in name,
+                "weights_lib.mod_j" in name,
+            ]
+        ):
             continue
         vars = param.abs().clamp(0.0, bound).sub(bound).abs()
         sum = sum + vars.sum()
@@ -754,11 +756,13 @@ def get_regularization_term_low_weights_model_beta(
 ) -> torch.Tensor:
     sum = 0.0
     for name, param in model.named_parameters():
-        if any([
-            "data_cache" in name,
-            # "weights_lib.mod_i" in name,
-            # "weights_lib.mod_j" in name,
-        ]):
+        if any(
+            [
+                "data_cache" in name,
+                "weights_lib.mod_i" in name,
+                "weights_lib.mod_j" in name,
+            ]
+        ):
             continue
         vars = param.abs().clamp(0.0, bound).sub(bound).abs()
         varsum = vars.mul(1.0 / bound).sqrt()
@@ -837,10 +841,32 @@ def count_params(
     return sum
 
 
-if __name__ == "__main__":
-    train_mode = True
+def model_info(
+    model: nn.Module,
+) -> None:
+    info = [
+        f"{n: <44s} -> "
+        + ", ".join(
+            [
+                f"{p.abs().min().item()=:.6f}",
+                f"{p.abs().max().item()=:.6f}",
+                f"{p.abs().mean().item()=:.6f}",
+                f"{p.min().item()=:.6f}",
+                f"{p.max().item()=:.6f}",
+                f"{p.mean().item()=:.6f}",
+                f"{p.std().item()=:.6f}",
+            ]
+        )
+        for n, p in model.named_parameters()
+    ]
+    print("\n".join(info))
+    pass
 
-    load_model = False
+
+if __name__ == "__main__":
+    train_mode = False
+
+    load_model = True
     load_optim = False
     drop_ctx_cache = False
     drop_latents_cache = False
@@ -848,20 +874,20 @@ if __name__ == "__main__":
 
     path_prefix_load = "/mnt/f/git_AIResearch/dyna/data/models/dw_decoder"
     path_prefix_save = "/mnt/f/git_AIResearch/dyna/data/models/dw_decoder"
-    load_path_model = f"{path_prefix_load}/decoder_gamma_model.10000.pth"
-    load_path_optim = f"{path_prefix_load}/decoder_gamma_optim.10000.pth"
-    save_path_model = f"{path_prefix_save}/decoder_gamma_model_X"
-    save_path_optim = f"{path_prefix_save}/decoder_gamma_optim_X"
+    load_path_model = f"{path_prefix_load}/decoder_gamma_model_Y.10240.pth"
+    load_path_optim = f"{path_prefix_load}/decoder_gamma_optim_Y.10240.pth"
+    save_path_model = f"{path_prefix_save}/decoder_gamma_model_Y-2"
+    save_path_optim = f"{path_prefix_save}/decoder_gamma_optim_Y-2"
     save_model = True
     save_optim = True
-    save_nth_step = 1000
+    save_nth_step = 10240
     log_nth_iteration = 10
 
     learning_rate = 1.0e-2
     momentum = 0.9
     weight_decay = 0.0
     eps = 1.0e-5
-    regularization_alpha_model = 2.0e-7
+    regularization_alpha_model = 0.5e-7  # 2.0e-7
     regularization_alpha_ctx = 2.0e-4
     regularization_alpha_latents = 1.5e-6
     regularization_low_weights_model_bound = [
@@ -880,21 +906,21 @@ if __name__ == "__main__":
     weights_hysteresis_loop = False
     weights_hysteresis_loop_zero_bound = 1.0e-3
     weights_hysteresis_loop_zero_jump = 2.0e-3
+    loss_channels_weights = [1.5, 1.0, 1.0]
     loss_weights_main_vs_reg = 0.8
 
     data_cache_ctx_len = 1024
     data_cache_latents_len = 1024
     data_cache_latents_shape = [8, 32, 32]
-    dropout_rate = 0.10
+    dropout_rate = 0.15  # 0.10
 
-    total_steps = 10000
+    total_steps = 10240
     batch_size = 64
-    sliding_batch = False
+    sliding_batch = True
     grad_accumulation_steps = 1
-    loss_channels_weights = [1.5, 1.0, 1.0]
 
-    images_sample_count = 1024
-    starting_from = 1024 * 8
+    images_sample_count = 128
+    starting_from = 1024 * 16
     images_path_src = "/mnt/f/Datasets/Images_512x512/dataset_01"
     images_path_dst = "/mnt/f/git_AIResearch/dyna/data/img_dst"
     output_shape = [512, 512]
