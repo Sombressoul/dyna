@@ -880,14 +880,14 @@ if __name__ == "__main__":
     save_path_optim = f"{path_prefix_save}/decoder_gamma_optim_Y-2"
     save_model = True
     save_optim = True
-    save_nth_step = 10240
+    save_nth_step = 9600
     log_nth_iteration = 10
 
     learning_rate = 1.0e-2
     momentum = 0.9
     weight_decay = 0.0
     eps = 1.0e-5
-    regularization_alpha_model = 0.5e-7  # 2.0e-7
+    regularization_alpha_model = 0.5e-7
     regularization_alpha_ctx = 2.0e-4
     regularization_alpha_latents = 1.5e-6
     regularization_low_weights_model_bound = [
@@ -914,12 +914,12 @@ if __name__ == "__main__":
     data_cache_latents_shape = [8, 32, 32]
     dropout_rate = 0.15  # 0.10
 
-    total_steps = 10240
+    total_steps = 96000
     batch_size = 64
     sliding_batch = True
     grad_accumulation_steps = 1
 
-    images_sample_count = 128
+    images_sample_count = 1024
     starting_from = 1024 * 16
     images_path_src = "/mnt/f/Datasets/Images_512x512/dataset_01"
     images_path_dst = "/mnt/f/git_AIResearch/dyna/data/img_dst"
