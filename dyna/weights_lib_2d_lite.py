@@ -64,41 +64,6 @@ class WeightsLib2DLite(nn.Module):
             ).contiguous(),
         )
         # Init: bias
-        self.translate_base = nn.Parameter(
-            data=torch.nn.init.uniform_(
-                tensor=torch.empty(
-                    [1, self.count_components, 1, 1, 2],
-                    dtype=self.dtype_weights,
-                ),
-                a=-1.0,
-                b=+1.0,
-            ).contiguous(),
-        )
-        # Init: scale
-        self.rotate_base = nn.Parameter(
-            data=torch.cat(
-                [
-                    torch.nn.init.uniform_(
-                        tensor=torch.empty(
-                            [1, self.count_components, 1, 1, 1],
-                            dtype=self.dtype_weights,
-                        ),
-                        a=-1.0,
-                        b=+1.0,
-                    ),
-                    torch.nn.init.uniform_(
-                        tensor=torch.empty(
-                            [1, self.count_components, 1, 1, 1],
-                            dtype=self.dtype_weights,
-                        ),
-                        a=-1.0,
-                        b=+1.0,
-                    ),
-                ],
-                dim=-1,
-            ).contiguous(),
-        )
-        # Init: bias
         self.translate_dynamic = nn.Parameter(
             data=torch.nn.init.uniform_(
                 tensor=torch.empty(
@@ -348,13 +313,6 @@ class WeightsLib2DLite(nn.Module):
         # ================================================================================= #
         # ____________________________> Dynamic weights computation.
         # ================================================================================= #
-        weights = self.weights_base.repeat([1, self.translate_base.shape[1], 1, 1, 1])
-        weights = weights + self.translate_base.expand_as(weights)
-        z = self.rotate_base.expand_as(weights)
-        r = (weights * z).diff(dim=-1)
-        i = (weights * z[..., [1, 0]]).sum(dim=-1, keepdim=True)
-        weights = torch.cat([r, i], dim=-1)
-
         transforms = torch.einsum("ij,kjl -> ikl", x, self.mod_transforms).contiguous()
         transforms = transforms.view(
             [*transforms.shape[0:-1], transforms.shape[-1] // 2, 1, 1, 2]
@@ -409,8 +367,6 @@ class WeightsLib2DLite(nn.Module):
 
         if torch.isnan(mod).any() or torch.isinf(mod).any():
             self._log_var(self.weights_base, "self.weights_base", False)
-            self._log_var(self.translate_base, "self.translate_base", False)
-            self._log_var(self.rotate_base, "self.rotate_base", False)
             self._log_var(self.mod_transforms, "self.mod_transforms", False)
             self._log_var(self.mod_i, "self.mod_i", False)
             self._log_var(self.mod_j, "self.mod_j", False)
