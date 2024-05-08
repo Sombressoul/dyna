@@ -423,7 +423,10 @@ class WeightsLib2DLite(nn.Module):
         r = (r_num / r_denom).unsqueeze(-1)
         i = mod[..., 1].unsqueeze(-1)
         mod = torch.cat([r, i], dim=-1)
-        weights_dynamic = self.weights_base + (self.weights_base * mod)
+
+        r = (self.weights_base * mod).diff(dim=-1)
+        i = (self.weights_base * mod[..., [1, 0]]).sum(dim=-1, keepdim=True)
+        weights_dynamic = torch.cat([r, i], dim=-1)
 
         A = weights_dynamic.permute([0, 1, 3, 2, 4])
         A = A.unsqueeze(-2)
