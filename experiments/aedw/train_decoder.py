@@ -340,6 +340,14 @@ class DecoderOnlyModel(nn.Module):
         x = x + (x_q - x).detach()
         return x
 
+    def logSigma(
+        self,
+        x: torch.Tensor,
+    ) -> torch.Tensor:
+        sign = torch.where(x > 0.0, +1.0, -1.0).to(dtype=x.dtype, device=x.device)
+        x = (torch.log(x.abs() + torch.e) - 1.0) * sign
+        return x
+
     def doubleLogNormAbs(
         self,
         x: torch.Tensor,
@@ -375,16 +383,19 @@ class DecoderOnlyModel(nn.Module):
         x_b = self.dropout(x)
         x_c = self.dropout(x)
         x_a = self.conv_up_04_a(x_a, ctx)
-        x_a = self.doubleLogNorm(x_a)
+        # x_a = self.doubleLogNorm(x_a)
+        x_a = self.logSigma(x_a)
         x_a = self.upsample_nearest(x_a)
         x_b = self.conv_up_04_b(x_b, ctx)
-        x_b = self.doubleLogNorm(x_b)
+        # x_b = self.doubleLogNorm(x_b)
+        x_b = self.logSigma(x_b)
         x_c = self.upsample_bilinear(x_c)
         x_c = self.conv_up_04_c(x_c, ctx)
-        x_c = self.doubleLogNorm(x_c)
+        # x_c = self.doubleLogNorm(x_c)
+        x_c = self.logSigma(x_c)
         x = (x_a + x_b) * (1.0 + x_c)
         x = F.leaky_relu(x, 0.3)
-        x = self.quantizer(x)
+        # x = self.quantizer(x)
 
         ctx = self.dropout(context)
         ctx = self.linear_ctx_03(ctx)
@@ -393,16 +404,19 @@ class DecoderOnlyModel(nn.Module):
         x_b = self.dropout(x)
         x_c = self.dropout(x)
         x_a = self.conv_up_03_a(x_a, ctx)
-        x_a = self.doubleLogNorm(x_a)
+        # x_a = self.doubleLogNorm(x_a)
+        x_a = self.logSigma(x_a)
         x_a = self.upsample_nearest(x_a)
         x_b = self.conv_up_03_b(x_b, ctx)
-        x_b = self.doubleLogNorm(x_b)
+        # x_b = self.doubleLogNorm(x_b)
+        x_b = self.logSigma(x_b)
         x_c = self.upsample_bilinear(x_c)
         x_c = self.conv_up_03_c(x_c, ctx)
-        x_c = self.doubleLogNorm(x_c)
+        # x_c = self.doubleLogNorm(x_c)
+        x_c = self.logSigma(x_c)
         x = (x_a + x_b) * (1.0 + x_c)
         x = F.leaky_relu(x, 0.3)
-        x = self.quantizer(x)
+        # x = self.quantizer(x)
 
         ctx = self.dropout(context)
         ctx = self.linear_ctx_02(ctx)
@@ -411,34 +425,40 @@ class DecoderOnlyModel(nn.Module):
         x_b = self.dropout(x)
         x_c = self.dropout(x)
         x_a = self.conv_up_02_a(x_a, ctx)
-        x_a = self.doubleLogNorm(x_a)
+        # x_a = self.doubleLogNorm(x_a)
+        x_a = self.logSigma(x_a)
         x_a = self.upsample_nearest(x_a)
         x_b = self.conv_up_02_b(x_b, ctx)
-        x_b = self.doubleLogNorm(x_b)
+        # x_b = self.doubleLogNorm(x_b)
+        x_b = self.logSigma(x_b)
         x_c = self.upsample_bilinear(x_c)
         x_c = self.conv_up_02_c(x_c, ctx)
-        x_c = self.doubleLogNorm(x_c)
+        # x_c = self.doubleLogNorm(x_c)
+        x_c = self.logSigma(x_c)
         x = (x_a + x_b) * (1.0 + x_c)
         x = F.leaky_relu(x, 0.3)
-        x = self.quantizer(x)
+        # x = self.quantizer(x)
 
         ctx = self.dropout(context)
         ctx = self.linear_ctx_01(ctx)
         ctx = F.leaky_relu(ctx, 0.3)
         x_a = self.dropout(x)
-        x_b = self.dropout(-x)
-        x_c = self.dropout(x.abs().add(1.0).log())
+        x_b = self.dropout(x)
+        x_c = self.dropout(x)
         x_a = self.conv_up_01_a(x_a, ctx)
-        x_a = self.doubleLogNorm(x_a)
+        # x_a = self.doubleLogNorm(x_a)
+        x_a = self.logSigma(x_a)
         x_a = self.upsample_nearest(x_a)
         x_b = self.conv_up_01_b(x_b, ctx)
-        x_b = self.doubleLogNorm(x_b)
+        # x_b = self.doubleLogNorm(x_b)
+        x_b = self.logSigma(x_b)
         x_c = self.upsample_bilinear(x_c)
         x_c = self.conv_up_01_c(x_c, ctx)
-        x_c = self.doubleLogNorm(x_c)
+        # x_c = self.doubleLogNorm(x_c)
+        x_c = self.logSigma(x_c)
         x = (x_a + x_b) * (1.0 + x_c)
         x = F.leaky_relu(x, 0.3)
-        x = self.quantizer(x)
+        # x = self.quantizer(x)
 
         ctx = self.dropout(context)
         ctx = self.linear_ctx_out(ctx)
@@ -532,6 +552,7 @@ def train(
     grad_accumulation_steps: int,
     sliding_batch: bool,
     loss_channels_weights: torch.Tensor,
+    use_regularization: bool,
     regularization_alpha_model: float,
     regularization_alpha_ctx: float,
     regularization_alpha_latents: float,
@@ -607,17 +628,33 @@ def train(
         # loss_main = F.mse_loss(loss_base_decoded, loss_base_targets)
 
         # Regularizations
-        reg_term_model = get_regularization_term_model(
-            model=model,
-            alpha=regularization_alpha_model,
+        null_placeholder = torch.tensor([0.0]).to(
+            dtype=loss_main.dtype,
+            device=loss_main.device,
         )
-        reg_term_ctx = get_regularization_term_ctx(
-            model=model,
-            alpha=regularization_alpha_ctx,
+        reg_term_model = (
+            get_regularization_term_model(
+                model=model,
+                alpha=regularization_alpha_model,
+            )
+            if use_regularization
+            else null_placeholder.clone()
         )
-        reg_term_latents = get_regularization_term_latents(
-            model=model,
-            alpha=regularization_alpha_latents,
+        reg_term_ctx = (
+            get_regularization_term_ctx(
+                model=model,
+                alpha=regularization_alpha_ctx,
+            )
+            if use_regularization
+            else null_placeholder.clone()
+        )
+        reg_term_latents = (
+            get_regularization_term_latents(
+                model=model,
+                alpha=regularization_alpha_latents,
+            )
+            if use_regularization
+            else null_placeholder.clone()
         )
 
         if regularization_low_weights_fn is not None:
@@ -637,7 +674,7 @@ def train(
                     alpha=regularization_low_weights_model_alpha,
                 )
         else:
-            reg_term_low_weights_model = 0.0
+            reg_term_low_weights_model = null_placeholder.clone()
 
         loss_reg = (
             reg_term_model
@@ -678,6 +715,13 @@ def train(
                     torch.nn.utils.clip_grad_value_(model.parameters(), grad_clip_val)
                 if "latents" in clip_grad_by:
                     grad_clip_val = model.data_cache_latents.grad.abs().mean().item()
+                    torch.nn.utils.clip_grad_value_(model.parameters(), grad_clip_val)
+                if "mean" in clip_grad_by:
+                    mean_grads = []
+                    for param in model.parameters():
+                        if param.requires_grad:
+                            mean_grads.append(param.grad.abs().mean().item())
+                    grad_clip_val = sum(mean_grads) / len(mean_grads)
                     torch.nn.utils.clip_grad_value_(model.parameters(), grad_clip_val)
             else:
                 if grad_min_clip_value is not None and grad_max_clip_value is not None:
@@ -1053,10 +1097,10 @@ def quantize_weights(
 if __name__ == "__main__":
     train_mode = True
 
-    load_model = False
+    load_model = True
     load_optim = False
-    drop_ctx_cache = False
-    drop_latents_cache = False
+    drop_ctx_cache = True
+    drop_latents_cache = True
     # onload_fn = perturb_weights
     # onload_fn = freeze_model
     # onload_fn = data_cache_double
@@ -1065,26 +1109,30 @@ if __name__ == "__main__":
     #     freeze_model,
     # ]
     # onload_fn = quantize_weights
-    # onload_fn = freeze_latents
+    # onload_fn = [
+    #     freeze_latents,
+    #     freeze_ctx,
+    # ]
     onload_fn = None
 
-    path_prefix_load = "/mnt/f/git_AIResearch/dyna/data/models"
+    path_prefix_load = "/mnt/f/git_AIResearch/dyna/data/models/decoder_model_B-S6"
     path_prefix_save = "/mnt/f/git_AIResearch/dyna/data/models"
-    load_path_model = f"{path_prefix_load}/decoder_model_A"
-    load_path_optim = f"{path_prefix_load}/decoder_optim_A"
-    save_path_model = f"{path_prefix_save}/decoder_model_A"
-    save_path_optim = f"{path_prefix_save}/decoder_optim_A"
+    load_path_model = f"{path_prefix_load}/decoder_model_B-S6.20000.pth"
+    load_path_optim = f"{path_prefix_load}/"
+    save_path_model = f"{path_prefix_save}/decoder_model_B-S1-fp32"
+    save_path_optim = f"{path_prefix_save}/decoder_optim_B-S1-fp32"
     save_model = True
     save_optim = True
     save_nth_step = 10000
     log_nth_iteration = 100
 
     learning_rate = 1.0e-2
-    momentum = 0.9
+    momentum = 0.0
     weight_decay = 0.0
     eps = 1.0e-5
     data_cache_ctx_bound = 1.0e-3
     data_cache_latents_bound = 1.0e-3
+    use_regularization = False
     regularization_alpha_model = 1.0e-9
     regularization_alpha_ctx = 1.5e-5
     regularization_alpha_latents = 2.5e-8
@@ -1106,9 +1154,9 @@ if __name__ == "__main__":
     weights_hysteresis_loop_zero_jump = 2.0e-3
     loss_channels_weights = [1.0, 1.0, 1.0]
     loss_weights_main_reg = [1.0, 1.0]
-    grad_min_clip_value = 1.0e-1
-    grad_max_clip_value = 1.0e-1
-    clip_grad_by = "latents"  # ctx/latents/None
+    grad_min_clip_value = None
+    grad_max_clip_value = None
+    clip_grad_by = "mean"  # ctx/latents/mean/None
 
     data_cache_ctx_len = 2048
     data_cache_latents_len = 2048
@@ -1121,7 +1169,7 @@ if __name__ == "__main__":
     grad_accumulation_steps = 1
 
     images_sample_count = 2048
-    starting_from = 1024 * 0
+    starting_from = 1024 * 32
     images_path_src = "/mnt/f/Datasets/Images_512x512/dataset_01"
     images_path_dst = "/mnt/f/git_AIResearch/dyna/data/img_dst"
     output_shape = [512, 512]
@@ -1203,32 +1251,35 @@ if __name__ == "__main__":
         lambda p: torch.save(optimizer.state_dict(), f"{save_path_optim}.{p}.pth"),
     ]
 
+    start_training = lambda: train(
+        data=data,
+        total_steps=total_steps,
+        batch_size=batch_size,
+        grad_accumulation_steps=grad_accumulation_steps,
+        sliding_batch=sliding_batch,
+        loss_channels_weights=torch.tensor(loss_channels_weights),
+        use_regularization=use_regularization,
+        regularization_alpha_model=regularization_alpha_model,
+        regularization_alpha_ctx=regularization_alpha_ctx,
+        regularization_alpha_latents=regularization_alpha_latents,
+        regularization_low_weights_model_bound=regularization_low_weights_model_bound,
+        regularization_low_weights_model_alpha=regularization_low_weights_model_alpha,
+        regularization_low_weights_fn=regularization_low_weights_fn,
+        weights_hysteresis_loop=weights_hysteresis_loop,
+        weights_hysteresis_loop_zero_bound=weights_hysteresis_loop_zero_bound,
+        weights_hysteresis_loop_zero_jump=weights_hysteresis_loop_zero_jump,
+        loss_weights_main_reg=loss_weights_main_reg,
+        grad_min_clip_value=grad_min_clip_value,
+        grad_max_clip_value=grad_max_clip_value,
+        clip_grad_by=clip_grad_by,
+        model=model,
+        optimizer=optimizer,
+        log_nth_iteration=log_nth_iteration,
+        images_path_dst=images_path_dst,
+        save_nth_step=save_nth_step,
+        savers=savers,
+        to_save=[save_model, save_optim],
+    )
+
     if train_mode:
-        train(
-            data=data,
-            total_steps=total_steps,
-            batch_size=batch_size,
-            grad_accumulation_steps=grad_accumulation_steps,
-            sliding_batch=sliding_batch,
-            loss_channels_weights=torch.tensor(loss_channels_weights),
-            regularization_alpha_model=regularization_alpha_model,
-            regularization_alpha_ctx=regularization_alpha_ctx,
-            regularization_alpha_latents=regularization_alpha_latents,
-            regularization_low_weights_model_bound=regularization_low_weights_model_bound,
-            regularization_low_weights_model_alpha=regularization_low_weights_model_alpha,
-            regularization_low_weights_fn=regularization_low_weights_fn,
-            weights_hysteresis_loop=weights_hysteresis_loop,
-            weights_hysteresis_loop_zero_bound=weights_hysteresis_loop_zero_bound,
-            weights_hysteresis_loop_zero_jump=weights_hysteresis_loop_zero_jump,
-            loss_weights_main_reg=loss_weights_main_reg,
-            grad_min_clip_value=grad_min_clip_value,
-            grad_max_clip_value=grad_max_clip_value,
-            clip_grad_by=clip_grad_by,
-            model=model,
-            optimizer=optimizer,
-            log_nth_iteration=log_nth_iteration,
-            images_path_dst=images_path_dst,
-            save_nth_step=save_nth_step,
-            savers=savers,
-            to_save=[save_model, save_optim],
-        )
+        start_training()
