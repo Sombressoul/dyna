@@ -4,7 +4,7 @@ import torch.nn as nn
 from typing import Union, List
 
 
-class WeightsLib2DLite(nn.Module):
+class WeightsLib2D(nn.Module):
     def __init__(
         self,
         output_shape: Union[torch.Size, List[int]],
