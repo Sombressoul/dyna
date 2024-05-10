@@ -10,6 +10,7 @@ class WeightsLib2D(nn.Module):
         output_shape: Union[torch.Size, List[int]],
         components_count: int = 16,
         mod_rank: int = 16,
+        transformations_rank: int = 16,
         asymmetry: float = 1e-3,
         eps: float = 1.0e-5,
         dtype_weights: torch.dtype = torch.bfloat16,
@@ -21,7 +22,8 @@ class WeightsLib2D(nn.Module):
         # ================================================================================= #
         assert len(output_shape) == 2, "Shape must be 2D."
         assert components_count > 1, "Components must be greater than 1."
-        assert mod_rank > 1, "Rank must be greater than 1."
+        assert mod_rank > 1, "Mod rank must be greater than 1."
+        assert transformations_rank > 0, "Transformations rank must be greater than 0."
 
         # ================================================================================= #
         # ____________________________> Parameters.
@@ -29,6 +31,7 @@ class WeightsLib2D(nn.Module):
         self.output_shape = output_shape
         self.count_components = components_count
         self.mod_rank = mod_rank
+        self.transformations_rank = transformations_rank
         self.asymmetry = asymmetry
         self.eps = eps
         self.dtype_weights = dtype_weights
@@ -182,10 +185,14 @@ class WeightsLib2D(nn.Module):
             ).contiguous(),
         )
         # Init: mod_i_transforms
-        self.mod_transforms = nn.Parameter(
+        self.mod_transformations = nn.Parameter(
             data=torch.nn.init.xavier_uniform_(
                 tensor=torch.empty(
-                    [4, self.count_components, self.count_components * 2],
+                    [
+                        2 + (self.transformations_rank * 2),
+                        self.count_components,
+                        self.count_components * 2,
+                    ],
                     dtype=self.dtype_weights,
                 ),
             ).contiguous(),
@@ -274,6 +281,26 @@ class WeightsLib2D(nn.Module):
         x = torch.cat([r, i], dim=-1)
         return x
 
+    def interpolate(
+        self,
+        t: torch.Tensor,
+        mod: torch.Tensor,
+    ) -> torch.Tensor:
+        t = t.permute([0, 5, 2, 3, 4, 1])
+        t = t.reshape([t.shape[0], t.shape[1] * t.shape[2], t.shape[-1]])
+        t = nn.functional.interpolate(
+            t,
+            size=mod.shape[-2],
+            mode="linear",
+            align_corners=False,
+        )
+        t = (
+            t.reshape([t.shape[0], 2, -1, t.shape[-1]])
+            .permute([0, 2, 3, 1])
+            .unsqueeze(-3)
+        )
+        return t
+
     def forward(
         self,
         x: torch.Tensor,
@@ -313,40 +340,68 @@ class WeightsLib2D(nn.Module):
         # ================================================================================= #
         # ____________________________> Dynamic weights computation.
         # ================================================================================= #
-        transforms = torch.einsum("ij,kjl -> ikl", x, self.mod_transforms).contiguous()
-        transforms = transforms.view(
-            [*transforms.shape[0:-1], transforms.shape[-1] // 2, 1, 1, 2]
-        )  # [n, (i_translate|i_rotate|j_translate|j_rotate), self.components_count, 1, 1, 2]
+        # Get transformations.
+        transformations = torch.einsum(
+            "ij,kjl -> ikl", x, self.mod_transformations
+        ).contiguous()
+        transformations = transformations.view(
+            [*transformations.shape[0:-1], transformations.shape[-1] // 2, 1, 1, 2]
+        )
 
+        # Transform mod_i.
         mod_i = self.mod_i.repeat(
             [
-                transforms.shape[0],
+                transformations.shape[0],
                 *[1 for _ in range(len(self.mod_i.shape) - 1)],
             ]
         )
-        mod_i = mod_i + transforms[::, 0, ...]
-        z = transforms[::, 1, ...]
+        mod_i = mod_i + transformations[::, 0, ...]
+        if self.transformations_rank == 1:
+            z = transformations[::, 2, ...]
+        else:
+            z = self.interpolate(
+                t=transformations[
+                    ::,
+                    2 : 2 + self.transformations_rank,
+                    ...,
+                ],
+                mod=mod_i,
+            )
         r = (mod_i * z).diff(dim=-1)
         i = (mod_i * z[..., [1, 0]]).sum(dim=-1, keepdim=True)
         mod_i = torch.cat([r, i], dim=-1)
 
+        # Transform mod_j.
         mod_j = self.mod_j.repeat(
             [
-                transforms.shape[0],
+                transformations.shape[0],
                 *[1 for _ in range(len(self.mod_j.shape) - 1)],
             ]
         )
-        mod_j = mod_j + transforms[::, 2, ...]
-        z = transforms[::, 3, ...]
+        mod_j = mod_j + transformations[::, 1, ...]
+        if self.transformations_rank == 1:
+            z = transformations[::, 3, ...]
+        else:
+            z = self.interpolate(
+                t=transformations[
+                    ::,
+                    2 + self.transformations_rank : 2 + (self.transformations_rank * 2),
+                    ...,
+                ],
+                mod=mod_j,
+            )
         r = (mod_j * z).diff(dim=-1)
         i = (mod_j * z[..., [1, 0]]).sum(dim=-1, keepdim=True)
         mod_j = torch.cat([r, i], dim=-1)
 
+        # Apply some kind of generalized Mobius-like transformation with inversions.
+        # Calculate normal mod_i matrix.
         r = (mod_i * self.inversions).diff(dim=-1)
         i = (mod_i * self.inversions[..., [1, 0]]).sum(dim=-1, keepdim=True)
         mod_i = torch.cat([r, i], dim=-1)
         mod_i = mod_i.sum(dim=1, keepdim=True).contiguous()
 
+        # Calculate inverse mod_j matrix.
         denom = (mod_j * mod_j).sum(dim=-1, keepdim=True)
         # avoiding division by zero ->
         denom[torch.where(denom < self.asymmetry)] = self.asymmetry
@@ -356,6 +411,7 @@ class WeightsLib2D(nn.Module):
         mod_j = torch.cat([r, i], dim=-1)
         mod_j = mod_j.sum(dim=1, keepdim=True).contiguous()
 
+        # Complex matrix multiplication between mod_i and mod_j.
         A = mod_i.permute([0, 1, 3, 2, 4])
         A = A.unsqueeze(-2)
         A = torch.cat([A, A], dim=-2)
@@ -367,12 +423,13 @@ class WeightsLib2D(nn.Module):
 
         if torch.isnan(mod).any() or torch.isinf(mod).any():
             self._log_var(self.weights_base, "self.weights_base", False)
-            self._log_var(self.mod_transforms, "self.mod_transforms", False)
+            self._log_var(self.mod_transformations, "self.mod_transforms", False)
             self._log_var(self.mod_i, "self.mod_i", False)
             self._log_var(self.mod_j, "self.mod_j", False)
             self._log_var(self.inversions, "self.inversions", False)
             raise ValueError("mod has NaN or Inf elements.")
 
+        # Normalize real part.
         mod_r = mod[..., 0]
         r_num = mod_r - mod_r.mean(dim=[-1, -2], keepdim=True)
         r_denom = mod_r.std(dim=[-1, -2], keepdim=True)
@@ -408,9 +465,14 @@ class WeightsLib2D(nn.Module):
         i = i.sum(dim=-1, keepdim=True)
         weights_dynamic = torch.cat([r, i], dim=-1)
 
-        projection_denom = torch.sqrt(self.projections[..., 0]**2 + self.projections[..., 1]**2 + self.eps)
+        # Project resulting complex values on the corresponding lines on the complex plane.
+        projection_denom = torch.sqrt(
+            self.projections[..., 0] ** 2 + self.projections[..., 1] ** 2 + self.eps
+        )
         theta_cos = self.projections[..., 0] / projection_denom
         theta_sin = self.projections[..., 1] / projection_denom
-        weights_dynamic = weights_dynamic[..., 0] * theta_cos + weights_dynamic[..., 1] * theta_sin
+        weights_dynamic = (
+            weights_dynamic[..., 0] * theta_cos + weights_dynamic[..., 1] * theta_sin
+        )
 
         return weights_dynamic
