@@ -26,6 +26,7 @@ class Model(nn.Module):
         mat_count: int = 16,
         components_count: int = 16,
         mod_rank: int = 8,
+        t_rank: int = 1,
         asymmetry: float = 1e-3,
         dtype_weights: torch.dtype = torch.bfloat16,
     ) -> None:
@@ -45,6 +46,7 @@ class Model(nn.Module):
         self.weights = WeightsLib2D(
             output_shape=output_shape,
             mod_rank=mod_rank,
+            transformations_rank=t_rank,
             components_count=components_count,
             asymmetry=asymmetry,
             dtype_weights=dtype_weights,
@@ -289,6 +291,12 @@ def main():
         help="mod rank of the library matrices (default: 16)",
     )
     parser.add_argument(
+        "--t-rank",
+        type=int,
+        default=1,
+        help="transformations rank of the library matrices (default: 1)",
+    )
+    parser.add_argument(
         "--asymmetry",
         type=float,
         default=1e-3,
@@ -420,6 +428,7 @@ def main():
         mat_count=args.mat_count,
         components_count=args.components_count,
         mod_rank=args.mod_rank,
+        t_rank=args.t_rank,
         asymmetry=args.asymmetry,
         dtype_weights=dtype_weights,
     ).to(device)
