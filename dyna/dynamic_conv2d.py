@@ -23,6 +23,7 @@ class DynamicConv2D(nn.Module):
         out_channels: int,
         context_length: int,
         mod_rank: int,
+        transformations_rank: int,
         kernel_size: Union[int, List[int]] = [3, 3],
         stride: Union[int, List[int]] = [1, 1],
         padding: Union[int, List[int]] = [0, 0],
@@ -58,6 +59,7 @@ class DynamicConv2D(nn.Module):
         ], "bias_static must be a float or None."
         assert context_length > 0, "context_length must be greater than 0."
         assert mod_rank > 0, "mod_rank must be greater than 0."
+        assert transformations_rank > 0, "transformations_rank must be greater than 0."
         assert len(kernel_size) == 2, "kernel_size must be an int or a 2-element tuple."
         assert len(stride) == 2, "stride must be an int or a 2-element tuple."
         assert len(padding) == 2, "padding must be an int or a 2-element tuple."
@@ -99,6 +101,7 @@ class DynamicConv2D(nn.Module):
         self.out_channels = out_channels
         self.context_length = context_length
         self.mod_rank = mod_rank
+        self.transformations_rank = transformations_rank
         self.kernel_size = kernel_size
         self.stride = stride
         self.padding = padding
@@ -152,6 +155,7 @@ class DynamicConv2D(nn.Module):
             output_shape=self.dynamic_weights_shape,
             components_count=self.context_length,
             mod_rank=self.mod_rank,
+            transformations_rank=self.transformations_rank,
             asymmetry=self.asymmetry,
             dtype_weights=self.dtype_weights,
         )
