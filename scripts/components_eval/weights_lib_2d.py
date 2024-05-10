@@ -13,7 +13,7 @@ evals_dir = os.path.dirname(script_dir)
 project_dir = os.path.dirname(evals_dir)
 sys.path.append(project_dir)
 
-from dyna import WeightsLib2D
+from dyna import WeightsLib2DDev
 
 
 model = None
@@ -67,7 +67,7 @@ class Model(nn.Module):
         # ____________________________> Weights.
         # ================================================================================= #
         # Init WeightsLib2D.
-        self.weights = WeightsLib2D(
+        self.weights = WeightsLib2DDev(
             shape=shape,
             rank_mod=rank_mod,
             use_deltas=use_deltas,

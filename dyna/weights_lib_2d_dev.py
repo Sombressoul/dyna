@@ -31,7 +31,7 @@ class ActivationParams:
 #       - fast, great performance
 #   Combo #2: deltas with trainable exponents, cardiod activation, translative transformation, complex
 #       - more diverse on long-range training
-class WeightsLib2D(nn.Module):
+class WeightsLib2DDev(nn.Module):
     def __init__(
         self,
         shape: Union[torch.Size, List[int]],
