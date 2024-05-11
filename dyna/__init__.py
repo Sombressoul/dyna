@@ -4,6 +4,7 @@ from dyna.modulated_activation import ModulatedActivation
 from dyna.modulated_activation_bell import ModulatedActivationBell
 from dyna.modulated_activation_sine import ModulatedActivationSine
 from dyna.signal import SignalModular, SignalComponential
+from dyna.siglog import siglog
 from dyna.sparse_ensemble import SparseEnsemble
 from dyna.theta_input import ThetaInput
 from dyna.theta_output import ThetaOutput
@@ -20,6 +21,7 @@ __all__ = [
     "ModulatedActivationSine",
     "SignalModular",
     "SignalComponential",
+    "siglog",
     "SparseEnsemble",
     "ThetaInput",
     "ThetaOutput",
