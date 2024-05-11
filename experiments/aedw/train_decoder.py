@@ -18,6 +18,8 @@ evals_dir = os.path.dirname(script_dir)
 project_dir = os.path.dirname(evals_dir)
 sys.path.append(project_dir)
 
+torch.manual_seed(42)
+
 from dyna import DynamicConv2D
 
 
@@ -42,6 +44,7 @@ class DecoderOnlyModel(nn.Module):
         self.bias_static = 0.0
         self.context_length = 64
         self.mod_rank = 16
+        self.transformations_rank = 32
 
         self.data_cache_ctx_bound = data_cache_ctx_bound
         self.data_cache_latents_bound = data_cache_latents_bound
@@ -73,6 +76,7 @@ class DecoderOnlyModel(nn.Module):
             out_channels=self.channels_dynamic_levels[3],
             context_length=self.context_length,
             mod_rank=self.mod_rank,
+            transformations_rank=self.transformations_rank,
             kernel_size=self.kernel_size_t,
             stride=[2, 2],
             padding=[1, 1],
@@ -89,6 +93,7 @@ class DecoderOnlyModel(nn.Module):
             out_channels=self.channels_dynamic_levels[3],
             context_length=self.context_length,
             mod_rank=self.mod_rank,
+            transformations_rank=self.transformations_rank,
             kernel_size=self.kernel_size_r,
             stride=[1, 1],
             padding=[1, 1],
@@ -105,6 +110,7 @@ class DecoderOnlyModel(nn.Module):
             out_channels=self.channels_dynamic_levels[3],
             context_length=self.context_length,
             mod_rank=self.mod_rank,
+            transformations_rank=self.transformations_rank,
             kernel_size=self.kernel_size_m,
             stride=[1, 1],
             padding=[2, 2],
@@ -127,6 +133,7 @@ class DecoderOnlyModel(nn.Module):
             out_channels=self.channels_dynamic_levels[2],
             context_length=self.context_length,
             mod_rank=self.mod_rank,
+            transformations_rank=self.transformations_rank,
             kernel_size=self.kernel_size_t,
             stride=[2, 2],
             padding=[1, 1],
@@ -143,6 +150,7 @@ class DecoderOnlyModel(nn.Module):
             out_channels=self.channels_dynamic_levels[2],
             context_length=self.context_length,
             mod_rank=self.mod_rank,
+            transformations_rank=self.transformations_rank,
             kernel_size=self.kernel_size_r,
             stride=[1, 1],
             padding=[1, 1],
@@ -159,6 +167,7 @@ class DecoderOnlyModel(nn.Module):
             out_channels=self.channels_dynamic_levels[2],
             context_length=self.context_length,
             mod_rank=self.mod_rank,
+            transformations_rank=self.transformations_rank,
             kernel_size=self.kernel_size_m,
             stride=[1, 1],
             padding=[2, 2],
@@ -181,6 +190,7 @@ class DecoderOnlyModel(nn.Module):
             out_channels=self.channels_dynamic_levels[1],
             context_length=self.context_length,
             mod_rank=self.mod_rank,
+            transformations_rank=self.transformations_rank,
             kernel_size=self.kernel_size_t,
             stride=[2, 2],
             padding=[1, 1],
@@ -197,6 +207,7 @@ class DecoderOnlyModel(nn.Module):
             out_channels=self.channels_dynamic_levels[1],
             context_length=self.context_length,
             mod_rank=self.mod_rank,
+            transformations_rank=self.transformations_rank,
             kernel_size=self.kernel_size_r,
             stride=[1, 1],
             padding=[1, 1],
@@ -213,6 +224,7 @@ class DecoderOnlyModel(nn.Module):
             out_channels=self.channels_dynamic_levels[1],
             context_length=self.context_length,
             mod_rank=self.mod_rank,
+            transformations_rank=self.transformations_rank,
             kernel_size=self.kernel_size_m,
             stride=[1, 1],
             padding=[2, 2],
@@ -235,6 +247,7 @@ class DecoderOnlyModel(nn.Module):
             out_channels=self.channels_dynamic_levels[0],
             context_length=self.context_length,
             mod_rank=self.mod_rank,
+            transformations_rank=self.transformations_rank,
             kernel_size=self.kernel_size_t,
             stride=[2, 2],
             padding=[1, 1],
@@ -251,6 +264,7 @@ class DecoderOnlyModel(nn.Module):
             out_channels=self.channels_dynamic_levels[0],
             context_length=self.context_length,
             mod_rank=self.mod_rank,
+            transformations_rank=self.transformations_rank,
             kernel_size=self.kernel_size_r,
             stride=[1, 1],
             padding=[1, 1],
@@ -267,6 +281,7 @@ class DecoderOnlyModel(nn.Module):
             out_channels=self.channels_dynamic_levels[0],
             context_length=self.context_length,
             mod_rank=self.mod_rank,
+            transformations_rank=self.transformations_rank,
             kernel_size=self.kernel_size_m,
             stride=[1, 1],
             padding=[2, 2],
@@ -289,6 +304,7 @@ class DecoderOnlyModel(nn.Module):
             out_channels=self.channels_io,
             context_length=self.context_length,
             mod_rank=self.mod_rank,
+            transformations_rank=self.transformations_rank,
             kernel_size=[1, 1],
             stride=[1, 1],
             padding=[0, 0],
@@ -340,12 +356,13 @@ class DecoderOnlyModel(nn.Module):
         x = x + (x_q - x).detach()
         return x
 
-    def logSigma(
+    def siglog(
         self,
         x: torch.Tensor,
     ) -> torch.Tensor:
         sign = torch.where(x > 0.0, +1.0, -1.0).to(dtype=x.dtype, device=x.device)
-        x = (torch.log(x.abs() + torch.e) - 1.0) * sign
+        x_t = (torch.log(x.abs() + torch.e + self.eps) - 1.0) * sign
+        x = x + (x_t - x).detach()
         return x
 
     def doubleLogNormAbs(
@@ -384,15 +401,15 @@ class DecoderOnlyModel(nn.Module):
         x_c = self.dropout(x)
         x_a = self.conv_up_04_a(x_a, ctx)
         # x_a = self.doubleLogNorm(x_a)
-        x_a = self.logSigma(x_a)
+        x_a = self.siglog(x_a)
         x_a = self.upsample_nearest(x_a)
         x_b = self.conv_up_04_b(x_b, ctx)
         # x_b = self.doubleLogNorm(x_b)
-        x_b = self.logSigma(x_b)
+        x_b = self.siglog(x_b)
         x_c = self.upsample_bilinear(x_c)
         x_c = self.conv_up_04_c(x_c, ctx)
         # x_c = self.doubleLogNorm(x_c)
-        x_c = self.logSigma(x_c)
+        x_c = self.siglog(x_c)
         x = (x_a + x_b) * (1.0 + x_c)
         x = F.leaky_relu(x, 0.3)
         # x = self.quantizer(x)
@@ -405,15 +422,15 @@ class DecoderOnlyModel(nn.Module):
         x_c = self.dropout(x)
         x_a = self.conv_up_03_a(x_a, ctx)
         # x_a = self.doubleLogNorm(x_a)
-        x_a = self.logSigma(x_a)
+        x_a = self.siglog(x_a)
         x_a = self.upsample_nearest(x_a)
         x_b = self.conv_up_03_b(x_b, ctx)
         # x_b = self.doubleLogNorm(x_b)
-        x_b = self.logSigma(x_b)
+        x_b = self.siglog(x_b)
         x_c = self.upsample_bilinear(x_c)
         x_c = self.conv_up_03_c(x_c, ctx)
         # x_c = self.doubleLogNorm(x_c)
-        x_c = self.logSigma(x_c)
+        x_c = self.siglog(x_c)
         x = (x_a + x_b) * (1.0 + x_c)
         x = F.leaky_relu(x, 0.3)
         # x = self.quantizer(x)
@@ -426,15 +443,15 @@ class DecoderOnlyModel(nn.Module):
         x_c = self.dropout(x)
         x_a = self.conv_up_02_a(x_a, ctx)
         # x_a = self.doubleLogNorm(x_a)
-        x_a = self.logSigma(x_a)
+        x_a = self.siglog(x_a)
         x_a = self.upsample_nearest(x_a)
         x_b = self.conv_up_02_b(x_b, ctx)
         # x_b = self.doubleLogNorm(x_b)
-        x_b = self.logSigma(x_b)
+        x_b = self.siglog(x_b)
         x_c = self.upsample_bilinear(x_c)
         x_c = self.conv_up_02_c(x_c, ctx)
         # x_c = self.doubleLogNorm(x_c)
-        x_c = self.logSigma(x_c)
+        x_c = self.siglog(x_c)
         x = (x_a + x_b) * (1.0 + x_c)
         x = F.leaky_relu(x, 0.3)
         # x = self.quantizer(x)
@@ -447,15 +464,15 @@ class DecoderOnlyModel(nn.Module):
         x_c = self.dropout(x)
         x_a = self.conv_up_01_a(x_a, ctx)
         # x_a = self.doubleLogNorm(x_a)
-        x_a = self.logSigma(x_a)
+        x_a = self.siglog(x_a)
         x_a = self.upsample_nearest(x_a)
         x_b = self.conv_up_01_b(x_b, ctx)
         # x_b = self.doubleLogNorm(x_b)
-        x_b = self.logSigma(x_b)
+        x_b = self.siglog(x_b)
         x_c = self.upsample_bilinear(x_c)
         x_c = self.conv_up_01_c(x_c, ctx)
         # x_c = self.doubleLogNorm(x_c)
-        x_c = self.logSigma(x_c)
+        x_c = self.siglog(x_c)
         x = (x_a + x_b) * (1.0 + x_c)
         x = F.leaky_relu(x, 0.3)
         # x = self.quantizer(x)
@@ -764,7 +781,7 @@ def train(
                         f"Loss m/r scaled: {loss_main.item()/loss_weights_main_reg[0]:.5f}/{loss_reg.item()/loss_weights_main_reg[1]:.5f}",
                         f"Loss total: {loss.item()}",
                         f"Mean grad ctx/latents: {last_grad_ctx:.7f}/{last_grad_latents:.7f}",
-                        f"Grad clipping level: {grad_clip_val:.7f}",
+                        f"Grad clipping level: {grad_clip_val:.10f}",
                         f"StdR: {(sample - decoded).std()}",
                         f"Mean loss: {(sum(loss_logging_accumulator)/len(loss_logging_accumulator)):.5f}",
                     ]
@@ -1028,7 +1045,7 @@ def perturb_weights(
     for name, param in model.named_parameters():
         if "data_cache" in name:
             continue
-        param.data = param.data + (torch.randn_like(param.data) * 1.0e-2)
+        param.data = param.data + (torch.randn_like(param.data) * 1.0e-4)
         print(f"perturb_weights: {name}")
     pass
 
@@ -1097,10 +1114,10 @@ def quantize_weights(
 if __name__ == "__main__":
     train_mode = True
 
-    load_model = True
+    load_model = False
     load_optim = False
-    drop_ctx_cache = True
-    drop_latents_cache = True
+    drop_ctx_cache = False
+    drop_latents_cache = False
     # onload_fn = perturb_weights
     # onload_fn = freeze_model
     # onload_fn = data_cache_double
@@ -1113,25 +1130,31 @@ if __name__ == "__main__":
     #     freeze_latents,
     #     freeze_ctx,
     # ]
+    # onload_fn = [
+    #     data_cache_double,
+    #     freeze_model,
+    # ]
+    # onload_fn = freeze_model
+    # onload_fn = freeze_latents
     onload_fn = None
 
-    path_prefix_load = "/mnt/f/git_AIResearch/dyna/data/models/decoder_model_B-S6"
+    path_prefix_load = "/mnt/f/git_AIResearch/dyna/data/models"
     path_prefix_save = "/mnt/f/git_AIResearch/dyna/data/models"
-    load_path_model = f"{path_prefix_load}/decoder_model_B-S6.20000.pth"
+    load_path_model = f"{path_prefix_load}/decoder_model_resulting-training_S1.20000.pth"
     load_path_optim = f"{path_prefix_load}/"
-    save_path_model = f"{path_prefix_save}/decoder_model_B-S1-fp32"
-    save_path_optim = f"{path_prefix_save}/decoder_optim_B-S1-fp32"
+    save_path_model = f"{path_prefix_save}/test_1"
+    save_path_optim = f"{path_prefix_save}/"
     save_model = True
-    save_optim = True
+    save_optim = False
     save_nth_step = 10000
-    log_nth_iteration = 100
+    log_nth_iteration = 10
 
-    learning_rate = 1.0e-2
+    learning_rate = 1.0e-3
     momentum = 0.0
     weight_decay = 0.0
     eps = 1.0e-5
-    data_cache_ctx_bound = 1.0e-3
-    data_cache_latents_bound = 1.0e-3
+    data_cache_ctx_bound = 1.0e-4
+    data_cache_latents_bound = 1.0e-4
     use_regularization = False
     regularization_alpha_model = 1.0e-9
     regularization_alpha_ctx = 1.5e-5
@@ -1156,24 +1179,27 @@ if __name__ == "__main__":
     loss_weights_main_reg = [1.0, 1.0]
     grad_min_clip_value = None
     grad_max_clip_value = None
-    clip_grad_by = "mean"  # ctx/latents/mean/None
+    # clip_grad_by = "mean"  # ctx/latents/mean/None
+    clip_grad_by = "latents"
+    # clip_grad_by = "ctx"
+    # clip_grad_by = None
 
-    data_cache_ctx_len = 2048
-    data_cache_latents_len = 2048
+    data_cache_ctx_len = 256
+    data_cache_latents_len = 256
     data_cache_latents_shape = [8, 32, 32]
     dropout_rate = 0.0
 
-    total_steps = 100000
+    total_steps = 10000
     batch_size = 64
     sliding_batch = False
     grad_accumulation_steps = 1
 
-    images_sample_count = 2048
-    starting_from = 1024 * 32
+    images_sample_count = 256 # 4096
+    starting_from = 1024 * 0 # 12
     images_path_src = "/mnt/f/Datasets/Images_512x512/dataset_01"
     images_path_dst = "/mnt/f/git_AIResearch/dyna/data/img_dst"
     output_shape = [512, 512]
-    dtype_weights = torch.bfloat16
+    dtype_weights = torch.float32
     device = torch.device("cuda")
 
     model = DecoderOnlyModel(
@@ -1202,25 +1228,27 @@ if __name__ == "__main__":
 
     if drop_ctx_cache:
         model.data_cache_ctx = nn.Parameter(
-            torch.nn.init.normal_(
+            torch.nn.init.uniform_(
                 model.data_cache_ctx,
-                mean=0.0,
-                std=data_cache_ctx_bound,
+                a=-data_cache_ctx_bound,
+                b=+data_cache_ctx_bound,
             ).to(
                 dtype=dtype_weights,
             )
         )
+        print("Dropped: data_cache_ctx")
 
     if drop_latents_cache:
         model.data_cache_latents = nn.Parameter(
-            torch.nn.init.normal_(
+            torch.nn.init.uniform_(
                 model.data_cache_latents,
-                mean=0.0,
-                std=data_cache_latents_bound,
+                a=-data_cache_latents_bound,
+                b=+data_cache_latents_bound,
             ).to(
                 dtype=dtype_weights,
             )
         )
+        print("Dropped: data_cache_latents")
 
     optimizer = MADGRAD(
         model.parameters(),
