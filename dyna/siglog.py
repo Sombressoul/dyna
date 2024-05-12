@@ -27,7 +27,7 @@ class SigLog(torch.autograd.Function):
         x_pow = 1.0 + torch.where(x_abs < 1.0, x_abs, 0.0).to(
             dtype=input.dtype,
             device=input.device,
-        )
+        ).sqrt()
         dx = 1.0 / (x_abs**x_pow + 1)
         return grad_output * dx
 
