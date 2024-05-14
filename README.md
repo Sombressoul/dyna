@@ -103,7 +103,7 @@ sequenceDiagram
 SigLog is a sigmoid-like function based on natural logarithm: [siglog.py](dyna/siglog.py)
 
 Function definition:
-$$f(x) = \left( \ln \left( |x| + e + \epsilon \right)-1.0 \right) \cdot \left\{x\geq0.0:x\rightarrow+1.0,x\rightarrow-1.0\right\}$$
+$$f(x) = \left( \ln \left( |x| + e + \epsilon \right)-1.0 \right) \cdot \lbrace x\geq0.0:x\rightarrow+1.0,x\rightarrow-1.0 \rbrace $$
 Where $e$ is the Euler's constant and $\epsilon$ is a small value, introduced to avoid zero values in the output.
 
 Approximated derivative:
