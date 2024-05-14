@@ -114,7 +114,7 @@ $$f'(x) \approx \frac{1}{|x|^{1 + \{|x|<1.0:x\rightarrow 1-\sqrt{x \bmod 1.0}, x
 __Pros:__
    - Wide range of output values: $\lim_{x\to-\infty}=-\infty$ and $\lim_{x\to+\infty}=+\infty$, since function's logarithmic nature.
    - Meaningful gradients over a wide range of output values, even when used with low precision training, leads to better propagation of gradients and partially eliminates the problem of their vanishing.
-   - Efficient and meaningful compression of large values limits the problem of gradient explosion to some extent.
+   - Efficient and meaningful compression of large values.
    - Zero-centered symmetry.
 
 __Cons:__
