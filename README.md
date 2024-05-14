@@ -29,6 +29,7 @@ Key feature of the DyNA approach and the main principle could be described as fo
 - [Dynamic Neural Architecture (DyNA)](#dynamic-neural-architecture-dyna)
   - [Key Concepts](#key-concepts)
     - [Transform-Modulate-Propagate](#transform-modulate-propagate)
+  - [Math Background: SigLog - Sigmoid Logarithmic](#math-background-siglog---sigmoid-logarithmic)
   - [Math Background: Bell Activation](#math-background-bell-activation)
     - [Components](#components)
     - [Nonlinearity](#nonlinearity)
@@ -96,6 +97,30 @@ sequenceDiagram
     Activation->>Signal: Modulated signal
     deactivate Activation
 ```
+
+## Math Background: SigLog - Sigmoid Logarithmic
+
+SigLog is a sigmoid-like function based on natural logarithm: [siglog.py](dyna/siglog.py)
+
+Function definition:
+$$f(x) = \left( \ln \left( |x| + e + \epsilon \right)-1.0 \right) \cdot \left\{\begin{array}{ll}-1.0 & x < 0.0\\+1.0 & x\geq 0.0\end{array}\right.$$
+Where $e$ is the Euler's constant and $\epsilon$ is a small value, introduced to avoid zero values in the output.
+
+Approximated derivative:
+$$f'(x) \approx \frac{1}{|x|^{1 + \{|x|<1.0:x\rightarrow 1-\sqrt{x \bmod 1.0}, x\rightarrow 0.0 \}}+1.0}$$
+
+![SigLog](./doc/SigLog.png)
+
+__Pros:__
+   - Wide range of output values: $\lim_{x\to-\infty}=-\infty$ and $\lim_{x\to+\infty}=+\infty$, since function's logarithmic nature.
+   - Meaningful gradients over a wide range of output values, even when used with low precision training, leads to better propagation of gradients and partially eliminates the problem of their vanishing.
+   - Efficient and meaningful compression of large values limits the problem of gradient explosion to some extent.
+   - Zero-centered symmetry.
+
+__Cons:__
+   - Lower dynamics of output values in comparison with other sigmoid-like functions (tanh, conventional sigmoid etc.).
+   - Relatively computationally intensive in both forward and backward passes.
+   - Not exact derivative.
 
 ## Math Background: Bell Activation
 
