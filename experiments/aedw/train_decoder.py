@@ -7,6 +7,7 @@ import torchvision.transforms as transforms
 import kornia
 import math
 import gc
+import random
 
 from PIL import Image
 from madgrad import MADGRAD
@@ -66,6 +67,7 @@ class DecoderOnlyModel(nn.Module):
         self.dropout = nn.Dropout(p=self.dropout_rate)
         self.upsample_nearest = nn.Upsample(scale_factor=2, mode="nearest")
         self.upsample_bilinear = nn.Upsample(scale_factor=2, mode="bilinear")
+
         # ====> Block 04
         self.conv_04_upsampler = DynamicConv2D(
             in_channels=self.channels_dynamic_levels[4],
@@ -81,10 +83,9 @@ class DecoderOnlyModel(nn.Module):
             bias_static=self.bias_static,
             transpose=True,
             output_padding=[1, 1],
-            asymmetry=1.0e-3,
             dtype_weights=self.dtype_weights,
         )
-        self.conv_up_04_c_sml = DynamicConv2D(
+        self.conv_up_04_f_sml = DynamicConv2D(
             in_channels=self.channels_dynamic_levels[4],
             out_channels=self.channels_dynamic_levels[3],
             context_length=self.context_length,
@@ -98,10 +99,9 @@ class DecoderOnlyModel(nn.Module):
             bias_static=self.bias_static,
             transpose=False,
             output_padding=None,
-            asymmetry=1.0e-3,
             dtype_weights=self.dtype_weights,
         )
-        self.conv_up_04_c_med = DynamicConv2D(
+        self.conv_up_04_f_med = DynamicConv2D(
             in_channels=self.channels_dynamic_levels[4],
             out_channels=self.channels_dynamic_levels[3],
             context_length=self.context_length,
@@ -115,10 +115,9 @@ class DecoderOnlyModel(nn.Module):
             bias_static=self.bias_static,
             transpose=False,
             output_padding=None,
-            asymmetry=1.0e-3,
             dtype_weights=self.dtype_weights,
         )
-        self.conv_up_04_c_lrg = DynamicConv2D(
+        self.conv_up_04_f_lrg = DynamicConv2D(
             in_channels=self.channels_dynamic_levels[4],
             out_channels=self.channels_dynamic_levels[3],
             context_length=self.context_length,
@@ -132,13 +131,11 @@ class DecoderOnlyModel(nn.Module):
             bias_static=self.bias_static,
             transpose=False,
             output_padding=None,
-            asymmetry=1.0e-3,
             dtype_weights=self.dtype_weights,
         )
-        self.conv_04_reducer_delta = DynamicConv2D(
-            in_channels=self.channels_dynamic_levels[4]
-            + self.channels_dynamic_levels[3] * 3,
-            out_channels=self.channels_dynamic_levels[3],
+        self.conv_04_f_refiner = DynamicConv2D(
+            in_channels=self.channels_dynamic_levels[3] * 4,
+            out_channels=self.channels_dynamic_levels[3] * 4,
             context_length=self.context_length,
             mod_rank=self.mod_rank,
             transformations_rank=self.transformations_rank,
@@ -150,9 +147,91 @@ class DecoderOnlyModel(nn.Module):
             bias_static=self.bias_static,
             transpose=False,
             output_padding=None,
-            asymmetry=1.0e-3,
             dtype_weights=self.dtype_weights,
         )
+        self.conv_up_04_c_sml = DynamicConv2D(
+            in_channels=self.channels_dynamic_levels[3] * 4,
+            out_channels=self.channels_dynamic_levels[3],
+            context_length=self.context_length,
+            mod_rank=self.mod_rank,
+            transformations_rank=self.transformations_rank,
+            kernel_size=self.kernel_size_c_sml,
+            stride=[1, 1],
+            padding=[1, 1],
+            dilation=[1, 1],
+            bias_dynamic=self.use_bias,
+            bias_static=self.bias_static,
+            transpose=False,
+            output_padding=None,
+            dtype_weights=self.dtype_weights,
+        )
+        self.conv_up_04_c_med = DynamicConv2D(
+            in_channels=self.channels_dynamic_levels[3] * 4,
+            out_channels=self.channels_dynamic_levels[3],
+            context_length=self.context_length,
+            mod_rank=self.mod_rank,
+            transformations_rank=self.transformations_rank,
+            kernel_size=self.kernel_size_c_med,
+            stride=[1, 1],
+            padding=[2, 2],
+            dilation=[1, 1],
+            bias_dynamic=self.use_bias,
+            bias_static=self.bias_static,
+            transpose=False,
+            output_padding=None,
+            dtype_weights=self.dtype_weights,
+        )
+        self.conv_up_04_c_lrg = DynamicConv2D(
+            in_channels=self.channels_dynamic_levels[3] * 4,
+            out_channels=self.channels_dynamic_levels[3],
+            context_length=self.context_length,
+            mod_rank=self.mod_rank,
+            transformations_rank=self.transformations_rank,
+            kernel_size=self.kernel_size_c_lrg,
+            stride=[1, 1],
+            padding=[3, 3],
+            dilation=[1, 1],
+            bias_dynamic=self.use_bias,
+            bias_static=self.bias_static,
+            transpose=False,
+            output_padding=None,
+            dtype_weights=self.dtype_weights,
+        )
+        self.conv_04_c_refiner = DynamicConv2D(
+            in_channels=self.channels_dynamic_levels[3],
+            out_channels=self.channels_dynamic_levels[3],
+            context_length=self.context_length,
+            mod_rank=self.mod_rank,
+            transformations_rank=self.transformations_rank,
+            kernel_size=[3, 3],
+            stride=[1, 1],
+            padding=[1, 1],
+            dilation=[1, 1],
+            bias_dynamic=self.use_bias,
+            bias_static=self.bias_static,
+            transpose=False,
+            output_padding=None,
+            dtype_weights=self.dtype_weights,
+        )
+        self.wl_ctx_04_a = WeightsLib2D(
+            components_count=self.context_length,
+            mod_rank=self.mod_rank,
+            output_shape=[
+                self.context_length,
+                self.context_length,
+            ],
+            dtype_weights=self.dtype_weights,
+        )
+        self.wl_ctx_04_b = WeightsLib2D(
+            components_count=self.context_length,
+            mod_rank=self.mod_rank,
+            output_shape=[
+                self.context_length,
+                self.context_length,
+            ],
+            dtype_weights=self.dtype_weights,
+        )
+
         # ====> Block 03
         self.conv_03_upsampler = DynamicConv2D(
             in_channels=self.channels_dynamic_levels[3],
@@ -168,10 +247,9 @@ class DecoderOnlyModel(nn.Module):
             bias_static=self.bias_static,
             transpose=True,
             output_padding=[1, 1],
-            asymmetry=1.0e-3,
             dtype_weights=self.dtype_weights,
         )
-        self.conv_up_03_c_sml = DynamicConv2D(
+        self.conv_up_03_f_sml = DynamicConv2D(
             in_channels=self.channels_dynamic_levels[3],
             out_channels=self.channels_dynamic_levels[2],
             context_length=self.context_length,
@@ -185,10 +263,9 @@ class DecoderOnlyModel(nn.Module):
             bias_static=self.bias_static,
             transpose=False,
             output_padding=None,
-            asymmetry=1.0e-3,
             dtype_weights=self.dtype_weights,
         )
-        self.conv_up_03_c_med = DynamicConv2D(
+        self.conv_up_03_f_med = DynamicConv2D(
             in_channels=self.channels_dynamic_levels[3],
             out_channels=self.channels_dynamic_levels[2],
             context_length=self.context_length,
@@ -202,10 +279,9 @@ class DecoderOnlyModel(nn.Module):
             bias_static=self.bias_static,
             transpose=False,
             output_padding=None,
-            asymmetry=1.0e-3,
             dtype_weights=self.dtype_weights,
         )
-        self.conv_up_03_c_lrg = DynamicConv2D(
+        self.conv_up_03_f_lrg = DynamicConv2D(
             in_channels=self.channels_dynamic_levels[3],
             out_channels=self.channels_dynamic_levels[2],
             context_length=self.context_length,
@@ -219,13 +295,11 @@ class DecoderOnlyModel(nn.Module):
             bias_static=self.bias_static,
             transpose=False,
             output_padding=None,
-            asymmetry=1.0e-3,
             dtype_weights=self.dtype_weights,
         )
-        self.conv_03_reducer_delta = DynamicConv2D(
-            in_channels=self.channels_dynamic_levels[3]
-            + self.channels_dynamic_levels[2] * 3,
-            out_channels=self.channels_dynamic_levels[2],
+        self.conv_03_f_refiner = DynamicConv2D(
+            in_channels=self.channels_dynamic_levels[2] * 4,
+            out_channels=self.channels_dynamic_levels[2] * 4,
             context_length=self.context_length,
             mod_rank=self.mod_rank,
             transformations_rank=self.transformations_rank,
@@ -237,9 +311,91 @@ class DecoderOnlyModel(nn.Module):
             bias_static=self.bias_static,
             transpose=False,
             output_padding=None,
-            asymmetry=1.0e-3,
             dtype_weights=self.dtype_weights,
         )
+        self.conv_up_03_c_sml = DynamicConv2D(
+            in_channels=self.channels_dynamic_levels[2] * 4,
+            out_channels=self.channels_dynamic_levels[2],
+            context_length=self.context_length,
+            mod_rank=self.mod_rank,
+            transformations_rank=self.transformations_rank,
+            kernel_size=self.kernel_size_c_sml,
+            stride=[1, 1],
+            padding=[1, 1],
+            dilation=[1, 1],
+            bias_dynamic=self.use_bias,
+            bias_static=self.bias_static,
+            transpose=False,
+            output_padding=None,
+            dtype_weights=self.dtype_weights,
+        )
+        self.conv_up_03_c_med = DynamicConv2D(
+            in_channels=self.channels_dynamic_levels[2] * 4,
+            out_channels=self.channels_dynamic_levels[2],
+            context_length=self.context_length,
+            mod_rank=self.mod_rank,
+            transformations_rank=self.transformations_rank,
+            kernel_size=self.kernel_size_c_med,
+            stride=[1, 1],
+            padding=[2, 2],
+            dilation=[1, 1],
+            bias_dynamic=self.use_bias,
+            bias_static=self.bias_static,
+            transpose=False,
+            output_padding=None,
+            dtype_weights=self.dtype_weights,
+        )
+        self.conv_up_03_c_lrg = DynamicConv2D(
+            in_channels=self.channels_dynamic_levels[2] * 4,
+            out_channels=self.channels_dynamic_levels[2],
+            context_length=self.context_length,
+            mod_rank=self.mod_rank,
+            transformations_rank=self.transformations_rank,
+            kernel_size=self.kernel_size_c_lrg,
+            stride=[1, 1],
+            padding=[3, 3],
+            dilation=[1, 1],
+            bias_dynamic=self.use_bias,
+            bias_static=self.bias_static,
+            transpose=False,
+            output_padding=None,
+            dtype_weights=self.dtype_weights,
+        )
+        self.conv_03_c_refiner = DynamicConv2D(
+            in_channels=self.channels_dynamic_levels[2],
+            out_channels=self.channels_dynamic_levels[2],
+            context_length=self.context_length,
+            mod_rank=self.mod_rank,
+            transformations_rank=self.transformations_rank,
+            kernel_size=[3, 3],
+            stride=[1, 1],
+            padding=[1, 1],
+            dilation=[1, 1],
+            bias_dynamic=self.use_bias,
+            bias_static=self.bias_static,
+            transpose=False,
+            output_padding=None,
+            dtype_weights=self.dtype_weights,
+        )
+        self.wl_ctx_03_a = WeightsLib2D(
+            components_count=self.context_length,
+            mod_rank=self.mod_rank,
+            output_shape=[
+                self.context_length,
+                self.context_length,
+            ],
+            dtype_weights=self.dtype_weights,
+        )
+        self.wl_ctx_03_b = WeightsLib2D(
+            components_count=self.context_length,
+            mod_rank=self.mod_rank,
+            output_shape=[
+                self.context_length,
+                self.context_length,
+            ],
+            dtype_weights=self.dtype_weights,
+        )
+
         # ====> Block 02
         self.conv_02_upsampler = DynamicConv2D(
             in_channels=self.channels_dynamic_levels[2],
@@ -255,10 +411,9 @@ class DecoderOnlyModel(nn.Module):
             bias_static=self.bias_static,
             transpose=True,
             output_padding=[1, 1],
-            asymmetry=1.0e-3,
             dtype_weights=self.dtype_weights,
         )
-        self.conv_up_02_c_sml = DynamicConv2D(
+        self.conv_up_02_f_sml = DynamicConv2D(
             in_channels=self.channels_dynamic_levels[2],
             out_channels=self.channels_dynamic_levels[1],
             context_length=self.context_length,
@@ -272,10 +427,9 @@ class DecoderOnlyModel(nn.Module):
             bias_static=self.bias_static,
             transpose=False,
             output_padding=None,
-            asymmetry=1.0e-3,
             dtype_weights=self.dtype_weights,
         )
-        self.conv_up_02_c_med = DynamicConv2D(
+        self.conv_up_02_f_med = DynamicConv2D(
             in_channels=self.channels_dynamic_levels[2],
             out_channels=self.channels_dynamic_levels[1],
             context_length=self.context_length,
@@ -289,10 +443,9 @@ class DecoderOnlyModel(nn.Module):
             bias_static=self.bias_static,
             transpose=False,
             output_padding=None,
-            asymmetry=1.0e-3,
             dtype_weights=self.dtype_weights,
         )
-        self.conv_up_02_c_lrg = DynamicConv2D(
+        self.conv_up_02_f_lrg = DynamicConv2D(
             in_channels=self.channels_dynamic_levels[2],
             out_channels=self.channels_dynamic_levels[1],
             context_length=self.context_length,
@@ -306,13 +459,11 @@ class DecoderOnlyModel(nn.Module):
             bias_static=self.bias_static,
             transpose=False,
             output_padding=None,
-            asymmetry=1.0e-3,
             dtype_weights=self.dtype_weights,
         )
-        self.conv_02_reducer_delta = DynamicConv2D(
-            in_channels=self.channels_dynamic_levels[2]
-            + self.channels_dynamic_levels[1] * 3,
-            out_channels=self.channels_dynamic_levels[1],
+        self.conv_02_f_refiner = DynamicConv2D(
+            in_channels=self.channels_dynamic_levels[1] * 4,
+            out_channels=self.channels_dynamic_levels[1] * 4,
             context_length=self.context_length,
             mod_rank=self.mod_rank,
             transformations_rank=self.transformations_rank,
@@ -324,9 +475,91 @@ class DecoderOnlyModel(nn.Module):
             bias_static=self.bias_static,
             transpose=False,
             output_padding=None,
-            asymmetry=1.0e-3,
             dtype_weights=self.dtype_weights,
         )
+        self.conv_up_02_c_sml = DynamicConv2D(
+            in_channels=self.channels_dynamic_levels[1] * 4,
+            out_channels=self.channels_dynamic_levels[1],
+            context_length=self.context_length,
+            mod_rank=self.mod_rank,
+            transformations_rank=self.transformations_rank,
+            kernel_size=self.kernel_size_c_sml,
+            stride=[1, 1],
+            padding=[1, 1],
+            dilation=[1, 1],
+            bias_dynamic=self.use_bias,
+            bias_static=self.bias_static,
+            transpose=False,
+            output_padding=None,
+            dtype_weights=self.dtype_weights,
+        )
+        self.conv_up_02_c_med = DynamicConv2D(
+            in_channels=self.channels_dynamic_levels[1] * 4,
+            out_channels=self.channels_dynamic_levels[1],
+            context_length=self.context_length,
+            mod_rank=self.mod_rank,
+            transformations_rank=self.transformations_rank,
+            kernel_size=self.kernel_size_c_med,
+            stride=[1, 1],
+            padding=[2, 2],
+            dilation=[1, 1],
+            bias_dynamic=self.use_bias,
+            bias_static=self.bias_static,
+            transpose=False,
+            output_padding=None,
+            dtype_weights=self.dtype_weights,
+        )
+        self.conv_up_02_c_lrg = DynamicConv2D(
+            in_channels=self.channels_dynamic_levels[1] * 4,
+            out_channels=self.channels_dynamic_levels[1],
+            context_length=self.context_length,
+            mod_rank=self.mod_rank,
+            transformations_rank=self.transformations_rank,
+            kernel_size=self.kernel_size_c_lrg,
+            stride=[1, 1],
+            padding=[3, 3],
+            dilation=[1, 1],
+            bias_dynamic=self.use_bias,
+            bias_static=self.bias_static,
+            transpose=False,
+            output_padding=None,
+            dtype_weights=self.dtype_weights,
+        )
+        self.conv_02_c_refiner = DynamicConv2D(
+            in_channels=self.channels_dynamic_levels[1],
+            out_channels=self.channels_dynamic_levels[1],
+            context_length=self.context_length,
+            mod_rank=self.mod_rank,
+            transformations_rank=self.transformations_rank,
+            kernel_size=[3, 3],
+            stride=[1, 1],
+            padding=[1, 1],
+            dilation=[1, 1],
+            bias_dynamic=self.use_bias,
+            bias_static=self.bias_static,
+            transpose=False,
+            output_padding=None,
+            dtype_weights=self.dtype_weights,
+        )
+        self.wl_ctx_02_a = WeightsLib2D(
+            components_count=self.context_length,
+            mod_rank=self.mod_rank,
+            output_shape=[
+                self.context_length,
+                self.context_length,
+            ],
+            dtype_weights=self.dtype_weights,
+        )
+        self.wl_ctx_02_b = WeightsLib2D(
+            components_count=self.context_length,
+            mod_rank=self.mod_rank,
+            output_shape=[
+                self.context_length,
+                self.context_length,
+            ],
+            dtype_weights=self.dtype_weights,
+        )
+
         # ====> Block 01
         self.conv_01_upsampler = DynamicConv2D(
             in_channels=self.channels_dynamic_levels[1],
@@ -342,10 +575,9 @@ class DecoderOnlyModel(nn.Module):
             bias_static=self.bias_static,
             transpose=True,
             output_padding=[1, 1],
-            asymmetry=1.0e-3,
             dtype_weights=self.dtype_weights,
         )
-        self.conv_up_01_c_sml = DynamicConv2D(
+        self.conv_up_01_f_sml = DynamicConv2D(
             in_channels=self.channels_dynamic_levels[1],
             out_channels=self.channels_dynamic_levels[0],
             context_length=self.context_length,
@@ -359,10 +591,9 @@ class DecoderOnlyModel(nn.Module):
             bias_static=self.bias_static,
             transpose=False,
             output_padding=None,
-            asymmetry=1.0e-3,
             dtype_weights=self.dtype_weights,
         )
-        self.conv_up_01_c_med = DynamicConv2D(
+        self.conv_up_01_f_med = DynamicConv2D(
             in_channels=self.channels_dynamic_levels[1],
             out_channels=self.channels_dynamic_levels[0],
             context_length=self.context_length,
@@ -376,10 +607,9 @@ class DecoderOnlyModel(nn.Module):
             bias_static=self.bias_static,
             transpose=False,
             output_padding=None,
-            asymmetry=1.0e-3,
             dtype_weights=self.dtype_weights,
         )
-        self.conv_up_01_c_lrg = DynamicConv2D(
+        self.conv_up_01_f_lrg = DynamicConv2D(
             in_channels=self.channels_dynamic_levels[1],
             out_channels=self.channels_dynamic_levels[0],
             context_length=self.context_length,
@@ -393,13 +623,11 @@ class DecoderOnlyModel(nn.Module):
             bias_static=self.bias_static,
             transpose=False,
             output_padding=None,
-            asymmetry=1.0e-3,
             dtype_weights=self.dtype_weights,
         )
-        self.conv_01_reducer_delta = DynamicConv2D(
-            in_channels=self.channels_dynamic_levels[1]
-            + self.channels_dynamic_levels[0] * 3,
-            out_channels=self.channels_dynamic_levels[0],
+        self.conv_01_f_refiner = DynamicConv2D(
+            in_channels=self.channels_dynamic_levels[0] * 4,
+            out_channels=self.channels_dynamic_levels[0] * 4,
             context_length=self.context_length,
             mod_rank=self.mod_rank,
             transformations_rank=self.transformations_rank,
@@ -411,9 +639,91 @@ class DecoderOnlyModel(nn.Module):
             bias_static=self.bias_static,
             transpose=False,
             output_padding=None,
-            asymmetry=1.0e-3,
             dtype_weights=self.dtype_weights,
         )
+        self.conv_up_01_c_sml = DynamicConv2D(
+            in_channels=self.channels_dynamic_levels[0] * 4,
+            out_channels=self.channels_dynamic_levels[0],
+            context_length=self.context_length,
+            mod_rank=self.mod_rank,
+            transformations_rank=self.transformations_rank,
+            kernel_size=self.kernel_size_c_sml,
+            stride=[1, 1],
+            padding=[1, 1],
+            dilation=[1, 1],
+            bias_dynamic=self.use_bias,
+            bias_static=self.bias_static,
+            transpose=False,
+            output_padding=None,
+            dtype_weights=self.dtype_weights,
+        )
+        self.conv_up_01_c_med = DynamicConv2D(
+            in_channels=self.channels_dynamic_levels[0] * 4,
+            out_channels=self.channels_dynamic_levels[0],
+            context_length=self.context_length,
+            mod_rank=self.mod_rank,
+            transformations_rank=self.transformations_rank,
+            kernel_size=self.kernel_size_c_med,
+            stride=[1, 1],
+            padding=[2, 2],
+            dilation=[1, 1],
+            bias_dynamic=self.use_bias,
+            bias_static=self.bias_static,
+            transpose=False,
+            output_padding=None,
+            dtype_weights=self.dtype_weights,
+        )
+        self.conv_up_01_c_lrg = DynamicConv2D(
+            in_channels=self.channels_dynamic_levels[0] * 4,
+            out_channels=self.channels_dynamic_levels[0],
+            context_length=self.context_length,
+            mod_rank=self.mod_rank,
+            transformations_rank=self.transformations_rank,
+            kernel_size=self.kernel_size_c_lrg,
+            stride=[1, 1],
+            padding=[3, 3],
+            dilation=[1, 1],
+            bias_dynamic=self.use_bias,
+            bias_static=self.bias_static,
+            transpose=False,
+            output_padding=None,
+            dtype_weights=self.dtype_weights,
+        )
+        self.conv_01_c_refiner = DynamicConv2D(
+            in_channels=self.channels_dynamic_levels[0],
+            out_channels=self.channels_dynamic_levels[0],
+            context_length=self.context_length,
+            mod_rank=self.mod_rank,
+            transformations_rank=self.transformations_rank,
+            kernel_size=[3, 3],
+            stride=[1, 1],
+            padding=[1, 1],
+            dilation=[1, 1],
+            bias_dynamic=self.use_bias,
+            bias_static=self.bias_static,
+            transpose=False,
+            output_padding=None,
+            dtype_weights=self.dtype_weights,
+        )
+        self.wl_ctx_01_a = WeightsLib2D(
+            components_count=self.context_length,
+            mod_rank=self.mod_rank,
+            output_shape=[
+                self.context_length,
+                self.context_length,
+            ],
+            dtype_weights=self.dtype_weights,
+        )
+        self.wl_ctx_01_b = WeightsLib2D(
+            components_count=self.context_length,
+            mod_rank=self.mod_rank,
+            output_shape=[
+                self.context_length,
+                self.context_length,
+            ],
+            dtype_weights=self.dtype_weights,
+        )
+
         # ====> Block out
         self.conv_out = DynamicConv2D(
             in_channels=self.channels_dynamic_levels[0],
@@ -429,10 +739,28 @@ class DecoderOnlyModel(nn.Module):
             bias_static=self.bias_static,
             transpose=False,
             output_padding=None,
-            asymmetry=1.0e-3,
+            dtype_weights=self.dtype_weights,
+        )
+        self.wl_ctx_out_a = WeightsLib2D(
+            components_count=self.context_length,
+            mod_rank=self.mod_rank,
+            output_shape=[
+                self.context_length,
+                self.context_length,
+            ],
+            dtype_weights=self.dtype_weights,
+        )
+        self.wl_ctx_out_b = WeightsLib2D(
+            components_count=self.context_length,
+            mod_rank=self.mod_rank,
+            output_shape=[
+                self.context_length,
+                self.context_length,
+            ],
             dtype_weights=self.dtype_weights,
         )
 
+        # ====> Block data cache
         self.data_cache_ctx = nn.Parameter(
             data=torch.nn.init.uniform_(
                 tensor=torch.empty(
@@ -452,89 +780,6 @@ class DecoderOnlyModel(nn.Module):
                 a=-self.data_cache_latents_bound,
                 b=+self.data_cache_latents_bound,
             ),
-        )
-
-        self.wl_noise_04 = WeightsLib2D(
-            components_count=self.context_length,
-            mod_rank=self.mod_rank,
-            output_shape=[
-                self.data_cache_latents_shape[1] * 2,
-                self.data_cache_latents_shape[2] * 2,
-            ],
-            dtype_weights=self.dtype_weights,
-        )
-        self.wl_noise_03 = WeightsLib2D(
-            components_count=self.context_length,
-            mod_rank=self.mod_rank,
-            output_shape=[
-                self.data_cache_latents_shape[1] * 4,
-                self.data_cache_latents_shape[2] * 4,
-            ],
-            dtype_weights=self.dtype_weights,
-        )
-        self.wl_noise_02 = WeightsLib2D(
-            components_count=self.context_length,
-            mod_rank=self.mod_rank,
-            output_shape=[
-                self.data_cache_latents_shape[1] * 8,
-                self.data_cache_latents_shape[2] * 8,
-            ],
-            dtype_weights=self.dtype_weights,
-        )
-        self.wl_noise_01 = WeightsLib2D(
-            components_count=self.context_length,
-            mod_rank=self.mod_rank,
-            output_shape=[
-                self.data_cache_latents_shape[1] * 16,
-                self.data_cache_latents_shape[2] * 16,
-            ],
-            dtype_weights=self.dtype_weights,
-        )
-
-        self.wl_ctx_04 = WeightsLib2D(
-            components_count=self.context_length,
-            mod_rank=self.mod_rank,
-            output_shape=[
-                self.context_length,
-                self.context_length,
-            ],
-            dtype_weights=self.dtype_weights,
-        )
-        self.wl_ctx_03 = WeightsLib2D(
-            components_count=self.context_length,
-            mod_rank=self.mod_rank,
-            output_shape=[
-                self.context_length,
-                self.context_length,
-            ],
-            dtype_weights=self.dtype_weights,
-        )
-        self.wl_ctx_02 = WeightsLib2D(
-            components_count=self.context_length,
-            mod_rank=self.mod_rank,
-            output_shape=[
-                self.context_length,
-                self.context_length,
-            ],
-            dtype_weights=self.dtype_weights,
-        )
-        self.wl_ctx_01 = WeightsLib2D(
-            components_count=self.context_length,
-            mod_rank=self.mod_rank,
-            output_shape=[
-                self.context_length,
-                self.context_length,
-            ],
-            dtype_weights=self.dtype_weights,
-        )
-        self.wl_ctx_out = WeightsLib2D(
-            components_count=self.context_length,
-            mod_rank=self.mod_rank,
-            output_shape=[
-                self.context_length,
-                self.context_length,
-            ],
-            dtype_weights=self.dtype_weights,
         )
 
         pass
@@ -601,6 +846,41 @@ class DecoderOnlyModel(nn.Module):
 
         return x
 
+    def partial_norm(
+        self,
+        x: torch.Tensor,
+        fraction: float = 0.1,
+        gamma: torch.Tensor = None,
+        beta: torch.Tensor = None,
+        eps: float = 1e-5,
+    ) -> torch.Tensor:
+        sample_numel = x[0].numel()
+        partial_size = int(sample_numel * fraction)
+        partial_size = 1 if partial_size == 0 else partial_size
+        indices = torch.randint(0, sample_numel, [x.shape[0], partial_size])
+        indices = [indices[i].add_(sample_numel * i) for i in range(indices.shape[0])]
+        indices = torch.cat(indices, dim=0)
+        partial_x = x.reshape([-1])[indices].view([-1, partial_size])
+        # It is better to use .view() above, but that may cause memory access errors.
+        # I have to climb under the hood to fix this, but I don't want to. \/(o_O)\/
+        norm_x = partial_x.norm(p="fro", dim=-1, keepdim=True)
+        rms_x = norm_x * partial_size ** (-1.0 / 2)
+        rms_x = rms_x.view([-1] + [1] * (len(x.shape) - 1))
+        x = x / (rms_x + eps)
+        x = x * gamma if gamma is not None else x
+        x = x + beta if beta is not None else x
+        return x
+
+    def standardize(
+        self,
+        x: torch.Tensor,
+        dims: list[int] = [-1],
+        eps: float = 1e-6,
+    ) -> torch.Tensor:
+        x_mean = x.mean(dim=dims, keepdim=True)
+        x_std = x.std(dim=dims, keepdim=True)
+        return (x - x_mean) / (x_std + eps)
+
     def forward(
         self,
         ids: torch.Tensor,
@@ -609,130 +889,165 @@ class DecoderOnlyModel(nn.Module):
         context = self.data_cache_ctx[ids]
         x = self.data_cache_latents[ids]
 
-        activation_fn = lambda x: siglog_parametric(x, alpha=1.0 / torch.e)
+        activation_fn = lambda x: siglog_parametric(x, alpha=1.0 / (2 * math.e))
+
+        # Prepare inputs.
+        x = self.partial_norm(x)
+        context = self.partial_norm(context)
         ctx = context
 
-        # Pseudo-input normalization
-        x = F.layer_norm(x, x.shape[1:])
-        ctx = F.layer_norm(ctx, ctx.shape[1:])
-
         # Block 04
+        x = self.partial_norm(x)
+        ctx = self.partial_norm(ctx)
+
         x = self.dropout(x)
-        ctx = (ctx.unsqueeze(1) @ self.wl_ctx_04(ctx)).squeeze(1)
-        ctx = activation_fn(ctx)
-        ctx = F.layer_norm(ctx, ctx.shape[1:])
         ctx = self.dropout(ctx)
+
         x_upsampled = self.conv_04_upsampler(x, ctx)
-        x_upsampled = activation_fn(x_upsampled)
-        x_upsampled = F.layer_norm(x_upsampled, x_upsampled.shape[1:])
-        noise = self.wl_noise_04(ctx)
-        noise = activation_fn(noise).unsqueeze(1)
-        noise = F.layer_norm(noise, noise.shape[1:])
-        x_noised = x_upsampled + noise
-        x_c_sml = self.conv_up_04_c_sml(x_noised, ctx)
+        ctx = (ctx.unsqueeze(1) @ self.wl_ctx_04_a(ctx)).squeeze(1)
+        ctx = activation_fn(ctx)
+        ctx = (ctx.unsqueeze(1) @ self.wl_ctx_04_b(ctx)).squeeze(1)
+        ctx = activation_fn(ctx)
+
+        x_f_sml = self.conv_up_04_f_sml(x_upsampled, ctx)
+        x_f_sml = activation_fn(x_f_sml)
+        x_f_med = self.conv_up_04_f_med(x_upsampled, ctx)
+        x_f_med = activation_fn(x_f_med)
+        x_f_lrg = self.conv_up_04_f_lrg(x_upsampled, ctx)
+        x_f_lrg = activation_fn(x_f_lrg)
+        x_faceted = torch.cat([x_upsampled, x_f_sml, x_f_med, x_f_lrg], dim=1)
+        x_faceted = self.conv_04_f_refiner(x_faceted, ctx)
+        x_faceted = activation_fn(x_faceted)
+
+        x_c_sml = self.conv_up_04_c_sml(x_faceted, ctx)
         x_c_sml = activation_fn(x_c_sml)
-        x_c_sml = F.layer_norm(x_c_sml, x_c_sml.shape[1:])
-        x_c_med = self.conv_up_04_c_med(x_noised, ctx)
+        x_c_med = self.conv_up_04_c_med(x_faceted, ctx)
         x_c_med = activation_fn(x_c_med)
-        x_c_med = F.layer_norm(x_c_med, x_c_med.shape[1:])
-        x_c_lrg = self.conv_up_04_c_lrg(x_noised, ctx)
+        x_c_lrg = self.conv_up_04_c_lrg(x_faceted, ctx)
         x_c_lrg = activation_fn(x_c_lrg)
-        x_c_lrg = F.layer_norm(x_c_lrg, x_c_lrg.shape[1:])
-        x_denoised = torch.cat([x_upsampled, x_c_sml, x_c_med, x_c_lrg], dim=1)
-        x_denoised = self.conv_04_reducer_delta(x_denoised, ctx)
-        x_denoised = activation_fn(x_denoised)
-        x_denoised = F.layer_norm(x_denoised, x_denoised.shape[1:])
-        x = x_denoised
+        x_combined = (x_c_sml + x_c_med + x_c_lrg) / 3.0
+        x_combined = self.conv_04_c_refiner(x_combined, ctx)
+        x_combined = activation_fn(x_combined)
+
+        x = x_upsampled + x_combined
 
         # Block 03
+        x = self.partial_norm(x)
+        ctx = self.partial_norm(ctx)
+
         x = self.dropout(x)
-        ctx = (ctx.unsqueeze(1) @ self.wl_ctx_03(ctx)).squeeze(1)
-        ctx = activation_fn(ctx)
-        ctx = F.layer_norm(ctx, ctx.shape[1:])
         ctx = self.dropout(ctx)
+
         x_upsampled = self.conv_03_upsampler(x, ctx)
-        x_upsampled = activation_fn(x_upsampled)
-        x_upsampled = F.layer_norm(x_upsampled, x_upsampled.shape[1:])
-        noise = self.wl_noise_03(ctx)
-        noise = activation_fn(noise).unsqueeze(1)
-        noise = F.layer_norm(noise, noise.shape[1:])
-        x_noised = x_upsampled + noise
-        x_c_sml = self.conv_up_03_c_sml(x_noised, ctx)
+        ctx = (ctx.unsqueeze(1) @ self.wl_ctx_03_a(ctx)).squeeze(1)
+        ctx = activation_fn(ctx)
+        ctx = (ctx.unsqueeze(1) @ self.wl_ctx_03_b(ctx)).squeeze(1)
+        ctx = activation_fn(ctx)
+
+        x_f_sml = self.conv_up_03_f_sml(x_upsampled, ctx)
+        x_f_sml = activation_fn(x_f_sml)
+        x_f_med = self.conv_up_03_f_med(x_upsampled, ctx)
+        x_f_med = activation_fn(x_f_med)
+        x_f_lrg = self.conv_up_03_f_lrg(x_upsampled, ctx)
+        x_f_lrg = activation_fn(x_f_lrg)
+        x_faceted = torch.cat([x_upsampled, x_f_sml, x_f_med, x_f_lrg], dim=1)
+        x_faceted = self.conv_03_f_refiner(x_faceted, ctx)
+        x_faceted = activation_fn(x_faceted)
+
+        x_c_sml = self.conv_up_03_c_sml(x_faceted, ctx)
         x_c_sml = activation_fn(x_c_sml)
-        x_c_sml = F.layer_norm(x_c_sml, x_c_sml.shape[1:])
-        x_c_med = self.conv_up_03_c_med(x_noised, ctx)
+        x_c_med = self.conv_up_03_c_med(x_faceted, ctx)
         x_c_med = activation_fn(x_c_med)
-        x_c_med = F.layer_norm(x_c_med, x_c_med.shape[1:])
-        x_c_lrg = self.conv_up_03_c_lrg(x_noised, ctx)
+        x_c_lrg = self.conv_up_03_c_lrg(x_faceted, ctx)
         x_c_lrg = activation_fn(x_c_lrg)
-        x_c_lrg = F.layer_norm(x_c_lrg, x_c_lrg.shape[1:])
-        x_denoised = torch.cat([x_upsampled, x_c_sml, x_c_med, x_c_lrg], dim=1)
-        x_denoised = self.conv_03_reducer_delta(x_denoised, ctx)
-        x_denoised = activation_fn(x_denoised)
-        x_denoised = F.layer_norm(x_denoised, x_denoised.shape[1:])
-        x = x_denoised
+        x_combined = (x_c_sml + x_c_med + x_c_lrg) / 3.0
+        x_combined = self.conv_03_c_refiner(x_combined, ctx)
+        x_combined = activation_fn(x_combined)
+
+        x = x_upsampled + x_combined
 
         # Block 02
+        x = self.partial_norm(x)
+        ctx = self.partial_norm(ctx)
+
         x = self.dropout(x)
-        ctx = (ctx.unsqueeze(1) @ self.wl_ctx_02(ctx)).squeeze(1)
-        ctx = activation_fn(ctx)
-        ctx = F.layer_norm(ctx, ctx.shape[1:])
         ctx = self.dropout(ctx)
+
         x_upsampled = self.conv_02_upsampler(x, ctx)
-        x_upsampled = activation_fn(x_upsampled)
-        x_upsampled = F.layer_norm(x_upsampled, x_upsampled.shape[1:])
-        noise = self.wl_noise_02(ctx)
-        noise = activation_fn(noise).unsqueeze(1)
-        noise = F.layer_norm(noise, noise.shape[1:])
-        x_noised = x_upsampled + noise
-        x_c_sml = self.conv_up_02_c_sml(x_noised, ctx)
+        ctx = (ctx.unsqueeze(1) @ self.wl_ctx_02_a(ctx)).squeeze(1)
+        ctx = activation_fn(ctx)
+        ctx = (ctx.unsqueeze(1) @ self.wl_ctx_02_b(ctx)).squeeze(1)
+        ctx = activation_fn(ctx)
+
+        x_f_sml = self.conv_up_02_f_sml(x_upsampled, ctx)
+        x_f_sml = activation_fn(x_f_sml)
+        x_f_med = self.conv_up_02_f_med(x_upsampled, ctx)
+        x_f_med = activation_fn(x_f_med)
+        x_f_lrg = self.conv_up_02_f_lrg(x_upsampled, ctx)
+        x_f_lrg = activation_fn(x_f_lrg)
+        x_faceted = torch.cat([x_upsampled, x_f_sml, x_f_med, x_f_lrg], dim=1)
+        x_faceted = self.conv_02_f_refiner(x_faceted, ctx)
+        x_faceted = activation_fn(x_faceted)
+
+        x_c_sml = self.conv_up_02_c_sml(x_faceted, ctx)
         x_c_sml = activation_fn(x_c_sml)
-        x_c_sml = F.layer_norm(x_c_sml, x_c_sml.shape[1:])
-        x_c_med = self.conv_up_02_c_med(x_noised, ctx)
+        x_c_med = self.conv_up_02_c_med(x_faceted, ctx)
         x_c_med = activation_fn(x_c_med)
-        x_c_med = F.layer_norm(x_c_med, x_c_med.shape[1:])
-        x_c_lrg = self.conv_up_02_c_lrg(x_noised, ctx)
+        x_c_lrg = self.conv_up_02_c_lrg(x_faceted, ctx)
         x_c_lrg = activation_fn(x_c_lrg)
-        x_c_lrg = F.layer_norm(x_c_lrg, x_c_lrg.shape[1:])
-        x_denoised = torch.cat([x_upsampled, x_c_sml, x_c_med, x_c_lrg], dim=1)
-        x_denoised = self.conv_02_reducer_delta(x_denoised, ctx)
-        x_denoised = activation_fn(x_denoised)
-        x_denoised = F.layer_norm(x_denoised, x_denoised.shape[1:])
-        x = x_denoised
+        x_combined = (x_c_sml + x_c_med + x_c_lrg) / 3.0
+        x_combined = self.conv_02_c_refiner(x_combined, ctx)
+        x_combined = activation_fn(x_combined)
+
+        x = x_upsampled + x_combined
 
         # Block 01
+        x = self.partial_norm(x)
+        ctx = self.partial_norm(ctx)
+
         x = self.dropout(x)
-        ctx = (ctx.unsqueeze(1) @ self.wl_ctx_01(ctx)).squeeze(1)
-        ctx = activation_fn(ctx)
-        ctx = F.layer_norm(ctx, ctx.shape[1:])
         ctx = self.dropout(ctx)
+
         x_upsampled = self.conv_01_upsampler(x, ctx)
-        x_upsampled = activation_fn(x_upsampled)
-        x_upsampled = F.layer_norm(x_upsampled, x_upsampled.shape[1:])
-        noise = self.wl_noise_01(ctx)
-        noise = activation_fn(noise).unsqueeze(1)
-        noise = F.layer_norm(noise, noise.shape[1:])
-        x_noised = x_upsampled + noise
-        x_c_sml = self.conv_up_01_c_sml(x_noised, ctx)
+        ctx = (ctx.unsqueeze(1) @ self.wl_ctx_01_a(ctx)).squeeze(1)
+        ctx = activation_fn(ctx)
+        ctx = (ctx.unsqueeze(1) @ self.wl_ctx_01_b(ctx)).squeeze(1)
+        ctx = activation_fn(ctx)
+
+        x_f_sml = self.conv_up_01_f_sml(x_upsampled, ctx)
+        x_f_sml = activation_fn(x_f_sml)
+        x_f_med = self.conv_up_01_f_med(x_upsampled, ctx)
+        x_f_med = activation_fn(x_f_med)
+        x_f_lrg = self.conv_up_01_f_lrg(x_upsampled, ctx)
+        x_f_lrg = activation_fn(x_f_lrg)
+        x_faceted = torch.cat([x_upsampled, x_f_sml, x_f_med, x_f_lrg], dim=1)
+        x_faceted = self.conv_01_f_refiner(x_faceted, ctx)
+        x_faceted = activation_fn(x_faceted)
+
+        x_c_sml = self.conv_up_01_c_sml(x_faceted, ctx)
         x_c_sml = activation_fn(x_c_sml)
-        x_c_sml = F.layer_norm(x_c_sml, x_c_sml.shape[1:])
-        x_c_med = self.conv_up_01_c_med(x_noised, ctx)
+        x_c_med = self.conv_up_01_c_med(x_faceted, ctx)
         x_c_med = activation_fn(x_c_med)
-        x_c_med = F.layer_norm(x_c_med, x_c_med.shape[1:])
-        x_c_lrg = self.conv_up_01_c_lrg(x_noised, ctx)
+        x_c_lrg = self.conv_up_01_c_lrg(x_faceted, ctx)
         x_c_lrg = activation_fn(x_c_lrg)
-        x_c_lrg = F.layer_norm(x_c_lrg, x_c_lrg.shape[1:])
-        x_denoised = torch.cat([x_upsampled, x_c_sml, x_c_med, x_c_lrg], dim=1)
-        x_denoised = self.conv_01_reducer_delta(x_denoised, ctx)
-        x_denoised = activation_fn(x_denoised)
-        x_denoised = F.layer_norm(x_denoised, x_denoised.shape[1:])
-        x = x_denoised
+        x_combined = (x_c_sml + x_c_med + x_c_lrg) / 3.0
+        x_combined = self.conv_01_c_refiner(x_combined, ctx)
+        x_combined = activation_fn(x_combined)
+
+        x = x_upsampled + x_combined
 
         # Block out
-        ctx_morph = self.wl_ctx_out(ctx)
-        ctx = (ctx.unsqueeze(1) @ ctx_morph).squeeze(1)
+        x = self.partial_norm(x)
+        ctx = self.partial_norm(ctx)
+
+        x = self.dropout(x)
+        ctx = self.dropout(ctx)
+
+        ctx = (ctx.unsqueeze(1) @ self.wl_ctx_out_a(ctx)).squeeze(1)
         ctx = activation_fn(ctx)
-        ctx = F.layer_norm(ctx, ctx.shape[1:])
+        ctx = (ctx.unsqueeze(1) @ self.wl_ctx_out_b(ctx)).squeeze(1)
+        ctx = activation_fn(ctx)
+
         x = self.conv_out(x, ctx)
         x = F.sigmoid(x)
 
@@ -874,6 +1189,9 @@ def train(
     last_grad_ctx = 0.0
     last_grad_latents = 0.0
     loss_logging_accumulator = []
+    loss_main_logging_accumulator = []
+    loss_reg_logging_accumulator = []
+    stdr_logging_accumulator = []
 
     frozen_ctx_last_epoch_id = 0
     epoch_frozen_ctx = None
@@ -1030,6 +1348,7 @@ def train(
             loss_main * loss_weights_main_reg[0] + loss_reg * loss_weights_main_reg[1]
         )
         loss_logging_accumulator.append(loss.item())
+        stdr_logging_accumulator.append((sample - decoded).std())
 
         if accumulation_step == grad_accumulation_steps:
             accumulation_step = 0
@@ -1098,6 +1417,9 @@ def train(
 
         # print(f"step loss: {loss.item()}")
 
+        loss_main_logging_accumulator.append(loss_main.item())
+        loss_reg_logging_accumulator.append(loss_reg.item())
+
         if (step_idx + 1) % log_nth_iteration == 0:
             print(
                 "\n# ==============> "
@@ -1111,11 +1433,17 @@ def train(
                         f"Mean grad ctx/latents: {last_grad_ctx:.10f}/{last_grad_latents:.10f}",
                         f"Grad clipping level: {grad_clip_val:.10f}",
                         f"StdR: {(sample - decoded).std()}",
-                        f"Mean loss: {(sum(loss_logging_accumulator)/len(loss_logging_accumulator)):.5f}",
+                        f"Mean loss (main): {(sum(loss_main_logging_accumulator)/len(loss_main_logging_accumulator)):.5f}",
+                        f"Mean loss (reg): {(sum(loss_reg_logging_accumulator)/len(loss_reg_logging_accumulator)):.5f}",
+                        f"Mean StdR: {(sum(stdr_logging_accumulator)/len(stdr_logging_accumulator)):.5f}",
+                        f"Mean loss (total): {(sum(loss_logging_accumulator)/len(loss_logging_accumulator)):.5f}",
                     ]
                 )
                 + "\n# <=============="
             )
+            stdr_logging_accumulator = []
+            loss_main_logging_accumulator = []
+            loss_reg_logging_accumulator = []
             loss_logging_accumulator = []
             # var_logger(model.data_cache_ctx, "model.data_cache_ctx", False)
             # var_logger(model.data_cache_latents, "model.data_cache_latents", False)
@@ -1147,9 +1475,7 @@ def get_regularization_term_model(
 ) -> torch.Tensor:
     sum = 0.0
     for name, param in model.named_parameters():
-        if "data_cache" in name:
-            continue
-        else:
+        if "data_cache" not in name:
             sum = sum + (param**2).sum()
     return alpha * sum
 
@@ -1407,11 +1733,21 @@ def perturb_weights(
     device: Optional[torch.device] = None,
     dtype: Optional[torch.dtype] = None,
 ) -> None:
+    a = 0.01
+    b = 0.05
     for name, param in model.named_parameters():
-        if "data_cache" in name:
-            continue
-        param.data = param.data + (torch.randn_like(param.data) * 1.0e-2)
-        print(f"perturb_weights: {name}")
+        if "data_cache" not in name:
+            delta = torch.nn.init.uniform_(
+                torch.empty_like(param.data),
+                a=a,
+                b=b,
+            )
+            delta = delta * torch.randn_like(param.data).sign()
+            cnd = torch.where(param.data.abs() < a)
+            param.data[cnd] = (param.data + delta)[cnd]
+            cnd = torch.where(param.data.abs() < a)
+            param.data[cnd] = delta[cnd]
+            print(f"perturb_weights: {name}")
     pass
 
 
@@ -1479,45 +1815,49 @@ def quantize_weights(
 def eval_infer(
     model: DecoderOnlyModel,
 ) -> None:
-    model_output = model(torch.arange(0, 16, 1))
-    data_rgb = data_lab_to_rgb(model_output)
-    generate_images_from_data(data_rgb, images_path_dst, "infer")
+    with torch.no_grad():
+        model_output = model(torch.arange(0, 16, 1))
+        data_rgb = data_lab_to_rgb(model_output)
+        generate_images_from_data(data_rgb, images_path_dst, "infer")
     pass
 
 
 def eval_ctx_rand(
     model: DecoderOnlyModel,
 ) -> None:
-    ctx = model.data_cache_ctx.data.clone()
-    model.data_cache_ctx.data = torch.randn_like(ctx)
-    model_output = model(torch.arange(0, 16, 1))
-    model.data_cache_ctx.data = ctx
-    data_rgb = data_lab_to_rgb(model_output)
-    generate_images_from_data(data_rgb, images_path_dst, "ctx_rand")
+    with torch.no_grad():
+        ctx = model.data_cache_ctx.data.clone()
+        model.data_cache_ctx.data = torch.randn_like(ctx)
+        model_output = model(torch.arange(0, 16, 1))
+        model.data_cache_ctx.data = ctx
+        data_rgb = data_lab_to_rgb(model_output)
+        generate_images_from_data(data_rgb, images_path_dst, "ctx_rand")
     pass
 
 
 def eval_latents_rand(
     model: DecoderOnlyModel,
 ) -> None:
-    latents = model.data_cache_latents.data.clone()
-    model.data_cache_latents.data = torch.randn_like(latents)
-    model_output = model(torch.arange(0, 16, 1))
-    model.data_cache_latents.data = latents
-    data_rgb = data_lab_to_rgb(model_output)
-    generate_images_from_data(data_rgb, images_path_dst, "latents_rand")
+    with torch.no_grad():
+        latents = model.data_cache_latents.data.clone()
+        model.data_cache_latents.data = torch.randn_like(latents)
+        model_output = model(torch.arange(0, 16, 1))
+        model.data_cache_latents.data = latents
+        data_rgb = data_lab_to_rgb(model_output)
+        generate_images_from_data(data_rgb, images_path_dst, "latents_rand")
     pass
 
 
 def eval_latents_ones(
     model: DecoderOnlyModel,
 ) -> None:
-    latents = model.data_cache_latents.data.clone()
-    model.data_cache_latents.data = torch.ones_like(latents)
-    model_output = model(torch.arange(0, 16, 1))
-    model.data_cache_latents.data = latents
-    data_rgb = data_lab_to_rgb(model_output)
-    generate_images_from_data(data_rgb, images_path_dst, "latents_ones")
+    with torch.no_grad():
+        latents = model.data_cache_latents.data.clone()
+        model.data_cache_latents.data = torch.ones_like(latents)
+        model_output = model(torch.arange(0, 16, 1))
+        model.data_cache_latents.data = latents
+        data_rgb = data_lab_to_rgb(model_output)
+        generate_images_from_data(data_rgb, images_path_dst, "latents_ones")
     pass
 
 
@@ -1566,25 +1906,25 @@ if __name__ == "__main__":
 
     path_prefix_load = "/mnt/f/git_AIResearch/dyna/data/models"
     path_prefix_save = "/mnt/f/git_AIResearch/dyna/data/models"
-    load_path_model = f"{path_prefix_load}/decoder_model_G1.60000.pth"
+    load_path_model = f"{path_prefix_load}/"
     load_path_optim = f"{path_prefix_load}/"
-    save_path_model = f"{path_prefix_save}/decoder_model_G1"
-    save_path_optim = f"{path_prefix_save}/decoder_optim_G1"
+    save_path_model = f"{path_prefix_save}/decoder_model_G0"
+    save_path_optim = f"{path_prefix_save}/decoder_optim_G0"
     save_model = True
-    save_optim = False
-    save_nth_step = 10_000
+    save_optim = True
+    save_nth_step = 1_000
     log_nth_iteration = 10
 
-    learning_rate = 1.0e-5
+    learning_rate = 1.0e-6
     momentum = 0.9
     weight_decay = 0.0
     eps = 1.0e-5
-    data_cache_ctx_bound = 1.0e-4
-    data_cache_latents_bound = 1.0e-4
+    data_cache_ctx_bound = 1.0e-5
+    data_cache_latents_bound = 1.0e-5
     use_regularization = False
-    regularization_alpha_model = 1.0e-9
-    regularization_alpha_ctx = 1.0e-2
-    regularization_alpha_latents = 1.0e-4
+    regularization_alpha_model = 1.0e-7
+    regularization_alpha_ctx = 1.0e-12
+    regularization_alpha_latents = 1.0e-12
     regularization_low_weights_model_bound = [
         1.0e-2,
         1.0e-4,
@@ -1620,10 +1960,10 @@ if __name__ == "__main__":
     data_cache_ctx_len = 2048
     data_cache_latents_len = 2048
     data_cache_latents_shape = [8, 32, 32]
-    dropout_rate = 0.05
+    dropout_rate = 0.1
 
     total_steps = 100_000
-    batch_size = 32
+    batch_size = 16
     sliding_batch = False
     grad_accumulation_steps = 1
 
@@ -1690,6 +2030,20 @@ if __name__ == "__main__":
         momentum=momentum,
         eps=eps,
     )
+    # optimizer = torch.optim.SGD(
+    #     params=model.parameters(),
+    #     lr=0.00001,
+    #     dampening=0.0,
+    #     nesterov=True,
+    #     weight_decay=0.0,
+    #     momentum=0.9,
+    # )
+    # optimizer = torch.optim.Adam(
+    #     params=model.parameters(),
+    #     lr=1.0e-7,
+    #     weight_decay=0.1,
+    #     amsgrad=True,
+    # )
 
     if load_optim:
         optimizer.load_state_dict(torch.load(load_path_optim))
