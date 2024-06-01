@@ -330,6 +330,15 @@ class DecoderOnlyModel(nn.Module):
         x_mean = x.mean(dim=dims, keepdim=True)
         x_std = x.std(dim=dims, keepdim=True)
         return (x - x_mean) / (x_std + eps)
+    
+    def squash(
+        self,
+        x: torch.Tensor,
+    ) -> torch.Tensor:
+        x_sq = x*x
+        x_abs = x_sq.sqrt()
+        x = (x_sq / (1.0 + x_sq)) * (x / x_abs)
+        return x
 
     def forward(
         self,
@@ -339,9 +348,10 @@ class DecoderOnlyModel(nn.Module):
         context = self.data_cache_ctx[ids]
         x = self.data_cache_latents[ids]
 
-        activation_fn = lambda x: siglog_parametric(x, alpha=1.0 / (2 * math.e))
+        activation_fn = lambda x: siglog_parametric(x, alpha=1.0 / math.e, smooth_grad=True, smoothing=0.1)
 
         # Prepare inputs.
+        # x = self.standardize(x, dims=[-1, -2])
         x = x
         ctx = context
 
@@ -1079,7 +1089,7 @@ def model_unfreeze_all(
     pass
 
 
-def model_modify_cache(
+def model_expand_cache(
     model: DecoderOnlyModel,
     device: Optional[torch.device] = None,
     dtype: Optional[torch.dtype] = None,
@@ -1098,7 +1108,7 @@ def model_modify_cache(
             )
             new[0 : current.shape[0]] = current
             param.data = new
-            print(f"modify_data_cache: {name}")
+            print(f"model_expand_cache: {name}")
         if "data_cache_ctx" in name:
             current = param.data.clone()
             new = torch.nn.init.normal_(
@@ -1112,7 +1122,57 @@ def model_modify_cache(
             )
             new[0 : current.shape[0]] = current
             param.data = new
-            print(f"modify_data_cache: {name}")
+            print(f"model_expand_cache: {name}")
+    pass
+
+
+def model_constant_ctx(
+    model: DecoderOnlyModel,
+    device: Optional[torch.device] = None,
+    dtype: Optional[torch.dtype] = None,
+) -> None:
+    v = 0.0001
+    for name, param in model.named_parameters():
+        if "data_cache_ctx" in name:
+            param.data = torch.nn.init.constant_(
+                param.data,
+                val=v,
+            )
+            print(f"model_constant_ctx: {v}")
+    pass
+
+
+def model_constant_latents(
+    model: DecoderOnlyModel,
+    device: Optional[torch.device] = None,
+    dtype: Optional[torch.dtype] = None,
+) -> None:
+    v = 0.1
+    for name, param in model.named_parameters():
+        if "data_cache_latents" in name:
+            param.data = torch.nn.init.constant_(
+                param.data,
+                val=v,
+            )
+            print(f"model_constant_latents: {v}")
+    pass
+
+
+def model_same_latents(
+    model: DecoderOnlyModel,
+    device: Optional[torch.device] = None,
+    dtype: Optional[torch.dtype] = None,
+) -> None:
+    for name, param in model.named_parameters():
+        if "data_cache_latents" in name:
+            sample = param.data[0].clone().unsqueeze(0)
+            sample = nn.init.uniform_(
+                sample,
+                a=-0.1,
+                b=+0.1,
+            )
+            param.data = sample.repeat([param.data.shape[0], 1, 1, 1])
+            print(f"model_same_latents")
     pass
 
 
@@ -1310,15 +1370,13 @@ def model_change_data_cache_latents(
 if __name__ == "__main__":
     train_mode = True
 
-    load_model = False
+    load_model = True
     load_optim = False
     drop_ctx_cache = False
     drop_latents_cache = False
     onload_model_fn = [
         # model_perturb_weights,
         # model_freeze_model,
-        # model_freeze_latents,
-        # model_freeze_ctx,
         # model_unfreeze_model,
         # model_unfreeze_latents,
         # model_unfreeze_ctx,
@@ -1328,7 +1386,14 @@ if __name__ == "__main__":
         # model_freeze_model,
         # model_freeze_ctx,
         # model_unfreeze_all,
-        # model_modify_cache,
+        # model_expand_cache,
+        # model_constant_ctx,
+        # model_freeze_ctx,
+        # model_constant_latents,
+        # model_same_latents,
+        # model_freeze_latents,
+        # model_data_cache_double,
+        # model_data_cache_double,
     ]
     onload_optim_fn = [
         # lambda o: optim_change_momentum(o, 0.9),
@@ -1336,10 +1401,10 @@ if __name__ == "__main__":
 
     path_prefix_load = "/mnt/f/git_AIResearch/dyna/data/models"
     path_prefix_save = "/mnt/f/git_AIResearch/dyna/data/models"
-    load_path_model = f"{path_prefix_load}/"
+    load_path_model = f"{path_prefix_load}/decoder_model_G1_512x512_UNFROZEN.LAST.pth"
     load_path_optim = f"{path_prefix_load}/"
-    save_path_model = f"{path_prefix_save}/decoder_model_G0_512x512"
-    save_path_optim = f"{path_prefix_save}/decoder_optim_G0_512x512"
+    save_path_model = f"{path_prefix_save}/model_fuck-it"
+    save_path_optim = f"{path_prefix_save}/optim_fuck-it"
     save_model = True
     save_optim = True
     save_nth_iteration = 10_000
@@ -1348,12 +1413,12 @@ if __name__ == "__main__":
     # optimizer type
     optimizer_type = torch.optim.Adam
     # optimizer: torch.optim.Adam
-    adam_learning_rate = 1.0e-5
-    adam_amsgrad = False
+    adam_learning_rate = 1.0e-4
+    adam_amsgrad = True
     adam_weight_decay = 0.0
     adam_eps = 1.0e-8
     # optimizer: MADGRAD
-    madgrad_learning_rate = 1.0e-5
+    madgrad_learning_rate = 1.0e-4
     madgrad_momentum = 0.9
     madgrad_weight_decay = 0.0
     madgrad_eps = 1.0e-6
@@ -1395,12 +1460,12 @@ if __name__ == "__main__":
     freeze_latents_epochs = 0
     freeze_model_nth_epoch = 0
     freeze_model_epochs = 0
-    
-    nelements = 4096
+
+    nelements = 1024
     data_cache_ctx_len = nelements
     data_cache_latents_len = nelements
     data_cache_latents_shape = [4, 32, 32]
-    dropout_rate_latents = 0.0025
+    dropout_rate_latents = 0.0000
     dropout_rate_context = 0.0000
 
     total_steps = 100_000
@@ -1486,7 +1551,6 @@ if __name__ == "__main__":
         )
     else:
         raise ValueError(f"Unknown optimizer type: {optimizer_type}")
-
 
     if load_optim:
         optimizer.load_state_dict(torch.load(load_path_optim))
