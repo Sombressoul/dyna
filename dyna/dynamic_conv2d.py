@@ -258,6 +258,71 @@ class DynamicConv2D(nn.Module):
 
         return index
 
+    def get_weights(
+        self,
+        context: torch.Tensor,
+        batch_dim: Optional[int] = None,
+    ) -> torch.Tensor:
+        batch_dim = batch_dim if batch_dim is not None else context.shape[0]
+
+        if batch_dim < 1:
+            raise ValueError(
+                " ".join(
+                    [
+                        "batch_dim must be greater than or equal to 1.",
+                        f"Got: {batch_dim}.",
+                    ]
+                )
+            )
+
+        with torch.no_grad():
+            if self.dynamic_weights_index.device != context.device:
+                self.dynamic_weights_index = self.dynamic_weights_index.to(
+                    context.device
+                )
+
+            dynamic_weights_index = self.dynamic_weights_index
+            dynamic_weights_index = dynamic_weights_index.unsqueeze(0).repeat(
+                [
+                    batch_dim,
+                    *[1 for _ in range(len(dynamic_weights_index.shape))],
+                ]
+            )
+            index_shifts = torch.arange(
+                0,
+                self.dynamic_weights_index.numel() * batch_dim,
+                self.dynamic_weights_index.numel(),
+                device=context.device,
+            ).reshape(
+                [batch_dim, *[1 for _ in range(len(dynamic_weights_index.shape) - 1)]]
+            )
+            dynamic_weights_index = dynamic_weights_index + index_shifts
+
+        dynamic_weights = self.weights_lib(context)
+        dynamic_weights = (
+            dynamic_weights + self.bias_dynamic_weights_lib.unsqueeze(0)
+            if self.bias_dynamic
+            else dynamic_weights
+        )
+        dynamic_weights = (
+            dynamic_weights.repeat(
+                [
+                    batch_dim,
+                    *[1 for _ in range(len(dynamic_weights.shape) - 1)],
+                ]
+            )
+            if dynamic_weights.shape[0] != batch_dim
+            else dynamic_weights
+        )
+        dynamic_weights = torch.take(
+            input=dynamic_weights,
+            index=dynamic_weights_index,
+        )
+        conv_weights = dynamic_weights.reshape([batch_dim, *self.conv_weights_shape])
+        conv_weights = conv_weights.transpose(1, 2) if self.transpose else conv_weights
+
+        return conv_weights
+
     def forward(
         self,
         x: torch.Tensor,
@@ -273,51 +338,7 @@ class DynamicConv2D(nn.Module):
                 )
             )
 
-        with torch.no_grad():
-            if self.dynamic_weights_index.device != x.device:
-                self.dynamic_weights_index = self.dynamic_weights_index.to(x.device)
-
-            dynamic_weights_index = self.dynamic_weights_index
-            dynamic_weights_index = dynamic_weights_index.unsqueeze(0).repeat(
-                [
-                    x.shape[0],
-                    *[1 for _ in range(len(dynamic_weights_index.shape))],
-                ]
-            )
-            index_shifts = torch.arange(
-                0,
-                self.dynamic_weights_index.numel() * x.shape[0],
-                self.dynamic_weights_index.numel(),
-                device=x.device,
-            ).reshape(
-                [x.shape[0], *[1 for _ in range(len(dynamic_weights_index.shape) - 1)]]
-            )
-            dynamic_weights_index = dynamic_weights_index + index_shifts
-
-        dynamic_weights = self.weights_lib(context)
-        dynamic_weights = (
-            dynamic_weights + self.bias_dynamic_weights_lib.unsqueeze(0)
-            if self.bias_dynamic
-            else dynamic_weights
-        )
-        dynamic_weights = (
-            dynamic_weights.repeat(
-                [
-                    x.shape[0],
-                    *[1 for _ in range(len(dynamic_weights.shape) - 1)],
-                ]
-            )
-            if dynamic_weights.shape[0] != x.shape[0]
-            else dynamic_weights
-        )
-        dynamic_weights = torch.take(
-            input=dynamic_weights,
-            index=dynamic_weights_index,
-        )
-        conv_weights = dynamic_weights.reshape([x.shape[0], *self.conv_weights_shape])
-
         if self.transpose:
-            conv_weights = conv_weights.transpose(1, 2)
             wrapped_fn = lambda x, w: F.conv_transpose2d(
                 input=x,
                 weight=w,
@@ -338,7 +359,13 @@ class DynamicConv2D(nn.Module):
             )
 
         batched_fn = torch.vmap(wrapped_fn)
-        x = batched_fn(x.unsqueeze(1), conv_weights)
+        x = batched_fn(
+            x.unsqueeze(1),
+            self.get_weights(
+                context=context,
+                batch_dim=x.shape[0],
+            ),
+        )
         x = x.squeeze(1)
 
         if self.bias_static is not None:
