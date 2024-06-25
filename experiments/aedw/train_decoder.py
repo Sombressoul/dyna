@@ -59,12 +59,12 @@ class DecoderOnlyModel(nn.Module):
         self.kernel_size_t = [3, 3]
         self.kernel_size_c_base = [3, 3]
         self.kernel_size_c_sml = [3, 3]
-        self.kernel_size_c_med = [7, 7]
-        self.kernel_size_c_lrg = [11, 11]
+        self.kernel_size_c_med = [5, 5]
+        self.kernel_size_c_lrg = [7, 7]
         self.padding_size_c_base = [1, 1]
         self.padding_size_c_sml = [1, 1]
-        self.padding_size_c_med = [3, 3]
-        self.padding_size_c_lrg = [5, 5]
+        self.padding_size_c_med = [2, 2]
+        self.padding_size_c_lrg = [3, 3]
 
         self.eps = 1.0e-3
         self.q_levels = 16
@@ -81,6 +81,186 @@ class DecoderOnlyModel(nn.Module):
         self.dropout_context = nn.Dropout(p=self.dropout_rate_context)
         self.upsample_nearest = nn.Upsample(scale_factor=2, mode="nearest")
         self.upsample_bilinear = nn.Upsample(scale_factor=2, mode="bilinear")
+
+        # ====> Block 05
+        self.block_05_conv_upsample = DynamicConv2D(
+            in_channels=self.decoder_channels_reduced,
+            out_channels=self.decoder_channels_up,
+            context_length=self.context_length,
+            mod_rank=self.mod_rank,
+            transformations_rank=self.transformations_rank,
+            kernel_size=self.kernel_size_c_base,
+            stride=[2, 2],
+            padding=self.padding_size_c_base,
+            dilation=[1, 1],
+            bias_dynamic=self.use_bias,
+            bias_static=self.bias_static,
+            transpose=True,
+            output_padding=[1, 1],
+            dtype_weights=self.dtype_weights,
+        )
+        self.block_05_conv_sml = DynamicConv2D(
+            in_channels=self.decoder_channels_up,
+            out_channels=self.decoder_channels_conv,
+            context_length=self.context_length,
+            mod_rank=self.mod_rank,
+            transformations_rank=self.transformations_rank,
+            kernel_size=self.kernel_size_c_sml,
+            stride=[1, 1],
+            padding=self.padding_size_c_sml,
+            dilation=[1, 1],
+            bias_dynamic=self.use_bias,
+            bias_static=self.bias_static,
+            transpose=False,
+            output_padding=None,
+            dtype_weights=self.dtype_weights,
+        )
+        self.block_05_conv_med = DynamicConv2D(
+            in_channels=self.decoder_channels_up,
+            out_channels=self.decoder_channels_conv,
+            context_length=self.context_length,
+            mod_rank=self.mod_rank,
+            transformations_rank=self.transformations_rank,
+            kernel_size=self.kernel_size_c_med,
+            stride=[1, 1],
+            padding=self.padding_size_c_med,
+            dilation=[1, 1],
+            bias_dynamic=self.use_bias,
+            bias_static=self.bias_static,
+            transpose=False,
+            output_padding=None,
+            dtype_weights=self.dtype_weights,
+        )
+        self.block_05_conv_lrg = DynamicConv2D(
+            in_channels=self.decoder_channels_up,
+            out_channels=self.decoder_channels_conv,
+            context_length=self.context_length,
+            mod_rank=self.mod_rank,
+            transformations_rank=self.transformations_rank,
+            kernel_size=self.kernel_size_c_lrg,
+            stride=[1, 1],
+            padding=self.padding_size_c_lrg,
+            dilation=[1, 1],
+            bias_dynamic=self.use_bias,
+            bias_static=self.bias_static,
+            transpose=False,
+            output_padding=None,
+            dtype_weights=self.dtype_weights,
+        )
+        self.block_05_conv_out = DynamicConv2D(
+            in_channels=self.decoder_channels_reduced,
+            out_channels=self.decoder_channels_reduced,
+            context_length=self.context_length,
+            mod_rank=self.mod_rank,
+            transformations_rank=self.transformations_rank,
+            kernel_size=[3, 3],
+            stride=[1, 1],
+            padding=[1, 1],
+            dilation=[1, 1],
+            bias_dynamic=self.use_bias,
+            bias_static=self.bias_static,
+            transpose=False,
+            output_padding=None,
+            dtype_weights=self.dtype_weights,
+        )
+        self.block_05_wl_lat = WeightsLib2D(
+            components_count=self.context_length,
+            mod_rank=self.mod_rank,
+            transformations_rank=self.transformations_rank,
+            output_shape=[
+                self.decoder_channels_conv * 3,
+                self.decoder_channels_reduced,
+            ],
+            dtype_weights=self.dtype_weights,
+        )
+        self.block_05_wl_ctx = WeightsLib2D(
+            components_count=self.context_length,
+            mod_rank=self.mod_rank,
+            transformations_rank=self.transformations_rank,
+            output_shape=[
+                self.context_length,
+                self.context_length,
+            ],
+            dtype_weights=self.dtype_weights,
+        )
+        self.block_05_ctx_linear_upsample = nn.Linear(
+            in_features=self.context_length,
+            out_features=self.context_length,
+            bias=True,
+            dtype=self.dtype_weights,
+        )
+        self.block_05_ctx_linear_wl_lat = nn.Linear(
+            in_features=self.context_length,
+            out_features=self.context_length,
+            bias=True,
+            dtype=self.dtype_weights,
+        )
+        self.block_05_ctx_linear_conv_out = nn.Linear(
+            in_features=self.context_length,
+            out_features=self.context_length,
+            bias=True,
+            dtype=self.dtype_weights,
+        )
+        self.block_05_ctx_linear_sml = nn.Linear(
+            in_features=self.context_length,
+            out_features=self.context_length,
+            bias=True,
+            dtype=self.dtype_weights,
+        )
+        self.block_05_ctx_linear_med = nn.Linear(
+            in_features=self.context_length,
+            out_features=self.context_length,
+            bias=True,
+            dtype=self.dtype_weights,
+        )
+        self.block_05_ctx_linear_lrg = nn.Linear(
+            in_features=self.context_length,
+            out_features=self.context_length,
+            bias=True,
+            dtype=self.dtype_weights,
+        )
+        self.block_05_norm_ctx = nn.LayerNorm(
+            normalized_shape=[self.context_length],
+            elementwise_affine=True,
+            bias=True,
+            dtype=self.dtype_weights,
+        )
+        self.block_05_norm_conv_upsample = nn.LayerNorm(
+            normalized_shape=[self.decoder_channels_up],
+            elementwise_affine=True,
+            bias=True,
+            dtype=self.dtype_weights,
+        )
+        self.block_05_norm_conv_sml = nn.LayerNorm(
+            normalized_shape=[self.decoder_channels_conv],
+            elementwise_affine=True,
+            bias=True,
+            dtype=self.dtype_weights,
+        )
+        self.block_05_norm_conv_med = nn.LayerNorm(
+            normalized_shape=[self.decoder_channels_conv],
+            elementwise_affine=True,
+            bias=True,
+            dtype=self.dtype_weights,
+        )
+        self.block_05_norm_conv_lrg = nn.LayerNorm(
+            normalized_shape=[self.decoder_channels_conv],
+            elementwise_affine=True,
+            bias=True,
+            dtype=self.dtype_weights,
+        )
+        self.block_05_norm_out_pre = nn.LayerNorm(
+            normalized_shape=[self.decoder_channels_reduced],
+            elementwise_affine=True,
+            bias=True,
+            dtype=self.dtype_weights,
+        )
+        self.block_05_norm_out_post = nn.LayerNorm(
+            normalized_shape=[self.decoder_channels_reduced],
+            elementwise_affine=True,
+            bias=True,
+            dtype=self.dtype_weights,
+        )
 
         # ====> Block 04
         self.block_04_conv_upsample = DynamicConv2D(
@@ -147,6 +327,22 @@ class DecoderOnlyModel(nn.Module):
             output_padding=None,
             dtype_weights=self.dtype_weights,
         )
+        self.block_04_conv_out = DynamicConv2D(
+            in_channels=self.decoder_channels_reduced,
+            out_channels=self.decoder_channels_reduced,
+            context_length=self.context_length,
+            mod_rank=self.mod_rank,
+            transformations_rank=self.transformations_rank,
+            kernel_size=[3, 3],
+            stride=[1, 1],
+            padding=[1, 1],
+            dilation=[1, 1],
+            bias_dynamic=self.use_bias,
+            bias_static=self.bias_static,
+            transpose=False,
+            output_padding=None,
+            dtype_weights=self.dtype_weights,
+        )
         self.block_04_wl_lat = WeightsLib2D(
             components_count=self.context_length,
             mod_rank=self.mod_rank,
@@ -166,6 +362,42 @@ class DecoderOnlyModel(nn.Module):
                 self.context_length,
             ],
             dtype_weights=self.dtype_weights,
+        )
+        self.block_04_ctx_linear_upsample = nn.Linear(
+            in_features=self.context_length,
+            out_features=self.context_length,
+            bias=True,
+            dtype=self.dtype_weights,
+        )
+        self.block_04_ctx_linear_wl_lat = nn.Linear(
+            in_features=self.context_length,
+            out_features=self.context_length,
+            bias=True,
+            dtype=self.dtype_weights,
+        )
+        self.block_04_ctx_linear_conv_out = nn.Linear(
+            in_features=self.context_length,
+            out_features=self.context_length,
+            bias=True,
+            dtype=self.dtype_weights,
+        )
+        self.block_04_ctx_linear_sml = nn.Linear(
+            in_features=self.context_length,
+            out_features=self.context_length,
+            bias=True,
+            dtype=self.dtype_weights,
+        )
+        self.block_04_ctx_linear_med = nn.Linear(
+            in_features=self.context_length,
+            out_features=self.context_length,
+            bias=True,
+            dtype=self.dtype_weights,
+        )
+        self.block_04_ctx_linear_lrg = nn.Linear(
+            in_features=self.context_length,
+            out_features=self.context_length,
+            bias=True,
+            dtype=self.dtype_weights,
         )
         self.block_04_norm_ctx = nn.LayerNorm(
             normalized_shape=[self.context_length],
@@ -197,7 +429,13 @@ class DecoderOnlyModel(nn.Module):
             bias=True,
             dtype=self.dtype_weights,
         )
-        self.block_04_norm_out = nn.LayerNorm(
+        self.block_04_norm_out_pre = nn.LayerNorm(
+            normalized_shape=[self.decoder_channels_reduced],
+            elementwise_affine=True,
+            bias=True,
+            dtype=self.dtype_weights,
+        )
+        self.block_04_norm_out_post = nn.LayerNorm(
             normalized_shape=[self.decoder_channels_reduced],
             elementwise_affine=True,
             bias=True,
@@ -269,6 +507,22 @@ class DecoderOnlyModel(nn.Module):
             output_padding=None,
             dtype_weights=self.dtype_weights,
         )
+        self.block_03_conv_out = DynamicConv2D(
+            in_channels=self.decoder_channels_reduced,
+            out_channels=self.decoder_channels_reduced,
+            context_length=self.context_length,
+            mod_rank=self.mod_rank,
+            transformations_rank=self.transformations_rank,
+            kernel_size=[3, 3],
+            stride=[1, 1],
+            padding=[1, 1],
+            dilation=[1, 1],
+            bias_dynamic=self.use_bias,
+            bias_static=self.bias_static,
+            transpose=False,
+            output_padding=None,
+            dtype_weights=self.dtype_weights,
+        )
         self.block_03_wl_lat = WeightsLib2D(
             components_count=self.context_length,
             mod_rank=self.mod_rank,
@@ -288,6 +542,42 @@ class DecoderOnlyModel(nn.Module):
                 self.context_length,
             ],
             dtype_weights=self.dtype_weights,
+        )
+        self.block_03_ctx_linear_upsample = nn.Linear(
+            in_features=self.context_length,
+            out_features=self.context_length,
+            bias=True,
+            dtype=self.dtype_weights,
+        )
+        self.block_03_ctx_linear_wl_lat = nn.Linear(
+            in_features=self.context_length,
+            out_features=self.context_length,
+            bias=True,
+            dtype=self.dtype_weights,
+        )
+        self.block_03_ctx_linear_conv_out = nn.Linear(
+            in_features=self.context_length,
+            out_features=self.context_length,
+            bias=True,
+            dtype=self.dtype_weights,
+        )
+        self.block_03_ctx_linear_sml = nn.Linear(
+            in_features=self.context_length,
+            out_features=self.context_length,
+            bias=True,
+            dtype=self.dtype_weights,
+        )
+        self.block_03_ctx_linear_med = nn.Linear(
+            in_features=self.context_length,
+            out_features=self.context_length,
+            bias=True,
+            dtype=self.dtype_weights,
+        )
+        self.block_03_ctx_linear_lrg = nn.Linear(
+            in_features=self.context_length,
+            out_features=self.context_length,
+            bias=True,
+            dtype=self.dtype_weights,
         )
         self.block_03_norm_ctx = nn.LayerNorm(
             normalized_shape=[self.context_length],
@@ -319,7 +609,13 @@ class DecoderOnlyModel(nn.Module):
             bias=True,
             dtype=self.dtype_weights,
         )
-        self.block_03_norm_out = nn.LayerNorm(
+        self.block_03_norm_out_pre = nn.LayerNorm(
+            normalized_shape=[self.decoder_channels_reduced],
+            elementwise_affine=True,
+            bias=True,
+            dtype=self.dtype_weights,
+        )
+        self.block_03_norm_out_post = nn.LayerNorm(
             normalized_shape=[self.decoder_channels_reduced],
             elementwise_affine=True,
             bias=True,
@@ -391,6 +687,22 @@ class DecoderOnlyModel(nn.Module):
             output_padding=None,
             dtype_weights=self.dtype_weights,
         )
+        self.block_02_conv_out = DynamicConv2D(
+            in_channels=self.decoder_channels_reduced,
+            out_channels=self.decoder_channels_reduced,
+            context_length=self.context_length,
+            mod_rank=self.mod_rank,
+            transformations_rank=self.transformations_rank,
+            kernel_size=[3, 3],
+            stride=[1, 1],
+            padding=[1, 1],
+            dilation=[1, 1],
+            bias_dynamic=self.use_bias,
+            bias_static=self.bias_static,
+            transpose=False,
+            output_padding=None,
+            dtype_weights=self.dtype_weights,
+        )
         self.block_02_wl_lat = WeightsLib2D(
             components_count=self.context_length,
             mod_rank=self.mod_rank,
@@ -410,6 +722,42 @@ class DecoderOnlyModel(nn.Module):
                 self.context_length,
             ],
             dtype_weights=self.dtype_weights,
+        )
+        self.block_02_ctx_linear_upsample = nn.Linear(
+            in_features=self.context_length,
+            out_features=self.context_length,
+            bias=True,
+            dtype=self.dtype_weights,
+        )
+        self.block_02_ctx_linear_wl_lat = nn.Linear(
+            in_features=self.context_length,
+            out_features=self.context_length,
+            bias=True,
+            dtype=self.dtype_weights,
+        )
+        self.block_02_ctx_linear_conv_out = nn.Linear(
+            in_features=self.context_length,
+            out_features=self.context_length,
+            bias=True,
+            dtype=self.dtype_weights,
+        )
+        self.block_02_ctx_linear_sml = nn.Linear(
+            in_features=self.context_length,
+            out_features=self.context_length,
+            bias=True,
+            dtype=self.dtype_weights,
+        )
+        self.block_02_ctx_linear_med = nn.Linear(
+            in_features=self.context_length,
+            out_features=self.context_length,
+            bias=True,
+            dtype=self.dtype_weights,
+        )
+        self.block_02_ctx_linear_lrg = nn.Linear(
+            in_features=self.context_length,
+            out_features=self.context_length,
+            bias=True,
+            dtype=self.dtype_weights,
         )
         self.block_02_norm_ctx = nn.LayerNorm(
             normalized_shape=[self.context_length],
@@ -441,7 +789,13 @@ class DecoderOnlyModel(nn.Module):
             bias=True,
             dtype=self.dtype_weights,
         )
-        self.block_02_norm_out = nn.LayerNorm(
+        self.block_02_norm_out_pre = nn.LayerNorm(
+            normalized_shape=[self.decoder_channels_reduced],
+            elementwise_affine=True,
+            bias=True,
+            dtype=self.dtype_weights,
+        )
+        self.block_02_norm_out_post = nn.LayerNorm(
             normalized_shape=[self.decoder_channels_reduced],
             elementwise_affine=True,
             bias=True,
@@ -513,6 +867,22 @@ class DecoderOnlyModel(nn.Module):
             output_padding=None,
             dtype_weights=self.dtype_weights,
         )
+        self.block_01_conv_out = DynamicConv2D(
+            in_channels=self.decoder_channels_reduced,
+            out_channels=self.decoder_channels_reduced,
+            context_length=self.context_length,
+            mod_rank=self.mod_rank,
+            transformations_rank=self.transformations_rank,
+            kernel_size=[3, 3],
+            stride=[1, 1],
+            padding=[1, 1],
+            dilation=[1, 1],
+            bias_dynamic=self.use_bias,
+            bias_static=self.bias_static,
+            transpose=False,
+            output_padding=None,
+            dtype_weights=self.dtype_weights,
+        )
         self.block_01_wl_lat = WeightsLib2D(
             components_count=self.context_length,
             mod_rank=self.mod_rank,
@@ -532,6 +902,42 @@ class DecoderOnlyModel(nn.Module):
                 self.context_length,
             ],
             dtype_weights=self.dtype_weights,
+        )
+        self.block_01_ctx_linear_upsample = nn.Linear(
+            in_features=self.context_length,
+            out_features=self.context_length,
+            bias=True,
+            dtype=self.dtype_weights,
+        )
+        self.block_01_ctx_linear_wl_lat = nn.Linear(
+            in_features=self.context_length,
+            out_features=self.context_length,
+            bias=True,
+            dtype=self.dtype_weights,
+        )
+        self.block_01_ctx_linear_conv_out = nn.Linear(
+            in_features=self.context_length,
+            out_features=self.context_length,
+            bias=True,
+            dtype=self.dtype_weights,
+        )
+        self.block_01_ctx_linear_sml = nn.Linear(
+            in_features=self.context_length,
+            out_features=self.context_length,
+            bias=True,
+            dtype=self.dtype_weights,
+        )
+        self.block_01_ctx_linear_med = nn.Linear(
+            in_features=self.context_length,
+            out_features=self.context_length,
+            bias=True,
+            dtype=self.dtype_weights,
+        )
+        self.block_01_ctx_linear_lrg = nn.Linear(
+            in_features=self.context_length,
+            out_features=self.context_length,
+            bias=True,
+            dtype=self.dtype_weights,
         )
         self.block_01_norm_ctx = nn.LayerNorm(
             normalized_shape=[self.context_length],
@@ -563,7 +969,13 @@ class DecoderOnlyModel(nn.Module):
             bias=True,
             dtype=self.dtype_weights,
         )
-        self.block_01_norm_out = nn.LayerNorm(
+        self.block_01_norm_out_pre = nn.LayerNorm(
+            normalized_shape=[self.decoder_channels_reduced],
+            elementwise_affine=True,
+            bias=True,
+            dtype=self.dtype_weights,
+        )
+        self.block_01_norm_out_post = nn.LayerNorm(
             normalized_shape=[self.decoder_channels_reduced],
             elementwise_affine=True,
             bias=True,
@@ -571,16 +983,36 @@ class DecoderOnlyModel(nn.Module):
         )
 
         # ====> Block out
-        self.block_out_conv = nn.Conv2d(
+        self.block_out_conv = DynamicConv2D(
             in_channels=self.decoder_channels_reduced,
             out_channels=self.decoder_channels_out,
+            context_length=self.context_length,
+            mod_rank=self.mod_rank,
+            transformations_rank=self.transformations_rank,
             kernel_size=[3, 3],
             stride=[1, 1],
             padding=[1, 1],
             dilation=[1, 1],
-            groups=1,
+            bias_dynamic=self.use_bias,
+            bias_static=self.bias_static,
+            transpose=False,
+            output_padding=None,
+            dtype_weights=self.dtype_weights,
+        )
+        self.block_out_wl_ctx = WeightsLib2D(
+            components_count=self.context_length,
+            mod_rank=self.mod_rank,
+            transformations_rank=self.transformations_rank,
+            output_shape=[
+                self.context_length,
+                self.context_length,
+            ],
+            dtype_weights=self.dtype_weights,
+        )
+        self.block_out_norm_ctx = nn.LayerNorm(
+            normalized_shape=[self.context_length],
+            elementwise_affine=True,
             bias=True,
-            padding_mode="zeros",
             dtype=self.dtype_weights,
         )
 
@@ -732,7 +1164,7 @@ class DecoderOnlyModel(nn.Module):
         x_a = x_th_sq
         x_b = 1.0 - x_th_sq
         return (x_sl * x_a) + (x * x_b)
-    
+
     def noisein(
         self,
         x: torch.Tensor,
@@ -740,7 +1172,7 @@ class DecoderOnlyModel(nn.Module):
     ) -> torch.Tensor:
         if rate <= 0.0:
             return x
-        
+
         x_shape = x.shape
         x = x.flatten(1)
         x_numel = x.shape[1]
@@ -751,12 +1183,139 @@ class DecoderOnlyModel(nn.Module):
             std=x.std().item(),
         )
         target_indices = torch.randint(0, x_numel, [x.shape[0], x_noise_numel])
-        target_indices = target_indices + torch.arange(0, math.prod(x.shape), x_numel).unsqueeze(1)
+        target_indices = target_indices + torch.arange(
+            0, math.prod(x.shape), x_numel
+        ).unsqueeze(1)
         target_indices = target_indices.flatten(0)
-        x = x.flatten(0)
+        x = x.flatten(0).clone()
         x[target_indices] = (x[target_indices] * 0.0) + x_noise.flatten(0)
-        x = x.view([*x_shape])
+        x = x.reshape([*x_shape])
         return x
+
+    def forward_pretrain(
+        self,
+        ids: torch.Tensor,
+    ) -> torch.Tensor:
+        # Get base ctx
+        ids = ids.to(device=self.data_cache_latents.device, dtype=torch.int32)
+        ctx = self.data_cache_ctx[ids]
+
+        # Block 04
+        w_b04_wl_ctx = self.block_04_wl_ctx(ctx)
+        w_b04_wl_lat = self.block_04_wl_lat(ctx)
+        w_b04_upsample = self.block_04_conv_upsample.get_weights(ctx)
+        w_b04_sml = self.block_04_conv_sml.get_weights(ctx)
+        w_b04_med = self.block_04_conv_med.get_weights(ctx)
+        w_b04_lrg = self.block_04_conv_lrg.get_weights(ctx)
+        w_b04_out = self.block_04_conv_out.get_weights(ctx)
+
+        # Block 03
+        w_b03_wl_ctx = self.block_03_wl_ctx(ctx)
+        w_b03_wl_lat = self.block_03_wl_lat(ctx)
+        w_b03_upsample = self.block_03_conv_upsample.get_weights(ctx)
+        w_b03_sml = self.block_03_conv_sml.get_weights(ctx)
+        w_b03_med = self.block_03_conv_med.get_weights(ctx)
+        w_b03_lrg = self.block_03_conv_lrg.get_weights(ctx)
+        w_b03_out = self.block_03_conv_out.get_weights(ctx)
+
+        # Block 02
+        w_b02_wl_ctx = self.block_02_wl_ctx(ctx)
+        w_b02_wl_lat = self.block_02_wl_lat(ctx)
+        w_b02_upsample = self.block_02_conv_upsample.get_weights(ctx)
+        w_b02_sml = self.block_02_conv_sml.get_weights(ctx)
+        w_b02_med = self.block_02_conv_med.get_weights(ctx)
+        w_b02_lrg = self.block_02_conv_lrg.get_weights(ctx)
+        w_b02_out = self.block_02_conv_out.get_weights(ctx)
+
+        # Block 01
+        w_b01_wl_ctx = self.block_01_wl_ctx(ctx)
+        w_b01_wl_lat = self.block_01_wl_lat(ctx)
+        w_b01_upsample = self.block_01_conv_upsample.get_weights(ctx)
+        w_b01_sml = self.block_01_conv_sml.get_weights(ctx)
+        w_b01_med = self.block_01_conv_med.get_weights(ctx)
+        w_b01_lrg = self.block_01_conv_lrg.get_weights(ctx)
+        w_b01_out = self.block_01_conv_out.get_weights(ctx)
+
+        # Combo blocks
+        w_wl_ctx = torch.cat(
+            [
+                w_b04_wl_ctx.unsqueeze(1),
+                w_b03_wl_ctx.unsqueeze(1),
+                w_b02_wl_ctx.unsqueeze(1),
+                w_b01_wl_ctx.unsqueeze(1),
+            ],
+            dim=1,
+        )
+        w_wl_lat = torch.cat(
+            [
+                w_b04_wl_lat.unsqueeze(1),
+                w_b03_wl_lat.unsqueeze(1),
+                w_b02_wl_lat.unsqueeze(1),
+                w_b01_wl_lat.unsqueeze(1),
+            ],
+            dim=1,
+        )
+        w_upsample = torch.cat(
+            [
+                w_b04_upsample.unsqueeze(1),
+                w_b03_upsample.unsqueeze(1),
+                w_b02_upsample.unsqueeze(1),
+                w_b01_upsample.unsqueeze(1),
+            ],
+            dim=1,
+        )
+        w_sml = torch.cat(
+            [
+                w_b04_sml.unsqueeze(1),
+                w_b03_sml.unsqueeze(1),
+                w_b02_sml.unsqueeze(1),
+                w_b01_sml.unsqueeze(1),
+            ],
+            dim=1,
+        )
+        w_med = torch.cat(
+            [
+                w_b04_med.unsqueeze(1),
+                w_b03_med.unsqueeze(1),
+                w_b02_med.unsqueeze(1),
+                w_b01_med.unsqueeze(1),
+            ],
+            dim=1,
+        )
+        w_lrg = torch.cat(
+            [
+                w_b04_lrg.unsqueeze(1),
+                w_b03_lrg.unsqueeze(1),
+                w_b02_lrg.unsqueeze(1),
+                w_b01_lrg.unsqueeze(1),
+            ],
+            dim=1,
+        )
+        w_out = torch.cat(
+            [
+                w_b04_out.unsqueeze(1),
+                w_b03_out.unsqueeze(1),
+                w_b02_out.unsqueeze(1),
+                w_b01_out.unsqueeze(1),
+            ],
+            dim=1,
+        )
+
+        # Out
+        w_out_wl_ctx = self.block_out_wl_ctx(ctx).unsqueeze(1)
+        w_out_conv = self.block_out_conv.get_weights(ctx).unsqueeze(1)
+
+        return [
+            w_wl_ctx,
+            w_wl_lat,
+            w_upsample,
+            w_sml,
+            w_med,
+            w_lrg,
+            w_out,
+            w_out_wl_ctx,
+            w_out_conv,
+        ]
 
     def forward(
         self,
@@ -771,15 +1330,83 @@ class DecoderOnlyModel(nn.Module):
         # activation_fn = lambda x: siglog_parametric(x, alpha=0.01)
 
         activation_fn_x = lambda x: siglog_parametric(
-            x, alpha=(1.0 / math.e), smooth_grad=True, smoothing=0.01
+            x,
+            alpha=(1.0 / math.e),
+            smooth_grad=True,
+            smoothing=0.01,
         )
         activation_fn_ctx = lambda ctx: siglog_parametric(
-            ctx, alpha=(1.0 / math.e), smooth_grad=True, smoothing=0.01
+            ctx,
+            alpha=(1.0 / math.e),
+            smooth_grad=True,
+            smoothing=0.01,
         )
 
         # Prepare inputs.
         x = x
         ctx = context
+
+        # Inter-Block dropout
+        x = self.dropout_latents(x)
+        ctx = self.dropout_context(ctx)
+
+        # # Block 05
+        # ctx = self.noisein(ctx, self.noisein_rate_context)
+        # ctx = (ctx.unsqueeze(1) @ self.block_05_wl_ctx(ctx)).squeeze(1)
+        # ctx = activation_fn_ctx(ctx)
+        # ctx = self.block_05_norm_ctx(ctx)
+        # ctx_upsample = self.block_05_ctx_linear_upsample(ctx)
+        # ctx_upsample = activation_fn_ctx(ctx_upsample)
+        # ctx_sml = self.block_05_ctx_linear_sml(ctx)
+        # ctx_sml = activation_fn_ctx(ctx_sml)
+        # ctx_med = self.block_05_ctx_linear_med(ctx)
+        # ctx_med = activation_fn_ctx(ctx_med)
+        # ctx_lrg = self.block_05_ctx_linear_lrg(ctx)
+        # ctx_lrg = activation_fn_ctx(ctx_lrg)
+        # ctx_wl_lat = self.block_05_ctx_linear_wl_lat(ctx)
+        # ctx_wl_lat = activation_fn_ctx(ctx_wl_lat)
+        # ctx_conv_out = self.block_05_ctx_linear_conv_out(ctx)
+        # ctx_conv_out = activation_fn_ctx(ctx_conv_out)
+        # x_upsampled = self.block_05_conv_upsample(x, ctx_upsample)
+        # x_upsampled = activation_fn_x(x_upsampled)
+        # x_upsampled = x_upsampled.permute([0, 2, 3, 1])
+        # x_upsampled = self.block_05_norm_conv_upsample(x_upsampled)
+        # x_upsampled = x_upsampled.permute([0, 3, 1, 2])
+        # x_upsampled = self.dropout_latents(x_upsampled)
+        # x_upsampled = self.noisein(x_upsampled, self.noisein_rate_latents)
+        # x_convolved_sml = self.block_05_conv_sml(x_upsampled, ctx_sml)
+        # x_convolved_sml = activation_fn_x(x_convolved_sml)
+        # x_convolved_sml = x_convolved_sml.permute([0, 2, 3, 1])
+        # x_convolved_sml = self.block_05_norm_conv_sml(x_convolved_sml)
+        # x_convolved_sml = x_convolved_sml.permute([0, 3, 1, 2])
+        # x_convolved_sml = self.dropout_latents(x_convolved_sml)
+        # x_convolved_med = self.block_05_conv_med(x_upsampled, ctx_med)
+        # x_convolved_med = activation_fn_x(x_convolved_med)
+        # x_convolved_med = x_convolved_med.permute([0, 2, 3, 1])
+        # x_convolved_med = self.block_05_norm_conv_med(x_convolved_med)
+        # x_convolved_med = x_convolved_med.permute([0, 3, 1, 2])
+        # x_convolved_med = self.dropout_latents(x_convolved_med)
+        # x_convolved_lrg = self.block_05_conv_lrg(x_upsampled, ctx_lrg)
+        # x_convolved_lrg = activation_fn_x(x_convolved_lrg)
+        # x_convolved_lrg = x_convolved_lrg.permute([0, 2, 3, 1])
+        # x_convolved_lrg = self.block_05_norm_conv_lrg(x_convolved_lrg)
+        # x_convolved_lrg = x_convolved_lrg.permute([0, 3, 1, 2])
+        # x_convolved_lrg = self.dropout_latents(x_convolved_lrg)
+        # x_convolved = torch.cat(
+        #     [x_convolved_sml, x_convolved_med, x_convolved_lrg], dim=1
+        # )
+        # x_convolved = self.dropout_latents(x_convolved)
+        # x_lat_w = self.block_05_wl_lat(ctx_wl_lat)
+        # x = x_convolved.permute([0, 2, 3, 1])
+        # x = torch.einsum("b...j,bjk->b...k", x, x_lat_w)
+        # x = activation_fn_x(x)
+        # x = self.block_05_norm_out_pre(x)
+        # x = x.permute([0, 3, 1, 2])
+        # x = self.block_05_conv_out(x, ctx_conv_out)
+        # x = activation_fn_x(x)
+        # x = x.permute([0, 2, 3, 1])
+        # x = self.block_05_norm_out_post(x)
+        # x = x.permute([0, 3, 1, 2])
 
         # # Inter-Block dropout
         # x = self.dropout_latents(x)
@@ -790,26 +1417,38 @@ class DecoderOnlyModel(nn.Module):
         # ctx = (ctx.unsqueeze(1) @ self.block_04_wl_ctx(ctx)).squeeze(1)
         # ctx = activation_fn_ctx(ctx)
         # ctx = self.block_04_norm_ctx(ctx)
-        # x_upsampled = self.block_04_conv_upsample(x, ctx)
+        # ctx_upsample = self.block_04_ctx_linear_upsample(ctx)
+        # ctx_upsample = activation_fn_ctx(ctx_upsample)
+        # ctx_sml = self.block_04_ctx_linear_sml(ctx)
+        # ctx_sml = activation_fn_ctx(ctx_sml)
+        # ctx_med = self.block_04_ctx_linear_med(ctx)
+        # ctx_med = activation_fn_ctx(ctx_med)
+        # ctx_lrg = self.block_04_ctx_linear_lrg(ctx)
+        # ctx_lrg = activation_fn_ctx(ctx_lrg)
+        # ctx_wl_lat = self.block_04_ctx_linear_wl_lat(ctx)
+        # ctx_wl_lat = activation_fn_ctx(ctx_wl_lat)
+        # ctx_conv_out = self.block_04_ctx_linear_conv_out(ctx)
+        # ctx_conv_out = activation_fn_ctx(ctx_conv_out)
+        # x_upsampled = self.block_04_conv_upsample(x, ctx_upsample)
         # x_upsampled = activation_fn_x(x_upsampled)
         # x_upsampled = x_upsampled.permute([0, 2, 3, 1])
         # x_upsampled = self.block_04_norm_conv_upsample(x_upsampled)
         # x_upsampled = x_upsampled.permute([0, 3, 1, 2])
         # x_upsampled = self.dropout_latents(x_upsampled)
         # x_upsampled = self.noisein(x_upsampled, self.noisein_rate_latents)
-        # x_convolved_sml = self.block_04_conv_sml(x_upsampled, ctx)
+        # x_convolved_sml = self.block_04_conv_sml(x_upsampled, ctx_sml)
         # x_convolved_sml = activation_fn_x(x_convolved_sml)
         # x_convolved_sml = x_convolved_sml.permute([0, 2, 3, 1])
         # x_convolved_sml = self.block_04_norm_conv_sml(x_convolved_sml)
         # x_convolved_sml = x_convolved_sml.permute([0, 3, 1, 2])
         # x_convolved_sml = self.dropout_latents(x_convolved_sml)
-        # x_convolved_med = self.block_04_conv_med(x_upsampled, ctx)
+        # x_convolved_med = self.block_04_conv_med(x_upsampled, ctx_med)
         # x_convolved_med = activation_fn_x(x_convolved_med)
         # x_convolved_med = x_convolved_med.permute([0, 2, 3, 1])
         # x_convolved_med = self.block_04_norm_conv_med(x_convolved_med)
         # x_convolved_med = x_convolved_med.permute([0, 3, 1, 2])
         # x_convolved_med = self.dropout_latents(x_convolved_med)
-        # x_convolved_lrg = self.block_04_conv_lrg(x_upsampled, ctx)
+        # x_convolved_lrg = self.block_04_conv_lrg(x_upsampled, ctx_lrg)
         # x_convolved_lrg = activation_fn_x(x_convolved_lrg)
         # x_convolved_lrg = x_convolved_lrg.permute([0, 2, 3, 1])
         # x_convolved_lrg = self.block_04_norm_conv_lrg(x_convolved_lrg)
@@ -819,11 +1458,16 @@ class DecoderOnlyModel(nn.Module):
         #     [x_convolved_sml, x_convolved_med, x_convolved_lrg], dim=1
         # )
         # x_convolved = self.dropout_latents(x_convolved)
-        # x_lat_w = self.block_04_wl_lat(ctx)
+        # x_lat_w = self.block_04_wl_lat(ctx_wl_lat)
         # x = x_convolved.permute([0, 2, 3, 1])
         # x = torch.einsum("b...j,bjk->b...k", x, x_lat_w)
         # x = activation_fn_x(x)
-        # x = self.block_04_norm_out(x)
+        # x = self.block_04_norm_out_pre(x)
+        # x = x.permute([0, 3, 1, 2])
+        # x = self.block_04_conv_out(x, ctx_conv_out)
+        # x = activation_fn_x(x)
+        # x = x.permute([0, 2, 3, 1])
+        # x = self.block_04_norm_out_post(x)
         # x = x.permute([0, 3, 1, 2])
 
         # # Inter-Block dropout
@@ -835,26 +1479,38 @@ class DecoderOnlyModel(nn.Module):
         # ctx = (ctx.unsqueeze(1) @ self.block_03_wl_ctx(ctx)).squeeze(1)
         # ctx = activation_fn_ctx(ctx)
         # ctx = self.block_03_norm_ctx(ctx)
-        # x_upsampled = self.block_03_conv_upsample(x, ctx)
+        # ctx_upsample = self.block_03_ctx_linear_upsample(ctx)
+        # ctx_upsample = activation_fn_ctx(ctx_upsample)
+        # ctx_sml = self.block_03_ctx_linear_sml(ctx)
+        # ctx_sml = activation_fn_ctx(ctx_sml)
+        # ctx_med = self.block_03_ctx_linear_med(ctx)
+        # ctx_med = activation_fn_ctx(ctx_med)
+        # ctx_lrg = self.block_03_ctx_linear_lrg(ctx)
+        # ctx_lrg = activation_fn_ctx(ctx_lrg)
+        # ctx_wl_lat = self.block_03_ctx_linear_wl_lat(ctx)
+        # ctx_wl_lat = activation_fn_ctx(ctx_wl_lat)
+        # ctx_conv_out = self.block_03_ctx_linear_conv_out(ctx)
+        # ctx_conv_out = activation_fn_ctx(ctx_conv_out)
+        # x_upsampled = self.block_03_conv_upsample(x, ctx_upsample)
         # x_upsampled = activation_fn_x(x_upsampled)
         # x_upsampled = x_upsampled.permute([0, 2, 3, 1])
         # x_upsampled = self.block_03_norm_conv_upsample(x_upsampled)
         # x_upsampled = x_upsampled.permute([0, 3, 1, 2])
         # x_upsampled = self.dropout_latents(x_upsampled)
         # x_upsampled = self.noisein(x_upsampled, self.noisein_rate_latents)
-        # x_convolved_sml = self.block_03_conv_sml(x_upsampled, ctx)
+        # x_convolved_sml = self.block_03_conv_sml(x_upsampled, ctx_sml)
         # x_convolved_sml = activation_fn_x(x_convolved_sml)
         # x_convolved_sml = x_convolved_sml.permute([0, 2, 3, 1])
         # x_convolved_sml = self.block_03_norm_conv_sml(x_convolved_sml)
         # x_convolved_sml = x_convolved_sml.permute([0, 3, 1, 2])
         # x_convolved_sml = self.dropout_latents(x_convolved_sml)
-        # x_convolved_med = self.block_03_conv_med(x_upsampled, ctx)
+        # x_convolved_med = self.block_03_conv_med(x_upsampled, ctx_med)
         # x_convolved_med = activation_fn_x(x_convolved_med)
         # x_convolved_med = x_convolved_med.permute([0, 2, 3, 1])
         # x_convolved_med = self.block_03_norm_conv_med(x_convolved_med)
         # x_convolved_med = x_convolved_med.permute([0, 3, 1, 2])
         # x_convolved_med = self.dropout_latents(x_convolved_med)
-        # x_convolved_lrg = self.block_03_conv_lrg(x_upsampled, ctx)
+        # x_convolved_lrg = self.block_03_conv_lrg(x_upsampled, ctx_lrg)
         # x_convolved_lrg = activation_fn_x(x_convolved_lrg)
         # x_convolved_lrg = x_convolved_lrg.permute([0, 2, 3, 1])
         # x_convolved_lrg = self.block_03_norm_conv_lrg(x_convolved_lrg)
@@ -864,11 +1520,16 @@ class DecoderOnlyModel(nn.Module):
         #     [x_convolved_sml, x_convolved_med, x_convolved_lrg], dim=1
         # )
         # x_convolved = self.dropout_latents(x_convolved)
-        # x_lat_w = self.block_03_wl_lat(ctx)
+        # x_lat_w = self.block_03_wl_lat(ctx_wl_lat)
         # x = x_convolved.permute([0, 2, 3, 1])
         # x = torch.einsum("b...j,bjk->b...k", x, x_lat_w)
         # x = activation_fn_x(x)
-        # x = self.block_03_norm_out(x)
+        # x = self.block_03_norm_out_pre(x)
+        # x = x.permute([0, 3, 1, 2])
+        # x = self.block_03_conv_out(x, ctx_conv_out)
+        # x = activation_fn_x(x)
+        # x = x.permute([0, 2, 3, 1])
+        # x = self.block_03_norm_out_post(x)
         # x = x.permute([0, 3, 1, 2])
 
         # # Inter-Block dropout
@@ -880,26 +1541,38 @@ class DecoderOnlyModel(nn.Module):
         # ctx = (ctx.unsqueeze(1) @ self.block_02_wl_ctx(ctx)).squeeze(1)
         # ctx = activation_fn_ctx(ctx)
         # ctx = self.block_02_norm_ctx(ctx)
-        # x_upsampled = self.block_02_conv_upsample(x, ctx)
+        # ctx_upsample = self.block_02_ctx_linear_upsample(ctx)
+        # ctx_upsample = activation_fn_ctx(ctx_upsample)
+        # ctx_sml = self.block_02_ctx_linear_sml(ctx)
+        # ctx_sml = activation_fn_ctx(ctx_sml)
+        # ctx_med = self.block_02_ctx_linear_med(ctx)
+        # ctx_med = activation_fn_ctx(ctx_med)
+        # ctx_lrg = self.block_02_ctx_linear_lrg(ctx)
+        # ctx_lrg = activation_fn_ctx(ctx_lrg)
+        # ctx_wl_lat = self.block_02_ctx_linear_wl_lat(ctx)
+        # ctx_wl_lat = activation_fn_ctx(ctx_wl_lat)
+        # ctx_conv_out = self.block_02_ctx_linear_conv_out(ctx)
+        # ctx_conv_out = activation_fn_ctx(ctx_conv_out)
+        # x_upsampled = self.block_02_conv_upsample(x, ctx_upsample)
         # x_upsampled = activation_fn_x(x_upsampled)
         # x_upsampled = x_upsampled.permute([0, 2, 3, 1])
         # x_upsampled = self.block_02_norm_conv_upsample(x_upsampled)
         # x_upsampled = x_upsampled.permute([0, 3, 1, 2])
         # x_upsampled = self.dropout_latents(x_upsampled)
         # x_upsampled = self.noisein(x_upsampled, self.noisein_rate_latents)
-        # x_convolved_sml = self.block_02_conv_sml(x_upsampled, ctx)
+        # x_convolved_sml = self.block_02_conv_sml(x_upsampled, ctx_sml)
         # x_convolved_sml = activation_fn_x(x_convolved_sml)
         # x_convolved_sml = x_convolved_sml.permute([0, 2, 3, 1])
         # x_convolved_sml = self.block_02_norm_conv_sml(x_convolved_sml)
         # x_convolved_sml = x_convolved_sml.permute([0, 3, 1, 2])
         # x_convolved_sml = self.dropout_latents(x_convolved_sml)
-        # x_convolved_med = self.block_02_conv_med(x_upsampled, ctx)
+        # x_convolved_med = self.block_02_conv_med(x_upsampled, ctx_med)
         # x_convolved_med = activation_fn_x(x_convolved_med)
         # x_convolved_med = x_convolved_med.permute([0, 2, 3, 1])
         # x_convolved_med = self.block_02_norm_conv_med(x_convolved_med)
         # x_convolved_med = x_convolved_med.permute([0, 3, 1, 2])
         # x_convolved_med = self.dropout_latents(x_convolved_med)
-        # x_convolved_lrg = self.block_02_conv_lrg(x_upsampled, ctx)
+        # x_convolved_lrg = self.block_02_conv_lrg(x_upsampled, ctx_lrg)
         # x_convolved_lrg = activation_fn_x(x_convolved_lrg)
         # x_convolved_lrg = x_convolved_lrg.permute([0, 2, 3, 1])
         # x_convolved_lrg = self.block_02_norm_conv_lrg(x_convolved_lrg)
@@ -909,11 +1582,16 @@ class DecoderOnlyModel(nn.Module):
         #     [x_convolved_sml, x_convolved_med, x_convolved_lrg], dim=1
         # )
         # x_convolved = self.dropout_latents(x_convolved)
-        # x_lat_w = self.block_02_wl_lat(ctx)
+        # x_lat_w = self.block_02_wl_lat(ctx_wl_lat)
         # x = x_convolved.permute([0, 2, 3, 1])
         # x = torch.einsum("b...j,bjk->b...k", x, x_lat_w)
         # x = activation_fn_x(x)
-        # x = self.block_02_norm_out(x)
+        # x = self.block_02_norm_out_pre(x)
+        # x = x.permute([0, 3, 1, 2])
+        # x = self.block_02_conv_out(x, ctx_conv_out)
+        # x = activation_fn_x(x)
+        # x = x.permute([0, 2, 3, 1])
+        # x = self.block_02_norm_out_post(x)
         # x = x.permute([0, 3, 1, 2])
 
         # # Inter-Block dropout
@@ -925,26 +1603,38 @@ class DecoderOnlyModel(nn.Module):
         ctx = (ctx.unsqueeze(1) @ self.block_01_wl_ctx(ctx)).squeeze(1)
         ctx = activation_fn_ctx(ctx)
         ctx = self.block_01_norm_ctx(ctx)
-        x_upsampled = self.block_01_conv_upsample(x, ctx)
+        ctx_upsample = self.block_01_ctx_linear_upsample(ctx)
+        ctx_upsample = activation_fn_ctx(ctx_upsample)
+        ctx_sml = self.block_01_ctx_linear_sml(ctx)
+        ctx_sml = activation_fn_ctx(ctx_sml)
+        ctx_med = self.block_01_ctx_linear_med(ctx)
+        ctx_med = activation_fn_ctx(ctx_med)
+        ctx_lrg = self.block_01_ctx_linear_lrg(ctx)
+        ctx_lrg = activation_fn_ctx(ctx_lrg)
+        ctx_wl_lat = self.block_01_ctx_linear_wl_lat(ctx)
+        ctx_wl_lat = activation_fn_ctx(ctx_wl_lat)
+        ctx_conv_out = self.block_01_ctx_linear_conv_out(ctx)
+        ctx_conv_out = activation_fn_ctx(ctx_conv_out)
+        x_upsampled = self.block_01_conv_upsample(x, ctx_upsample)
         x_upsampled = activation_fn_x(x_upsampled)
         x_upsampled = x_upsampled.permute([0, 2, 3, 1])
         x_upsampled = self.block_01_norm_conv_upsample(x_upsampled)
         x_upsampled = x_upsampled.permute([0, 3, 1, 2])
         x_upsampled = self.dropout_latents(x_upsampled)
         x_upsampled = self.noisein(x_upsampled, self.noisein_rate_latents)
-        x_convolved_sml = self.block_01_conv_sml(x_upsampled, ctx)
+        x_convolved_sml = self.block_01_conv_sml(x_upsampled, ctx_sml)
         x_convolved_sml = activation_fn_x(x_convolved_sml)
         x_convolved_sml = x_convolved_sml.permute([0, 2, 3, 1])
         x_convolved_sml = self.block_01_norm_conv_sml(x_convolved_sml)
         x_convolved_sml = x_convolved_sml.permute([0, 3, 1, 2])
         x_convolved_sml = self.dropout_latents(x_convolved_sml)
-        x_convolved_med = self.block_01_conv_med(x_upsampled, ctx)
+        x_convolved_med = self.block_01_conv_med(x_upsampled, ctx_med)
         x_convolved_med = activation_fn_x(x_convolved_med)
         x_convolved_med = x_convolved_med.permute([0, 2, 3, 1])
         x_convolved_med = self.block_01_norm_conv_med(x_convolved_med)
         x_convolved_med = x_convolved_med.permute([0, 3, 1, 2])
         x_convolved_med = self.dropout_latents(x_convolved_med)
-        x_convolved_lrg = self.block_01_conv_lrg(x_upsampled, ctx)
+        x_convolved_lrg = self.block_01_conv_lrg(x_upsampled, ctx_lrg)
         x_convolved_lrg = activation_fn_x(x_convolved_lrg)
         x_convolved_lrg = x_convolved_lrg.permute([0, 2, 3, 1])
         x_convolved_lrg = self.block_01_norm_conv_lrg(x_convolved_lrg)
@@ -954,11 +1644,16 @@ class DecoderOnlyModel(nn.Module):
             [x_convolved_sml, x_convolved_med, x_convolved_lrg], dim=1
         )
         x_convolved = self.dropout_latents(x_convolved)
-        x_lat_w = self.block_01_wl_lat(ctx)
+        x_lat_w = self.block_01_wl_lat(ctx_wl_lat)
         x = x_convolved.permute([0, 2, 3, 1])
         x = torch.einsum("b...j,bjk->b...k", x, x_lat_w)
         x = activation_fn_x(x)
-        x = self.block_01_norm_out(x)
+        x = self.block_01_norm_out_pre(x)
+        x = x.permute([0, 3, 1, 2])
+        x = self.block_01_conv_out(x, ctx_conv_out)
+        x = activation_fn_x(x)
+        x = x.permute([0, 2, 3, 1])
+        x = self.block_01_norm_out_post(x)
         x = x.permute([0, 3, 1, 2])
 
         # Inter-Block dropout
@@ -966,7 +1661,12 @@ class DecoderOnlyModel(nn.Module):
         ctx = self.dropout_context(ctx)
 
         # Out
-        x = self.block_out_conv(x)
+        # ctx = self.noisein(ctx, self.noisein_rate_context)
+        ctx = (ctx.unsqueeze(1) @ self.block_out_wl_ctx(ctx)).squeeze(1)
+        ctx = activation_fn_ctx(ctx)
+        ctx = self.block_out_norm_ctx(ctx)
+        # x = self.noisein(x, self.noisein_rate_latents)
+        x = self.block_out_conv(x, ctx)
         x = F.sigmoid(x)
 
         return x
@@ -1048,6 +1748,70 @@ def data_lab_to_rgb(
     return rgb
 
 
+def pretrain(
+    model: DecoderOnlyModel,
+    epochs: int = 1000,
+    batch_size: int = 32,
+) -> None:
+    max_id = model.data_cache_ctx.shape[0]
+
+    x = model.forward_pretrain(torch.tensor([0]))
+    targets = []
+    for response in x:
+        target = torch.nn.init.normal_(
+            tensor=torch.empty_like(response).repeat(
+                [
+                    max_id + 1,
+                    *[1 for _ in response.shape[1:]],
+                ]
+            ),
+            mean=0.0,
+            std=1.0,
+        )
+        targets.append(target)
+
+    # optimizer = torch.optim.NAdam(
+    #     model.parameters(),
+    #     lr=1.0e-4,
+    #     weight_decay=1.0e-6,
+    #     momentum_decay=5.0e-3,
+    #     decoupled_weight_decay=True,
+    # )
+    optimizer = MADGRAD(
+        model.parameters(),
+        lr=1.0e-2,
+        momentum=0.9,
+    )
+
+    for epoch_id in range(epochs):
+        epoch_ids = torch.randperm(max_id)
+
+        optimizer.zero_grad()
+        epoch_loss = 0.0
+
+        for _ in range(0, max_id, batch_size):
+            batch_ids = epoch_ids[0:batch_size]
+            epoch_ids = epoch_ids[batch_size:]
+
+            batch_response = model.forward_pretrain(batch_ids)
+            batch_loss = 0.0
+            for response_id in range(len(batch_response)):
+                response = batch_response[response_id]
+                target = targets[response_id][batch_ids]
+                loss = F.mse_loss(response, target)
+                batch_loss += loss
+            batch_loss = batch_loss / ((max_id + 1) // batch_size)
+            batch_loss = batch_loss / len(batch_response)
+            batch_loss.backward()
+            epoch_loss += batch_loss.item()
+
+        print(f"Epoch {epoch_id + 1}/{epochs}, Loss: {epoch_loss}")
+
+        optimizer.step()
+
+    pass
+
+
 def train(
     data: torch.Tensor,
     total_steps: int,
@@ -1076,7 +1840,7 @@ def train(
     freeze_latents_epochs: Optional[int],
     freeze_model_nth_epoch: Optional[int],
     freeze_model_epochs: Optional[int],
-    model: nn.Module,
+    model: DecoderOnlyModel,
     optimizer: torch.optim.Optimizer,
     log_nth_update_step: int,
     images_path_dst: str = None,
@@ -1745,8 +2509,8 @@ def model_perturb_weights(
     device: Optional[torch.device] = None,
     dtype: Optional[torch.dtype] = None,
 ) -> None:
-    a = 0.0005
-    b = 0.0010
+    a = 0.001
+    b = 0.005
     for name, param in model.named_parameters():
         if "data_cache" not in name:
             delta = torch.nn.init.uniform_(
@@ -1957,6 +2721,7 @@ def model_freeze_block(
             print(f"model_freeze_block: {name}")
     pass
 
+
 def model_unfreeze_block(
     model: DecoderOnlyModel,
     device: Optional[torch.device] = None,
@@ -1994,13 +2759,20 @@ if __name__ == "__main__":
         # model_freeze_latents,
         # model_data_cache_double,
         # model_data_cache_double,
-        lambda m, d, t: model_change_data_cache_latents(m, d, t, [512, 16, 256, 256]),
-        lambda m, d, t: model_change_data_cache_ctx(m, d, t, [512, 64]),
+        lambda m, d, t: model_change_data_cache_latents(m, d, t, [128, 16, 256, 256]),
+        # lambda m, d, t: model_change_data_cache_ctx(m, d, t, [128, 64]),
         # model_freeze_ctx,
-        model_perturb_weights,
-        model_unfreeze_all,
-        model_freeze_model,
-        lambda m, d, t: model_unfreeze_block(m, d, t, "block_01"),
+        # model_perturb_weights,
+        # model_unfreeze_all,
+        # model_freeze_model,
+
+        # lambda m, d, t: model_unfreeze_block(m, d, t, "block_out"),
+        # lambda m, d, t: model_unfreeze_block(m, d, t, "block_01"),
+        # lambda m, d, t: model_unfreeze_block(m, d, t, "block_02"),
+        # lambda m, d, t: model_unfreeze_block(m, d, t, "block_03"),
+        # lambda m, d, t: model_unfreeze_block(m, d, t, "block_04"),
+
+        lambda m, d, t: model_freeze_block(m, d, t, "block_out"),
         # lambda m, d, t: model_freeze_block(m, d, t, "block_01"),
         # lambda m, d, t: model_freeze_block(m, d, t, "block_02"),
         # lambda m, d, t: model_freeze_block(m, d, t, "block_03"),
@@ -2012,14 +2784,14 @@ if __name__ == "__main__":
 
     path_prefix_load = "/mnt/f/git_AIResearch/dyna/data/models"
     path_prefix_save = "/mnt/f/git_AIResearch/dyna/data/models"
-    load_path_model = f"{path_prefix_load}/G6/model.G6.LAST_1024x256.pth"
+    load_path_model = f"{path_prefix_load}/model.G1.LAST.pth"
     load_path_optim = f"{path_prefix_load}/"
-    save_path_model = f"{path_prefix_save}/model.G7"
-    save_path_optim = f"{path_prefix_save}/optim.G7"
+    save_path_model = f"{path_prefix_save}/model.G2"
+    save_path_optim = f"{path_prefix_save}/optim.G2"
     save_model = True
-    save_optim = True
+    save_optim = False
     save_nth_iteration = 10_000
-    log_nth_update_step = 1
+    log_nth_update_step = 128
 
     # optimizer type
     optimizer_type = torch.optim.NAdam
@@ -2035,12 +2807,12 @@ if __name__ == "__main__":
     adam_weight_decay = 0.0
     adam_eps = 1.0e-8
     # optimizer: torch.optim.NAdam
-    nadam_learning_rate = 1.0e-5
+    nadam_learning_rate = 1.0e-6
     nadam_weight_decay = 1.0e-6
     nadam_momentum_decay = 5.0e-3
     nadam_decoupled_weight_decay = True
     # optimizer: MADGRAD
-    madgrad_learning_rate = 1.0e-5
+    madgrad_learning_rate = 1.0e-3
     madgrad_momentum = 0.9
     madgrad_weight_decay = 0.0
     madgrad_eps = 1.0e-6
@@ -2087,22 +2859,22 @@ if __name__ == "__main__":
     freeze_model_nth_epoch = 0
     freeze_model_epochs = 0
 
-    nelements = 512
-    data_cache_ctx_len = 2048 # nelements
-    data_cache_latents_len = 1024 # nelements
-    data_cache_latents_shape = [16, 256, 256]
+    nelements = 128
+    data_cache_ctx_len = nelements
+    data_cache_latents_len = nelements
+    data_cache_latents_shape = [16, 512, 512]
     dropout_rate_latents = 0.0000
     dropout_rate_context = 0.0000
-    noisein_rate_latents = 0.1000
-    noisein_rate_context = 0.0000
+    noisein_rate_latents = 0.5000
+    noisein_rate_context = 0.1000
 
     total_steps = 100_000
-    batch_size = 16
+    batch_size = 1
     sliding_batch = False
-    grad_accumulation_steps = nelements // batch_size
+    grad_accumulation_steps = 1  # nelements // batch_size
 
     images_sample_count = nelements
-    starting_from = 1024 * 6
+    starting_from = 1024 * 7
     images_path_src = "/mnt/f/Datasets/Images_512x512/dataset_01"
     images_path_dst = "/mnt/f/git_AIResearch/dyna/data/img_dst"
     output_shape = [512, 512]
@@ -2243,21 +3015,21 @@ if __name__ == "__main__":
         lambda p: torch.save(optimizer.state_dict(), f"{save_path_optim}.{p}.pth"),
     ]
 
-    # WARMUP
-    lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
-        optimizer=optimizer,
-        T_0=50,
-        T_mult=1,
-    )
-    warmup_epochs = 100
-    warmup_scheduler = warmup.LinearWarmup(
-        optimizer=optimizer,
-        warmup_period=warmup_epochs,
-    )
+    # # WARMUP
+    # lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
+    #     optimizer=optimizer,
+    #     T_0=50,
+    #     T_mult=1,
+    # )
+    # warmup_epochs = 100
+    # warmup_scheduler = warmup.LinearWarmup(
+    #     optimizer=optimizer,
+    #     warmup_period=warmup_epochs,
+    # )
 
-    # lr_scheduler = None
-    # warmup_epochs = None
-    # warmup_scheduler = None
+    lr_scheduler = None
+    warmup_epochs = None
+    warmup_scheduler = None
 
     if optim_update_lr:
         for g in optimizer.param_groups:
