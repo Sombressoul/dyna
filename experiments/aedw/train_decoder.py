@@ -1474,129 +1474,129 @@ class DecoderOnlyModel(nn.Module):
         # x = self.dropout_latents(x)
         # ctx = self.dropout_context(ctx)
 
-        # # Block 03
-        # ctx = self.noisein(ctx, self.noisein_rate_context)
-        # ctx = (ctx.unsqueeze(1) @ self.block_03_wl_ctx(ctx)).squeeze(1)
-        # ctx = activation_fn_ctx(ctx)
-        # ctx = self.block_03_norm_ctx(ctx)
-        # ctx_upsample = self.block_03_ctx_linear_upsample(ctx)
-        # ctx_upsample = activation_fn_ctx(ctx_upsample)
-        # ctx_sml = self.block_03_ctx_linear_sml(ctx)
-        # ctx_sml = activation_fn_ctx(ctx_sml)
-        # ctx_med = self.block_03_ctx_linear_med(ctx)
-        # ctx_med = activation_fn_ctx(ctx_med)
-        # ctx_lrg = self.block_03_ctx_linear_lrg(ctx)
-        # ctx_lrg = activation_fn_ctx(ctx_lrg)
-        # ctx_wl_lat = self.block_03_ctx_linear_wl_lat(ctx)
-        # ctx_wl_lat = activation_fn_ctx(ctx_wl_lat)
-        # ctx_conv_out = self.block_03_ctx_linear_conv_out(ctx)
-        # ctx_conv_out = activation_fn_ctx(ctx_conv_out)
-        # x_upsampled = self.block_03_conv_upsample(x, ctx_upsample)
-        # x_upsampled = activation_fn_x(x_upsampled)
-        # x_upsampled = x_upsampled.permute([0, 2, 3, 1])
-        # x_upsampled = self.block_03_norm_conv_upsample(x_upsampled)
-        # x_upsampled = x_upsampled.permute([0, 3, 1, 2])
-        # x_upsampled = self.dropout_latents(x_upsampled)
-        # x_upsampled = self.noisein(x_upsampled, self.noisein_rate_latents)
-        # x_convolved_sml = self.block_03_conv_sml(x_upsampled, ctx_sml)
-        # x_convolved_sml = activation_fn_x(x_convolved_sml)
-        # x_convolved_sml = x_convolved_sml.permute([0, 2, 3, 1])
-        # x_convolved_sml = self.block_03_norm_conv_sml(x_convolved_sml)
-        # x_convolved_sml = x_convolved_sml.permute([0, 3, 1, 2])
-        # x_convolved_sml = self.dropout_latents(x_convolved_sml)
-        # x_convolved_med = self.block_03_conv_med(x_upsampled, ctx_med)
-        # x_convolved_med = activation_fn_x(x_convolved_med)
-        # x_convolved_med = x_convolved_med.permute([0, 2, 3, 1])
-        # x_convolved_med = self.block_03_norm_conv_med(x_convolved_med)
-        # x_convolved_med = x_convolved_med.permute([0, 3, 1, 2])
-        # x_convolved_med = self.dropout_latents(x_convolved_med)
-        # x_convolved_lrg = self.block_03_conv_lrg(x_upsampled, ctx_lrg)
-        # x_convolved_lrg = activation_fn_x(x_convolved_lrg)
-        # x_convolved_lrg = x_convolved_lrg.permute([0, 2, 3, 1])
-        # x_convolved_lrg = self.block_03_norm_conv_lrg(x_convolved_lrg)
-        # x_convolved_lrg = x_convolved_lrg.permute([0, 3, 1, 2])
-        # x_convolved_lrg = self.dropout_latents(x_convolved_lrg)
-        # x_convolved = torch.cat(
-        #     [x_convolved_sml, x_convolved_med, x_convolved_lrg], dim=1
-        # )
-        # x_convolved = self.dropout_latents(x_convolved)
-        # x_lat_w = self.block_03_wl_lat(ctx_wl_lat)
-        # x = x_convolved.permute([0, 2, 3, 1])
-        # x = torch.einsum("b...j,bjk->b...k", x, x_lat_w)
-        # x = activation_fn_x(x)
-        # x = self.block_03_norm_out_pre(x)
-        # x = x.permute([0, 3, 1, 2])
-        # x = self.block_03_conv_out(x, ctx_conv_out)
-        # x = activation_fn_x(x)
-        # x = x.permute([0, 2, 3, 1])
-        # x = self.block_03_norm_out_post(x)
-        # x = x.permute([0, 3, 1, 2])
+        # Block 03
+        ctx = self.noisein(ctx, self.noisein_rate_context)
+        ctx = (ctx.unsqueeze(1) @ self.block_03_wl_ctx(ctx)).squeeze(1)
+        ctx = activation_fn_ctx(ctx)
+        ctx = self.block_03_norm_ctx(ctx)
+        ctx_upsample = self.block_03_ctx_linear_upsample(ctx)
+        ctx_upsample = activation_fn_ctx(ctx_upsample)
+        ctx_sml = self.block_03_ctx_linear_sml(ctx)
+        ctx_sml = activation_fn_ctx(ctx_sml)
+        ctx_med = self.block_03_ctx_linear_med(ctx)
+        ctx_med = activation_fn_ctx(ctx_med)
+        ctx_lrg = self.block_03_ctx_linear_lrg(ctx)
+        ctx_lrg = activation_fn_ctx(ctx_lrg)
+        ctx_wl_lat = self.block_03_ctx_linear_wl_lat(ctx)
+        ctx_wl_lat = activation_fn_ctx(ctx_wl_lat)
+        ctx_conv_out = self.block_03_ctx_linear_conv_out(ctx)
+        ctx_conv_out = activation_fn_ctx(ctx_conv_out)
+        x_upsampled = self.block_03_conv_upsample(x, ctx_upsample)
+        x_upsampled = activation_fn_x(x_upsampled)
+        x_upsampled = x_upsampled.permute([0, 2, 3, 1])
+        x_upsampled = self.block_03_norm_conv_upsample(x_upsampled)
+        x_upsampled = x_upsampled.permute([0, 3, 1, 2])
+        x_upsampled = self.dropout_latents(x_upsampled)
+        x_upsampled = self.noisein(x_upsampled, self.noisein_rate_latents)
+        x_convolved_sml = self.block_03_conv_sml(x_upsampled, ctx_sml)
+        x_convolved_sml = activation_fn_x(x_convolved_sml)
+        x_convolved_sml = x_convolved_sml.permute([0, 2, 3, 1])
+        x_convolved_sml = self.block_03_norm_conv_sml(x_convolved_sml)
+        x_convolved_sml = x_convolved_sml.permute([0, 3, 1, 2])
+        x_convolved_sml = self.dropout_latents(x_convolved_sml)
+        x_convolved_med = self.block_03_conv_med(x_upsampled, ctx_med)
+        x_convolved_med = activation_fn_x(x_convolved_med)
+        x_convolved_med = x_convolved_med.permute([0, 2, 3, 1])
+        x_convolved_med = self.block_03_norm_conv_med(x_convolved_med)
+        x_convolved_med = x_convolved_med.permute([0, 3, 1, 2])
+        x_convolved_med = self.dropout_latents(x_convolved_med)
+        x_convolved_lrg = self.block_03_conv_lrg(x_upsampled, ctx_lrg)
+        x_convolved_lrg = activation_fn_x(x_convolved_lrg)
+        x_convolved_lrg = x_convolved_lrg.permute([0, 2, 3, 1])
+        x_convolved_lrg = self.block_03_norm_conv_lrg(x_convolved_lrg)
+        x_convolved_lrg = x_convolved_lrg.permute([0, 3, 1, 2])
+        x_convolved_lrg = self.dropout_latents(x_convolved_lrg)
+        x_convolved = torch.cat(
+            [x_convolved_sml, x_convolved_med, x_convolved_lrg], dim=1
+        )
+        x_convolved = self.dropout_latents(x_convolved)
+        x_lat_w = self.block_03_wl_lat(ctx_wl_lat)
+        x = x_convolved.permute([0, 2, 3, 1])
+        x = torch.einsum("b...j,bjk->b...k", x, x_lat_w)
+        x = activation_fn_x(x)
+        x = self.block_03_norm_out_pre(x)
+        x = x.permute([0, 3, 1, 2])
+        x = self.block_03_conv_out(x, ctx_conv_out)
+        x = activation_fn_x(x)
+        x = x.permute([0, 2, 3, 1])
+        x = self.block_03_norm_out_post(x)
+        x = x.permute([0, 3, 1, 2])
 
-        # # Inter-Block dropout
-        # x = self.dropout_latents(x)
-        # ctx = self.dropout_context(ctx)
+        # Inter-Block dropout
+        x = self.dropout_latents(x)
+        ctx = self.dropout_context(ctx)
 
-        # # Block 02
-        # ctx = self.noisein(ctx, self.noisein_rate_context)
-        # ctx = (ctx.unsqueeze(1) @ self.block_02_wl_ctx(ctx)).squeeze(1)
-        # ctx = activation_fn_ctx(ctx)
-        # ctx = self.block_02_norm_ctx(ctx)
-        # ctx_upsample = self.block_02_ctx_linear_upsample(ctx)
-        # ctx_upsample = activation_fn_ctx(ctx_upsample)
-        # ctx_sml = self.block_02_ctx_linear_sml(ctx)
-        # ctx_sml = activation_fn_ctx(ctx_sml)
-        # ctx_med = self.block_02_ctx_linear_med(ctx)
-        # ctx_med = activation_fn_ctx(ctx_med)
-        # ctx_lrg = self.block_02_ctx_linear_lrg(ctx)
-        # ctx_lrg = activation_fn_ctx(ctx_lrg)
-        # ctx_wl_lat = self.block_02_ctx_linear_wl_lat(ctx)
-        # ctx_wl_lat = activation_fn_ctx(ctx_wl_lat)
-        # ctx_conv_out = self.block_02_ctx_linear_conv_out(ctx)
-        # ctx_conv_out = activation_fn_ctx(ctx_conv_out)
-        # x_upsampled = self.block_02_conv_upsample(x, ctx_upsample)
-        # x_upsampled = activation_fn_x(x_upsampled)
-        # x_upsampled = x_upsampled.permute([0, 2, 3, 1])
-        # x_upsampled = self.block_02_norm_conv_upsample(x_upsampled)
-        # x_upsampled = x_upsampled.permute([0, 3, 1, 2])
-        # x_upsampled = self.dropout_latents(x_upsampled)
-        # x_upsampled = self.noisein(x_upsampled, self.noisein_rate_latents)
-        # x_convolved_sml = self.block_02_conv_sml(x_upsampled, ctx_sml)
-        # x_convolved_sml = activation_fn_x(x_convolved_sml)
-        # x_convolved_sml = x_convolved_sml.permute([0, 2, 3, 1])
-        # x_convolved_sml = self.block_02_norm_conv_sml(x_convolved_sml)
-        # x_convolved_sml = x_convolved_sml.permute([0, 3, 1, 2])
-        # x_convolved_sml = self.dropout_latents(x_convolved_sml)
-        # x_convolved_med = self.block_02_conv_med(x_upsampled, ctx_med)
-        # x_convolved_med = activation_fn_x(x_convolved_med)
-        # x_convolved_med = x_convolved_med.permute([0, 2, 3, 1])
-        # x_convolved_med = self.block_02_norm_conv_med(x_convolved_med)
-        # x_convolved_med = x_convolved_med.permute([0, 3, 1, 2])
-        # x_convolved_med = self.dropout_latents(x_convolved_med)
-        # x_convolved_lrg = self.block_02_conv_lrg(x_upsampled, ctx_lrg)
-        # x_convolved_lrg = activation_fn_x(x_convolved_lrg)
-        # x_convolved_lrg = x_convolved_lrg.permute([0, 2, 3, 1])
-        # x_convolved_lrg = self.block_02_norm_conv_lrg(x_convolved_lrg)
-        # x_convolved_lrg = x_convolved_lrg.permute([0, 3, 1, 2])
-        # x_convolved_lrg = self.dropout_latents(x_convolved_lrg)
-        # x_convolved = torch.cat(
-        #     [x_convolved_sml, x_convolved_med, x_convolved_lrg], dim=1
-        # )
-        # x_convolved = self.dropout_latents(x_convolved)
-        # x_lat_w = self.block_02_wl_lat(ctx_wl_lat)
-        # x = x_convolved.permute([0, 2, 3, 1])
-        # x = torch.einsum("b...j,bjk->b...k", x, x_lat_w)
-        # x = activation_fn_x(x)
-        # x = self.block_02_norm_out_pre(x)
-        # x = x.permute([0, 3, 1, 2])
-        # x = self.block_02_conv_out(x, ctx_conv_out)
-        # x = activation_fn_x(x)
-        # x = x.permute([0, 2, 3, 1])
-        # x = self.block_02_norm_out_post(x)
-        # x = x.permute([0, 3, 1, 2])
+        # Block 02
+        ctx = self.noisein(ctx, self.noisein_rate_context)
+        ctx = (ctx.unsqueeze(1) @ self.block_02_wl_ctx(ctx)).squeeze(1)
+        ctx = activation_fn_ctx(ctx)
+        ctx = self.block_02_norm_ctx(ctx)
+        ctx_upsample = self.block_02_ctx_linear_upsample(ctx)
+        ctx_upsample = activation_fn_ctx(ctx_upsample)
+        ctx_sml = self.block_02_ctx_linear_sml(ctx)
+        ctx_sml = activation_fn_ctx(ctx_sml)
+        ctx_med = self.block_02_ctx_linear_med(ctx)
+        ctx_med = activation_fn_ctx(ctx_med)
+        ctx_lrg = self.block_02_ctx_linear_lrg(ctx)
+        ctx_lrg = activation_fn_ctx(ctx_lrg)
+        ctx_wl_lat = self.block_02_ctx_linear_wl_lat(ctx)
+        ctx_wl_lat = activation_fn_ctx(ctx_wl_lat)
+        ctx_conv_out = self.block_02_ctx_linear_conv_out(ctx)
+        ctx_conv_out = activation_fn_ctx(ctx_conv_out)
+        x_upsampled = self.block_02_conv_upsample(x, ctx_upsample)
+        x_upsampled = activation_fn_x(x_upsampled)
+        x_upsampled = x_upsampled.permute([0, 2, 3, 1])
+        x_upsampled = self.block_02_norm_conv_upsample(x_upsampled)
+        x_upsampled = x_upsampled.permute([0, 3, 1, 2])
+        x_upsampled = self.dropout_latents(x_upsampled)
+        x_upsampled = self.noisein(x_upsampled, self.noisein_rate_latents)
+        x_convolved_sml = self.block_02_conv_sml(x_upsampled, ctx_sml)
+        x_convolved_sml = activation_fn_x(x_convolved_sml)
+        x_convolved_sml = x_convolved_sml.permute([0, 2, 3, 1])
+        x_convolved_sml = self.block_02_norm_conv_sml(x_convolved_sml)
+        x_convolved_sml = x_convolved_sml.permute([0, 3, 1, 2])
+        x_convolved_sml = self.dropout_latents(x_convolved_sml)
+        x_convolved_med = self.block_02_conv_med(x_upsampled, ctx_med)
+        x_convolved_med = activation_fn_x(x_convolved_med)
+        x_convolved_med = x_convolved_med.permute([0, 2, 3, 1])
+        x_convolved_med = self.block_02_norm_conv_med(x_convolved_med)
+        x_convolved_med = x_convolved_med.permute([0, 3, 1, 2])
+        x_convolved_med = self.dropout_latents(x_convolved_med)
+        x_convolved_lrg = self.block_02_conv_lrg(x_upsampled, ctx_lrg)
+        x_convolved_lrg = activation_fn_x(x_convolved_lrg)
+        x_convolved_lrg = x_convolved_lrg.permute([0, 2, 3, 1])
+        x_convolved_lrg = self.block_02_norm_conv_lrg(x_convolved_lrg)
+        x_convolved_lrg = x_convolved_lrg.permute([0, 3, 1, 2])
+        x_convolved_lrg = self.dropout_latents(x_convolved_lrg)
+        x_convolved = torch.cat(
+            [x_convolved_sml, x_convolved_med, x_convolved_lrg], dim=1
+        )
+        x_convolved = self.dropout_latents(x_convolved)
+        x_lat_w = self.block_02_wl_lat(ctx_wl_lat)
+        x = x_convolved.permute([0, 2, 3, 1])
+        x = torch.einsum("b...j,bjk->b...k", x, x_lat_w)
+        x = activation_fn_x(x)
+        x = self.block_02_norm_out_pre(x)
+        x = x.permute([0, 3, 1, 2])
+        x = self.block_02_conv_out(x, ctx_conv_out)
+        x = activation_fn_x(x)
+        x = x.permute([0, 2, 3, 1])
+        x = self.block_02_norm_out_post(x)
+        x = x.permute([0, 3, 1, 2])
 
-        # # Inter-Block dropout
-        # x = self.dropout_latents(x)
-        # ctx = self.dropout_context(ctx)
+        # Inter-Block dropout
+        x = self.dropout_latents(x)
+        ctx = self.dropout_context(ctx)
 
         # Block 01
         ctx = self.noisein(ctx, self.noisein_rate_context)
@@ -1661,11 +1661,11 @@ class DecoderOnlyModel(nn.Module):
         ctx = self.dropout_context(ctx)
 
         # Out
-        # ctx = self.noisein(ctx, self.noisein_rate_context)
+        ctx = self.noisein(ctx, self.noisein_rate_context)
         ctx = (ctx.unsqueeze(1) @ self.block_out_wl_ctx(ctx)).squeeze(1)
         ctx = activation_fn_ctx(ctx)
         ctx = self.block_out_norm_ctx(ctx)
-        # x = self.noisein(x, self.noisein_rate_latents)
+        x = self.noisein(x, self.noisein_rate_latents)
         x = self.block_out_conv(x, ctx)
         x = F.sigmoid(x)
 
@@ -2739,9 +2739,9 @@ if __name__ == "__main__":
     train_mode = True
 
     load_model = True
-    load_optim = False
-    drop_ctx_cache = True
-    drop_latents_cache = True
+    load_optim = True
+    drop_ctx_cache = False
+    drop_latents_cache = False
     onload_model_fn = [
         # model_freeze_model,
         # model_unfreeze_model,
@@ -2759,8 +2759,8 @@ if __name__ == "__main__":
         # model_freeze_latents,
         # model_data_cache_double,
         # model_data_cache_double,
-        lambda m, d, t: model_change_data_cache_latents(m, d, t, [128, 16, 256, 256]),
-        # lambda m, d, t: model_change_data_cache_ctx(m, d, t, [128, 64]),
+        # lambda m, d, t: model_change_data_cache_latents(m, d, t, [512, 16, 64, 64]),
+        # lambda m, d, t: model_change_data_cache_ctx(m, d, t, [512, 64]),
         # model_freeze_ctx,
         # model_perturb_weights,
         # model_unfreeze_all,
@@ -2772,7 +2772,7 @@ if __name__ == "__main__":
         # lambda m, d, t: model_unfreeze_block(m, d, t, "block_03"),
         # lambda m, d, t: model_unfreeze_block(m, d, t, "block_04"),
 
-        lambda m, d, t: model_freeze_block(m, d, t, "block_out"),
+        # lambda m, d, t: model_freeze_block(m, d, t, "block_out"),
         # lambda m, d, t: model_freeze_block(m, d, t, "block_01"),
         # lambda m, d, t: model_freeze_block(m, d, t, "block_02"),
         # lambda m, d, t: model_freeze_block(m, d, t, "block_03"),
@@ -2784,14 +2784,14 @@ if __name__ == "__main__":
 
     path_prefix_load = "/mnt/f/git_AIResearch/dyna/data/models"
     path_prefix_save = "/mnt/f/git_AIResearch/dyna/data/models"
-    load_path_model = f"{path_prefix_load}/model.G1.LAST.pth"
-    load_path_optim = f"{path_prefix_load}/"
-    save_path_model = f"{path_prefix_save}/model.G2"
-    save_path_optim = f"{path_prefix_save}/optim.G2"
+    load_path_model = f"{path_prefix_load}/model.G2-a.LAST.pth"
+    load_path_optim = f"{path_prefix_load}/optim.G2-a.LAST.pth"
+    save_path_model = f"{path_prefix_save}/model.G2-b"
+    save_path_optim = f"{path_prefix_save}/optim.G2-b"
     save_model = True
     save_optim = False
     save_nth_iteration = 10_000
-    log_nth_update_step = 128
+    log_nth_update_step = 512 // 2
 
     # optimizer type
     optimizer_type = torch.optim.NAdam
@@ -2817,8 +2817,8 @@ if __name__ == "__main__":
     madgrad_weight_decay = 0.0
     madgrad_eps = 1.0e-6
     # various for optimizers
-    optim_update_lr = False
-    optim_target_lr = 1.0e-6
+    optim_update_lr = True
+    optim_target_lr = 1.0e-5
 
     data_cache_ctx_bound = 1.0e-5
     data_cache_latents_bound = 1.0e-5
@@ -2859,22 +2859,22 @@ if __name__ == "__main__":
     freeze_model_nth_epoch = 0
     freeze_model_epochs = 0
 
-    nelements = 128
+    nelements = 512
     data_cache_ctx_len = nelements
     data_cache_latents_len = nelements
-    data_cache_latents_shape = [16, 512, 512]
+    data_cache_latents_shape = [16, 64, 64]
     dropout_rate_latents = 0.0000
     dropout_rate_context = 0.0000
     noisein_rate_latents = 0.5000
     noisein_rate_context = 0.1000
 
     total_steps = 100_000
-    batch_size = 1
+    batch_size = 2
     sliding_batch = False
-    grad_accumulation_steps = 1  # nelements // batch_size
+    grad_accumulation_steps = 1 # nelements // batch_size
 
     images_sample_count = nelements
-    starting_from = 1024 * 7
+    starting_from = 1024 * 8
     images_path_src = "/mnt/f/Datasets/Images_512x512/dataset_01"
     images_path_dst = "/mnt/f/git_AIResearch/dyna/data/img_dst"
     output_shape = [512, 512]
