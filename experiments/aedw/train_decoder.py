@@ -2828,17 +2828,17 @@ if __name__ == "__main__":
 
     path_prefix_load = "/mnt/f/git_AIResearch/dyna/data/models"
     path_prefix_save = "/mnt/f/git_AIResearch/dyna/data/models"
-    load_path_model = f"{path_prefix_load}/model.G4.LAST.pth"
-    load_path_optim = f"{path_prefix_load}/optim.G4.LAST.pth"
-    save_path_model = f"{path_prefix_save}/model.G5"
-    save_path_optim = f"{path_prefix_save}/optim.G5"
+    load_path_model = f"{path_prefix_load}/model.G14.LAST.pth"
+    load_path_optim = f"{path_prefix_load}/optim.G14.LAST.pth"
+    save_path_model = f"{path_prefix_save}/model.G15"
+    save_path_optim = f"{path_prefix_save}/optim.G15"
     save_model = True
     save_optim = True
     save_nth_iteration = 10_000
-    log_nth_update_step = 128
+    log_nth_update_step = 1
 
     # optimizer type
-    optimizer_type = MADGRAD
+    optimizer_type = torch.optim.NAdam
     # optimizer: torch.optim.SGD
     sgd_learning_rate = 1.0e-3
     sgd_momentum = 0.0
@@ -2851,7 +2851,7 @@ if __name__ == "__main__":
     adam_weight_decay = 0.0
     adam_eps = 1.0e-8
     # optimizer: torch.optim.NAdam
-    nadam_learning_rate = 1.0e-5
+    nadam_learning_rate = 1.0e-4
     nadam_weight_decay = 1.0e-6
     nadam_momentum_decay = 5.0e-3
     nadam_decoupled_weight_decay = True
@@ -2909,15 +2909,15 @@ if __name__ == "__main__":
     data_cache_latents_shape = [16, 16, 16]
     dropout_rate_latents = 0.0000
     dropout_rate_context = 0.0000
-    noisein_rate_latents = 0.0500
-    noisein_rate_context = 0.0500
-    noiseover_rate_latents = 0.1000
-    noiseover_rate_context = 0.0100
+    noisein_rate_latents = 0.0000
+    noisein_rate_context = 0.0000
+    noiseover_rate_latents = 0.0500
+    noiseover_rate_context = 0.0000
 
     total_steps = 200_000
-    batch_size = 1
+    batch_size = 14
     sliding_batch = False
-    grad_accumulation_steps = 1 # nelements // batch_size
+    grad_accumulation_steps = nelements // batch_size
 
     images_sample_count = nelements
     starting_from = 1024 * 6
@@ -3066,10 +3066,10 @@ if __name__ == "__main__":
     # # WARMUP
     # lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
     #     optimizer=optimizer,
-    #     T_0=50,
+    #     T_0=128,
     #     T_mult=1,
     # )
-    # warmup_epochs = 100
+    # warmup_epochs = 128
     # warmup_scheduler = warmup.LinearWarmup(
     #     optimizer=optimizer,
     #     warmup_period=warmup_epochs,
