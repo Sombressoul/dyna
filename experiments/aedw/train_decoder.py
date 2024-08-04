@@ -19,7 +19,8 @@ evals_dir = os.path.dirname(script_dir)
 project_dir = os.path.dirname(evals_dir)
 sys.path.append(project_dir)
 
-torch.manual_seed(42)
+# torch.manual_seed(42)
+torch.manual_seed(1383218)
 
 from dyna import DynamicConv2D, WeightsLib2D, siglog, siglog_parametric
 
@@ -56,6 +57,10 @@ class DecoderOnlyModel(nn.Module):
         self.context_length = 64
         self.mod_rank = 32
         self.transformations_rank = 32
+
+        self.branch_x_convolved_sml = True
+        self.branch_x_convolved_med = True
+        self.branch_x_convolved_lrg = True
 
         self.data_cache_ctx_bound = data_cache_ctx_bound
         self.data_cache_latents_bound = data_cache_latents_bound
@@ -223,7 +228,13 @@ class DecoderOnlyModel(nn.Module):
             bias=True,
             dtype=self.dtype_weights,
         )
-        self.block_05_norm_ctx = nn.LayerNorm(
+        self.block_05_norm_ctx_pre = nn.LayerNorm(
+            normalized_shape=[self.context_length],
+            elementwise_affine=True,
+            bias=True,
+            dtype=self.dtype_weights,
+        )
+        self.block_05_norm_ctx_post = nn.LayerNorm(
             normalized_shape=[self.context_length],
             elementwise_affine=True,
             bias=True,
@@ -403,7 +414,13 @@ class DecoderOnlyModel(nn.Module):
             bias=True,
             dtype=self.dtype_weights,
         )
-        self.block_04_norm_ctx = nn.LayerNorm(
+        self.block_04_norm_ctx_pre = nn.LayerNorm(
+            normalized_shape=[self.context_length],
+            elementwise_affine=True,
+            bias=True,
+            dtype=self.dtype_weights,
+        )
+        self.block_04_norm_ctx_post = nn.LayerNorm(
             normalized_shape=[self.context_length],
             elementwise_affine=True,
             bias=True,
@@ -583,7 +600,13 @@ class DecoderOnlyModel(nn.Module):
             bias=True,
             dtype=self.dtype_weights,
         )
-        self.block_03_norm_ctx = nn.LayerNorm(
+        self.block_03_norm_ctx_pre = nn.LayerNorm(
+            normalized_shape=[self.context_length],
+            elementwise_affine=True,
+            bias=True,
+            dtype=self.dtype_weights,
+        )
+        self.block_03_norm_ctx_post = nn.LayerNorm(
             normalized_shape=[self.context_length],
             elementwise_affine=True,
             bias=True,
@@ -763,7 +786,13 @@ class DecoderOnlyModel(nn.Module):
             bias=True,
             dtype=self.dtype_weights,
         )
-        self.block_02_norm_ctx = nn.LayerNorm(
+        self.block_02_norm_ctx_pre = nn.LayerNorm(
+            normalized_shape=[self.context_length],
+            elementwise_affine=True,
+            bias=True,
+            dtype=self.dtype_weights,
+        )
+        self.block_02_norm_ctx_post = nn.LayerNorm(
             normalized_shape=[self.context_length],
             elementwise_affine=True,
             bias=True,
@@ -943,7 +972,13 @@ class DecoderOnlyModel(nn.Module):
             bias=True,
             dtype=self.dtype_weights,
         )
-        self.block_01_norm_ctx = nn.LayerNorm(
+        self.block_01_norm_ctx_pre = nn.LayerNorm(
+            normalized_shape=[self.context_length],
+            elementwise_affine=True,
+            bias=True,
+            dtype=self.dtype_weights,
+        )
+        self.block_01_norm_ctx_post = nn.LayerNorm(
             normalized_shape=[self.context_length],
             elementwise_affine=True,
             bias=True,
@@ -1013,7 +1048,13 @@ class DecoderOnlyModel(nn.Module):
             ],
             dtype_weights=self.dtype_weights,
         )
-        self.block_out_norm_ctx = nn.LayerNorm(
+        self.block_out_norm_ctx_pre = nn.LayerNorm(
+            normalized_shape=[self.context_length],
+            elementwise_affine=True,
+            bias=True,
+            dtype=self.dtype_weights,
+        )
+        self.block_out_norm_ctx_post = nn.LayerNorm(
             normalized_shape=[self.context_length],
             elementwise_affine=True,
             bias=True,
@@ -1381,18 +1422,19 @@ class DecoderOnlyModel(nn.Module):
 
         # Prepare inputs.
         x = x
-        ctx = context
+        base_ctx = context
 
         # Inter-Block dropout
         x = self.dropout_latents(x)
-        ctx = self.dropout_context(ctx)
+        ctx = self.dropout_context(base_ctx)
 
         # Block 05
+        ctx = self.block_05_norm_ctx_pre(ctx)
         ctx = self.noisein(ctx, self.noisein_rate_context)
         ctx = self.noiseover(ctx, self.noiseover_rate_context)
         ctx = (ctx.unsqueeze(1) @ self.block_05_wl_ctx(ctx)).squeeze(1)
         ctx = activation_fn_ctx(ctx)
-        ctx = self.block_05_norm_ctx(ctx)
+        ctx = self.block_05_norm_ctx_post(ctx)
         ctx_upsample = self.block_05_ctx_linear_upsample(ctx)
         ctx_upsample = activation_fn_ctx(ctx_upsample)
         ctx_sml = self.block_05_ctx_linear_sml(ctx)
@@ -1432,7 +1474,24 @@ class DecoderOnlyModel(nn.Module):
         x_convolved_lrg = x_convolved_lrg.permute([0, 3, 1, 2])
         x_convolved_lrg = self.dropout_latents(x_convolved_lrg)
         x_convolved = torch.cat(
-            [x_convolved_sml, x_convolved_med, x_convolved_lrg], dim=1
+            [
+                (
+                    x_convolved_sml
+                    if self.branch_x_convolved_sml
+                    else torch.zeros_like(x_convolved_sml)
+                ),
+                (
+                    x_convolved_med
+                    if self.branch_x_convolved_med
+                    else torch.zeros_like(x_convolved_med)
+                ),
+                (
+                    x_convolved_lrg
+                    if self.branch_x_convolved_lrg
+                    else torch.zeros_like(x_convolved_lrg)
+                ),
+            ],
+            dim=1,
         )
         x_convolved = self.dropout_latents(x_convolved)
         x_lat_w = self.block_05_wl_lat(ctx_wl_lat)
@@ -1449,14 +1508,15 @@ class DecoderOnlyModel(nn.Module):
 
         # Inter-Block dropout
         x = self.dropout_latents(x)
-        ctx = self.dropout_context(ctx)
+        ctx = self.dropout_context(base_ctx)
 
         # Block 04
+        ctx = self.block_04_norm_ctx_pre(ctx)
         ctx = self.noisein(ctx, self.noisein_rate_context)
         ctx = self.noiseover(ctx, self.noiseover_rate_context)
         ctx = (ctx.unsqueeze(1) @ self.block_04_wl_ctx(ctx)).squeeze(1)
         ctx = activation_fn_ctx(ctx)
-        ctx = self.block_04_norm_ctx(ctx)
+        ctx = self.block_04_norm_ctx_post(ctx)
         ctx_upsample = self.block_04_ctx_linear_upsample(ctx)
         ctx_upsample = activation_fn_ctx(ctx_upsample)
         ctx_sml = self.block_04_ctx_linear_sml(ctx)
@@ -1496,7 +1556,24 @@ class DecoderOnlyModel(nn.Module):
         x_convolved_lrg = x_convolved_lrg.permute([0, 3, 1, 2])
         x_convolved_lrg = self.dropout_latents(x_convolved_lrg)
         x_convolved = torch.cat(
-            [x_convolved_sml, x_convolved_med, x_convolved_lrg], dim=1
+            [
+                (
+                    x_convolved_sml
+                    if self.branch_x_convolved_sml
+                    else torch.zeros_like(x_convolved_sml)
+                ),
+                (
+                    x_convolved_med
+                    if self.branch_x_convolved_med
+                    else torch.zeros_like(x_convolved_med)
+                ),
+                (
+                    x_convolved_lrg
+                    if self.branch_x_convolved_lrg
+                    else torch.zeros_like(x_convolved_lrg)
+                ),
+            ],
+            dim=1,
         )
         x_convolved = self.dropout_latents(x_convolved)
         x_lat_w = self.block_04_wl_lat(ctx_wl_lat)
@@ -1513,14 +1590,15 @@ class DecoderOnlyModel(nn.Module):
 
         # Inter-Block dropout
         x = self.dropout_latents(x)
-        ctx = self.dropout_context(ctx)
+        ctx = self.dropout_context(base_ctx)
 
         # Block 03
+        ctx = self.block_03_norm_ctx_pre(ctx)
         ctx = self.noisein(ctx, self.noisein_rate_context)
         ctx = self.noiseover(ctx, self.noiseover_rate_context)
         ctx = (ctx.unsqueeze(1) @ self.block_03_wl_ctx(ctx)).squeeze(1)
         ctx = activation_fn_ctx(ctx)
-        ctx = self.block_03_norm_ctx(ctx)
+        ctx = self.block_03_norm_ctx_post(ctx)
         ctx_upsample = self.block_03_ctx_linear_upsample(ctx)
         ctx_upsample = activation_fn_ctx(ctx_upsample)
         ctx_sml = self.block_03_ctx_linear_sml(ctx)
@@ -1560,7 +1638,24 @@ class DecoderOnlyModel(nn.Module):
         x_convolved_lrg = x_convolved_lrg.permute([0, 3, 1, 2])
         x_convolved_lrg = self.dropout_latents(x_convolved_lrg)
         x_convolved = torch.cat(
-            [x_convolved_sml, x_convolved_med, x_convolved_lrg], dim=1
+            [
+                (
+                    x_convolved_sml
+                    if self.branch_x_convolved_sml
+                    else torch.zeros_like(x_convolved_sml)
+                ),
+                (
+                    x_convolved_med
+                    if self.branch_x_convolved_med
+                    else torch.zeros_like(x_convolved_med)
+                ),
+                (
+                    x_convolved_lrg
+                    if self.branch_x_convolved_lrg
+                    else torch.zeros_like(x_convolved_lrg)
+                ),
+            ],
+            dim=1,
         )
         x_convolved = self.dropout_latents(x_convolved)
         x_lat_w = self.block_03_wl_lat(ctx_wl_lat)
@@ -1577,14 +1672,15 @@ class DecoderOnlyModel(nn.Module):
 
         # Inter-Block dropout
         x = self.dropout_latents(x)
-        ctx = self.dropout_context(ctx)
+        ctx = self.dropout_context(base_ctx)
 
         # Block 02
+        ctx = self.block_02_norm_ctx_pre(ctx)
         ctx = self.noisein(ctx, self.noisein_rate_context)
         ctx = self.noiseover(ctx, self.noiseover_rate_context)
         ctx = (ctx.unsqueeze(1) @ self.block_02_wl_ctx(ctx)).squeeze(1)
         ctx = activation_fn_ctx(ctx)
-        ctx = self.block_02_norm_ctx(ctx)
+        ctx = self.block_02_norm_ctx_post(ctx)
         ctx_upsample = self.block_02_ctx_linear_upsample(ctx)
         ctx_upsample = activation_fn_ctx(ctx_upsample)
         ctx_sml = self.block_02_ctx_linear_sml(ctx)
@@ -1624,7 +1720,24 @@ class DecoderOnlyModel(nn.Module):
         x_convolved_lrg = x_convolved_lrg.permute([0, 3, 1, 2])
         x_convolved_lrg = self.dropout_latents(x_convolved_lrg)
         x_convolved = torch.cat(
-            [x_convolved_sml, x_convolved_med, x_convolved_lrg], dim=1
+            [
+                (
+                    x_convolved_sml
+                    if self.branch_x_convolved_sml
+                    else torch.zeros_like(x_convolved_sml)
+                ),
+                (
+                    x_convolved_med
+                    if self.branch_x_convolved_med
+                    else torch.zeros_like(x_convolved_med)
+                ),
+                (
+                    x_convolved_lrg
+                    if self.branch_x_convolved_lrg
+                    else torch.zeros_like(x_convolved_lrg)
+                ),
+            ],
+            dim=1,
         )
         x_convolved = self.dropout_latents(x_convolved)
         x_lat_w = self.block_02_wl_lat(ctx_wl_lat)
@@ -1641,14 +1754,15 @@ class DecoderOnlyModel(nn.Module):
 
         # Inter-Block dropout
         x = self.dropout_latents(x)
-        ctx = self.dropout_context(ctx)
+        ctx = self.dropout_context(base_ctx)
 
         # Block 01
+        ctx = self.block_01_norm_ctx_pre(ctx)
         ctx = self.noisein(ctx, self.noisein_rate_context)
         ctx = self.noiseover(ctx, self.noiseover_rate_context)
         ctx = (ctx.unsqueeze(1) @ self.block_01_wl_ctx(ctx)).squeeze(1)
         ctx = activation_fn_ctx(ctx)
-        ctx = self.block_01_norm_ctx(ctx)
+        ctx = self.block_01_norm_ctx_post(ctx)
         ctx_upsample = self.block_01_ctx_linear_upsample(ctx)
         ctx_upsample = activation_fn_ctx(ctx_upsample)
         ctx_sml = self.block_01_ctx_linear_sml(ctx)
@@ -1688,7 +1802,24 @@ class DecoderOnlyModel(nn.Module):
         x_convolved_lrg = x_convolved_lrg.permute([0, 3, 1, 2])
         x_convolved_lrg = self.dropout_latents(x_convolved_lrg)
         x_convolved = torch.cat(
-            [x_convolved_sml, x_convolved_med, x_convolved_lrg], dim=1
+            [
+                (
+                    x_convolved_sml
+                    if self.branch_x_convolved_sml
+                    else torch.zeros_like(x_convolved_sml)
+                ),
+                (
+                    x_convolved_med
+                    if self.branch_x_convolved_med
+                    else torch.zeros_like(x_convolved_med)
+                ),
+                (
+                    x_convolved_lrg
+                    if self.branch_x_convolved_lrg
+                    else torch.zeros_like(x_convolved_lrg)
+                ),
+            ],
+            dim=1,
         )
         x_convolved = self.dropout_latents(x_convolved)
         x_lat_w = self.block_01_wl_lat(ctx_wl_lat)
@@ -1705,14 +1836,15 @@ class DecoderOnlyModel(nn.Module):
 
         # Inter-Block dropout
         x = self.dropout_latents(x)
-        ctx = self.dropout_context(ctx)
+        ctx = self.dropout_context(base_ctx)
 
         # Out
+        ctx = self.block_out_norm_ctx_pre(ctx)
         ctx = self.noisein(ctx, self.noisein_rate_context)
         ctx = self.noiseover(ctx, self.noiseover_rate_context)
         ctx = (ctx.unsqueeze(1) @ self.block_out_wl_ctx(ctx)).squeeze(1)
         ctx = activation_fn_ctx(ctx)
-        ctx = self.block_out_norm_ctx(ctx)
+        ctx = self.block_out_norm_ctx_post(ctx)
         x = self.noisein(x, self.noisein_rate_latents)
         x = self.noiseover(x, self.noiseover_rate_latents)
         x = self.block_out_conv(x, ctx)
@@ -2450,6 +2582,17 @@ def model_unfreeze_ctx(
     pass
 
 
+def model_freeze_all(
+    model: DecoderOnlyModel,
+    device: Optional[torch.device] = None,
+    dtype: Optional[torch.dtype] = None,
+) -> None:
+    for name, param in model.named_parameters():
+        param.requires_grad = False
+    print(f"model_freeze_all")
+    pass
+
+
 def model_unfreeze_all(
     model: DecoderOnlyModel,
     device: Optional[torch.device] = None,
@@ -2548,13 +2691,13 @@ def model_same_latents(
     pass
 
 
-def model_perturb_weights(
+def model_perturb_small_weights(
     model: DecoderOnlyModel,
     device: Optional[torch.device] = None,
     dtype: Optional[torch.dtype] = None,
+    a: float = 0.0005,
+    b: float = 0.0010,
 ) -> None:
-    a = 0.001
-    b = 0.005
     for name, param in model.named_parameters():
         if "data_cache" not in name:
             delta = torch.nn.init.uniform_(
@@ -2567,7 +2710,7 @@ def model_perturb_weights(
             param.data[cnd] = (param.data + delta)[cnd]
             cnd = torch.where(param.data.abs() < a)
             param.data[cnd] = delta[cnd]
-            print(f"perturb_weights: {name}")
+            print(f"model_perturb_small_weights: {name}")
     pass
 
 
@@ -2779,18 +2922,52 @@ def model_unfreeze_block(
     pass
 
 
+def renormalize_weigths(
+    model: DecoderOnlyModel,
+    include_data_cache: bool = False,
+) -> None:
+    max_std = torch.tensor([0.0], device=model.data_cache_latents.device)
+
+    for name, param in model.named_parameters():
+        if not include_data_cache and "data_cache" in name:
+            continue
+        std = param.data.std()
+        if std > max_std:
+            max_std = std
+
+    for name, param in model.named_parameters():
+        if not include_data_cache and "data_cache" in name:
+            continue
+        param.data = param.data / max_std
+
+    pass
+
+
+def model_perturb_weights(
+    model: DecoderOnlyModel,
+    rate: float = 0.025,
+    include_data_cache: bool = False,
+) -> None:
+    
+    for name, param in model.named_parameters():
+        if not include_data_cache and "data_cache" in name:
+            continue
+        noise = torch.randn_like(param.data) * param.data.std() * rate
+        param.data = param.data + noise
+        print(f"model_perturb_weights (rate={rate:.5f}): {name}")
+    
+    pass
+
+
 if __name__ == "__main__":
     train_mode = True
 
-    load_model = True
-    load_optim = True
+    load_model = False
+    load_optim = False
     drop_ctx_cache = False
     drop_latents_cache = False
     onload_model_fn = [
         # model_freeze_model,
-        # model_unfreeze_model,
-        # model_unfreeze_latents,
-        # model_unfreeze_ctx,
         # model_data_cache_double,
         # model_quantize_weights,
         # lambda m, d, t: model_change_data_cache_latents(m, d, t, [1024, 8, 8, 8]),
@@ -2803,19 +2980,23 @@ if __name__ == "__main__":
         # model_freeze_latents,
         # model_data_cache_double,
         # model_data_cache_double,
-        # lambda m, d, t: model_change_data_cache_latents(m, d, t, [256, 16, 16, 16]),
-        # lambda m, d, t: model_change_data_cache_ctx(m, d, t, [256, 64]),
-        # model_freeze_ctx,
-        # model_perturb_weights,
+        # lambda m, d, t: model_change_data_cache_latents(m, d, t, [3072, 16, 8, 8]),
+        # lambda m, d, t: model_change_data_cache_ctx(m, d, t, [3072, 64]),
+        # model_freeze_all,
+        # model_unfreeze_model,
+        # model_unfreeze_latents,
+        # model_unfreeze_ctx,
+        # lambda m, d, t: model_perturb_weights(m, 0.05, False),
+        # model_perturb_small_weights,
         # model_unfreeze_all,
         # model_freeze_model,
-
+        # model_freeze_latents,
+        # model_freeze_ctx,
         # lambda m, d, t: model_unfreeze_block(m, d, t, "block_out"),
         # lambda m, d, t: model_unfreeze_block(m, d, t, "block_01"),
         # lambda m, d, t: model_unfreeze_block(m, d, t, "block_02"),
         # lambda m, d, t: model_unfreeze_block(m, d, t, "block_03"),
         # lambda m, d, t: model_unfreeze_block(m, d, t, "block_04"),
-
         # lambda m, d, t: model_freeze_block(m, d, t, "block_out"),
         # lambda m, d, t: model_freeze_block(m, d, t, "block_01"),
         # lambda m, d, t: model_freeze_block(m, d, t, "block_02"),
@@ -2828,41 +3009,49 @@ if __name__ == "__main__":
 
     path_prefix_load = "/mnt/f/git_AIResearch/dyna/data/models"
     path_prefix_save = "/mnt/f/git_AIResearch/dyna/data/models"
-    load_path_model = f"{path_prefix_load}/model.G14.LAST.pth"
-    load_path_optim = f"{path_prefix_load}/optim.G14.LAST.pth"
-    save_path_model = f"{path_prefix_save}/model.G15"
-    save_path_optim = f"{path_prefix_save}/optim.G15"
+    load_path_model = f"{path_prefix_load}/model.G00.AdamW.LAST.pth"
+    load_path_optim = f"{path_prefix_load}/optim.G00.AdamW.LAST.pth"
+    save_path_model = f"{path_prefix_save}/model.G00.AdamW"
+    save_path_optim = f"{path_prefix_save}/optim.G00.AdamW"
     save_model = True
     save_optim = True
     save_nth_iteration = 10_000
     log_nth_update_step = 1
 
     # optimizer type
-    optimizer_type = torch.optim.NAdam
+    optimizer_type = torch.optim.AdamW
     # optimizer: torch.optim.SGD
-    sgd_learning_rate = 1.0e-3
+    sgd_learning_rate = 1.0e-4
     sgd_momentum = 0.0
     sgd_dampening = 0.0
     sgd_weight_decay = 0.0
     sgd_nesterov = False
     # optimizer: torch.optim.Adam
-    adam_learning_rate = 1.0e-5
+    adam_learning_rate = 1.0e-4
     adam_amsgrad = True
     adam_weight_decay = 0.0
     adam_eps = 1.0e-8
+    # optimizer: torch.optim.AdamW
+    adamw_learning_rate = 1.0e-5
+    adamw_amsgrad = True
+    adamw_weight_decay = 1.0e-1
+    adamw_eps = 1.0e-8
     # optimizer: torch.optim.NAdam
-    nadam_learning_rate = 1.0e-4
+    nadam_learning_rate = 1.0e-5
     nadam_weight_decay = 1.0e-6
     nadam_momentum_decay = 5.0e-3
     nadam_decoupled_weight_decay = True
+    # optimizer: torch.optim.RAdam
+    radam_learning_rate = 1.0e-5
+    radam_weight_decay = 1.0e-4
     # optimizer: MADGRAD
-    madgrad_learning_rate = 1.0e-3
-    madgrad_momentum = 0.0
+    madgrad_learning_rate = 1.0e-5
+    madgrad_momentum = 0.9
     madgrad_weight_decay = 0.0
     madgrad_eps = 1.0e-6
     # various for optimizers
     optim_update_lr = False
-    optim_target_lr = 1.0e-3
+    optim_target_lr = 1.0e-4
 
     data_cache_ctx_bound = 1.0e-5
     data_cache_latents_bound = 1.0e-5
@@ -2903,27 +3092,27 @@ if __name__ == "__main__":
     freeze_model_nth_epoch = 0
     freeze_model_epochs = 0
 
-    nelements = 1024
+    nelements = 3072
     data_cache_ctx_len = nelements
     data_cache_latents_len = nelements
-    data_cache_latents_shape = [16, 16, 16]
+    data_cache_latents_shape = [16, 8, 8]
     dropout_rate_latents = 0.0000
     dropout_rate_context = 0.0000
-    noisein_rate_latents = 0.0000
+    noisein_rate_latents = 0.0500
     noisein_rate_context = 0.0000
     noiseover_rate_latents = 0.0500
-    noiseover_rate_context = 0.0000
+    noiseover_rate_context = 0.0500
 
     total_steps = 200_000
-    batch_size = 14
+    batch_size = 24
     sliding_batch = False
-    grad_accumulation_steps = nelements // batch_size
+    grad_accumulation_steps = 32 # nelements // batch_size
 
     images_sample_count = nelements
-    starting_from = 1024 * 6
+    starting_from = 1024 * 10
     images_path_src = "/mnt/f/Datasets/Images_512x512/dataset_01"
     images_path_dst = "/mnt/f/git_AIResearch/dyna/data/img_dst"
-    output_shape = [512, 512]
+    output_shape = [256, 256]
     dtype_weights = torch.float32
     device = torch.device("cuda")
 
@@ -3011,6 +3200,22 @@ if __name__ == "__main__":
             momentum_decay=nadam_momentum_decay,
             decoupled_weight_decay=nadam_decoupled_weight_decay,
         )
+    elif optimizer_type is torch.optim.RAdam:
+        print("Using RAdam")
+        optimizer = torch.optim.RAdam(
+            model.parameters(),
+            lr=radam_learning_rate,
+            weight_decay=radam_weight_decay,
+        )
+    elif optimizer_type is torch.optim.AdamW:
+        print("Using AdamW")
+        optimizer = torch.optim.AdamW(
+            model.parameters(),
+            lr=adamw_learning_rate,
+            weight_decay=adamw_weight_decay,
+            amsgrad=adamw_amsgrad,
+            eps=adamw_eps,
+        )
     elif optimizer_type is MADGRAD:
         print("Using MADGRAD")
         optimizer = MADGRAD(
@@ -3063,13 +3268,18 @@ if __name__ == "__main__":
         lambda p: torch.save(optimizer.state_dict(), f"{save_path_optim}.{p}.pth"),
     ]
 
-    # # WARMUP
+    # WARMUP
     # lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
     #     optimizer=optimizer,
-    #     T_0=128,
+    #     T_0=50,
     #     T_mult=1,
     # )
-    # warmup_epochs = 128
+    # lr_scheduler = torch.optim.lr_scheduler.ConstantLR(
+    #     optimizer=optimizer,
+    #     factor=1.00,
+    #     total_iters=10,
+    # )
+    # warmup_epochs = 50
     # warmup_scheduler = warmup.LinearWarmup(
     #     optimizer=optimizer,
     #     warmup_period=warmup_epochs,
