@@ -3013,8 +3013,8 @@ def model_perturb_weights(
 if __name__ == "__main__":
     train_mode = True
 
-    load_model = True
-    load_optim = True
+    load_model = False
+    load_optim = False
     drop_ctx_cache = False
     drop_latents_cache = False
     onload_model_fn = [
@@ -3061,14 +3061,14 @@ if __name__ == "__main__":
 
     path_prefix_load = "/mnt/f/git_AIResearch/dyna/data/models"
     path_prefix_save = "/mnt/f/git_AIResearch/dyna/data/models"
-    load_path_model = f"{path_prefix_load}/model.G03.AdamW.LAST.pth"
-    load_path_optim = f"{path_prefix_load}/optim.G03.AdamW.LAST.pth"
-    save_path_model = f"{path_prefix_save}/model.G04.AdamW"
-    save_path_optim = f"{path_prefix_save}/optim.G04.AdamW"
+    load_path_model = f"{path_prefix_load}/model.G00.AdamW.LAST.pth"
+    load_path_optim = f"{path_prefix_load}/optim.G00.AdamW.LAST.pth"
+    save_path_model = f"{path_prefix_save}/model.G00.AdamW"
+    save_path_optim = f"{path_prefix_save}/optim.G00.AdamW"
     save_model = True
     save_optim = True
     save_nth_iteration = 10_000
-    log_nth_update_step = 1
+    log_nth_update_step = 4
 
     # optimizer type
     optimizer_type = torch.optim.AdamW
@@ -3084,7 +3084,7 @@ if __name__ == "__main__":
     adam_weight_decay = 0.0
     adam_eps = 1.0e-8
     # optimizer: torch.optim.AdamW
-    adamw_learning_rate = 1.0e-5
+    adamw_learning_rate = 1.0e-4
     adamw_amsgrad = True
     adamw_weight_decay = 1.0e-1
     adamw_eps = 1.0e-8
@@ -3144,10 +3144,10 @@ if __name__ == "__main__":
     freeze_model_nth_epoch = 0
     freeze_model_epochs = 0
 
-    nelements = 4096
+    nelements = 128
     data_cache_ctx_len = nelements
     data_cache_latents_len = nelements
-    data_cache_latents_shape = [16, 16, 16]
+    data_cache_latents_shape = [16, 8, 8]
 
     dropout_rate_latents = 0.0000
     dropout_rate_context = 0.0000
@@ -3165,15 +3165,15 @@ if __name__ == "__main__":
     noiseover_rate_context_io = 0.0250
 
     total_steps = 200_000
-    batch_size = 8
+    batch_size = 16
     sliding_batch = False
-    grad_accumulation_steps = (nelements // batch_size) // 16
+    grad_accumulation_steps = (nelements // batch_size) // 4
 
     images_sample_count = nelements
     starting_from = 1024 * 10
     images_path_src = "/mnt/f/Datasets/Images_512x512/dataset_01"
     images_path_dst = "/mnt/f/git_AIResearch/dyna/data/img_dst"
-    output_shape = [512, 512]
+    output_shape = [256, 256]
     dtype_weights = torch.float32
     device = torch.device("cuda")
 
