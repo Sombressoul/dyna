@@ -3355,6 +3355,11 @@ if __name__ == "__main__":
         lambda p: torch.save(optimizer.state_dict(), f"{save_path_optim}.{p}.pth"),
     ]
 
+    if optim_update_lr:
+        for g in optimizer.param_groups:
+            g["lr"] = optim_target_lr
+        print(f"Updated learning rate to {optim_target_lr}")
+
     # WARMUP
     # lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
     #     optimizer=optimizer,
@@ -3375,11 +3380,6 @@ if __name__ == "__main__":
     # lr_scheduler = None
     # warmup_epochs = None
     # warmup_scheduler = None
-
-    if optim_update_lr:
-        for g in optimizer.param_groups:
-            g["lr"] = optim_target_lr
-        print(f"Updated learning rate to {optim_target_lr}")
 
     start_training = lambda: train(
         data=data,
