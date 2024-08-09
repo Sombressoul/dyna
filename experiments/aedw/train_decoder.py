@@ -20,7 +20,7 @@ project_dir = os.path.dirname(evals_dir)
 sys.path.append(project_dir)
 
 # torch.manual_seed(42)
-torch.manual_seed(1344)
+torch.manual_seed(35847)
 
 from dyna import DynamicConv2D, WeightsLib2D, siglog, siglog_parametric
 
@@ -2317,7 +2317,7 @@ def train(
             optimizer.step()
             if warmup_scheduler is not None:
                 with warmup_scheduler.dampening():
-                    if epoch_idx >= warmup_epochs:
+                    if epoch_idx > warmup_epochs:
                         lr_scheduler.step(epoch_idx - warmup_epochs)
 
             optimizer.zero_grad()
@@ -2765,6 +2765,26 @@ def model_perturb_small_weights(
     pass
 
 
+def model_reinit_weights_same_distribution(
+    model: DecoderOnlyModel,
+    include_data_cache: bool = False,
+) -> None:
+    for name, param in model.named_parameters():
+        if "data_cache" in name and not include_data_cache:
+            continue
+        mean = param.data.mean()
+        std = param.data.std()
+        param.data = torch.nn.init.normal_(
+            param.data,
+            mean=mean,
+            std=std,
+        )
+        print(
+            f"model_reinit_weights_same_distribution: {name}; mean/std: {mean.item()}/{std.item()}"
+        )
+    pass
+
+
 def model_data_cache_double(
     model: DecoderOnlyModel,
     device: Optional[torch.device] = None,
@@ -2999,14 +3019,14 @@ def model_perturb_weights(
     rate: float = 0.025,
     include_data_cache: bool = False,
 ) -> None:
-    
+
     for name, param in model.named_parameters():
         if not include_data_cache and "data_cache" in name:
             continue
         noise = torch.randn_like(param.data) * param.data.std() * rate
         param.data = param.data + noise
         print(f"model_perturb_weights (rate={rate:.5f}): {name}")
-    
+
     pass
 
 
@@ -3031,14 +3051,14 @@ if __name__ == "__main__":
         # model_freeze_latents,
         # model_data_cache_double,
         # model_data_cache_double,
-        # lambda m, d, t: model_change_data_cache_latents(m, d, t, [4096, 16, 16, 16]),
+        # lambda m, d, t: model_change_data_cache_latents(m, d, t, [4096, 16, 8, 8]),
         # lambda m, d, t: model_change_data_cache_ctx(m, d, t, [4096, 64]),
         # model_freeze_all,
         # model_unfreeze_model,
         # model_unfreeze_latents,
         # model_unfreeze_ctx,
-        # lambda m, d, t: model_perturb_weights(m, 0.05, False),
-        # lambda m, d, t: model_perturb_weights(m, 0.25, True),
+        # lambda m, d, t: model_perturb_weights(m, 2.00, True),
+        # lambda m, d, t: model_reinit_weights_same_distribution(m, True),
         # model_perturb_small_weights,
         # model_unfreeze_all,
         # model_freeze_model,
@@ -3061,10 +3081,10 @@ if __name__ == "__main__":
 
     path_prefix_load = "/mnt/f/git_AIResearch/dyna/data/models"
     path_prefix_save = "/mnt/f/git_AIResearch/dyna/data/models"
-    load_path_model = f"{path_prefix_load}/model.G00.AdamW.LAST.pth"
-    load_path_optim = f"{path_prefix_load}/optim.G00.AdamW.LAST.pth"
-    save_path_model = f"{path_prefix_save}/model.G00.AdamW"
-    save_path_optim = f"{path_prefix_save}/optim.G00.AdamW"
+    load_path_model = f"{path_prefix_load}/"
+    load_path_optim = f"{path_prefix_load}/"
+    save_path_model = f"{path_prefix_save}/model.G00.1024.AdamW"
+    save_path_optim = f"{path_prefix_save}/optim.G00.1024.AdamW"
     save_model = True
     save_optim = True
     save_nth_iteration = 10_000
@@ -3073,7 +3093,7 @@ if __name__ == "__main__":
     # optimizer type
     optimizer_type = torch.optim.AdamW
     # optimizer: torch.optim.SGD
-    sgd_learning_rate = 1.0e-4
+    sgd_learning_rate = 1.0e-3
     sgd_momentum = 0.0
     sgd_dampening = 0.0
     sgd_weight_decay = 0.0
@@ -3084,7 +3104,7 @@ if __name__ == "__main__":
     adam_weight_decay = 0.0
     adam_eps = 1.0e-8
     # optimizer: torch.optim.AdamW
-    adamw_learning_rate = 1.0e-4
+    adamw_learning_rate = 1.0e-5
     adamw_amsgrad = True
     adamw_weight_decay = 1.0e-1
     adamw_eps = 1.0e-8
@@ -3144,14 +3164,14 @@ if __name__ == "__main__":
     freeze_model_nth_epoch = 0
     freeze_model_epochs = 0
 
-    nelements = 128
+    nelements = 1024
     data_cache_ctx_len = nelements
     data_cache_latents_len = nelements
     data_cache_latents_shape = [16, 8, 8]
 
     dropout_rate_latents = 0.0000
     dropout_rate_context = 0.0000
-    
+
     noisein_rate_latents = 0.0000
     noisein_rate_context = 0.0000
     noisein_rate_latents_input = 0.0500
@@ -3165,12 +3185,12 @@ if __name__ == "__main__":
     noiseover_rate_context_io = 0.0250
 
     total_steps = 200_000
-    batch_size = 16
+    batch_size = 32
     sliding_batch = False
     grad_accumulation_steps = (nelements // batch_size) // 4
 
     images_sample_count = nelements
-    starting_from = 1024 * 10
+    starting_from = 1024 * 8
     images_path_src = "/mnt/f/Datasets/Images_512x512/dataset_01"
     images_path_dst = "/mnt/f/git_AIResearch/dyna/data/img_dst"
     output_shape = [256, 256]
@@ -3341,20 +3361,20 @@ if __name__ == "__main__":
     #     T_0=50,
     #     T_mult=1,
     # )
-    # lr_scheduler = torch.optim.lr_scheduler.ConstantLR(
-    #     optimizer=optimizer,
-    #     factor=1.00,
-    #     total_iters=10,
-    # )
-    # warmup_epochs = 50
-    # warmup_scheduler = warmup.LinearWarmup(
-    #     optimizer=optimizer,
-    #     warmup_period=warmup_epochs,
-    # )
+    lr_scheduler = torch.optim.lr_scheduler.ConstantLR(
+        optimizer=optimizer,
+        factor=1.00,
+        total_iters=4096 * 16,
+    )
+    warmup_epochs = 2048
+    warmup_scheduler = warmup.LinearWarmup(
+        optimizer=optimizer,
+        warmup_period=warmup_epochs,
+    )
 
-    lr_scheduler = None
-    warmup_epochs = None
-    warmup_scheduler = None
+    # lr_scheduler = None
+    # warmup_epochs = None
+    # warmup_scheduler = None
 
     if optim_update_lr:
         for g in optimizer.param_groups:
