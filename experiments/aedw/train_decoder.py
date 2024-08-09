@@ -2314,12 +2314,12 @@ def train(
             elif grad_clip_norm is not None:
                 torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip_norm)
 
-            optimizer.step()
             if warmup_scheduler is not None:
                 with warmup_scheduler.dampening():
                     if epoch_idx > warmup_epochs:
                         lr_scheduler.step(epoch_idx - warmup_epochs)
 
+            optimizer.step()
             optimizer.zero_grad()
 
             if weights_hysteresis_loop:
