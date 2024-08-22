@@ -1,6 +1,6 @@
 import torch
 
-from typing import Optional
+from typing import Optional, Union
 
 
 class SigLogParametric(torch.autograd.Function):
@@ -25,15 +25,16 @@ class SigLogParametric(torch.autograd.Function):
     def forward(
         ctx: torch.autograd.function.FunctionCtx,
         input: torch.Tensor,
-        alpha: float = None,
+        alpha: Union[float, torch.Tensor] = None,
         smoothing: float = None,
         smooth_grad: bool = None,
     ) -> torch.Tensor:
         alpha = alpha if alpha is not None else SigLogParametric.alpha
-        alpha = torch.tensor(alpha).to(dtype=input.dtype, device=input.device)
+        alpha = alpha if isinstance(alpha, torch.Tensor) else torch.tensor(alpha)
+        alpha = alpha.to(dtype=input.dtype, device=input.device)
         mod = torch.e * alpha
 
-        assert mod > 0, f"alpha cannot be <=0. Got: {alpha}"
+        assert mod > 0, f"alpha cannot be <=0. Got: {alpha.item()}"
 
         smoothing = smoothing if smoothing is not None else SigLogParametric.smoothing
         smoothing = torch.tensor(smoothing).to(dtype=input.dtype, device=input.device)
@@ -41,7 +42,9 @@ class SigLogParametric(torch.autograd.Function):
         smooth_grad = (
             smooth_grad if smooth_grad is not None else SigLogParametric.smooth_grad
         )
-        smooth_grad = torch.tensor(smooth_grad).to(dtype=torch.bool, device=input.device)
+        smooth_grad = torch.tensor(smooth_grad).to(
+            dtype=torch.bool, device=input.device
+        )
 
         ctx.save_for_backward(input, mod, smoothing, smooth_grad)
 
