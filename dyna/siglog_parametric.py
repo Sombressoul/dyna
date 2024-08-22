@@ -5,7 +5,7 @@ from typing import Optional, Union
 
 class SigLogParametric(torch.autograd.Function):
     alpha: float = 1.0 / torch.e
-    smoothing: float = 0.1
+    smoothing: float = 0.01
     smooth_grad: bool = False
 
     @staticmethod
