@@ -60,24 +60,37 @@ class SigLogParametric(torch.autograd.Function):
     ) -> torch.Tensor:
         (input, alpha, smoothing, smooth_grad) = ctx.saved_tensors
 
-        get_mod = lambda alpha, smoothing = 0.0: torch.e * (alpha + smoothing)
+        get_mod = lambda alpha, smoothing=0.0: torch.e * (alpha + smoothing)
 
         with torch.no_grad():
             if smooth_grad.item():
-                # Smooth symmetric derivative:
+                # Smooth symmetric derivative for both: x and alpha.
                 # f'(x) = (f(x+h) - f(x-h))/2h
                 x_1 = SigLogParametric._real_forward(input + smoothing, get_mod(alpha))
                 x_2 = SigLogParametric._real_forward(input - smoothing, get_mod(alpha))
                 dx = (x_1 - x_2) / (2 * smoothing)
-                mod_1 = SigLogParametric._real_forward(input, get_mod(alpha, +smoothing))
-                mod_2 = SigLogParametric._real_forward(input, get_mod(alpha, -smoothing))
+                mod_1 = SigLogParametric._real_forward(
+                    input,
+                    get_mod(alpha, +(alpha * smoothing)),
+                )
+                mod_2 = SigLogParametric._real_forward(
+                    input,
+                    get_mod(alpha, -(alpha * smoothing)),
+                )
                 dmod = (mod_1 - mod_2) / (2 * smoothing)
             else:
-                # Exact derivative:
+                # Exact derivative for x:
                 # f'(x) = 1.0 / (|x| + e*alpha)
                 dx = 1.0 / (input.abs() + get_mod(alpha))
-                mod_1 = SigLogParametric._real_forward(input, get_mod(alpha, +SigLogParametric.smoothing))
-                mod_2 = SigLogParametric._real_forward(input, get_mod(alpha, -SigLogParametric.smoothing))
+                # Smooth symmetric derivative for alpha.
+                mod_1 = SigLogParametric._real_forward(
+                    input,
+                    get_mod(alpha, +(alpha * SigLogParametric.smoothing)),
+                )
+                mod_2 = SigLogParametric._real_forward(
+                    input,
+                    get_mod(alpha, -(alpha * SigLogParametric.smoothing)),
+                )
                 dmod = (mod_1 - mod_2) / (2 * SigLogParametric.smoothing)
 
         return grad_output * dx, grad_output * dmod, None, None
