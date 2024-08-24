@@ -20,7 +20,7 @@ project_dir = os.path.dirname(evals_dir)
 sys.path.append(project_dir)
 
 # torch.manual_seed(42)
-torch.manual_seed(35847)
+torch.manual_seed(10002)
 
 from dyna import DynamicConv2D, WeightsLib2D, siglog, siglog_parametric
 
@@ -37,12 +37,14 @@ class DecoderOnlyModel(nn.Module):
         noisein_rate_context: float = 0.0,
         noisein_rate_latents_input: float = 0.0,
         noisein_rate_latents_output: float = 0.0,
-        noisein_rate_context_io: float = 0.0,
+        noisein_rate_context_input: float = 0.0,
+        noisein_rate_context_output: float = 0.0,
         noiseover_rate_latents: float = 0.0,
         noiseover_rate_context: float = 0.0,
         noiseover_rate_latents_input: float = 0.0,
         noiseover_rate_latents_output: float = 0.0,
-        noiseover_rate_context_io: float = 0.0,
+        noiseover_rate_context_input: float = 0.0,
+        noiseover_rate_context_output: float = 0.0,
         data_cache_ctx_bound: float = 0.01,
         data_cache_latents_bound: float = 0.01,
         dtype_weights: torch.dtype = torch.float32,
@@ -59,12 +61,14 @@ class DecoderOnlyModel(nn.Module):
         self.noisein_rate_context = noisein_rate_context
         self.noisein_rate_latents_input = noisein_rate_latents_input
         self.noisein_rate_latents_output = noisein_rate_latents_output
-        self.noisein_rate_context_io = noisein_rate_context_io
+        self.noisein_rate_context_input = noisein_rate_context_input
+        self.noisein_rate_context_output = noisein_rate_context_output
         self.noiseover_rate_latents = noiseover_rate_latents
         self.noiseover_rate_context = noiseover_rate_context
         self.noiseover_rate_latents_input = noiseover_rate_latents_input
         self.noiseover_rate_latents_output = noiseover_rate_latents_output
-        self.noiseover_rate_context_io = noiseover_rate_context_io
+        self.noiseover_rate_context_input = noiseover_rate_context_input
+        self.noiseover_rate_context_output = noiseover_rate_context_output
 
         self.use_bias = False
         self.bias_static = 0.0
@@ -82,12 +86,12 @@ class DecoderOnlyModel(nn.Module):
         self.kernel_size_t = [3, 3]
         self.kernel_size_c_base = [3, 3]
         self.kernel_size_c_sml = [3, 3]
-        self.kernel_size_c_med = [5, 5]
-        self.kernel_size_c_lrg = [7, 7]
+        self.kernel_size_c_med = [7, 7]
+        self.kernel_size_c_lrg = [11, 11]
         self.padding_size_c_base = [1, 1]
         self.padding_size_c_sml = [1, 1]
-        self.padding_size_c_med = [2, 2]
-        self.padding_size_c_lrg = [3, 3]
+        self.padding_size_c_med = [3, 3]
+        self.padding_size_c_lrg = [5, 5]
 
         self.eps = 1.0e-3
         self.q_levels = 16
@@ -1036,6 +1040,12 @@ class DecoderOnlyModel(nn.Module):
         )
 
         # ====> Block out
+        self.block_out_linear = nn.Linear(
+            in_features=self.decoder_channels_reduced,
+            out_features=self.decoder_channels_reduced,
+            bias=True,
+            dtype=self.dtype_weights,
+        )
         self.block_out_conv = DynamicConv2D(
             in_channels=self.decoder_channels_reduced,
             out_channels=self.decoder_channels_out,
@@ -1094,6 +1104,18 @@ class DecoderOnlyModel(nn.Module):
                 ),
                 a=-self.data_cache_latents_bound,
                 b=+self.data_cache_latents_bound,
+            ),
+        )
+
+        # ====> Block siglog parametric params
+        self.siglog_params = nn.Parameter(
+            data=torch.nn.init.normal_(
+                tensor=torch.empty(
+                    [77, 1],
+                    dtype=self.dtype_weights,
+                ),
+                mean=(1.0 / math.e),
+                std=1.0e-2,
             ),
         )
 
@@ -1423,18 +1445,35 @@ class DecoderOnlyModel(nn.Module):
         # activation_fn = lambda x: self.squash(siglog_parametric(x, alpha=0.01))
         # activation_fn = lambda x: siglog_parametric(x, alpha=0.01)
 
-        activation_fn_x = lambda x: siglog_parametric(
-            x,
-            alpha=(1.0 / math.e),
-            smooth_grad=True,
-            smoothing=0.01,
-        )
-        activation_fn_ctx = lambda ctx: siglog_parametric(
-            ctx,
-            alpha=(1.0 / math.e),
-            smooth_grad=True,
-            smoothing=0.01,
-        )
+        # activation_fn_x = lambda x: siglog_parametric(
+        #     x,
+        #     alpha=(0.25 / math.e),
+        #     smooth_grad=True,
+        #     smoothing=0.01,
+        # ) # 31 calls
+        # activation_fn_ctx = lambda ctx: siglog_parametric(
+        #     ctx,
+        #     alpha=(0.25 / math.e),
+        #     smooth_grad=True,
+        #     smoothing=0.01,
+        # ) # 36 calls
+
+        self.siglog_call_idx = 0
+
+        def activation_call(
+            x: torch.Tensor,
+        ) -> torch.Tensor:
+            x = siglog_parametric(
+                x,
+                alpha=self.siglog_params[self.siglog_call_idx, 0],
+                smooth_grad=True,
+                smoothing=0.01,
+            )
+            self.siglog_call_idx = self.siglog_call_idx + 1
+            return x
+
+        activation_fn_x = lambda x: activation_call(x)
+        activation_fn_ctx = lambda ctx: activation_call(ctx)
 
         # Prepare inputs.
         base_x = x
@@ -1443,8 +1482,8 @@ class DecoderOnlyModel(nn.Module):
         # Input noise-in/-over
         base_x = self.noisein(base_x, self.noisein_rate_latents_input)
         base_x = self.noiseover(base_x, self.noiseover_rate_latents_input)
-        base_ctx = self.noisein(base_ctx, self.noisein_rate_context_io)
-        base_ctx = self.noiseover(base_ctx, self.noiseover_rate_context_io)
+        base_ctx = self.noisein(base_ctx, self.noisein_rate_context_input)
+        base_ctx = self.noiseover(base_ctx, self.noiseover_rate_context_input)
 
         # Inter-Block dropout
         x = self.dropout_latents(base_x)
@@ -1535,7 +1574,7 @@ class DecoderOnlyModel(nn.Module):
 
         # Inter-Block dropout
         x = self.dropout_latents(x)
-        ctx = self.dropout_context(base_ctx)
+        ctx = self.dropout_context(ctx)
 
         # Block 04
         ctx = self.block_04_norm_ctx_pre(ctx)
@@ -1622,7 +1661,7 @@ class DecoderOnlyModel(nn.Module):
 
         # Inter-Block dropout
         x = self.dropout_latents(x)
-        ctx = self.dropout_context(base_ctx)
+        ctx = self.dropout_context(ctx)
 
         # Block 03
         ctx = self.block_03_norm_ctx_pre(ctx)
@@ -1709,7 +1748,7 @@ class DecoderOnlyModel(nn.Module):
 
         # Inter-Block dropout
         x = self.dropout_latents(x)
-        ctx = self.dropout_context(base_ctx)
+        ctx = self.dropout_context(ctx)
 
         # Block 02
         ctx = self.block_02_norm_ctx_pre(ctx)
@@ -1796,7 +1835,7 @@ class DecoderOnlyModel(nn.Module):
 
         # Inter-Block dropout
         x = self.dropout_latents(x)
-        ctx = self.dropout_context(base_ctx)
+        ctx = self.dropout_context(ctx)
 
         # Block 01
         ctx = self.block_01_norm_ctx_pre(ctx)
@@ -1884,10 +1923,12 @@ class DecoderOnlyModel(nn.Module):
         # Output noise-in/-over
         x = self.noisein(x, self.noisein_rate_latents_output)
         x = self.noiseover(x, self.noiseover_rate_latents_output)
+        ctx = self.noisein(ctx, self.noisein_rate_context_input)
+        ctx = self.noiseover(ctx, self.noiseover_rate_context_input)
 
         # Inter-Block dropout
         x = self.dropout_latents(x)
-        ctx = self.dropout_context(base_ctx)
+        ctx = self.dropout_context(ctx)
 
         # Out
         ctx = self.block_out_norm_ctx_pre(ctx)
@@ -1898,6 +1939,8 @@ class DecoderOnlyModel(nn.Module):
         ctx = self.block_out_norm_ctx_post(ctx)
         x = self.noisein(x, self.noisein_rate_latents)
         x = self.noiseover(x, self.noiseover_rate_latents)
+        x = self.block_out_linear(x.permute([0, 2, 3, 1])).permute([0, 3, 1, 2])
+        x = activation_fn_x(x)
         x = self.block_out_conv(x, ctx)
         x = F.sigmoid(x)
 
@@ -2046,7 +2089,9 @@ def train(
     grad_accumulation_steps: int,
     sliding_batch: bool,
     loss_channels_weights: torch.Tensor,
-    use_regularization: bool,
+    use_regularization_model: bool,
+    use_regularization_ctx: bool,
+    use_regularization_latents: bool,
     regularization_alpha_model: float,
     regularization_alpha_ctx: float,
     regularization_alpha_latents: float,
@@ -2210,7 +2255,7 @@ def train(
                 model=model,
                 alpha=regularization_alpha_model,
             )
-            if use_regularization
+            if use_regularization_model
             else null_placeholder.clone()
         )
         reg_term_ctx = (
@@ -2218,7 +2263,7 @@ def train(
                 model=model,
                 alpha=regularization_alpha_ctx,
             )
-            if use_regularization
+            if use_regularization_ctx
             else null_placeholder.clone()
         )
         reg_term_latents = (
@@ -2226,7 +2271,7 @@ def train(
                 model=model,
                 alpha=regularization_alpha_latents,
             )
-            if use_regularization
+            if use_regularization_latents
             else null_placeholder.clone()
         )
 
@@ -3030,10 +3075,65 @@ def model_perturb_weights(
     pass
 
 
+def model_extend_data_cache(
+    model: DecoderOnlyModel,
+    size: int,
+    std: float = None,
+) -> None:
+
+    assert size > 0, "size must be positive"
+    assert (
+        size > model.data_cache_ctx.data.shape[0]
+    ), "size must be greater than current size"
+
+    current_ctx = model.data_cache_ctx.data.clone()
+    current_latents = model.data_cache_latents.data.clone()
+
+    model.data_cache_ctx.data = torch.randn(
+        [size, *model.data_cache_ctx.data.shape[1:]],
+        dtype=current_ctx.dtype,
+        device=current_ctx.device,
+    )
+    model.data_cache_latents.data = torch.randn(
+        [size, *model.data_cache_latents.data.shape[1:]],
+        dtype=current_latents.dtype,
+        device=current_latents.device,
+    )
+
+    if std is None:
+        model.data_cache_ctx.data = (
+            model.data_cache_ctx.data - model.data_cache_ctx.data.mean()
+        ) + current_ctx.mean()
+        model.data_cache_latents.data = (
+            model.data_cache_latents.data - model.data_cache_latents.data.mean()
+        ) + current_latents.mean()
+
+        model.data_cache_ctx.data = (
+            model.data_cache_ctx.data / model.data_cache_ctx.data.std()
+        ) * current_ctx.std()
+        model.data_cache_latents.data = (
+            model.data_cache_latents.data / model.data_cache_latents.data.std()
+        ) * current_latents.std()
+    else:
+        model.data_cache_ctx.data = model.data_cache_ctx.data * std
+        model.data_cache_latents.data = model.data_cache_latents.data * std
+
+    model.data_cache_ctx.data[0 : current_ctx.shape[0]] = current_ctx.clone()
+    model.data_cache_latents.data[0 : current_latents.shape[0]] = (
+        current_latents.clone()
+    )
+
+    print(f"model_extend_data_cache: {size}")
+
+    del current_ctx, current_latents
+
+    pass
+
+
 if __name__ == "__main__":
     train_mode = True
 
-    load_model = False
+    load_model = True
     load_optim = False
     drop_ctx_cache = False
     drop_latents_cache = False
@@ -3051,15 +3151,17 @@ if __name__ == "__main__":
         # model_freeze_latents,
         # model_data_cache_double,
         # model_data_cache_double,
-        # lambda m, d, t: model_change_data_cache_latents(m, d, t, [4096, 16, 8, 8]),
-        # lambda m, d, t: model_change_data_cache_ctx(m, d, t, [4096, 64]),
+        # lambda m, d, t: model_change_data_cache_latents(m, d, t, [16, 16, 16, 16]),
+        # lambda m, d, t: model_change_data_cache_ctx(m, d, t, [16, 64]),
         # model_freeze_all,
         # model_unfreeze_model,
         # model_unfreeze_latents,
         # model_unfreeze_ctx,
-        # lambda m, d, t: model_perturb_weights(m, 2.00, True),
-        # lambda m, d, t: model_reinit_weights_same_distribution(m, True),
         # model_perturb_small_weights,
+        # lambda m, d, t: model_perturb_weights(m, 0.10, True),
+        # model_perturb_small_weights,
+        lambda m, d, t: model_extend_data_cache(m, 64, 1.0e-6),
+        # lambda m, d, t: model_reinit_weights_same_distribution(m, True),
         # model_unfreeze_all,
         # model_freeze_model,
         # model_freeze_latents,
@@ -3081,14 +3183,14 @@ if __name__ == "__main__":
 
     path_prefix_load = "/mnt/f/git_AIResearch/dyna/data/models"
     path_prefix_save = "/mnt/f/git_AIResearch/dyna/data/models"
-    load_path_model = f"{path_prefix_load}/"
-    load_path_optim = f"{path_prefix_load}/"
-    save_path_model = f"{path_prefix_save}/model.G00.1024.AdamW"
-    save_path_optim = f"{path_prefix_save}/optim.G00.1024.AdamW"
+    load_path_model = f"{path_prefix_load}/model.Type-04.G03.AdamW.LAST.pth"
+    load_path_optim = f"{path_prefix_load}/optim.Type-04.G03.AdamW.LAST.pth"
+    save_path_model = f"{path_prefix_save}/model.Type-04.G04.AdamW"
+    save_path_optim = f"{path_prefix_save}/optim.Type-04.G04.AdamW"
     save_model = True
     save_optim = True
     save_nth_iteration = 10_000
-    log_nth_update_step = 4
+    log_nth_update_step = 80
 
     # optimizer type
     optimizer_type = torch.optim.AdamW
@@ -3099,14 +3201,14 @@ if __name__ == "__main__":
     sgd_weight_decay = 0.0
     sgd_nesterov = False
     # optimizer: torch.optim.Adam
-    adam_learning_rate = 1.0e-4
+    adam_learning_rate = 2.5e-4
     adam_amsgrad = True
     adam_weight_decay = 0.0
     adam_eps = 1.0e-8
     # optimizer: torch.optim.AdamW
     adamw_learning_rate = 1.0e-5
     adamw_amsgrad = True
-    adamw_weight_decay = 1.0e-1
+    adamw_weight_decay = 2.5e-3
     adamw_eps = 1.0e-8
     # optimizer: torch.optim.NAdam
     nadam_learning_rate = 1.0e-5
@@ -3117,18 +3219,22 @@ if __name__ == "__main__":
     radam_learning_rate = 1.0e-5
     radam_weight_decay = 1.0e-4
     # optimizer: MADGRAD
-    madgrad_learning_rate = 1.0e-5
-    madgrad_momentum = 0.9
+    madgrad_learning_rate = 1.0e-4
+    madgrad_momentum = 0.0
     madgrad_weight_decay = 0.0
     madgrad_eps = 1.0e-6
     # various for optimizers
     optim_update_lr = False
     optim_target_lr = 1.0e-5
+    optim_update_wd = False
+    optim_target_wd = 1.0e-7
 
     data_cache_ctx_bound = 1.0e-5
     data_cache_latents_bound = 1.0e-5
-    use_regularization = False
-    regularization_alpha_model = 1.0e-7
+    use_regularization_model = True
+    use_regularization_ctx = False
+    use_regularization_latents = False
+    regularization_alpha_model = 1.0e-10
     regularization_alpha_ctx = 1.0e-12
     regularization_alpha_latents = 1.0e-12
     regularization_low_weights_model_bound = [
@@ -3164,36 +3270,38 @@ if __name__ == "__main__":
     freeze_model_nth_epoch = 0
     freeze_model_epochs = 0
 
-    nelements = 1024
-    data_cache_ctx_len = nelements
-    data_cache_latents_len = nelements
-    data_cache_latents_shape = [16, 8, 8]
+    nelements = 64
+    data_cache_ctx_len = 32 # nelements
+    data_cache_latents_len = 32 # nelements
+    data_cache_latents_shape = [16, 16, 16]
 
     dropout_rate_latents = 0.0000
     dropout_rate_context = 0.0000
 
     noisein_rate_latents = 0.0000
     noisein_rate_context = 0.0000
-    noisein_rate_latents_input = 0.0500
-    noisein_rate_latents_output = 0.1000
-    noisein_rate_context_io = 0.0000
+    noisein_rate_latents_input = 0.10
+    noisein_rate_latents_output = 0.05
+    noisein_rate_context_input = 0.0500
+    noisein_rate_context_output = 0.0250
 
     noiseover_rate_latents = 0.0000
     noiseover_rate_context = 0.0000
-    noiseover_rate_latents_input = 0.0500
-    noiseover_rate_latents_output = 0.1000
-    noiseover_rate_context_io = 0.0250
+    noiseover_rate_latents_input = 0.10
+    noiseover_rate_latents_output = 0.05
+    noiseover_rate_context_input = 0.0500
+    noiseover_rate_context_output = 0.0250
 
     total_steps = 200_000
-    batch_size = 32
+    batch_size = 8
     sliding_batch = False
-    grad_accumulation_steps = (nelements // batch_size) // 4
+    grad_accumulation_steps = 1 # (nelements // batch_size) # // 64
 
     images_sample_count = nelements
     starting_from = 1024 * 8
     images_path_src = "/mnt/f/Datasets/Images_512x512/dataset_01"
     images_path_dst = "/mnt/f/git_AIResearch/dyna/data/img_dst"
-    output_shape = [256, 256]
+    output_shape = [512, 512]
     dtype_weights = torch.float32
     device = torch.device("cuda")
 
@@ -3207,12 +3315,14 @@ if __name__ == "__main__":
         noisein_rate_context=noisein_rate_context,
         noisein_rate_latents_input=noisein_rate_latents_input,
         noisein_rate_latents_output=noisein_rate_latents_output,
-        noisein_rate_context_io=noisein_rate_context_io,
+        noisein_rate_context_input=noisein_rate_context_input,
+        noisein_rate_context_output=noisein_rate_context_output,
         noiseover_rate_latents=noiseover_rate_latents,
         noiseover_rate_context=noiseover_rate_context,
         noiseover_rate_latents_input=noiseover_rate_latents_input,
         noiseover_rate_latents_output=noiseover_rate_latents_output,
-        noiseover_rate_context_io=noiseover_rate_context_io,
+        noiseover_rate_context_input=noiseover_rate_context_input,
+        noiseover_rate_context_output=noiseover_rate_context_output,
         data_cache_ctx_bound=data_cache_ctx_bound,
         data_cache_latents_bound=data_cache_latents_bound,
         dtype_weights=dtype_weights,
@@ -3356,14 +3466,23 @@ if __name__ == "__main__":
     ]
 
     if optim_update_lr:
+        old_param = None
         for g in optimizer.param_groups:
+            old_param = g["lr"] if old_param is None else old_param
             g["lr"] = optim_target_lr
-        print(f"Updated learning rate to {optim_target_lr}")
+        print(f"Updated learning rate from {old_param} to {optim_target_lr}")
+
+    if optim_update_wd:
+        old_param = None
+        for g in optimizer.param_groups:
+            old_param = g["weight_decay"] if old_param is None else old_param
+            g["weight_decay"] = optim_target_wd
+        print(f"Updated weight decay from {old_param} to {optim_target_wd}")
 
     # WARMUP
     # lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
     #     optimizer=optimizer,
-    #     T_0=50,
+    #     T_0=16,
     #     T_mult=1,
     # )
     lr_scheduler = torch.optim.lr_scheduler.ConstantLR(
@@ -3371,7 +3490,7 @@ if __name__ == "__main__":
         factor=1.00,
         total_iters=4096 * 16,
     )
-    warmup_epochs = 2048
+    warmup_epochs = 4096 * 2
     warmup_scheduler = warmup.LinearWarmup(
         optimizer=optimizer,
         warmup_period=warmup_epochs,
@@ -3388,7 +3507,9 @@ if __name__ == "__main__":
         grad_accumulation_steps=grad_accumulation_steps,
         sliding_batch=sliding_batch,
         loss_channels_weights=torch.tensor(loss_channels_weights),
-        use_regularization=use_regularization,
+        use_regularization_model=use_regularization_model,
+        use_regularization_ctx=use_regularization_ctx,
+        use_regularization_latents=use_regularization_latents,
         regularization_alpha_model=regularization_alpha_model,
         regularization_alpha_ctx=regularization_alpha_ctx,
         regularization_alpha_latents=regularization_alpha_latents,
