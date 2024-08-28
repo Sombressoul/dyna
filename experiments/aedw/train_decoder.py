@@ -20,7 +20,7 @@ project_dir = os.path.dirname(evals_dir)
 sys.path.append(project_dir)
 
 # torch.manual_seed(42)
-torch.manual_seed(10002)
+torch.manual_seed(10038)
 
 from dyna import DynamicConv2D, WeightsLib2D, siglog, siglog_parametric
 
@@ -47,6 +47,7 @@ class DecoderOnlyModel(nn.Module):
         noiseover_rate_context_output: float = 0.0,
         data_cache_ctx_bound: float = 0.01,
         data_cache_latents_bound: float = 0.01,
+        context_through: bool = False,
         dtype_weights: torch.dtype = torch.float32,
     ):
         super().__init__()
@@ -75,6 +76,8 @@ class DecoderOnlyModel(nn.Module):
         self.context_length = 64
         self.mod_rank = 32
         self.transformations_rank = 32
+
+        self.context_through = context_through
 
         self.branch_x_convolved_sml = True
         self.branch_x_convolved_med = True
@@ -288,10 +291,11 @@ class DecoderOnlyModel(nn.Module):
             bias=True,
             dtype=self.dtype_weights,
         )
-        self.block_05_norm_out_post = nn.LayerNorm(
-            normalized_shape=[self.decoder_channels_reduced],
-            elementwise_affine=True,
-            bias=True,
+        self.block_05_norm_out_post = nn.BatchNorm2d(
+            num_features=self.decoder_channels_reduced,
+            eps=self.eps,
+            affine=True,
+            momentum=0.1,
             dtype=self.dtype_weights,
         )
 
@@ -474,10 +478,11 @@ class DecoderOnlyModel(nn.Module):
             bias=True,
             dtype=self.dtype_weights,
         )
-        self.block_04_norm_out_post = nn.LayerNorm(
-            normalized_shape=[self.decoder_channels_reduced],
-            elementwise_affine=True,
-            bias=True,
+        self.block_04_norm_out_post = nn.BatchNorm2d(
+            num_features=self.decoder_channels_reduced,
+            eps=self.eps,
+            affine=True,
+            momentum=0.1,
             dtype=self.dtype_weights,
         )
 
@@ -660,10 +665,11 @@ class DecoderOnlyModel(nn.Module):
             bias=True,
             dtype=self.dtype_weights,
         )
-        self.block_03_norm_out_post = nn.LayerNorm(
-            normalized_shape=[self.decoder_channels_reduced],
-            elementwise_affine=True,
-            bias=True,
+        self.block_03_norm_out_post = nn.BatchNorm2d(
+            num_features=self.decoder_channels_reduced,
+            eps=self.eps,
+            affine=True,
+            momentum=0.1,
             dtype=self.dtype_weights,
         )
 
@@ -846,10 +852,11 @@ class DecoderOnlyModel(nn.Module):
             bias=True,
             dtype=self.dtype_weights,
         )
-        self.block_02_norm_out_post = nn.LayerNorm(
-            normalized_shape=[self.decoder_channels_reduced],
-            elementwise_affine=True,
-            bias=True,
+        self.block_02_norm_out_post = nn.BatchNorm2d(
+            num_features=self.decoder_channels_reduced,
+            eps=self.eps,
+            affine=True,
+            momentum=0.1,
             dtype=self.dtype_weights,
         )
 
@@ -1032,10 +1039,11 @@ class DecoderOnlyModel(nn.Module):
             bias=True,
             dtype=self.dtype_weights,
         )
-        self.block_01_norm_out_post = nn.LayerNorm(
-            normalized_shape=[self.decoder_channels_reduced],
-            elementwise_affine=True,
-            bias=True,
+        self.block_01_norm_out_post = nn.BatchNorm2d(
+            num_features=self.decoder_channels_reduced,
+            eps=self.eps,
+            affine=True,
+            momentum=0.1,
             dtype=self.dtype_weights,
         )
 
@@ -1117,6 +1125,23 @@ class DecoderOnlyModel(nn.Module):
                 mean=(1.0 / math.e),
                 std=1.0e-2,
             ),
+        )
+
+        # ====> Base pre-norm
+        self.base_norm_context = nn.LayerNorm(
+            normalized_shape=[self.context_length],
+            elementwise_affine=True,
+            bias=False,
+            dtype=self.dtype_weights,
+        )
+
+        # ====> Base pre-norm
+        self.base_norm_latents = nn.BatchNorm2d(
+            num_features=self.data_cache_latents_shape[0],
+            eps=self.eps,
+            affine=True,
+            momentum=0.1,
+            dtype=self.dtype_weights,
         )
 
         pass
@@ -1476,8 +1501,8 @@ class DecoderOnlyModel(nn.Module):
         activation_fn_ctx = lambda ctx: activation_call(ctx)
 
         # Prepare inputs.
-        base_x = x
-        base_ctx = context
+        base_x = self.base_norm_latents(x)
+        base_ctx = self.base_norm_context(context)
 
         # Input noise-in/-over
         base_x = self.noisein(base_x, self.noisein_rate_latents_input)
@@ -1568,9 +1593,10 @@ class DecoderOnlyModel(nn.Module):
         x = x.permute([0, 3, 1, 2])
         x = self.block_05_conv_out(x, ctx_conv_out)
         x = activation_fn_x(x)
-        x = x.permute([0, 2, 3, 1])
         x = self.block_05_norm_out_post(x)
-        x = x.permute([0, 3, 1, 2])
+
+        # Context-through mode.
+        ctx = base_ctx if self.context_through else base_ctx + ctx
 
         # Inter-Block dropout
         x = self.dropout_latents(x)
@@ -1655,9 +1681,10 @@ class DecoderOnlyModel(nn.Module):
         x = x.permute([0, 3, 1, 2])
         x = self.block_04_conv_out(x, ctx_conv_out)
         x = activation_fn_x(x)
-        x = x.permute([0, 2, 3, 1])
         x = self.block_04_norm_out_post(x)
-        x = x.permute([0, 3, 1, 2])
+
+        # Context-through mode.
+        ctx = base_ctx if self.context_through else base_ctx + ctx
 
         # Inter-Block dropout
         x = self.dropout_latents(x)
@@ -1742,9 +1769,10 @@ class DecoderOnlyModel(nn.Module):
         x = x.permute([0, 3, 1, 2])
         x = self.block_03_conv_out(x, ctx_conv_out)
         x = activation_fn_x(x)
-        x = x.permute([0, 2, 3, 1])
         x = self.block_03_norm_out_post(x)
-        x = x.permute([0, 3, 1, 2])
+
+        # Context-through mode.
+        ctx = base_ctx if self.context_through else base_ctx + ctx
 
         # Inter-Block dropout
         x = self.dropout_latents(x)
@@ -1829,9 +1857,10 @@ class DecoderOnlyModel(nn.Module):
         x = x.permute([0, 3, 1, 2])
         x = self.block_02_conv_out(x, ctx_conv_out)
         x = activation_fn_x(x)
-        x = x.permute([0, 2, 3, 1])
         x = self.block_02_norm_out_post(x)
-        x = x.permute([0, 3, 1, 2])
+
+        # Context-through mode.
+        ctx = base_ctx if self.context_through else base_ctx + ctx
 
         # Inter-Block dropout
         x = self.dropout_latents(x)
@@ -1916,15 +1945,16 @@ class DecoderOnlyModel(nn.Module):
         x = x.permute([0, 3, 1, 2])
         x = self.block_01_conv_out(x, ctx_conv_out)
         x = activation_fn_x(x)
-        x = x.permute([0, 2, 3, 1])
         x = self.block_01_norm_out_post(x)
-        x = x.permute([0, 3, 1, 2])
+
+        # Context-through mode.
+        ctx = base_ctx if self.context_through else base_ctx + ctx
 
         # Output noise-in/-over
         x = self.noisein(x, self.noisein_rate_latents_output)
         x = self.noiseover(x, self.noiseover_rate_latents_output)
-        ctx = self.noisein(ctx, self.noisein_rate_context_input)
-        ctx = self.noiseover(ctx, self.noiseover_rate_context_input)
+        ctx = self.noisein(ctx, self.noisein_rate_context_output)
+        ctx = self.noiseover(ctx, self.noiseover_rate_context_output)
 
         # Inter-Block dropout
         x = self.dropout_latents(x)
@@ -2812,10 +2842,10 @@ def model_perturb_small_weights(
 
 def model_reinit_weights_same_distribution(
     model: DecoderOnlyModel,
-    include_data_cache: bool = False,
+    target: str = None,
 ) -> None:
     for name, param in model.named_parameters():
-        if "data_cache" in name and not include_data_cache:
+        if target is not None and target not in name:
             continue
         mean = param.data.mean()
         std = param.data.std()
@@ -2997,6 +3027,22 @@ def model_change_data_cache_latents(
             continue
     return None
 
+def model_fill_data_cache_latents(
+    model: DecoderOnlyModel,
+    value: float = 1.0e-5,
+) -> None:
+    model.data_cache_latents.data = torch.nn.init.constant_(model.data_cache_latents.data, val=value)
+    print(f"model_fill_data_cache_latents: filled with {value}")
+    pass
+
+def model_fill_data_cache_context(
+    model: DecoderOnlyModel,
+    value: float = 1.0e-5,
+) -> None:
+    model.data_cache_ctx.data = torch.nn.init.constant_(model.data_cache_ctx.data, val=value)
+    print(f"model_fill_data_cache_context: filled with {value}")
+    pass
+
 
 def model_change_data_cache_ctx(
     model: DecoderOnlyModel,
@@ -3129,11 +3175,14 @@ def model_extend_data_cache(
 
     pass
 
+def clear() -> None:
+    os.system("clear")
+    pass
 
 if __name__ == "__main__":
     train_mode = True
 
-    load_model = True
+    load_model = False
     load_optim = False
     drop_ctx_cache = False
     drop_latents_cache = False
@@ -3153,29 +3202,45 @@ if __name__ == "__main__":
         # model_data_cache_double,
         # lambda m, d, t: model_change_data_cache_latents(m, d, t, [16, 16, 16, 16]),
         # lambda m, d, t: model_change_data_cache_ctx(m, d, t, [16, 64]),
-        # model_freeze_all,
         # model_unfreeze_model,
         # model_unfreeze_latents,
-        # model_unfreeze_ctx,
         # model_perturb_small_weights,
-        # lambda m, d, t: model_perturb_weights(m, 0.10, True),
+        # lambda m, d, t: model_perturb_weights(m, 0.10, False),
         # model_perturb_small_weights,
-        lambda m, d, t: model_extend_data_cache(m, 64, 1.0e-6),
+        # lambda m, d, t: model_extend_data_cache(m, 128, 1.0e-6),
         # lambda m, d, t: model_reinit_weights_same_distribution(m, True),
+        # lambda m, d, t: model_fill_data_cache_latents(m, 1.0e-6),
+        # lambda m, d, t: model_reinit_weights_same_distribution(m, target="siglog_params"),
+        # lambda m, d, t: model_reinit_weights_same_distribution(m, target="block_out"),
+        # lambda m, d, t: model_reinit_weights_same_distribution(m, target="block_01"),
+        # lambda m, d, t: model_reinit_weights_same_distribution(m, target="block_02"),
+        # lambda m, d, t: model_reinit_weights_same_distribution(m, target="block_03"),
+        # lambda m, d, t: model_reinit_weights_same_distribution(m, target="block_04"),
+        # lambda m, d, t: model_reinit_weights_same_distribution(m, target="block_05"),
+        # lambda m, d, t: model_reinit_weights_same_distribution(m, target="data_cache"),
+        # lambda m, d, t: model_fill_data_cache_context(m, 1.0e-6),
+        # lambda m, d, t: model_fill_data_cache_latents(m, 1.0e-6),
+        # model_freeze_all,
+        # model_unfreeze_ctx,
+        # model_unfreeze_latents,
         # model_unfreeze_all,
         # model_freeze_model,
         # model_freeze_latents,
         # model_freeze_ctx,
+        # lambda m, d, t: model_unfreeze_block(m, d, t, "siglog_params"),
         # lambda m, d, t: model_unfreeze_block(m, d, t, "block_out"),
         # lambda m, d, t: model_unfreeze_block(m, d, t, "block_01"),
         # lambda m, d, t: model_unfreeze_block(m, d, t, "block_02"),
         # lambda m, d, t: model_unfreeze_block(m, d, t, "block_03"),
         # lambda m, d, t: model_unfreeze_block(m, d, t, "block_04"),
+        # lambda m, d, t: model_unfreeze_block(m, d, t, "block_05"),
+        # lambda m, d, t: model_freeze_block(m, d, t, "siglog_params"),
         # lambda m, d, t: model_freeze_block(m, d, t, "block_out"),
         # lambda m, d, t: model_freeze_block(m, d, t, "block_01"),
         # lambda m, d, t: model_freeze_block(m, d, t, "block_02"),
         # lambda m, d, t: model_freeze_block(m, d, t, "block_03"),
         # lambda m, d, t: model_freeze_block(m, d, t, "block_04"),
+        # lambda m, d, t: model_freeze_block(m, d, t, "block_05"),
     ]
     onload_optim_fn = [
         # lambda o: optim_change_momentum(o, 0.9),
@@ -3183,19 +3248,19 @@ if __name__ == "__main__":
 
     path_prefix_load = "/mnt/f/git_AIResearch/dyna/data/models"
     path_prefix_save = "/mnt/f/git_AIResearch/dyna/data/models"
-    load_path_model = f"{path_prefix_load}/model.Type-04.G03.AdamW.LAST.pth"
-    load_path_optim = f"{path_prefix_load}/optim.Type-04.G03.AdamW.LAST.pth"
-    save_path_model = f"{path_prefix_save}/model.Type-04.G04.AdamW"
-    save_path_optim = f"{path_prefix_save}/optim.Type-04.G04.AdamW"
+    load_path_model = f"{path_prefix_load}/model.Type-04.G00.AdamW.LAST.pth"
+    load_path_optim = f"{path_prefix_load}/optim.Type-04.G00.AdamW.LAST.pth"
+    save_path_model = f"{path_prefix_save}/model.Type-04.G00.AdamW"
+    save_path_optim = f"{path_prefix_save}/optim.Type-04.G00.AdamW"
     save_model = True
-    save_optim = True
+    save_optim = False
     save_nth_iteration = 10_000
-    log_nth_update_step = 80
+    log_nth_update_step = 1
 
     # optimizer type
     optimizer_type = torch.optim.AdamW
     # optimizer: torch.optim.SGD
-    sgd_learning_rate = 1.0e-3
+    sgd_learning_rate = 1.0e-5
     sgd_momentum = 0.0
     sgd_dampening = 0.0
     sgd_weight_decay = 0.0
@@ -3206,9 +3271,9 @@ if __name__ == "__main__":
     adam_weight_decay = 0.0
     adam_eps = 1.0e-8
     # optimizer: torch.optim.AdamW
-    adamw_learning_rate = 1.0e-5
+    adamw_learning_rate = 1.0e-3
     adamw_amsgrad = True
-    adamw_weight_decay = 2.5e-3
+    adamw_weight_decay = 1.0e-2
     adamw_eps = 1.0e-8
     # optimizer: torch.optim.NAdam
     nadam_learning_rate = 1.0e-5
@@ -3225,12 +3290,12 @@ if __name__ == "__main__":
     madgrad_eps = 1.0e-6
     # various for optimizers
     optim_update_lr = False
-    optim_target_lr = 1.0e-5
+    optim_target_lr = 1.0e-4
     optim_update_wd = False
     optim_target_wd = 1.0e-7
 
-    data_cache_ctx_bound = 1.0e-5
-    data_cache_latents_bound = 1.0e-5
+    data_cache_ctx_bound = 1.0e-6
+    data_cache_latents_bound = 1.0e-6
     use_regularization_model = True
     use_regularization_ctx = False
     use_regularization_latents = False
@@ -3270,35 +3335,37 @@ if __name__ == "__main__":
     freeze_model_nth_epoch = 0
     freeze_model_epochs = 0
 
-    nelements = 64
-    data_cache_ctx_len = 32 # nelements
-    data_cache_latents_len = 32 # nelements
+    nelements = 128
+    data_cache_ctx_len = nelements
+    data_cache_latents_len = nelements
     data_cache_latents_shape = [16, 16, 16]
 
-    dropout_rate_latents = 0.0000
-    dropout_rate_context = 0.0000
+    context_through = False
 
-    noisein_rate_latents = 0.0000
-    noisein_rate_context = 0.0000
-    noisein_rate_latents_input = 0.10
-    noisein_rate_latents_output = 0.05
-    noisein_rate_context_input = 0.0500
-    noisein_rate_context_output = 0.0250
+    dropout_rate_latents = 0.0
+    dropout_rate_context = 0.0
 
-    noiseover_rate_latents = 0.0000
-    noiseover_rate_context = 0.0000
-    noiseover_rate_latents_input = 0.10
-    noiseover_rate_latents_output = 0.05
-    noiseover_rate_context_input = 0.0500
-    noiseover_rate_context_output = 0.0250
+    noisein_rate_latents = 0.0
+    noisein_rate_context = 0.0
+    noisein_rate_latents_input = 0.100
+    noisein_rate_latents_output = 0.100
+    noisein_rate_context_input = 0.025
+    noisein_rate_context_output = 0.025
+
+    noiseover_rate_latents = 0.0
+    noiseover_rate_context = 0.0
+    noiseover_rate_latents_input = 0.100
+    noiseover_rate_latents_output = 0.100
+    noiseover_rate_context_input = 0.025
+    noiseover_rate_context_output = 0.025
 
     total_steps = 200_000
     batch_size = 8
     sliding_batch = False
-    grad_accumulation_steps = 1 # (nelements // batch_size) # // 64
+    grad_accumulation_steps = (nelements // batch_size)
 
     images_sample_count = nelements
-    starting_from = 1024 * 8
+    starting_from = 1024 * 4
     images_path_src = "/mnt/f/Datasets/Images_512x512/dataset_01"
     images_path_dst = "/mnt/f/git_AIResearch/dyna/data/img_dst"
     output_shape = [512, 512]
@@ -3325,6 +3392,7 @@ if __name__ == "__main__":
         noiseover_rate_context_output=noiseover_rate_context_output,
         data_cache_ctx_bound=data_cache_ctx_bound,
         data_cache_latents_bound=data_cache_latents_bound,
+        context_through=context_through,
         dtype_weights=dtype_weights,
     ).to(device=device, dtype=dtype_weights)
 
@@ -3490,7 +3558,7 @@ if __name__ == "__main__":
         factor=1.00,
         total_iters=4096 * 16,
     )
-    warmup_epochs = 4096 * 2
+    warmup_epochs = 128
     warmup_scheduler = warmup.LinearWarmup(
         optimizer=optimizer,
         warmup_period=warmup_epochs,
