@@ -75,7 +75,7 @@ class DecoderOnlyModel(nn.Module):
         self.bias_static = 0.0
         self.context_length = 64
         self.mod_rank = 32
-        self.transformations_rank = 32
+        self.transformations_rank = 16
 
         self.context_through = context_through
 
@@ -89,12 +89,13 @@ class DecoderOnlyModel(nn.Module):
         self.kernel_size_t = [3, 3]
         self.kernel_size_c_base = [3, 3]
         self.kernel_size_c_sml = [3, 3]
-        self.kernel_size_c_med = [7, 7]
-        self.kernel_size_c_lrg = [11, 11]
-        self.padding_size_c_base = [1, 1]
-        self.padding_size_c_sml = [1, 1]
-        self.padding_size_c_med = [3, 3]
-        self.padding_size_c_lrg = [5, 5]
+        self.kernel_size_c_med = [5, 5]
+        self.kernel_size_c_lrg = [7, 7]
+        self.padding_size_upsample = [0, 0, 0, 0]
+        self.padding_size_c_base = [0, 0, 0, 0]
+        self.padding_size_c_sml = [0, 0, 0, 0]
+        self.padding_size_c_med = [1, 1, 1, 1]
+        self.padding_size_c_lrg = [2, 2, 2, 2]
 
         self.eps = 1.0e-3
         self.q_levels = 16
@@ -121,12 +122,12 @@ class DecoderOnlyModel(nn.Module):
             transformations_rank=self.transformations_rank,
             kernel_size=self.kernel_size_c_base,
             stride=[2, 2],
-            padding=self.padding_size_c_base,
+            padding=self.padding_size_upsample,
             dilation=[1, 1],
             bias_dynamic=self.use_bias,
             bias_static=self.bias_static,
             transpose=True,
-            output_padding=[1, 1],
+            output_padding=[0, 0],
             dtype_weights=self.dtype_weights,
         )
         self.block_05_conv_sml = DynamicConv2D(
@@ -185,7 +186,7 @@ class DecoderOnlyModel(nn.Module):
             transformations_rank=self.transformations_rank,
             kernel_size=[3, 3],
             stride=[1, 1],
-            padding=[1, 1],
+            padding=[1, 1, 1, 1],
             dilation=[1, 1],
             bias_dynamic=self.use_bias,
             bias_static=self.bias_static,
@@ -308,12 +309,12 @@ class DecoderOnlyModel(nn.Module):
             transformations_rank=self.transformations_rank,
             kernel_size=self.kernel_size_c_base,
             stride=[2, 2],
-            padding=self.padding_size_c_base,
+            padding=self.padding_size_upsample,
             dilation=[1, 1],
             bias_dynamic=self.use_bias,
             bias_static=self.bias_static,
             transpose=True,
-            output_padding=[1, 1],
+            output_padding=[0, 0],
             dtype_weights=self.dtype_weights,
         )
         self.block_04_conv_sml = DynamicConv2D(
@@ -372,7 +373,7 @@ class DecoderOnlyModel(nn.Module):
             transformations_rank=self.transformations_rank,
             kernel_size=[3, 3],
             stride=[1, 1],
-            padding=[1, 1],
+            padding=[1, 1, 1, 1],
             dilation=[1, 1],
             bias_dynamic=self.use_bias,
             bias_static=self.bias_static,
@@ -495,12 +496,12 @@ class DecoderOnlyModel(nn.Module):
             transformations_rank=self.transformations_rank,
             kernel_size=self.kernel_size_c_base,
             stride=[2, 2],
-            padding=self.padding_size_c_base,
+            padding=self.padding_size_upsample,
             dilation=[1, 1],
             bias_dynamic=self.use_bias,
             bias_static=self.bias_static,
             transpose=True,
-            output_padding=[1, 1],
+            output_padding=[0, 0],
             dtype_weights=self.dtype_weights,
         )
         self.block_03_conv_sml = DynamicConv2D(
@@ -559,7 +560,7 @@ class DecoderOnlyModel(nn.Module):
             transformations_rank=self.transformations_rank,
             kernel_size=[3, 3],
             stride=[1, 1],
-            padding=[1, 1],
+            padding=[1, 1, 1, 1],
             dilation=[1, 1],
             bias_dynamic=self.use_bias,
             bias_static=self.bias_static,
@@ -682,12 +683,12 @@ class DecoderOnlyModel(nn.Module):
             transformations_rank=self.transformations_rank,
             kernel_size=self.kernel_size_c_base,
             stride=[2, 2],
-            padding=self.padding_size_c_base,
+            padding=self.padding_size_upsample,
             dilation=[1, 1],
             bias_dynamic=self.use_bias,
             bias_static=self.bias_static,
             transpose=True,
-            output_padding=[1, 1],
+            output_padding=[0, 0],
             dtype_weights=self.dtype_weights,
         )
         self.block_02_conv_sml = DynamicConv2D(
@@ -746,7 +747,7 @@ class DecoderOnlyModel(nn.Module):
             transformations_rank=self.transformations_rank,
             kernel_size=[3, 3],
             stride=[1, 1],
-            padding=[1, 1],
+            padding=[1, 1, 1, 1],
             dilation=[1, 1],
             bias_dynamic=self.use_bias,
             bias_static=self.bias_static,
@@ -869,12 +870,12 @@ class DecoderOnlyModel(nn.Module):
             transformations_rank=self.transformations_rank,
             kernel_size=self.kernel_size_c_base,
             stride=[2, 2],
-            padding=self.padding_size_c_base,
+            padding=self.padding_size_upsample,
             dilation=[1, 1],
             bias_dynamic=self.use_bias,
             bias_static=self.bias_static,
             transpose=True,
-            output_padding=[1, 1],
+            output_padding=[0, 0],
             dtype_weights=self.dtype_weights,
         )
         self.block_01_conv_sml = DynamicConv2D(
@@ -933,7 +934,7 @@ class DecoderOnlyModel(nn.Module):
             transformations_rank=self.transformations_rank,
             kernel_size=[3, 3],
             stride=[1, 1],
-            padding=[1, 1],
+            padding=[1, 1, 1, 1],
             dilation=[1, 1],
             bias_dynamic=self.use_bias,
             bias_static=self.bias_static,
@@ -1062,7 +1063,7 @@ class DecoderOnlyModel(nn.Module):
             transformations_rank=self.transformations_rank,
             kernel_size=[3, 3],
             stride=[1, 1],
-            padding=[1, 1],
+            padding=[1, 1, 1, 1],
             dilation=[1, 1],
             bias_dynamic=self.use_bias,
             bias_static=self.bias_static,
@@ -2436,6 +2437,7 @@ def train(
                 )
                 + "\n# <=============="
             )
+            # exit()
             stdr_logging_accumulator = []
             loss_main_logging_accumulator = []
             loss_reg_logging_accumulator = []
@@ -2855,7 +2857,12 @@ def model_reinit_weights_same_distribution(
             std=std,
         )
         print(
-            f"model_reinit_weights_same_distribution: {name}; mean/std: {mean.item()}/{std.item()}"
+            " ".join(
+                [
+                    f"model_reinit_weights_same_distribution: {name};",
+                    f"mean/std: {mean.item()}/{std.item()}",
+                ]
+            )
         )
     pass
 
@@ -3027,19 +3034,25 @@ def model_change_data_cache_latents(
             continue
     return None
 
+
 def model_fill_data_cache_latents(
     model: DecoderOnlyModel,
     value: float = 1.0e-5,
 ) -> None:
-    model.data_cache_latents.data = torch.nn.init.constant_(model.data_cache_latents.data, val=value)
+    model.data_cache_latents.data = torch.nn.init.constant_(
+        model.data_cache_latents.data, val=value
+    )
     print(f"model_fill_data_cache_latents: filled with {value}")
     pass
+
 
 def model_fill_data_cache_context(
     model: DecoderOnlyModel,
     value: float = 1.0e-5,
 ) -> None:
-    model.data_cache_ctx.data = torch.nn.init.constant_(model.data_cache_ctx.data, val=value)
+    model.data_cache_ctx.data = torch.nn.init.constant_(
+        model.data_cache_ctx.data, val=value
+    )
     print(f"model_fill_data_cache_context: filled with {value}")
     pass
 
@@ -3175,9 +3188,11 @@ def model_extend_data_cache(
 
     pass
 
+
 def clear() -> None:
     os.system("clear")
     pass
+
 
 if __name__ == "__main__":
     train_mode = True
@@ -3210,6 +3225,7 @@ if __name__ == "__main__":
         # lambda m, d, t: model_extend_data_cache(m, 128, 1.0e-6),
         # lambda m, d, t: model_reinit_weights_same_distribution(m, True),
         # lambda m, d, t: model_fill_data_cache_latents(m, 1.0e-6),
+        # lambda m, d, t: model_reinit_weights_same_distribution(m),
         # lambda m, d, t: model_reinit_weights_same_distribution(m, target="siglog_params"),
         # lambda m, d, t: model_reinit_weights_same_distribution(m, target="block_out"),
         # lambda m, d, t: model_reinit_weights_same_distribution(m, target="block_01"),
@@ -3248,10 +3264,10 @@ if __name__ == "__main__":
 
     path_prefix_load = "/mnt/f/git_AIResearch/dyna/data/models"
     path_prefix_save = "/mnt/f/git_AIResearch/dyna/data/models"
-    load_path_model = f"{path_prefix_load}/model.Type-04.G00.AdamW.LAST.pth"
-    load_path_optim = f"{path_prefix_load}/optim.Type-04.G00.AdamW.LAST.pth"
-    save_path_model = f"{path_prefix_save}/model.Type-04.G00.AdamW"
-    save_path_optim = f"{path_prefix_save}/optim.Type-04.G00.AdamW"
+    load_path_model = f"{path_prefix_load}/"
+    load_path_optim = f"{path_prefix_load}/"
+    save_path_model = f"{path_prefix_save}/model.Type-06.00.G00.AdamW"
+    save_path_optim = f"{path_prefix_save}/optim.Type-06.00.G00.AdamW"
     save_model = True
     save_optim = False
     save_nth_iteration = 10_000
@@ -3271,7 +3287,7 @@ if __name__ == "__main__":
     adam_weight_decay = 0.0
     adam_eps = 1.0e-8
     # optimizer: torch.optim.AdamW
-    adamw_learning_rate = 1.0e-3
+    adamw_learning_rate = 1.0e-5
     adamw_amsgrad = True
     adamw_weight_decay = 1.0e-2
     adamw_eps = 1.0e-8
@@ -3284,8 +3300,8 @@ if __name__ == "__main__":
     radam_learning_rate = 1.0e-5
     radam_weight_decay = 1.0e-4
     # optimizer: MADGRAD
-    madgrad_learning_rate = 1.0e-4
-    madgrad_momentum = 0.0
+    madgrad_learning_rate = 1.0e-5
+    madgrad_momentum = 0.9
     madgrad_weight_decay = 0.0
     madgrad_eps = 1.0e-6
     # various for optimizers
@@ -3294,8 +3310,8 @@ if __name__ == "__main__":
     optim_update_wd = False
     optim_target_wd = 1.0e-7
 
-    data_cache_ctx_bound = 1.0e-6
-    data_cache_latents_bound = 1.0e-6
+    data_cache_ctx_bound = 1.0e-4
+    data_cache_latents_bound = 1.0e-4
     use_regularization_model = True
     use_regularization_ctx = False
     use_regularization_latents = False
@@ -3338,7 +3354,7 @@ if __name__ == "__main__":
     nelements = 128
     data_cache_ctx_len = nelements
     data_cache_latents_len = nelements
-    data_cache_latents_shape = [16, 16, 16]
+    data_cache_latents_shape = [16, 8, 8]
 
     context_through = False
 
@@ -3347,28 +3363,28 @@ if __name__ == "__main__":
 
     noisein_rate_latents = 0.0
     noisein_rate_context = 0.0
-    noisein_rate_latents_input = 0.100
-    noisein_rate_latents_output = 0.100
-    noisein_rate_context_input = 0.025
-    noisein_rate_context_output = 0.025
+    noisein_rate_latents_input = 0.10 # 0.100
+    noisein_rate_latents_output = 0.10 # 0.100
+    noisein_rate_context_input = 0.10 # 0.025
+    noisein_rate_context_output = 0.10 # 0.025
 
     noiseover_rate_latents = 0.0
     noiseover_rate_context = 0.0
-    noiseover_rate_latents_input = 0.100
-    noiseover_rate_latents_output = 0.100
-    noiseover_rate_context_input = 0.025
-    noiseover_rate_context_output = 0.025
+    noiseover_rate_latents_input = 0.10 # 0.100
+    noiseover_rate_latents_output = 0.10 # 0.100
+    noiseover_rate_context_input = 0.10 # 0.025
+    noiseover_rate_context_output = 0.10 # 0.025
 
     total_steps = 200_000
-    batch_size = 8
+    batch_size = 32
     sliding_batch = False
-    grad_accumulation_steps = (nelements // batch_size)
+    grad_accumulation_steps = nelements // batch_size
 
     images_sample_count = nelements
-    starting_from = 1024 * 4
+    starting_from = 1024 * 8
     images_path_src = "/mnt/f/Datasets/Images_512x512/dataset_01"
     images_path_dst = "/mnt/f/git_AIResearch/dyna/data/img_dst"
-    output_shape = [512, 512]
+    output_shape = [225, 225]
     dtype_weights = torch.float32
     device = torch.device("cuda")
 
@@ -3558,7 +3574,7 @@ if __name__ == "__main__":
         factor=1.00,
         total_iters=4096 * 16,
     )
-    warmup_epochs = 128
+    warmup_epochs = 512
     warmup_scheduler = warmup.LinearWarmup(
         optimizer=optimizer,
         warmup_period=warmup_epochs,
