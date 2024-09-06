@@ -113,6 +113,71 @@ class DecoderOnlyModel(nn.Module):
         self.upsample_nearest = nn.Upsample(scale_factor=2, mode="nearest")
         self.upsample_bilinear = nn.Upsample(scale_factor=2, mode="bilinear")
 
+        # ====> Block Input
+        self.block_input_x_linear_a = nn.Linear(
+            in_features=self.decoder_channels_reduced,
+            out_features=self.decoder_channels_reduced,
+            bias=True,
+            dtype=self.dtype_weights,
+        )
+        self.block_input_x_linear_b = nn.Linear(
+            in_features=self.decoder_channels_reduced,
+            out_features=self.decoder_channels_reduced,
+            bias=True,
+            dtype=self.dtype_weights,
+        )
+        self.block_input_ctx_linear_a = nn.Linear(
+            in_features=self.context_length,
+            out_features=self.context_length,
+            bias=True,
+            dtype=self.dtype_weights,
+        )
+        self.block_input_ctx_linear_b = nn.Linear(
+            in_features=self.context_length,
+            out_features=self.context_length,
+            bias=True,
+            dtype=self.dtype_weights,
+        )
+        self.block_input_base_norm_context_pre = nn.LayerNorm(
+            normalized_shape=[self.context_length],
+            elementwise_affine=True,
+            bias=False,
+            dtype=self.dtype_weights,
+        )
+        self.block_input_base_norm_context_post_a = nn.LayerNorm(
+            normalized_shape=[self.context_length],
+            elementwise_affine=True,
+            bias=False,
+            dtype=self.dtype_weights,
+        )
+        self.block_input_base_norm_context_post_b = nn.LayerNorm(
+            normalized_shape=[self.context_length],
+            elementwise_affine=True,
+            bias=False,
+            dtype=self.dtype_weights,
+        )
+        self.block_input_base_norm_latents_pre = nn.BatchNorm2d(
+            num_features=self.data_cache_latents_shape[0],
+            eps=self.eps,
+            affine=True,
+            momentum=0.1,
+            dtype=self.dtype_weights,
+        )
+        self.block_input_base_norm_latents_post_a = nn.BatchNorm2d(
+            num_features=self.data_cache_latents_shape[0],
+            eps=self.eps,
+            affine=True,
+            momentum=0.1,
+            dtype=self.dtype_weights,
+        )
+        self.block_input_base_norm_latents_post_b = nn.BatchNorm2d(
+            num_features=self.data_cache_latents_shape[0],
+            eps=self.eps,
+            affine=True,
+            momentum=0.1,
+            dtype=self.dtype_weights,
+        )
+
         # ====> Block 05
         self.block_05_conv_upsample = DynamicConv2D(
             in_channels=self.decoder_channels_reduced,
@@ -1128,23 +1193,6 @@ class DecoderOnlyModel(nn.Module):
             ),
         )
 
-        # ====> Base pre-norm
-        self.base_norm_context = nn.LayerNorm(
-            normalized_shape=[self.context_length],
-            elementwise_affine=True,
-            bias=False,
-            dtype=self.dtype_weights,
-        )
-
-        # ====> Base pre-norm
-        self.base_norm_latents = nn.BatchNorm2d(
-            num_features=self.data_cache_latents_shape[0],
-            eps=self.eps,
-            affine=True,
-            momentum=0.1,
-            dtype=self.dtype_weights,
-        )
-
         pass
 
     def quantizer(
@@ -1502,8 +1550,8 @@ class DecoderOnlyModel(nn.Module):
         activation_fn_ctx = lambda ctx: activation_call(ctx)
 
         # Prepare inputs.
-        base_x = self.base_norm_latents(x)
-        base_ctx = self.base_norm_context(context)
+        base_x = self.block_input_base_norm_latents_pre(x)
+        base_ctx = self.block_input_base_norm_context_pre(context)
 
         # Input noise-in/-over
         base_x = self.noisein(base_x, self.noisein_rate_latents_input)
@@ -1512,8 +1560,30 @@ class DecoderOnlyModel(nn.Module):
         base_ctx = self.noiseover(base_ctx, self.noiseover_rate_context_input)
 
         # Inter-Block dropout
-        x = self.dropout_latents(base_x)
-        ctx = self.dropout_context(base_ctx)
+        base_x = self.dropout_latents(base_x)
+        base_ctx = self.dropout_context(base_ctx)
+
+        # Prepare input x and ctx.
+        base_x = base_x.permute([0, 2, 3, 1])
+        base_x = self.block_input_x_linear_a(base_x)
+        base_x = base_x.permute([0, 3, 1, 2])
+        base_x = activation_fn_x(base_x)
+        base_x = self.block_input_base_norm_latents_post_a(base_x)
+        base_x = base_x.permute([0, 2, 3, 1])
+        base_x = self.block_input_x_linear_b(base_x)
+        base_x = base_x.permute([0, 3, 1, 2])
+        base_x = activation_fn_x(base_x)
+        base_x = self.block_input_base_norm_latents_post_b(base_x)
+        base_ctx = self.block_input_ctx_linear_a(base_ctx)
+        base_ctx = activation_fn_ctx(base_ctx)
+        base_ctx = self.block_input_base_norm_context_post_a(base_ctx)
+        base_ctx = self.block_input_ctx_linear_b(base_ctx)
+        base_ctx = activation_fn_ctx(base_ctx)
+        base_ctx = self.block_input_base_norm_context_post_b(base_ctx)
+
+        # Set x and ctx.
+        x = base_x
+        ctx = base_ctx
 
         # Block 05
         ctx = self.block_05_norm_ctx_pre(ctx)
@@ -2154,13 +2224,6 @@ def train(
     warmup_epochs: Optional[int] = None,
     lr_scheduler: Optional[Callable] = None,
 ) -> None:
-    params_model = sum(p.numel() for p in model.parameters() if p.requires_grad)
-
-    print("\n# --------------------------------------------------- #\n")
-    print(f"Model type: {type(model)}")
-    print(f"Model parameters: {params_model}")
-    print("\n# --------------------------------------------------- #\n")
-
     with torch.no_grad():
         data_lab = data.cpu().to(dtype=model.dtype_weights)
         data_lab = data_lab / 255.0
@@ -2190,11 +2253,21 @@ def train(
 
     kldiv_loss_fn = nn.KLDivLoss(reduction="none", log_target=True)
 
+    initially_decoded_samples = model(torch.arange(0, min(4, data_lab.shape[0]), 1))
     generate_images_from_data(
-        data=data_lab_to_rgb(model(torch.arange(0, min(4, data_lab.shape[0]), 1))),
+        data=data_lab_to_rgb(initially_decoded_samples),
         images_path_dst=images_path_dst,
         prefix="initial_state",
     )
+    
+    params_model = sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+    print("\n# --------------------------------------------------- #\n")
+    print(f"Model type: {type(model)}")
+    print(f"Model parameters: {params_model}")
+    print(f"Output samples shape: {initially_decoded_samples.shape[1:]}")
+    print("\n# --------------------------------------------------- #\n")
+
     print(f"Starting training. Epoch #{epoch_idx}")
     for step_idx in range(total_steps):
         if len(epoch_ids) < batch_size:
@@ -3271,7 +3344,7 @@ if __name__ == "__main__":
     save_model = True
     save_optim = False
     save_nth_iteration = 10_000
-    log_nth_update_step = 1
+    log_nth_update_step = 32
 
     # optimizer type
     optimizer_type = torch.optim.AdamW
@@ -3287,7 +3360,7 @@ if __name__ == "__main__":
     adam_weight_decay = 0.0
     adam_eps = 1.0e-8
     # optimizer: torch.optim.AdamW
-    adamw_learning_rate = 1.0e-5
+    adamw_learning_rate = 1.0e-6
     adamw_amsgrad = True
     adamw_weight_decay = 1.0e-2
     adamw_eps = 1.0e-8
@@ -3310,8 +3383,8 @@ if __name__ == "__main__":
     optim_update_wd = False
     optim_target_wd = 1.0e-7
 
-    data_cache_ctx_bound = 1.0e-4
-    data_cache_latents_bound = 1.0e-4
+    data_cache_ctx_bound = 1.0e-5
+    data_cache_latents_bound = 1.0e-5
     use_regularization_model = True
     use_regularization_ctx = False
     use_regularization_latents = False
@@ -3351,10 +3424,10 @@ if __name__ == "__main__":
     freeze_model_nth_epoch = 0
     freeze_model_epochs = 0
 
-    nelements = 128
+    nelements = 256
     data_cache_ctx_len = nelements
     data_cache_latents_len = nelements
-    data_cache_latents_shape = [16, 8, 8]
+    data_cache_latents_shape = [16, 16, 16]
 
     context_through = False
 
@@ -3365,26 +3438,26 @@ if __name__ == "__main__":
     noisein_rate_context = 0.0
     noisein_rate_latents_input = 0.10 # 0.100
     noisein_rate_latents_output = 0.10 # 0.100
-    noisein_rate_context_input = 0.10 # 0.025
-    noisein_rate_context_output = 0.10 # 0.025
+    noisein_rate_context_input = 0.05 # 0.025
+    noisein_rate_context_output = 0.05 # 0.025
 
     noiseover_rate_latents = 0.0
     noiseover_rate_context = 0.0
     noiseover_rate_latents_input = 0.10 # 0.100
     noiseover_rate_latents_output = 0.10 # 0.100
-    noiseover_rate_context_input = 0.10 # 0.025
-    noiseover_rate_context_output = 0.10 # 0.025
+    noiseover_rate_context_input = 0.05 # 0.025
+    noiseover_rate_context_output = 0.05 # 0.025
 
     total_steps = 200_000
-    batch_size = 32
+    batch_size = 8
     sliding_batch = False
-    grad_accumulation_steps = nelements // batch_size
+    grad_accumulation_steps = 1 # nelements // batch_size
 
     images_sample_count = nelements
     starting_from = 1024 * 8
     images_path_src = "/mnt/f/Datasets/Images_512x512/dataset_01"
     images_path_dst = "/mnt/f/git_AIResearch/dyna/data/img_dst"
-    output_shape = [225, 225]
+    output_shape = [481, 481]
     dtype_weights = torch.float32
     device = torch.device("cuda")
 
@@ -3574,7 +3647,7 @@ if __name__ == "__main__":
         factor=1.00,
         total_iters=4096 * 16,
     )
-    warmup_epochs = 512
+    warmup_epochs = 32 * 16
     warmup_scheduler = warmup.LinearWarmup(
         optimizer=optimizer,
         warmup_period=warmup_epochs,
