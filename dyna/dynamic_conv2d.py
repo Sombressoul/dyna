@@ -26,10 +26,12 @@ class DynamicConv2D(nn.Module):
         transformations_rank: int,
         kernel_size: Union[int, List[int]] = [3, 3],
         stride: Union[int, List[int]] = [1, 1],
-        padding: Union[int, List[int]] = [0, 0],
+        padding: Union[int, List[int]] = [0, 0, 0, 0],
+        padding_dynamic: bool = True,
         dilation: Union[int, List[int]] = [1, 1],
         bias_dynamic: bool = True,
         bias_static: Optional[float] = None,
+        offset_dynamic: bool = True,
         transpose: bool = False,
         output_padding: Optional[Union[int, List[int]]] = None,
         asymmetry: float = 1.0e-3,
@@ -45,9 +47,17 @@ class DynamicConv2D(nn.Module):
         if type(stride) == int:
             stride = [stride, stride]
         if type(padding) == int:
-            padding = [padding, padding]
+            padding = [
+                padding,
+                padding,
+                padding,
+                padding,
+            ]
         if type(output_padding) == int:
-            output_padding = [output_padding, output_padding]
+            output_padding = [
+                output_padding,
+                output_padding,
+            ]
         if type(dilation) == int:
             dilation = [dilation, dilation]
         if type(bias_dynamic) is not bool:
@@ -62,7 +72,6 @@ class DynamicConv2D(nn.Module):
         assert transformations_rank > 0, "transformations_rank must be greater than 0."
         assert len(kernel_size) == 2, "kernel_size must be an int or a 2-element tuple."
         assert len(stride) == 2, "stride must be an int or a 2-element tuple."
-        assert len(padding) == 2, "padding must be an int or a 2-element tuple."
         assert len(dilation) == 2, "dilation must be an int or a 2-element tuple."
         assert (
             in_channels > 0
@@ -71,8 +80,12 @@ class DynamicConv2D(nn.Module):
             and kernel_size[1] > 0
         ), "in_channels, out_channels, and kernel_size must be greater than 0."
         assert stride[0] > 0 and stride[1] > 0, "stride must be greater than 0."
+        assert len(padding) == 4, "padding must an int or a 4-element tuple."
         assert (
-            padding[0] >= 0 and padding[1] >= 0
+            padding[0] >= 0
+            and padding[1] >= 0
+            and padding[2] >= 0
+            and padding[3] >= 0
         ), "padding must be greater than or equal to 0."
         assert dilation[0] > 0 and dilation[1] > 0, "dilation must be greater than 0."
         assert (
@@ -105,10 +118,12 @@ class DynamicConv2D(nn.Module):
         self.kernel_size = kernel_size
         self.stride = stride
         self.padding = padding
+        self.padding_dynamic = padding_dynamic
         self.output_padding = output_padding
         self.dilation = dilation
-        self.bias_dynamic = bool(bias_dynamic)
+        self.bias_dynamic = bias_dynamic
         self.bias_static = bias_static
+        self.offset_dynamic = offset_dynamic
         self.transpose = transpose
         self.asymmetry = asymmetry
         self.dtype_weights = dtype_weights
@@ -185,6 +200,34 @@ class DynamicConv2D(nn.Module):
                 )
             )
             if self.bias_dynamic
+            else None
+        )
+        self.padding_dynamic_value = (
+            nn.Parameter(
+                data=nn.init.normal_(
+                    tensor=torch.empty(
+                        [1],
+                        dtype=self.dtype_weights,
+                    ),
+                    mean=0.0,
+                    std=1.0e-3,
+                )
+            )
+            if self.padding_dynamic
+            else None
+        )
+        self.offset_dynamic_value = (
+            nn.Parameter(
+                data=nn.init.normal_(
+                    tensor=torch.empty(
+                        [1],
+                        dtype=self.dtype_weights,
+                    ),
+                    mean=0.0,
+                    std=1.0e-3,
+                )
+            )
+            if self.offset_dynamic
             else None
         )
 
@@ -344,7 +387,7 @@ class DynamicConv2D(nn.Module):
                 weight=w,
                 bias=self.bias_dynamic_conv if self.bias_dynamic else None,
                 stride=self.stride,
-                padding=self.padding,
+                padding=[0, 0],
                 output_padding=self.output_padding,
                 dilation=self.dilation,
             )
@@ -354,8 +397,51 @@ class DynamicConv2D(nn.Module):
                 weight=w,
                 bias=self.bias_dynamic_conv if self.bias_dynamic else None,
                 stride=self.stride,
-                padding=self.padding,
+                padding=[0, 0],
                 dilation=self.dilation,
+            )
+
+        x = x + self.offset_dynamic_value if self.offset_dynamic else x
+
+        if self.padding_dynamic_value:
+            x_padded_ones = F.pad(
+                input=x,
+                pad=(
+                    self.padding
+                    if len(self.padding) == 4
+                    else [
+                        self.padding[0],
+                        self.padding[0],
+                        self.padding[1],
+                        self.padding[1],
+                    ]
+                ),
+                mode="constant",
+                value=1.0,
+            )
+            x_padded_zeros = F.pad(
+                input=x,
+                pad=(
+                    self.padding
+                    if len(self.padding) == 4
+                    else [
+                        self.padding[0],
+                        self.padding[0],
+                        self.padding[1],
+                        self.padding[1],
+                    ]
+                ),
+                mode="constant",
+                value=1.0,
+            )
+            x_padding = (x_padded_ones - x_padded_zeros) * self.padding_dynamic_value
+            x = x_padded_zeros + x_padding
+        else:
+            x = F.pad(
+                input=x,
+                pad=self.padding,
+                mode="constant",
+                value=self.padding_dynamic_value if self.padding_dynamic else None,
             )
 
         batched_fn = torch.vmap(wrapped_fn)
@@ -367,6 +453,8 @@ class DynamicConv2D(nn.Module):
             ),
         )
         x = x.squeeze(1)
+        
+        x = x - self.offset_dynamic_value if self.offset_dynamic else x
 
         if self.bias_static is not None:
             x = x + self.bias_static_buffer
