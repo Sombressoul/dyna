@@ -73,9 +73,9 @@ class DecoderOnlyModel(nn.Module):
 
         self.use_bias = False
         self.bias_static = 0.0
-        self.context_length = 64
+        self.context_length = 32
         self.mod_rank = 32
-        self.transformations_rank = 16
+        self.transformations_rank = 32
 
         self.context_through = context_through
 
@@ -3270,7 +3270,7 @@ def clear() -> None:
 if __name__ == "__main__":
     train_mode = True
 
-    load_model = False
+    load_model = True
     load_optim = False
     drop_ctx_cache = False
     drop_latents_cache = False
@@ -3288,12 +3288,12 @@ if __name__ == "__main__":
         # model_freeze_latents,
         # model_data_cache_double,
         # model_data_cache_double,
-        # lambda m, d, t: model_change_data_cache_latents(m, d, t, [16, 16, 16, 16]),
-        # lambda m, d, t: model_change_data_cache_ctx(m, d, t, [16, 64]),
+        # lambda m, d, t: model_change_data_cache_latents(m, d, t, [128, 16, 16, 16]),
+        # lambda m, d, t: model_change_data_cache_ctx(m, d, t, [128, 32]),
         # model_unfreeze_model,
         # model_unfreeze_latents,
         # model_perturb_small_weights,
-        # lambda m, d, t: model_perturb_weights(m, 0.10, False),
+        # lambda m, d, t: model_perturb_weights(m, 0.01, False),
         # model_perturb_small_weights,
         # lambda m, d, t: model_extend_data_cache(m, 128, 1.0e-6),
         # lambda m, d, t: model_reinit_weights_same_distribution(m, True),
@@ -3312,7 +3312,7 @@ if __name__ == "__main__":
         # model_freeze_all,
         # model_unfreeze_ctx,
         # model_unfreeze_latents,
-        # model_unfreeze_all,
+        model_unfreeze_all,
         # model_freeze_model,
         # model_freeze_latents,
         # model_freeze_ctx,
@@ -3337,14 +3337,14 @@ if __name__ == "__main__":
 
     path_prefix_load = "/mnt/f/git_AIResearch/dyna/data/models"
     path_prefix_save = "/mnt/f/git_AIResearch/dyna/data/models"
-    load_path_model = f"{path_prefix_load}/"
+    load_path_model = f"{path_prefix_load}/model.Type-07.G01.AdamW.LAST.pth"
     load_path_optim = f"{path_prefix_load}/"
-    save_path_model = f"{path_prefix_save}/model.Type-06.00.G00.AdamW"
-    save_path_optim = f"{path_prefix_save}/optim.Type-06.00.G00.AdamW"
+    save_path_model = f"{path_prefix_save}/model.Type-07.G02.AdamW"
+    save_path_optim = f"{path_prefix_save}/optim.Type-07.G02.AdamW"
     save_model = True
     save_optim = False
     save_nth_iteration = 10_000
-    log_nth_update_step = 32
+    log_nth_update_step = 1
 
     # optimizer type
     optimizer_type = torch.optim.AdamW
@@ -3360,7 +3360,7 @@ if __name__ == "__main__":
     adam_weight_decay = 0.0
     adam_eps = 1.0e-8
     # optimizer: torch.optim.AdamW
-    adamw_learning_rate = 1.0e-6
+    adamw_learning_rate = 1.0e-3
     adamw_amsgrad = True
     adamw_weight_decay = 1.0e-2
     adamw_eps = 1.0e-8
@@ -3373,7 +3373,7 @@ if __name__ == "__main__":
     radam_learning_rate = 1.0e-5
     radam_weight_decay = 1.0e-4
     # optimizer: MADGRAD
-    madgrad_learning_rate = 1.0e-5
+    madgrad_learning_rate = 1.0e-4
     madgrad_momentum = 0.9
     madgrad_weight_decay = 0.0
     madgrad_eps = 1.0e-6
@@ -3383,8 +3383,8 @@ if __name__ == "__main__":
     optim_update_wd = False
     optim_target_wd = 1.0e-7
 
-    data_cache_ctx_bound = 1.0e-5
-    data_cache_latents_bound = 1.0e-5
+    data_cache_ctx_bound = 1.0e-4
+    data_cache_latents_bound = 1.0e-4
     use_regularization_model = True
     use_regularization_ctx = False
     use_regularization_latents = False
@@ -3424,7 +3424,7 @@ if __name__ == "__main__":
     freeze_model_nth_epoch = 0
     freeze_model_epochs = 0
 
-    nelements = 256
+    nelements = 128
     data_cache_ctx_len = nelements
     data_cache_latents_len = nelements
     data_cache_latents_shape = [16, 16, 16]
@@ -3436,28 +3436,28 @@ if __name__ == "__main__":
 
     noisein_rate_latents = 0.0
     noisein_rate_context = 0.0
-    noisein_rate_latents_input = 0.10 # 0.100
-    noisein_rate_latents_output = 0.10 # 0.100
-    noisein_rate_context_input = 0.05 # 0.025
-    noisein_rate_context_output = 0.05 # 0.025
+    noisein_rate_latents_input = 0.0
+    noisein_rate_latents_output = 0.0
+    noisein_rate_context_input = 0.0
+    noisein_rate_context_output = 0.0
 
     noiseover_rate_latents = 0.0
     noiseover_rate_context = 0.0
-    noiseover_rate_latents_input = 0.10 # 0.100
-    noiseover_rate_latents_output = 0.10 # 0.100
-    noiseover_rate_context_input = 0.05 # 0.025
-    noiseover_rate_context_output = 0.05 # 0.025
+    noiseover_rate_latents_input = 0.0
+    noiseover_rate_latents_output = 0.0
+    noiseover_rate_context_input = 0.0
+    noiseover_rate_context_output = 0.0
 
     total_steps = 200_000
-    batch_size = 8
+    batch_size = 16
     sliding_batch = False
-    grad_accumulation_steps = 1 # nelements // batch_size
+    grad_accumulation_steps = nelements // batch_size
 
     images_sample_count = nelements
-    starting_from = 1024 * 8
+    starting_from = 1024 * 10
     images_path_src = "/mnt/f/Datasets/Images_512x512/dataset_01"
     images_path_dst = "/mnt/f/git_AIResearch/dyna/data/img_dst"
-    output_shape = [417, 417]
+    output_shape = [417, 417] # 16x16=[417, 417]; 8x8=[161, 161]
     dtype_weights = torch.float32
     device = torch.device("cuda")
 
@@ -3647,7 +3647,7 @@ if __name__ == "__main__":
         factor=1.00,
         total_iters=4096 * 16,
     )
-    warmup_epochs = 32 * 16
+    warmup_epochs = 512
     warmup_scheduler = warmup.LinearWarmup(
         optimizer=optimizer,
         warmup_period=warmup_epochs,
