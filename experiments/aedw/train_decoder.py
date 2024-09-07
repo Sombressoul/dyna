@@ -20,7 +20,7 @@ project_dir = os.path.dirname(evals_dir)
 sys.path.append(project_dir)
 
 # torch.manual_seed(42)
-torch.manual_seed(10038)
+torch.manual_seed(10042)
 
 from dyna import DynamicConv2D, WeightsLib2D, siglog, siglog_parametric
 
@@ -251,7 +251,7 @@ class DecoderOnlyModel(nn.Module):
             transformations_rank=self.transformations_rank,
             kernel_size=[3, 3],
             stride=[1, 1],
-            padding=[1, 1, 1, 1],
+            padding=[0, 0, 0, 0],
             dilation=[1, 1],
             bias_dynamic=self.use_bias,
             bias_static=self.bias_static,
@@ -438,7 +438,7 @@ class DecoderOnlyModel(nn.Module):
             transformations_rank=self.transformations_rank,
             kernel_size=[3, 3],
             stride=[1, 1],
-            padding=[1, 1, 1, 1],
+            padding=[0, 0, 0, 0],
             dilation=[1, 1],
             bias_dynamic=self.use_bias,
             bias_static=self.bias_static,
@@ -625,7 +625,7 @@ class DecoderOnlyModel(nn.Module):
             transformations_rank=self.transformations_rank,
             kernel_size=[3, 3],
             stride=[1, 1],
-            padding=[1, 1, 1, 1],
+            padding=[0, 0, 0, 0],
             dilation=[1, 1],
             bias_dynamic=self.use_bias,
             bias_static=self.bias_static,
@@ -812,7 +812,7 @@ class DecoderOnlyModel(nn.Module):
             transformations_rank=self.transformations_rank,
             kernel_size=[3, 3],
             stride=[1, 1],
-            padding=[1, 1, 1, 1],
+            padding=[0, 0, 0, 0],
             dilation=[1, 1],
             bias_dynamic=self.use_bias,
             bias_static=self.bias_static,
@@ -999,7 +999,7 @@ class DecoderOnlyModel(nn.Module):
             transformations_rank=self.transformations_rank,
             kernel_size=[3, 3],
             stride=[1, 1],
-            padding=[1, 1, 1, 1],
+            padding=[0, 0, 0, 0],
             dilation=[1, 1],
             bias_dynamic=self.use_bias,
             bias_static=self.bias_static,
@@ -1128,7 +1128,7 @@ class DecoderOnlyModel(nn.Module):
             transformations_rank=self.transformations_rank,
             kernel_size=[3, 3],
             stride=[1, 1],
-            padding=[1, 1, 1, 1],
+            padding=[0, 0, 0, 0],
             dilation=[1, 1],
             bias_dynamic=self.use_bias,
             bias_static=self.bias_static,
@@ -3457,7 +3457,7 @@ if __name__ == "__main__":
     starting_from = 1024 * 8
     images_path_src = "/mnt/f/Datasets/Images_512x512/dataset_01"
     images_path_dst = "/mnt/f/git_AIResearch/dyna/data/img_dst"
-    output_shape = [481, 481]
+    output_shape = [417, 417]
     dtype_weights = torch.float32
     device = torch.device("cuda")
 
