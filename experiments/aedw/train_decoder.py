@@ -97,7 +97,7 @@ class DecoderOnlyModel(nn.Module):
         self.padding_size_c_med = [0, 0, 0, 0]
         self.padding_size_c_lrg = [0, 0, 0, 0]
 
-        self.padding_process_value = 0.01
+        self.padding_process_value = -1.0 * math.e
         self.padding_size_c_sml_process = [0, 0, 0, 0]
         self.padding_size_c_med_process = [1, 1, 1, 1]
         self.padding_size_c_lrg_process = [2, 2, 2, 2]
@@ -3689,8 +3689,8 @@ if __name__ == "__main__":
         # lambda m, d, t: model_reinit_weights_same_distribution(m, target="block_04"),
         # lambda m, d, t: model_reinit_weights_same_distribution(m, target="block_05"),
         # lambda m, d, t: model_reinit_weights_same_distribution(m, target="data_cache"),
-        # lambda m, d, t: model_fill_data_cache_context(m, 1.0e-5),
-        # lambda m, d, t: model_fill_data_cache_latents(m, 1.0e-5),
+        lambda m, d, t: model_fill_data_cache_context(m, 1.0e-5),
+        lambda m, d, t: model_fill_data_cache_latents(m, 1.0e-5),
         # model_freeze_all,
         # model_unfreeze_ctx,
         # model_unfreeze_latents,
@@ -3744,7 +3744,7 @@ if __name__ == "__main__":
     # optimizer: torch.optim.AdamW
     adamw_learning_rate = 1.0e-5
     adamw_amsgrad = True
-    adamw_weight_decay = 1.0e-2
+    adamw_weight_decay = 1.0e-3
     adamw_eps = 1.0e-8
     # optimizer: torch.optim.NAdam
     nadam_learning_rate = 1.0e-5
@@ -3806,7 +3806,7 @@ if __name__ == "__main__":
     freeze_model_nth_epoch = 0
     freeze_model_epochs = 0
 
-    nelements = 32
+    nelements = 512
     data_cache_ctx_len = nelements
     data_cache_latents_len = nelements
     data_cache_latents_shape = [16, 8, 8]
