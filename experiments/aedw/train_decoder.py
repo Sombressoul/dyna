@@ -29,6 +29,7 @@ class DecoderOnlyModel(nn.Module):
     def __init__(
         self,
         data_cache_ctx_len: int = None,
+        data_cache_ctx_shape: list[int] = None,
         data_cache_latents_len: int = None,
         data_cache_latents_shape: list[int] = None,
         dropout_rate_latents: float = 0.0,
@@ -53,6 +54,7 @@ class DecoderOnlyModel(nn.Module):
         super().__init__()
 
         self.data_cache_ctx_len = data_cache_ctx_len
+        self.data_cache_ctx_shape = data_cache_ctx_shape
         self.data_cache_latents_len = data_cache_latents_len
         self.data_cache_latents_shape = data_cache_latents_shape
 
@@ -73,9 +75,9 @@ class DecoderOnlyModel(nn.Module):
 
         self.use_bias = False
         self.bias_static = 0.0
-        self.context_length = 32
-        self.mod_rank = 32
-        self.transformations_rank = 32
+        self.context_length = self.data_cache_ctx_shape[0]
+        self.mod_rank = 16 # 32
+        self.transformations_rank = 16 # 32
 
         self.context_through = context_through
 
@@ -109,9 +111,10 @@ class DecoderOnlyModel(nn.Module):
         self.q_scale = math.e
 
         self.decoder_channels_out = 3
-        self.decoder_channels_reduced = 16
-        self.decoder_channels_up = 32
-        self.decoder_channels_conv = 16
+        self.decoder_channels_reduced = 8 # 16
+        self.decoder_channels_up = 16 # 32
+        self.decoder_channels_conv = 8 # 16
+        self.decoder_channels_contextual = 16 # 32
 
         self.dtype_weights = dtype_weights
 
@@ -188,7 +191,7 @@ class DecoderOnlyModel(nn.Module):
         # ====> Block 05
         self.block_05_conv_contextual = DynamicConv2D(
             in_channels=self.decoder_channels_reduced,
-            out_channels=self.decoder_channels_reduced,
+            out_channels=self.decoder_channels_contextual,
             context_length=self.context_length,
             mod_rank=self.mod_rank,
             transformations_rank=self.transformations_rank,
@@ -203,7 +206,7 @@ class DecoderOnlyModel(nn.Module):
             dtype_weights=self.dtype_weights,
         )
         self.block_05_conv_contextual_norm = nn.BatchNorm2d(
-            num_features=self.decoder_channels_reduced,
+            num_features=self.decoder_channels_contextual,
             eps=self.eps,
             affine=True,
             momentum=0.1,
@@ -399,13 +402,13 @@ class DecoderOnlyModel(nn.Module):
             mod_rank=self.mod_rank,
             transformations_rank=self.transformations_rank,
             output_shape=[
-                self.decoder_channels_reduced,
-                self.decoder_channels_reduced,
+                self.decoder_channels_contextual,
+                self.decoder_channels_contextual,
             ],
             dtype_weights=self.dtype_weights,
         )
         self.block_05_wl_x_to_ctx_x_norm = nn.LayerNorm(
-            normalized_shape=[self.decoder_channels_reduced],
+            normalized_shape=[self.decoder_channels_contextual],
             elementwise_affine=True,
             bias=True,
             dtype=self.dtype_weights,
@@ -415,7 +418,7 @@ class DecoderOnlyModel(nn.Module):
             mod_rank=self.mod_rank,
             transformations_rank=self.transformations_rank,
             output_shape=[
-                self.context_length + self.decoder_channels_reduced,
+                self.context_length + self.decoder_channels_contextual,
                 self.context_length,
             ],
             dtype_weights=self.dtype_weights,
@@ -430,7 +433,7 @@ class DecoderOnlyModel(nn.Module):
         # ====> Block 04
         self.block_04_conv_contextual = DynamicConv2D(
             in_channels=self.decoder_channels_reduced,
-            out_channels=self.decoder_channels_reduced,
+            out_channels=self.decoder_channels_contextual,
             context_length=self.context_length,
             mod_rank=self.mod_rank,
             transformations_rank=self.transformations_rank,
@@ -445,7 +448,7 @@ class DecoderOnlyModel(nn.Module):
             dtype_weights=self.dtype_weights,
         )
         self.block_04_conv_contextual_norm = nn.BatchNorm2d(
-            num_features=self.decoder_channels_reduced,
+            num_features=self.decoder_channels_contextual,
             eps=self.eps,
             affine=True,
             momentum=0.1,
@@ -641,13 +644,13 @@ class DecoderOnlyModel(nn.Module):
             mod_rank=self.mod_rank,
             transformations_rank=self.transformations_rank,
             output_shape=[
-                self.decoder_channels_reduced,
-                self.decoder_channels_reduced,
+                self.decoder_channels_contextual,
+                self.decoder_channels_contextual,
             ],
             dtype_weights=self.dtype_weights,
         )
         self.block_04_wl_x_to_ctx_x_norm = nn.LayerNorm(
-            normalized_shape=[self.decoder_channels_reduced],
+            normalized_shape=[self.decoder_channels_contextual],
             elementwise_affine=True,
             bias=True,
             dtype=self.dtype_weights,
@@ -657,7 +660,7 @@ class DecoderOnlyModel(nn.Module):
             mod_rank=self.mod_rank,
             transformations_rank=self.transformations_rank,
             output_shape=[
-                self.context_length + self.decoder_channels_reduced,
+                self.context_length + self.decoder_channels_contextual,
                 self.context_length,
             ],
             dtype_weights=self.dtype_weights,
@@ -672,7 +675,7 @@ class DecoderOnlyModel(nn.Module):
         # ====> Block 03
         self.block_03_conv_contextual = DynamicConv2D(
             in_channels=self.decoder_channels_reduced,
-            out_channels=self.decoder_channels_reduced,
+            out_channels=self.decoder_channels_contextual,
             context_length=self.context_length,
             mod_rank=self.mod_rank,
             transformations_rank=self.transformations_rank,
@@ -687,7 +690,7 @@ class DecoderOnlyModel(nn.Module):
             dtype_weights=self.dtype_weights,
         )
         self.block_03_conv_contextual_norm = nn.BatchNorm2d(
-            num_features=self.decoder_channels_reduced,
+            num_features=self.decoder_channels_contextual,
             eps=self.eps,
             affine=True,
             momentum=0.1,
@@ -883,13 +886,13 @@ class DecoderOnlyModel(nn.Module):
             mod_rank=self.mod_rank,
             transformations_rank=self.transformations_rank,
             output_shape=[
-                self.decoder_channels_reduced,
-                self.decoder_channels_reduced,
+                self.decoder_channels_contextual,
+                self.decoder_channels_contextual,
             ],
             dtype_weights=self.dtype_weights,
         )
         self.block_03_wl_x_to_ctx_x_norm = nn.LayerNorm(
-            normalized_shape=[self.decoder_channels_reduced],
+            normalized_shape=[self.decoder_channels_contextual],
             elementwise_affine=True,
             bias=True,
             dtype=self.dtype_weights,
@@ -899,7 +902,7 @@ class DecoderOnlyModel(nn.Module):
             mod_rank=self.mod_rank,
             transformations_rank=self.transformations_rank,
             output_shape=[
-                self.context_length + self.decoder_channels_reduced,
+                self.context_length + self.decoder_channels_contextual,
                 self.context_length,
             ],
             dtype_weights=self.dtype_weights,
@@ -914,7 +917,7 @@ class DecoderOnlyModel(nn.Module):
         # ====> Block 02
         self.block_02_conv_contextual = DynamicConv2D(
             in_channels=self.decoder_channels_reduced,
-            out_channels=self.decoder_channels_reduced,
+            out_channels=self.decoder_channels_contextual,
             context_length=self.context_length,
             mod_rank=self.mod_rank,
             transformations_rank=self.transformations_rank,
@@ -929,7 +932,7 @@ class DecoderOnlyModel(nn.Module):
             dtype_weights=self.dtype_weights,
         )
         self.block_02_conv_contextual_norm = nn.BatchNorm2d(
-            num_features=self.decoder_channels_reduced,
+            num_features=self.decoder_channels_contextual,
             eps=self.eps,
             affine=True,
             momentum=0.1,
@@ -1125,13 +1128,13 @@ class DecoderOnlyModel(nn.Module):
             mod_rank=self.mod_rank,
             transformations_rank=self.transformations_rank,
             output_shape=[
-                self.decoder_channels_reduced,
-                self.decoder_channels_reduced,
+                self.decoder_channels_contextual,
+                self.decoder_channels_contextual,
             ],
             dtype_weights=self.dtype_weights,
         )
         self.block_02_wl_x_to_ctx_x_norm = nn.LayerNorm(
-            normalized_shape=[self.decoder_channels_reduced],
+            normalized_shape=[self.decoder_channels_contextual],
             elementwise_affine=True,
             bias=True,
             dtype=self.dtype_weights,
@@ -1141,7 +1144,7 @@ class DecoderOnlyModel(nn.Module):
             mod_rank=self.mod_rank,
             transformations_rank=self.transformations_rank,
             output_shape=[
-                self.context_length + self.decoder_channels_reduced,
+                self.context_length + self.decoder_channels_contextual,
                 self.context_length,
             ],
             dtype_weights=self.dtype_weights,
@@ -1156,7 +1159,7 @@ class DecoderOnlyModel(nn.Module):
         # ====> Block 01
         self.block_01_conv_contextual = DynamicConv2D(
             in_channels=self.decoder_channels_reduced,
-            out_channels=self.decoder_channels_reduced,
+            out_channels=self.decoder_channels_contextual,
             context_length=self.context_length,
             mod_rank=self.mod_rank,
             transformations_rank=self.transformations_rank,
@@ -1171,7 +1174,7 @@ class DecoderOnlyModel(nn.Module):
             dtype_weights=self.dtype_weights,
         )
         self.block_01_conv_contextual_norm = nn.BatchNorm2d(
-            num_features=self.decoder_channels_reduced,
+            num_features=self.decoder_channels_contextual,
             eps=self.eps,
             affine=True,
             momentum=0.1,
@@ -1367,13 +1370,13 @@ class DecoderOnlyModel(nn.Module):
             mod_rank=self.mod_rank,
             transformations_rank=self.transformations_rank,
             output_shape=[
-                self.decoder_channels_reduced,
-                self.decoder_channels_reduced,
+                self.decoder_channels_contextual,
+                self.decoder_channels_contextual,
             ],
             dtype_weights=self.dtype_weights,
         )
         self.block_01_wl_x_to_ctx_x_norm = nn.LayerNorm(
-            normalized_shape=[self.decoder_channels_reduced],
+            normalized_shape=[self.decoder_channels_contextual],
             elementwise_affine=True,
             bias=True,
             dtype=self.dtype_weights,
@@ -1383,7 +1386,7 @@ class DecoderOnlyModel(nn.Module):
             mod_rank=self.mod_rank,
             transformations_rank=self.transformations_rank,
             output_shape=[
-                self.context_length + self.decoder_channels_reduced,
+                self.context_length + self.decoder_channels_contextual,
                 self.context_length,
             ],
             dtype_weights=self.dtype_weights,
@@ -1398,7 +1401,7 @@ class DecoderOnlyModel(nn.Module):
         # ====> Block out
         self.block_out_conv_contextual = DynamicConv2D(
             in_channels=self.decoder_channels_reduced,
-            out_channels=self.decoder_channels_reduced,
+            out_channels=self.decoder_channels_contextual,
             context_length=self.context_length,
             mod_rank=self.mod_rank,
             transformations_rank=self.transformations_rank,
@@ -1413,7 +1416,7 @@ class DecoderOnlyModel(nn.Module):
             dtype_weights=self.dtype_weights,
         )
         self.block_out_conv_contextual_norm = nn.BatchNorm2d(
-            num_features=self.decoder_channels_reduced,
+            num_features=self.decoder_channels_contextual,
             eps=self.eps,
             affine=True,
             momentum=0.1,
@@ -1468,13 +1471,13 @@ class DecoderOnlyModel(nn.Module):
             mod_rank=self.mod_rank,
             transformations_rank=self.transformations_rank,
             output_shape=[
-                self.decoder_channels_reduced,
-                self.decoder_channels_reduced,
+                self.decoder_channels_contextual,
+                self.decoder_channels_contextual,
             ],
             dtype_weights=self.dtype_weights,
         )
         self.block_out_wl_x_to_ctx_x_norm = nn.LayerNorm(
-            normalized_shape=[self.decoder_channels_reduced],
+            normalized_shape=[self.decoder_channels_contextual],
             elementwise_affine=True,
             bias=True,
             dtype=self.dtype_weights,
@@ -1484,7 +1487,7 @@ class DecoderOnlyModel(nn.Module):
             mod_rank=self.mod_rank,
             transformations_rank=self.transformations_rank,
             output_shape=[
-                self.context_length + self.decoder_channels_reduced,
+                self.context_length + self.decoder_channels_contextual,
                 self.context_length,
             ],
             dtype_weights=self.dtype_weights,
@@ -1967,44 +1970,44 @@ class DecoderOnlyModel(nn.Module):
         x_convolved_sml = self.dropout_latents(x_convolved_sml)
         x_convolved_sml = self.noisein(x_convolved_sml, self.noisein_rate_latents)
         x_convolved_sml = self.noiseover(x_convolved_sml, self.noiseover_rate_latents)
-        x_convolved_sml = self.block_05_conv_sml(x_convolved_sml, ctx_sml)
-        x_convolved_sml = activation_fn_x(x_convolved_sml)
-        x_convolved_sml = x_convolved_sml.permute([0, 2, 3, 1])
-        x_convolved_sml = self.block_05_norm_conv_sml(x_convolved_sml)
-        x_convolved_sml = x_convolved_sml.permute([0, 3, 1, 2])
         x_convolved_sml = F.pad(
             input=x_convolved_sml,
             pad=self.padding_size_c_sml_process,
             mode="replicate",
         )
+        x_convolved_sml = self.block_05_conv_sml(x_convolved_sml, ctx_sml)
+        x_convolved_sml = activation_fn_x(x_convolved_sml)
+        x_convolved_sml = x_convolved_sml.permute([0, 2, 3, 1])
+        x_convolved_sml = self.block_05_norm_conv_sml(x_convolved_sml)
+        x_convolved_sml = x_convolved_sml.permute([0, 3, 1, 2])
         x_convolved_med = x_upsampled
         x_convolved_med = self.dropout_latents(x_convolved_med)
         x_convolved_med = self.noisein(x_convolved_med, self.noisein_rate_latents)
         x_convolved_med = self.noiseover(x_convolved_med, self.noiseover_rate_latents)
-        x_convolved_med = self.block_05_conv_med(x_convolved_med, ctx_med)
-        x_convolved_med = activation_fn_x(x_convolved_med)
-        x_convolved_med = x_convolved_med.permute([0, 2, 3, 1])
-        x_convolved_med = self.block_05_norm_conv_med(x_convolved_med)
-        x_convolved_med = x_convolved_med.permute([0, 3, 1, 2])
         x_convolved_med = F.pad(
             input=x_convolved_med,
             pad=self.padding_size_c_med_process,
             mode="replicate",
         )
+        x_convolved_med = self.block_05_conv_med(x_convolved_med, ctx_med)
+        x_convolved_med = activation_fn_x(x_convolved_med)
+        x_convolved_med = x_convolved_med.permute([0, 2, 3, 1])
+        x_convolved_med = self.block_05_norm_conv_med(x_convolved_med)
+        x_convolved_med = x_convolved_med.permute([0, 3, 1, 2])
         x_convolved_lrg = x_upsampled
         x_convolved_lrg = self.dropout_latents(x_convolved_lrg)
         x_convolved_lrg = self.noisein(x_convolved_lrg, self.noisein_rate_latents)
         x_convolved_lrg = self.noiseover(x_convolved_lrg, self.noiseover_rate_latents)
-        x_convolved_lrg = self.block_05_conv_lrg(x_convolved_lrg, ctx_lrg)
-        x_convolved_lrg = activation_fn_x(x_convolved_lrg)
-        x_convolved_lrg = x_convolved_lrg.permute([0, 2, 3, 1])
-        x_convolved_lrg = self.block_05_norm_conv_lrg(x_convolved_lrg)
-        x_convolved_lrg = x_convolved_lrg.permute([0, 3, 1, 2])
         x_convolved_lrg = F.pad(
             input=x_convolved_lrg,
             pad=self.padding_size_c_lrg_process,
             mode="replicate",
         )
+        x_convolved_lrg = self.block_05_conv_lrg(x_convolved_lrg, ctx_lrg)
+        x_convolved_lrg = activation_fn_x(x_convolved_lrg)
+        x_convolved_lrg = x_convolved_lrg.permute([0, 2, 3, 1])
+        x_convolved_lrg = self.block_05_norm_conv_lrg(x_convolved_lrg)
+        x_convolved_lrg = x_convolved_lrg.permute([0, 3, 1, 2])
         x_convolved = torch.cat(
             [
                 (
@@ -2036,7 +2039,7 @@ class DecoderOnlyModel(nn.Module):
         x = self.block_05_norm_out_post(x)
 
         # Context-through mode.
-        ctx = base_ctx if self.context_through else base_ctx + ctx
+        ctx = base_ctx if self.context_through else ctx
 
         # Inter-Block dropout
         x = self.dropout_latents(x)
@@ -2087,44 +2090,44 @@ class DecoderOnlyModel(nn.Module):
         x_convolved_sml = self.dropout_latents(x_convolved_sml)
         x_convolved_sml = self.noisein(x_convolved_sml, self.noisein_rate_latents)
         x_convolved_sml = self.noiseover(x_convolved_sml, self.noiseover_rate_latents)
-        x_convolved_sml = self.block_04_conv_sml(x_convolved_sml, ctx_sml)
-        x_convolved_sml = activation_fn_x(x_convolved_sml)
-        x_convolved_sml = x_convolved_sml.permute([0, 2, 3, 1])
-        x_convolved_sml = self.block_04_norm_conv_sml(x_convolved_sml)
-        x_convolved_sml = x_convolved_sml.permute([0, 3, 1, 2])
         x_convolved_sml = F.pad(
             input=x_convolved_sml,
             pad=self.padding_size_c_sml_process,
             mode="replicate",
         )
+        x_convolved_sml = self.block_04_conv_sml(x_convolved_sml, ctx_sml)
+        x_convolved_sml = activation_fn_x(x_convolved_sml)
+        x_convolved_sml = x_convolved_sml.permute([0, 2, 3, 1])
+        x_convolved_sml = self.block_04_norm_conv_sml(x_convolved_sml)
+        x_convolved_sml = x_convolved_sml.permute([0, 3, 1, 2])
         x_convolved_med = x_upsampled
         x_convolved_med = self.dropout_latents(x_convolved_med)
         x_convolved_med = self.noisein(x_convolved_med, self.noisein_rate_latents)
         x_convolved_med = self.noiseover(x_convolved_med, self.noiseover_rate_latents)
-        x_convolved_med = self.block_04_conv_med(x_convolved_med, ctx_med)
-        x_convolved_med = activation_fn_x(x_convolved_med)
-        x_convolved_med = x_convolved_med.permute([0, 2, 3, 1])
-        x_convolved_med = self.block_04_norm_conv_med(x_convolved_med)
-        x_convolved_med = x_convolved_med.permute([0, 3, 1, 2])
         x_convolved_med = F.pad(
             input=x_convolved_med,
             pad=self.padding_size_c_med_process,
             mode="replicate",
         )
+        x_convolved_med = self.block_04_conv_med(x_convolved_med, ctx_med)
+        x_convolved_med = activation_fn_x(x_convolved_med)
+        x_convolved_med = x_convolved_med.permute([0, 2, 3, 1])
+        x_convolved_med = self.block_04_norm_conv_med(x_convolved_med)
+        x_convolved_med = x_convolved_med.permute([0, 3, 1, 2])
         x_convolved_lrg = x_upsampled
         x_convolved_lrg = self.dropout_latents(x_convolved_lrg)
         x_convolved_lrg = self.noisein(x_convolved_lrg, self.noisein_rate_latents)
         x_convolved_lrg = self.noiseover(x_convolved_lrg, self.noiseover_rate_latents)
-        x_convolved_lrg = self.block_04_conv_lrg(x_convolved_lrg, ctx_lrg)
-        x_convolved_lrg = activation_fn_x(x_convolved_lrg)
-        x_convolved_lrg = x_convolved_lrg.permute([0, 2, 3, 1])
-        x_convolved_lrg = self.block_04_norm_conv_lrg(x_convolved_lrg)
-        x_convolved_lrg = x_convolved_lrg.permute([0, 3, 1, 2])
         x_convolved_lrg = F.pad(
             input=x_convolved_lrg,
             pad=self.padding_size_c_lrg_process,
             mode="replicate",
         )
+        x_convolved_lrg = self.block_04_conv_lrg(x_convolved_lrg, ctx_lrg)
+        x_convolved_lrg = activation_fn_x(x_convolved_lrg)
+        x_convolved_lrg = x_convolved_lrg.permute([0, 2, 3, 1])
+        x_convolved_lrg = self.block_04_norm_conv_lrg(x_convolved_lrg)
+        x_convolved_lrg = x_convolved_lrg.permute([0, 3, 1, 2])
         x_convolved = torch.cat(
             [
                 (
@@ -2156,7 +2159,7 @@ class DecoderOnlyModel(nn.Module):
         x = self.block_04_norm_out_post(x)
 
         # Context-through mode.
-        ctx = base_ctx if self.context_through else base_ctx + ctx
+        ctx = base_ctx if self.context_through else ctx
 
         # Inter-Block dropout
         x = self.dropout_latents(x)
@@ -2207,44 +2210,44 @@ class DecoderOnlyModel(nn.Module):
         x_convolved_sml = self.dropout_latents(x_convolved_sml)
         x_convolved_sml = self.noisein(x_convolved_sml, self.noisein_rate_latents)
         x_convolved_sml = self.noiseover(x_convolved_sml, self.noiseover_rate_latents)
-        x_convolved_sml = self.block_03_conv_sml(x_convolved_sml, ctx_sml)
-        x_convolved_sml = activation_fn_x(x_convolved_sml)
-        x_convolved_sml = x_convolved_sml.permute([0, 2, 3, 1])
-        x_convolved_sml = self.block_03_norm_conv_sml(x_convolved_sml)
-        x_convolved_sml = x_convolved_sml.permute([0, 3, 1, 2])
         x_convolved_sml = F.pad(
             input=x_convolved_sml,
             pad=self.padding_size_c_sml_process,
             mode="replicate",
         )
+        x_convolved_sml = self.block_03_conv_sml(x_convolved_sml, ctx_sml)
+        x_convolved_sml = activation_fn_x(x_convolved_sml)
+        x_convolved_sml = x_convolved_sml.permute([0, 2, 3, 1])
+        x_convolved_sml = self.block_03_norm_conv_sml(x_convolved_sml)
+        x_convolved_sml = x_convolved_sml.permute([0, 3, 1, 2])
         x_convolved_med = x_upsampled
         x_convolved_med = self.dropout_latents(x_convolved_med)
         x_convolved_med = self.noisein(x_convolved_med, self.noisein_rate_latents)
         x_convolved_med = self.noiseover(x_convolved_med, self.noiseover_rate_latents)
-        x_convolved_med = self.block_03_conv_med(x_convolved_med, ctx_med)
-        x_convolved_med = activation_fn_x(x_convolved_med)
-        x_convolved_med = x_convolved_med.permute([0, 2, 3, 1])
-        x_convolved_med = self.block_03_norm_conv_med(x_convolved_med)
-        x_convolved_med = x_convolved_med.permute([0, 3, 1, 2])
         x_convolved_med = F.pad(
             input=x_convolved_med,
             pad=self.padding_size_c_med_process,
             mode="replicate",
         )
+        x_convolved_med = self.block_03_conv_med(x_convolved_med, ctx_med)
+        x_convolved_med = activation_fn_x(x_convolved_med)
+        x_convolved_med = x_convolved_med.permute([0, 2, 3, 1])
+        x_convolved_med = self.block_03_norm_conv_med(x_convolved_med)
+        x_convolved_med = x_convolved_med.permute([0, 3, 1, 2])
         x_convolved_lrg = x_upsampled
         x_convolved_lrg = self.dropout_latents(x_convolved_lrg)
         x_convolved_lrg = self.noisein(x_convolved_lrg, self.noisein_rate_latents)
         x_convolved_lrg = self.noiseover(x_convolved_lrg, self.noiseover_rate_latents)
-        x_convolved_lrg = self.block_03_conv_lrg(x_convolved_lrg, ctx_lrg)
-        x_convolved_lrg = activation_fn_x(x_convolved_lrg)
-        x_convolved_lrg = x_convolved_lrg.permute([0, 2, 3, 1])
-        x_convolved_lrg = self.block_03_norm_conv_lrg(x_convolved_lrg)
-        x_convolved_lrg = x_convolved_lrg.permute([0, 3, 1, 2])
         x_convolved_lrg = F.pad(
             input=x_convolved_lrg,
             pad=self.padding_size_c_lrg_process,
             mode="replicate",
         )
+        x_convolved_lrg = self.block_03_conv_lrg(x_convolved_lrg, ctx_lrg)
+        x_convolved_lrg = activation_fn_x(x_convolved_lrg)
+        x_convolved_lrg = x_convolved_lrg.permute([0, 2, 3, 1])
+        x_convolved_lrg = self.block_03_norm_conv_lrg(x_convolved_lrg)
+        x_convolved_lrg = x_convolved_lrg.permute([0, 3, 1, 2])
         x_convolved = torch.cat(
             [
                 (
@@ -2276,7 +2279,7 @@ class DecoderOnlyModel(nn.Module):
         x = self.block_03_norm_out_post(x)
 
         # Context-through mode.
-        ctx = base_ctx if self.context_through else base_ctx + ctx
+        ctx = base_ctx if self.context_through else ctx
 
         # Inter-Block dropout
         x = self.dropout_latents(x)
@@ -2327,44 +2330,44 @@ class DecoderOnlyModel(nn.Module):
         x_convolved_sml = self.dropout_latents(x_convolved_sml)
         x_convolved_sml = self.noisein(x_convolved_sml, self.noisein_rate_latents)
         x_convolved_sml = self.noiseover(x_convolved_sml, self.noiseover_rate_latents)
-        x_convolved_sml = self.block_02_conv_sml(x_convolved_sml, ctx_sml)
-        x_convolved_sml = activation_fn_x(x_convolved_sml)
-        x_convolved_sml = x_convolved_sml.permute([0, 2, 3, 1])
-        x_convolved_sml = self.block_02_norm_conv_sml(x_convolved_sml)
-        x_convolved_sml = x_convolved_sml.permute([0, 3, 1, 2])
         x_convolved_sml = F.pad(
             input=x_convolved_sml,
             pad=self.padding_size_c_sml_process,
             mode="replicate",
         )
+        x_convolved_sml = self.block_02_conv_sml(x_convolved_sml, ctx_sml)
+        x_convolved_sml = activation_fn_x(x_convolved_sml)
+        x_convolved_sml = x_convolved_sml.permute([0, 2, 3, 1])
+        x_convolved_sml = self.block_02_norm_conv_sml(x_convolved_sml)
+        x_convolved_sml = x_convolved_sml.permute([0, 3, 1, 2])
         x_convolved_med = x_upsampled
         x_convolved_med = self.dropout_latents(x_convolved_med)
         x_convolved_med = self.noisein(x_convolved_med, self.noisein_rate_latents)
         x_convolved_med = self.noiseover(x_convolved_med, self.noiseover_rate_latents)
-        x_convolved_med = self.block_02_conv_med(x_convolved_med, ctx_med)
-        x_convolved_med = activation_fn_x(x_convolved_med)
-        x_convolved_med = x_convolved_med.permute([0, 2, 3, 1])
-        x_convolved_med = self.block_02_norm_conv_med(x_convolved_med)
-        x_convolved_med = x_convolved_med.permute([0, 3, 1, 2])
         x_convolved_med = F.pad(
             input=x_convolved_med,
             pad=self.padding_size_c_med_process,
             mode="replicate",
         )
+        x_convolved_med = self.block_02_conv_med(x_convolved_med, ctx_med)
+        x_convolved_med = activation_fn_x(x_convolved_med)
+        x_convolved_med = x_convolved_med.permute([0, 2, 3, 1])
+        x_convolved_med = self.block_02_norm_conv_med(x_convolved_med)
+        x_convolved_med = x_convolved_med.permute([0, 3, 1, 2])
         x_convolved_lrg = x_upsampled
         x_convolved_lrg = self.dropout_latents(x_convolved_lrg)
         x_convolved_lrg = self.noisein(x_convolved_lrg, self.noisein_rate_latents)
         x_convolved_lrg = self.noiseover(x_convolved_lrg, self.noiseover_rate_latents)
-        x_convolved_lrg = self.block_02_conv_lrg(x_convolved_lrg, ctx_lrg)
-        x_convolved_lrg = activation_fn_x(x_convolved_lrg)
-        x_convolved_lrg = x_convolved_lrg.permute([0, 2, 3, 1])
-        x_convolved_lrg = self.block_02_norm_conv_lrg(x_convolved_lrg)
-        x_convolved_lrg = x_convolved_lrg.permute([0, 3, 1, 2])
         x_convolved_lrg = F.pad(
             input=x_convolved_lrg,
             pad=self.padding_size_c_lrg_process,
             mode="replicate",
         )
+        x_convolved_lrg = self.block_02_conv_lrg(x_convolved_lrg, ctx_lrg)
+        x_convolved_lrg = activation_fn_x(x_convolved_lrg)
+        x_convolved_lrg = x_convolved_lrg.permute([0, 2, 3, 1])
+        x_convolved_lrg = self.block_02_norm_conv_lrg(x_convolved_lrg)
+        x_convolved_lrg = x_convolved_lrg.permute([0, 3, 1, 2])
         x_convolved = torch.cat(
             [
                 (
@@ -2396,7 +2399,7 @@ class DecoderOnlyModel(nn.Module):
         x = self.block_02_norm_out_post(x)
 
         # Context-through mode.
-        ctx = base_ctx if self.context_through else base_ctx + ctx
+        ctx = base_ctx if self.context_through else ctx
 
         # Inter-Block dropout
         x = self.dropout_latents(x)
@@ -2447,44 +2450,44 @@ class DecoderOnlyModel(nn.Module):
         x_convolved_sml = self.dropout_latents(x_convolved_sml)
         x_convolved_sml = self.noisein(x_convolved_sml, self.noisein_rate_latents)
         x_convolved_sml = self.noiseover(x_convolved_sml, self.noiseover_rate_latents)
-        x_convolved_sml = self.block_01_conv_sml(x_convolved_sml, ctx_sml)
-        x_convolved_sml = activation_fn_x(x_convolved_sml)
-        x_convolved_sml = x_convolved_sml.permute([0, 2, 3, 1])
-        x_convolved_sml = self.block_01_norm_conv_sml(x_convolved_sml)
-        x_convolved_sml = x_convolved_sml.permute([0, 3, 1, 2])
         x_convolved_sml = F.pad(
             input=x_convolved_sml,
             pad=self.padding_size_c_sml_process,
             mode="replicate",
         )
+        x_convolved_sml = self.block_01_conv_sml(x_convolved_sml, ctx_sml)
+        x_convolved_sml = activation_fn_x(x_convolved_sml)
+        x_convolved_sml = x_convolved_sml.permute([0, 2, 3, 1])
+        x_convolved_sml = self.block_01_norm_conv_sml(x_convolved_sml)
+        x_convolved_sml = x_convolved_sml.permute([0, 3, 1, 2])
         x_convolved_med = x_upsampled
         x_convolved_med = self.dropout_latents(x_convolved_med)
         x_convolved_med = self.noisein(x_convolved_med, self.noisein_rate_latents)
         x_convolved_med = self.noiseover(x_convolved_med, self.noiseover_rate_latents)
-        x_convolved_med = self.block_01_conv_med(x_convolved_med, ctx_med)
-        x_convolved_med = activation_fn_x(x_convolved_med)
-        x_convolved_med = x_convolved_med.permute([0, 2, 3, 1])
-        x_convolved_med = self.block_01_norm_conv_med(x_convolved_med)
-        x_convolved_med = x_convolved_med.permute([0, 3, 1, 2])
         x_convolved_med = F.pad(
             input=x_convolved_med,
             pad=self.padding_size_c_med_process,
             mode="replicate",
         )
+        x_convolved_med = self.block_01_conv_med(x_convolved_med, ctx_med)
+        x_convolved_med = activation_fn_x(x_convolved_med)
+        x_convolved_med = x_convolved_med.permute([0, 2, 3, 1])
+        x_convolved_med = self.block_01_norm_conv_med(x_convolved_med)
+        x_convolved_med = x_convolved_med.permute([0, 3, 1, 2])
         x_convolved_lrg = x_upsampled
         x_convolved_lrg = self.dropout_latents(x_convolved_lrg)
         x_convolved_lrg = self.noisein(x_convolved_lrg, self.noisein_rate_latents)
         x_convolved_lrg = self.noiseover(x_convolved_lrg, self.noiseover_rate_latents)
-        x_convolved_lrg = self.block_01_conv_lrg(x_convolved_lrg, ctx_lrg)
-        x_convolved_lrg = activation_fn_x(x_convolved_lrg)
-        x_convolved_lrg = x_convolved_lrg.permute([0, 2, 3, 1])
-        x_convolved_lrg = self.block_01_norm_conv_lrg(x_convolved_lrg)
-        x_convolved_lrg = x_convolved_lrg.permute([0, 3, 1, 2])
         x_convolved_lrg = F.pad(
             input=x_convolved_lrg,
             pad=self.padding_size_c_lrg_process,
             mode="replicate",
         )
+        x_convolved_lrg = self.block_01_conv_lrg(x_convolved_lrg, ctx_lrg)
+        x_convolved_lrg = activation_fn_x(x_convolved_lrg)
+        x_convolved_lrg = x_convolved_lrg.permute([0, 2, 3, 1])
+        x_convolved_lrg = self.block_01_norm_conv_lrg(x_convolved_lrg)
+        x_convolved_lrg = x_convolved_lrg.permute([0, 3, 1, 2])
         x_convolved = torch.cat(
             [
                 (
@@ -2516,7 +2519,7 @@ class DecoderOnlyModel(nn.Module):
         x = self.block_01_norm_out_post(x)
 
         # Context-through mode.
-        ctx = base_ctx if self.context_through else base_ctx + ctx
+        ctx = base_ctx if self.context_through else ctx
 
         # Output noise-in/-over
         x = self.noisein(x, self.noisein_rate_latents_output)
@@ -3839,6 +3842,7 @@ if __name__ == "__main__":
         # lambda m, d, t: model_siglog_alpha_fix(m, 0.1, 1.0 / math.e, 0.01),
         # model_perturb_small_weights,
         # lambda m, d, t: model_extend_data_cache(m, 128, 1.0e-6),
+        # lambda m, d, t: model_extend_data_cache(m, 512),
         # lambda m, d, t: model_reinit_weights_same_distribution(m, True),
         # lambda m, d, t: model_fill_data_cache_latents(m, 1.0e-6),
         # lambda m, d, t: model_reinit_weights_same_distribution(m),
@@ -3850,8 +3854,8 @@ if __name__ == "__main__":
         # lambda m, d, t: model_reinit_weights_same_distribution(m, target="block_04"),
         # lambda m, d, t: model_reinit_weights_same_distribution(m, target="block_05"),
         # lambda m, d, t: model_reinit_weights_same_distribution(m, target="data_cache"),
-        lambda m, d, t: model_fill_data_cache_context(m, 1.0e-5),
-        lambda m, d, t: model_fill_data_cache_latents(m, 1.0e-5),
+        # lambda m, d, t: model_fill_data_cache_context(m, 1.0e-5),
+        # lambda m, d, t: model_fill_data_cache_latents(m, 1.0e-5),
         # model_freeze_all,
         # model_unfreeze_ctx,
         # model_unfreeze_latents,
@@ -3866,7 +3870,7 @@ if __name__ == "__main__":
         # lambda m, d, t: model_unfreeze_block(m, d, t, "block_03"),
         # lambda m, d, t: model_unfreeze_block(m, d, t, "block_04"),
         # lambda m, d, t: model_unfreeze_block(m, d, t, "block_05"),
-        # lambda m, d, t: model_freeze_block(m, d, t, "siglog_params"),
+        lambda m, d, t: model_freeze_block(m, d, t, "siglog_params"),
         # lambda m, d, t: model_freeze_block(m, d, t, "block_out"),
         # lambda m, d, t: model_freeze_block(m, d, t, "block_01"),
         # lambda m, d, t: model_freeze_block(m, d, t, "block_02"),
@@ -3882,12 +3886,12 @@ if __name__ == "__main__":
     path_prefix_save = "/mnt/f/git_AIResearch/dyna/data/models"
     load_path_model = f"{path_prefix_load}/"
     load_path_optim = f"{path_prefix_load}/"
-    save_path_model = f"{path_prefix_save}/model.Type-08.G00.AdamW"
-    save_path_optim = f"{path_prefix_save}/optim.Type-08.G00.AdamW"
+    save_path_model = f"{path_prefix_save}/model.Type-09.G00.AdamW"
+    save_path_optim = f"{path_prefix_save}/optim.Type-09.G00.AdamW"
     save_model = True
-    save_optim = False
-    save_nth_iteration = 10_000
-    log_nth_update_step = 128 // 4
+    save_optim = True
+    save_nth_iteration = 5_000
+    log_nth_update_step = 64 # 128 // 4
 
     # optimizer type
     optimizer_type = torch.optim.AdamW
@@ -3903,9 +3907,9 @@ if __name__ == "__main__":
     adam_weight_decay = 0.0
     adam_eps = 1.0e-8
     # optimizer: torch.optim.AdamW
-    adamw_learning_rate = 1.0e-6
+    adamw_learning_rate = 1.0e-5
     adamw_amsgrad = True
-    adamw_weight_decay = 1.0e-5
+    adamw_weight_decay = 1.0e-7
     adamw_eps = 1.0e-8
     # optimizer: torch.optim.NAdam
     nadam_learning_rate = 1.0e-5
@@ -3926,7 +3930,7 @@ if __name__ == "__main__":
     optim_update_wd = False
     optim_target_wd = 0.1
 
-    data_cache_ctx_bound = 1.0e-4
+    data_cache_ctx_bound = 1.0e-3
     data_cache_latents_bound = 1.0e-4
     use_regularization_model = True
     use_regularization_ctx = False
@@ -3969,8 +3973,9 @@ if __name__ == "__main__":
 
     nelements = 1024
     data_cache_ctx_len = nelements
+    data_cache_ctx_shape = [16]
     data_cache_latents_len = nelements
-    data_cache_latents_shape = [16, 16, 16]
+    data_cache_latents_shape = [8, 16, 16]
 
     context_through = False
 
@@ -3979,20 +3984,20 @@ if __name__ == "__main__":
 
     noisein_rate_latents = 0.0
     noisein_rate_context = 0.0
-    noisein_rate_latents_input = 0.0
-    noisein_rate_latents_output = 0.0
-    noisein_rate_context_input = 0.0
-    noisein_rate_context_output = 0.0
+    noisein_rate_latents_input = 0.05
+    noisein_rate_latents_output = 0.05
+    noisein_rate_context_input = 1.0 / 16
+    noisein_rate_context_output = 1.0 / 16
 
     noiseover_rate_latents = 0.0
     noiseover_rate_context = 0.0
-    noiseover_rate_latents_input = 0.0
-    noiseover_rate_latents_output = 0.0
-    noiseover_rate_context_input = 0.0
-    noiseover_rate_context_output = 0.0
+    noiseover_rate_latents_input = 0.05
+    noiseover_rate_latents_output = 0.05
+    noiseover_rate_context_input = 0.025
+    noiseover_rate_context_output = 0.025
 
     total_steps = 200_000
-    batch_size = 8
+    batch_size = 16
     sliding_batch = False
     grad_accumulation_steps = 1 # nelements // batch_size
 
@@ -4006,6 +4011,7 @@ if __name__ == "__main__":
 
     model = DecoderOnlyModel(
         data_cache_ctx_len=data_cache_ctx_len,
+        data_cache_ctx_shape=data_cache_ctx_shape,
         data_cache_latents_len=data_cache_latents_len,
         data_cache_latents_shape=data_cache_latents_shape,
         dropout_rate_latents=dropout_rate_latents,
@@ -4190,7 +4196,7 @@ if __name__ == "__main__":
         factor=1.00,
         total_iters=4096 * 16,
     )
-    warmup_epochs = 128 * 32
+    warmup_epochs = 64 * 512
     warmup_scheduler = warmup.LinearWarmup(
         optimizer=optimizer,
         warmup_period=warmup_epochs,
