@@ -97,7 +97,6 @@ class DecoderOnlyModel(nn.Module):
         self.padding_size_c_med = [0, 0, 0, 0]
         self.padding_size_c_lrg = [0, 0, 0, 0]
 
-        self.padding_process_value = -1.0 * math.e
         self.padding_size_c_sml_process = [0, 0, 0, 0]
         self.padding_size_c_med_process = [1, 1, 1, 1]
         self.padding_size_c_lrg_process = [2, 2, 2, 2]
@@ -1829,8 +1828,7 @@ class DecoderOnlyModel(nn.Module):
         x_convolved_sml = F.pad(
             input=x_convolved_sml,
             pad=self.padding_size_c_sml_process,
-            mode="constant",
-            value=self.padding_process_value,
+            mode="replicate",
         )
         x_convolved_med = x_upsampled
         x_convolved_med = self.dropout_latents(x_convolved_med)
@@ -1844,8 +1842,7 @@ class DecoderOnlyModel(nn.Module):
         x_convolved_med = F.pad(
             input=x_convolved_med,
             pad=self.padding_size_c_med_process,
-            mode="constant",
-            value=self.padding_process_value,
+            mode="replicate",
         )
         x_convolved_lrg = x_upsampled
         x_convolved_lrg = self.dropout_latents(x_convolved_lrg)
@@ -1859,8 +1856,7 @@ class DecoderOnlyModel(nn.Module):
         x_convolved_lrg = F.pad(
             input=x_convolved_lrg,
             pad=self.padding_size_c_lrg_process,
-            mode="constant",
-            value=self.padding_process_value,
+            mode="replicate",
         )
         x_convolved = torch.cat(
             [
@@ -1946,8 +1942,7 @@ class DecoderOnlyModel(nn.Module):
         x_convolved_sml = F.pad(
             input=x_convolved_sml,
             pad=self.padding_size_c_sml_process,
-            mode="constant",
-            value=self.padding_process_value,
+            mode="replicate",
         )
         x_convolved_med = x_upsampled
         x_convolved_med = self.dropout_latents(x_convolved_med)
@@ -1961,8 +1956,7 @@ class DecoderOnlyModel(nn.Module):
         x_convolved_med = F.pad(
             input=x_convolved_med,
             pad=self.padding_size_c_med_process,
-            mode="constant",
-            value=self.padding_process_value,
+            mode="replicate",
         )
         x_convolved_lrg = x_upsampled
         x_convolved_lrg = self.dropout_latents(x_convolved_lrg)
@@ -1976,8 +1970,7 @@ class DecoderOnlyModel(nn.Module):
         x_convolved_lrg = F.pad(
             input=x_convolved_lrg,
             pad=self.padding_size_c_lrg_process,
-            mode="constant",
-            value=self.padding_process_value,
+            mode="replicate",
         )
         x_convolved = torch.cat(
             [
@@ -2063,8 +2056,7 @@ class DecoderOnlyModel(nn.Module):
         x_convolved_sml = F.pad(
             input=x_convolved_sml,
             pad=self.padding_size_c_sml_process,
-            mode="constant",
-            value=self.padding_process_value,
+            mode="replicate",
         )
         x_convolved_med = x_upsampled
         x_convolved_med = self.dropout_latents(x_convolved_med)
@@ -2078,8 +2070,7 @@ class DecoderOnlyModel(nn.Module):
         x_convolved_med = F.pad(
             input=x_convolved_med,
             pad=self.padding_size_c_med_process,
-            mode="constant",
-            value=self.padding_process_value,
+            mode="replicate",
         )
         x_convolved_lrg = x_upsampled
         x_convolved_lrg = self.dropout_latents(x_convolved_lrg)
@@ -2093,8 +2084,7 @@ class DecoderOnlyModel(nn.Module):
         x_convolved_lrg = F.pad(
             input=x_convolved_lrg,
             pad=self.padding_size_c_lrg_process,
-            mode="constant",
-            value=self.padding_process_value,
+            mode="replicate",
         )
         x_convolved = torch.cat(
             [
@@ -2180,8 +2170,7 @@ class DecoderOnlyModel(nn.Module):
         x_convolved_sml = F.pad(
             input=x_convolved_sml,
             pad=self.padding_size_c_sml_process,
-            mode="constant",
-            value=self.padding_process_value,
+            mode="replicate",
         )
         x_convolved_med = x_upsampled
         x_convolved_med = self.dropout_latents(x_convolved_med)
@@ -2195,8 +2184,7 @@ class DecoderOnlyModel(nn.Module):
         x_convolved_med = F.pad(
             input=x_convolved_med,
             pad=self.padding_size_c_med_process,
-            mode="constant",
-            value=self.padding_process_value,
+            mode="replicate",
         )
         x_convolved_lrg = x_upsampled
         x_convolved_lrg = self.dropout_latents(x_convolved_lrg)
@@ -2210,8 +2198,7 @@ class DecoderOnlyModel(nn.Module):
         x_convolved_lrg = F.pad(
             input=x_convolved_lrg,
             pad=self.padding_size_c_lrg_process,
-            mode="constant",
-            value=self.padding_process_value,
+            mode="replicate",
         )
         x_convolved = torch.cat(
             [
@@ -2297,8 +2284,7 @@ class DecoderOnlyModel(nn.Module):
         x_convolved_sml = F.pad(
             input=x_convolved_sml,
             pad=self.padding_size_c_sml_process,
-            mode="constant",
-            value=self.padding_process_value,
+            mode="replicate",
         )
         x_convolved_med = x_upsampled
         x_convolved_med = self.dropout_latents(x_convolved_med)
@@ -2312,8 +2298,7 @@ class DecoderOnlyModel(nn.Module):
         x_convolved_med = F.pad(
             input=x_convolved_med,
             pad=self.padding_size_c_med_process,
-            mode="constant",
-            value=self.padding_process_value,
+            mode="replicate",
         )
         x_convolved_lrg = x_upsampled
         x_convolved_lrg = self.dropout_latents(x_convolved_lrg)
@@ -2327,8 +2312,7 @@ class DecoderOnlyModel(nn.Module):
         x_convolved_lrg = F.pad(
             input=x_convolved_lrg,
             pad=self.padding_size_c_lrg_process,
-            mode="constant",
-            value=self.padding_process_value,
+            mode="replicate",
         )
         x_convolved = torch.cat(
             [
