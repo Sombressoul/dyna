@@ -20,7 +20,7 @@ project_dir = os.path.dirname(evals_dir)
 sys.path.append(project_dir)
 
 # torch.manual_seed(42)
-torch.manual_seed(10042)
+torch.manual_seed(10056)
 
 from dyna import DynamicConv2D, WeightsLib2D, siglog, siglog_parametric
 
@@ -94,8 +94,13 @@ class DecoderOnlyModel(nn.Module):
         self.padding_size_upsample = [0, 0, 0, 0]
         self.padding_size_c_base = [0, 0, 0, 0]
         self.padding_size_c_sml = [0, 0, 0, 0]
-        self.padding_size_c_med = [1, 1, 1, 1]
-        self.padding_size_c_lrg = [2, 2, 2, 2]
+        self.padding_size_c_med = [0, 0, 0, 0]
+        self.padding_size_c_lrg = [0, 0, 0, 0]
+
+        self.padding_process_value = 0.01
+        self.padding_size_c_sml_process = [0, 0, 0, 0]
+        self.padding_size_c_med_process = [1, 1, 1, 1]
+        self.padding_size_c_lrg_process = [2, 2, 2, 2]
 
         self.eps = 1.0e-3
         self.q_levels = 16
@@ -364,6 +369,38 @@ class DecoderOnlyModel(nn.Module):
             momentum=0.1,
             dtype=self.dtype_weights,
         )
+        self.block_05_wl_x_to_ctx_x = WeightsLib2D(
+            components_count=self.context_length,
+            mod_rank=self.mod_rank,
+            transformations_rank=self.transformations_rank,
+            output_shape=[
+                self.decoder_channels_reduced,
+                self.decoder_channels_reduced,
+            ],
+            dtype_weights=self.dtype_weights,
+        )
+        self.block_05_wl_x_to_ctx_x_norm = nn.LayerNorm(
+            normalized_shape=[self.decoder_channels_reduced],
+            elementwise_affine=True,
+            bias=True,
+            dtype=self.dtype_weights,
+        )
+        self.block_05_wl_x_to_ctx_xctx = WeightsLib2D(
+            components_count=self.context_length,
+            mod_rank=self.mod_rank,
+            transformations_rank=self.transformations_rank,
+            output_shape=[
+                self.context_length + self.decoder_channels_reduced,
+                self.context_length,
+            ],
+            dtype_weights=self.dtype_weights,
+        )
+        self.block_05_wl_x_to_ctx_xctx_norm = nn.LayerNorm(
+            normalized_shape=[self.context_length],
+            elementwise_affine=True,
+            bias=True,
+            dtype=self.dtype_weights,
+        )
 
         # ====> Block 04
         self.block_04_conv_upsample = DynamicConv2D(
@@ -549,6 +586,38 @@ class DecoderOnlyModel(nn.Module):
             eps=self.eps,
             affine=True,
             momentum=0.1,
+            dtype=self.dtype_weights,
+        )
+        self.block_04_wl_x_to_ctx_x = WeightsLib2D(
+            components_count=self.context_length,
+            mod_rank=self.mod_rank,
+            transformations_rank=self.transformations_rank,
+            output_shape=[
+                self.decoder_channels_reduced,
+                self.decoder_channels_reduced,
+            ],
+            dtype_weights=self.dtype_weights,
+        )
+        self.block_04_wl_x_to_ctx_x_norm = nn.LayerNorm(
+            normalized_shape=[self.decoder_channels_reduced],
+            elementwise_affine=True,
+            bias=True,
+            dtype=self.dtype_weights,
+        )
+        self.block_04_wl_x_to_ctx_xctx = WeightsLib2D(
+            components_count=self.context_length,
+            mod_rank=self.mod_rank,
+            transformations_rank=self.transformations_rank,
+            output_shape=[
+                self.context_length + self.decoder_channels_reduced,
+                self.context_length,
+            ],
+            dtype_weights=self.dtype_weights,
+        )
+        self.block_04_wl_x_to_ctx_xctx_norm = nn.LayerNorm(
+            normalized_shape=[self.context_length],
+            elementwise_affine=True,
+            bias=True,
             dtype=self.dtype_weights,
         )
 
@@ -738,6 +807,38 @@ class DecoderOnlyModel(nn.Module):
             momentum=0.1,
             dtype=self.dtype_weights,
         )
+        self.block_03_wl_x_to_ctx_x = WeightsLib2D(
+            components_count=self.context_length,
+            mod_rank=self.mod_rank,
+            transformations_rank=self.transformations_rank,
+            output_shape=[
+                self.decoder_channels_reduced,
+                self.decoder_channels_reduced,
+            ],
+            dtype_weights=self.dtype_weights,
+        )
+        self.block_03_wl_x_to_ctx_x_norm = nn.LayerNorm(
+            normalized_shape=[self.decoder_channels_reduced],
+            elementwise_affine=True,
+            bias=True,
+            dtype=self.dtype_weights,
+        )
+        self.block_03_wl_x_to_ctx_xctx = WeightsLib2D(
+            components_count=self.context_length,
+            mod_rank=self.mod_rank,
+            transformations_rank=self.transformations_rank,
+            output_shape=[
+                self.context_length + self.decoder_channels_reduced,
+                self.context_length,
+            ],
+            dtype_weights=self.dtype_weights,
+        )
+        self.block_03_wl_x_to_ctx_xctx_norm = nn.LayerNorm(
+            normalized_shape=[self.context_length],
+            elementwise_affine=True,
+            bias=True,
+            dtype=self.dtype_weights,
+        )
 
         # ====> Block 02
         self.block_02_conv_upsample = DynamicConv2D(
@@ -923,6 +1024,38 @@ class DecoderOnlyModel(nn.Module):
             eps=self.eps,
             affine=True,
             momentum=0.1,
+            dtype=self.dtype_weights,
+        )
+        self.block_02_wl_x_to_ctx_x = WeightsLib2D(
+            components_count=self.context_length,
+            mod_rank=self.mod_rank,
+            transformations_rank=self.transformations_rank,
+            output_shape=[
+                self.decoder_channels_reduced,
+                self.decoder_channels_reduced,
+            ],
+            dtype_weights=self.dtype_weights,
+        )
+        self.block_02_wl_x_to_ctx_x_norm = nn.LayerNorm(
+            normalized_shape=[self.decoder_channels_reduced],
+            elementwise_affine=True,
+            bias=True,
+            dtype=self.dtype_weights,
+        )
+        self.block_02_wl_x_to_ctx_xctx = WeightsLib2D(
+            components_count=self.context_length,
+            mod_rank=self.mod_rank,
+            transformations_rank=self.transformations_rank,
+            output_shape=[
+                self.context_length + self.decoder_channels_reduced,
+                self.context_length,
+            ],
+            dtype_weights=self.dtype_weights,
+        )
+        self.block_02_wl_x_to_ctx_xctx_norm = nn.LayerNorm(
+            normalized_shape=[self.context_length],
+            elementwise_affine=True,
+            bias=True,
             dtype=self.dtype_weights,
         )
 
@@ -1112,6 +1245,38 @@ class DecoderOnlyModel(nn.Module):
             momentum=0.1,
             dtype=self.dtype_weights,
         )
+        self.block_01_wl_x_to_ctx_x = WeightsLib2D(
+            components_count=self.context_length,
+            mod_rank=self.mod_rank,
+            transformations_rank=self.transformations_rank,
+            output_shape=[
+                self.decoder_channels_reduced,
+                self.decoder_channels_reduced,
+            ],
+            dtype_weights=self.dtype_weights,
+        )
+        self.block_01_wl_x_to_ctx_x_norm = nn.LayerNorm(
+            normalized_shape=[self.decoder_channels_reduced],
+            elementwise_affine=True,
+            bias=True,
+            dtype=self.dtype_weights,
+        )
+        self.block_01_wl_x_to_ctx_xctx = WeightsLib2D(
+            components_count=self.context_length,
+            mod_rank=self.mod_rank,
+            transformations_rank=self.transformations_rank,
+            output_shape=[
+                self.context_length + self.decoder_channels_reduced,
+                self.context_length,
+            ],
+            dtype_weights=self.dtype_weights,
+        )
+        self.block_01_wl_x_to_ctx_xctx_norm = nn.LayerNorm(
+            normalized_shape=[self.context_length],
+            elementwise_affine=True,
+            bias=True,
+            dtype=self.dtype_weights,
+        )
 
         # ====> Block out
         self.block_out_linear = nn.Linear(
@@ -1158,6 +1323,38 @@ class DecoderOnlyModel(nn.Module):
             bias=True,
             dtype=self.dtype_weights,
         )
+        self.block_out_wl_x_to_ctx_x = WeightsLib2D(
+            components_count=self.context_length,
+            mod_rank=self.mod_rank,
+            transformations_rank=self.transformations_rank,
+            output_shape=[
+                self.decoder_channels_reduced,
+                self.decoder_channels_reduced,
+            ],
+            dtype_weights=self.dtype_weights,
+        )
+        self.block_out_wl_x_to_ctx_x_norm = nn.LayerNorm(
+            normalized_shape=[self.decoder_channels_reduced],
+            elementwise_affine=True,
+            bias=True,
+            dtype=self.dtype_weights,
+        )
+        self.block_out_wl_x_to_ctx_xctx = WeightsLib2D(
+            components_count=self.context_length,
+            mod_rank=self.mod_rank,
+            transformations_rank=self.transformations_rank,
+            output_shape=[
+                self.context_length + self.decoder_channels_reduced,
+                self.context_length,
+            ],
+            dtype_weights=self.dtype_weights,
+        )
+        self.block_out_wl_x_to_ctx_xctx_norm = nn.LayerNorm(
+            normalized_shape=[self.context_length],
+            elementwise_affine=True,
+            bias=True,
+            dtype=self.dtype_weights,
+        )
 
         # ====> Block data cache
         self.data_cache_ctx = nn.Parameter(
@@ -1185,7 +1382,7 @@ class DecoderOnlyModel(nn.Module):
         self.siglog_params = nn.Parameter(
             data=torch.nn.init.normal_(
                 tensor=torch.empty(
-                    [77, 1],
+                    [89, 1],
                     dtype=self.dtype_weights,
                 ),
                 mean=(1.0 / math.e),
@@ -1586,6 +1783,17 @@ class DecoderOnlyModel(nn.Module):
         ctx = base_ctx
 
         # Block 05
+        ctx_x = x.flatten(2).permute([0, 2, 1])
+        ctx_x = (
+            ctx_x.unsqueeze(2) @ self.block_05_wl_x_to_ctx_x(ctx).unsqueeze(1)
+        ).squeeze(2)
+        ctx_x = activation_fn_ctx(ctx_x).mean(1)
+        ctx_x = self.block_05_wl_x_to_ctx_x_norm(ctx_x)
+        ctx_x = torch.cat([ctx_x, ctx], dim=1)
+        ctx_x = (ctx_x.unsqueeze(1) @ self.block_05_wl_x_to_ctx_xctx(ctx)).squeeze(1)
+        ctx_x = activation_fn_ctx(ctx_x)
+        ctx_x = self.block_05_wl_x_to_ctx_xctx_norm(ctx_x)
+        ctx = ctx + ctx_x
         ctx = self.block_05_norm_ctx_pre(ctx)
         ctx = self.noisein(ctx, self.noisein_rate_context)
         ctx = self.noiseover(ctx, self.noiseover_rate_context)
@@ -1618,6 +1826,12 @@ class DecoderOnlyModel(nn.Module):
         x_convolved_sml = x_convolved_sml.permute([0, 2, 3, 1])
         x_convolved_sml = self.block_05_norm_conv_sml(x_convolved_sml)
         x_convolved_sml = x_convolved_sml.permute([0, 3, 1, 2])
+        x_convolved_sml = F.pad(
+            input=x_convolved_sml,
+            pad=self.padding_size_c_sml_process,
+            mode="constant",
+            value=self.padding_process_value,
+        )
         x_convolved_med = x_upsampled
         x_convolved_med = self.dropout_latents(x_convolved_med)
         x_convolved_med = self.noisein(x_convolved_med, self.noisein_rate_latents)
@@ -1627,6 +1841,12 @@ class DecoderOnlyModel(nn.Module):
         x_convolved_med = x_convolved_med.permute([0, 2, 3, 1])
         x_convolved_med = self.block_05_norm_conv_med(x_convolved_med)
         x_convolved_med = x_convolved_med.permute([0, 3, 1, 2])
+        x_convolved_med = F.pad(
+            input=x_convolved_med,
+            pad=self.padding_size_c_med_process,
+            mode="constant",
+            value=self.padding_process_value,
+        )
         x_convolved_lrg = x_upsampled
         x_convolved_lrg = self.dropout_latents(x_convolved_lrg)
         x_convolved_lrg = self.noisein(x_convolved_lrg, self.noisein_rate_latents)
@@ -1636,6 +1856,12 @@ class DecoderOnlyModel(nn.Module):
         x_convolved_lrg = x_convolved_lrg.permute([0, 2, 3, 1])
         x_convolved_lrg = self.block_05_norm_conv_lrg(x_convolved_lrg)
         x_convolved_lrg = x_convolved_lrg.permute([0, 3, 1, 2])
+        x_convolved_lrg = F.pad(
+            input=x_convolved_lrg,
+            pad=self.padding_size_c_lrg_process,
+            mode="constant",
+            value=self.padding_process_value,
+        )
         x_convolved = torch.cat(
             [
                 (
@@ -1674,6 +1900,17 @@ class DecoderOnlyModel(nn.Module):
         ctx = self.dropout_context(ctx)
 
         # Block 04
+        ctx_x = x.flatten(2).permute([0, 2, 1])
+        ctx_x = (
+            ctx_x.unsqueeze(2) @ self.block_04_wl_x_to_ctx_x(ctx).unsqueeze(1)
+        ).squeeze(2)
+        ctx_x = activation_fn_ctx(ctx_x).mean(1)
+        ctx_x = self.block_04_wl_x_to_ctx_x_norm(ctx_x)
+        ctx_x = torch.cat([ctx_x, ctx], dim=1)
+        ctx_x = (ctx_x.unsqueeze(1) @ self.block_04_wl_x_to_ctx_xctx(ctx)).squeeze(1)
+        ctx_x = activation_fn_ctx(ctx_x)
+        ctx_x = self.block_04_wl_x_to_ctx_xctx_norm(ctx_x)
+        ctx = ctx + ctx_x
         ctx = self.block_04_norm_ctx_pre(ctx)
         ctx = self.noisein(ctx, self.noisein_rate_context)
         ctx = self.noiseover(ctx, self.noiseover_rate_context)
@@ -1706,6 +1943,12 @@ class DecoderOnlyModel(nn.Module):
         x_convolved_sml = x_convolved_sml.permute([0, 2, 3, 1])
         x_convolved_sml = self.block_04_norm_conv_sml(x_convolved_sml)
         x_convolved_sml = x_convolved_sml.permute([0, 3, 1, 2])
+        x_convolved_sml = F.pad(
+            input=x_convolved_sml,
+            pad=self.padding_size_c_sml_process,
+            mode="constant",
+            value=self.padding_process_value,
+        )
         x_convolved_med = x_upsampled
         x_convolved_med = self.dropout_latents(x_convolved_med)
         x_convolved_med = self.noisein(x_convolved_med, self.noisein_rate_latents)
@@ -1715,6 +1958,12 @@ class DecoderOnlyModel(nn.Module):
         x_convolved_med = x_convolved_med.permute([0, 2, 3, 1])
         x_convolved_med = self.block_04_norm_conv_med(x_convolved_med)
         x_convolved_med = x_convolved_med.permute([0, 3, 1, 2])
+        x_convolved_med = F.pad(
+            input=x_convolved_med,
+            pad=self.padding_size_c_med_process,
+            mode="constant",
+            value=self.padding_process_value,
+        )
         x_convolved_lrg = x_upsampled
         x_convolved_lrg = self.dropout_latents(x_convolved_lrg)
         x_convolved_lrg = self.noisein(x_convolved_lrg, self.noisein_rate_latents)
@@ -1724,6 +1973,12 @@ class DecoderOnlyModel(nn.Module):
         x_convolved_lrg = x_convolved_lrg.permute([0, 2, 3, 1])
         x_convolved_lrg = self.block_04_norm_conv_lrg(x_convolved_lrg)
         x_convolved_lrg = x_convolved_lrg.permute([0, 3, 1, 2])
+        x_convolved_lrg = F.pad(
+            input=x_convolved_lrg,
+            pad=self.padding_size_c_lrg_process,
+            mode="constant",
+            value=self.padding_process_value,
+        )
         x_convolved = torch.cat(
             [
                 (
@@ -1762,6 +2017,17 @@ class DecoderOnlyModel(nn.Module):
         ctx = self.dropout_context(ctx)
 
         # Block 03
+        ctx_x = x.flatten(2).permute([0, 2, 1])
+        ctx_x = (
+            ctx_x.unsqueeze(2) @ self.block_03_wl_x_to_ctx_x(ctx).unsqueeze(1)
+        ).squeeze(2)
+        ctx_x = activation_fn_ctx(ctx_x).mean(1)
+        ctx_x = self.block_03_wl_x_to_ctx_x_norm(ctx_x)
+        ctx_x = torch.cat([ctx_x, ctx], dim=1)
+        ctx_x = (ctx_x.unsqueeze(1) @ self.block_03_wl_x_to_ctx_xctx(ctx)).squeeze(1)
+        ctx_x = activation_fn_ctx(ctx_x)
+        ctx_x = self.block_03_wl_x_to_ctx_xctx_norm(ctx_x)
+        ctx = ctx + ctx_x
         ctx = self.block_03_norm_ctx_pre(ctx)
         ctx = self.noisein(ctx, self.noisein_rate_context)
         ctx = self.noiseover(ctx, self.noiseover_rate_context)
@@ -1794,6 +2060,12 @@ class DecoderOnlyModel(nn.Module):
         x_convolved_sml = x_convolved_sml.permute([0, 2, 3, 1])
         x_convolved_sml = self.block_03_norm_conv_sml(x_convolved_sml)
         x_convolved_sml = x_convolved_sml.permute([0, 3, 1, 2])
+        x_convolved_sml = F.pad(
+            input=x_convolved_sml,
+            pad=self.padding_size_c_sml_process,
+            mode="constant",
+            value=self.padding_process_value,
+        )
         x_convolved_med = x_upsampled
         x_convolved_med = self.dropout_latents(x_convolved_med)
         x_convolved_med = self.noisein(x_convolved_med, self.noisein_rate_latents)
@@ -1803,6 +2075,12 @@ class DecoderOnlyModel(nn.Module):
         x_convolved_med = x_convolved_med.permute([0, 2, 3, 1])
         x_convolved_med = self.block_03_norm_conv_med(x_convolved_med)
         x_convolved_med = x_convolved_med.permute([0, 3, 1, 2])
+        x_convolved_med = F.pad(
+            input=x_convolved_med,
+            pad=self.padding_size_c_med_process,
+            mode="constant",
+            value=self.padding_process_value,
+        )
         x_convolved_lrg = x_upsampled
         x_convolved_lrg = self.dropout_latents(x_convolved_lrg)
         x_convolved_lrg = self.noisein(x_convolved_lrg, self.noisein_rate_latents)
@@ -1812,6 +2090,12 @@ class DecoderOnlyModel(nn.Module):
         x_convolved_lrg = x_convolved_lrg.permute([0, 2, 3, 1])
         x_convolved_lrg = self.block_03_norm_conv_lrg(x_convolved_lrg)
         x_convolved_lrg = x_convolved_lrg.permute([0, 3, 1, 2])
+        x_convolved_lrg = F.pad(
+            input=x_convolved_lrg,
+            pad=self.padding_size_c_lrg_process,
+            mode="constant",
+            value=self.padding_process_value,
+        )
         x_convolved = torch.cat(
             [
                 (
@@ -1850,6 +2134,17 @@ class DecoderOnlyModel(nn.Module):
         ctx = self.dropout_context(ctx)
 
         # Block 02
+        ctx_x = x.flatten(2).permute([0, 2, 1])
+        ctx_x = (
+            ctx_x.unsqueeze(2) @ self.block_02_wl_x_to_ctx_x(ctx).unsqueeze(1)
+        ).squeeze(2)
+        ctx_x = activation_fn_ctx(ctx_x).mean(1)
+        ctx_x = self.block_02_wl_x_to_ctx_x_norm(ctx_x)
+        ctx_x = torch.cat([ctx_x, ctx], dim=1)
+        ctx_x = (ctx_x.unsqueeze(1) @ self.block_02_wl_x_to_ctx_xctx(ctx)).squeeze(1)
+        ctx_x = activation_fn_ctx(ctx_x)
+        ctx_x = self.block_02_wl_x_to_ctx_xctx_norm(ctx_x)
+        ctx = ctx + ctx_x
         ctx = self.block_02_norm_ctx_pre(ctx)
         ctx = self.noisein(ctx, self.noisein_rate_context)
         ctx = self.noiseover(ctx, self.noiseover_rate_context)
@@ -1882,6 +2177,12 @@ class DecoderOnlyModel(nn.Module):
         x_convolved_sml = x_convolved_sml.permute([0, 2, 3, 1])
         x_convolved_sml = self.block_02_norm_conv_sml(x_convolved_sml)
         x_convolved_sml = x_convolved_sml.permute([0, 3, 1, 2])
+        x_convolved_sml = F.pad(
+            input=x_convolved_sml,
+            pad=self.padding_size_c_sml_process,
+            mode="constant",
+            value=self.padding_process_value,
+        )
         x_convolved_med = x_upsampled
         x_convolved_med = self.dropout_latents(x_convolved_med)
         x_convolved_med = self.noisein(x_convolved_med, self.noisein_rate_latents)
@@ -1891,6 +2192,12 @@ class DecoderOnlyModel(nn.Module):
         x_convolved_med = x_convolved_med.permute([0, 2, 3, 1])
         x_convolved_med = self.block_02_norm_conv_med(x_convolved_med)
         x_convolved_med = x_convolved_med.permute([0, 3, 1, 2])
+        x_convolved_med = F.pad(
+            input=x_convolved_med,
+            pad=self.padding_size_c_med_process,
+            mode="constant",
+            value=self.padding_process_value,
+        )
         x_convolved_lrg = x_upsampled
         x_convolved_lrg = self.dropout_latents(x_convolved_lrg)
         x_convolved_lrg = self.noisein(x_convolved_lrg, self.noisein_rate_latents)
@@ -1900,6 +2207,12 @@ class DecoderOnlyModel(nn.Module):
         x_convolved_lrg = x_convolved_lrg.permute([0, 2, 3, 1])
         x_convolved_lrg = self.block_02_norm_conv_lrg(x_convolved_lrg)
         x_convolved_lrg = x_convolved_lrg.permute([0, 3, 1, 2])
+        x_convolved_lrg = F.pad(
+            input=x_convolved_lrg,
+            pad=self.padding_size_c_lrg_process,
+            mode="constant",
+            value=self.padding_process_value,
+        )
         x_convolved = torch.cat(
             [
                 (
@@ -1938,6 +2251,17 @@ class DecoderOnlyModel(nn.Module):
         ctx = self.dropout_context(ctx)
 
         # Block 01
+        ctx_x = x.flatten(2).permute([0, 2, 1])
+        ctx_x = (
+            ctx_x.unsqueeze(2) @ self.block_01_wl_x_to_ctx_x(ctx).unsqueeze(1)
+        ).squeeze(2)
+        ctx_x = activation_fn_ctx(ctx_x).mean(1)
+        ctx_x = self.block_01_wl_x_to_ctx_x_norm(ctx_x)
+        ctx_x = torch.cat([ctx_x, ctx], dim=1)
+        ctx_x = (ctx_x.unsqueeze(1) @ self.block_01_wl_x_to_ctx_xctx(ctx)).squeeze(1)
+        ctx_x = activation_fn_ctx(ctx_x)
+        ctx_x = self.block_01_wl_x_to_ctx_xctx_norm(ctx_x)
+        ctx = ctx + ctx_x
         ctx = self.block_01_norm_ctx_pre(ctx)
         ctx = self.noisein(ctx, self.noisein_rate_context)
         ctx = self.noiseover(ctx, self.noiseover_rate_context)
@@ -1970,6 +2294,12 @@ class DecoderOnlyModel(nn.Module):
         x_convolved_sml = x_convolved_sml.permute([0, 2, 3, 1])
         x_convolved_sml = self.block_01_norm_conv_sml(x_convolved_sml)
         x_convolved_sml = x_convolved_sml.permute([0, 3, 1, 2])
+        x_convolved_sml = F.pad(
+            input=x_convolved_sml,
+            pad=self.padding_size_c_sml_process,
+            mode="constant",
+            value=self.padding_process_value,
+        )
         x_convolved_med = x_upsampled
         x_convolved_med = self.dropout_latents(x_convolved_med)
         x_convolved_med = self.noisein(x_convolved_med, self.noisein_rate_latents)
@@ -1979,6 +2309,12 @@ class DecoderOnlyModel(nn.Module):
         x_convolved_med = x_convolved_med.permute([0, 2, 3, 1])
         x_convolved_med = self.block_01_norm_conv_med(x_convolved_med)
         x_convolved_med = x_convolved_med.permute([0, 3, 1, 2])
+        x_convolved_med = F.pad(
+            input=x_convolved_med,
+            pad=self.padding_size_c_med_process,
+            mode="constant",
+            value=self.padding_process_value,
+        )
         x_convolved_lrg = x_upsampled
         x_convolved_lrg = self.dropout_latents(x_convolved_lrg)
         x_convolved_lrg = self.noisein(x_convolved_lrg, self.noisein_rate_latents)
@@ -1988,6 +2324,12 @@ class DecoderOnlyModel(nn.Module):
         x_convolved_lrg = x_convolved_lrg.permute([0, 2, 3, 1])
         x_convolved_lrg = self.block_01_norm_conv_lrg(x_convolved_lrg)
         x_convolved_lrg = x_convolved_lrg.permute([0, 3, 1, 2])
+        x_convolved_lrg = F.pad(
+            input=x_convolved_lrg,
+            pad=self.padding_size_c_lrg_process,
+            mode="constant",
+            value=self.padding_process_value,
+        )
         x_convolved = torch.cat(
             [
                 (
@@ -2032,6 +2374,17 @@ class DecoderOnlyModel(nn.Module):
         ctx = self.dropout_context(ctx)
 
         # Out
+        ctx_x = x.flatten(2).permute([0, 2, 1])
+        ctx_x = (
+            ctx_x.unsqueeze(2) @ self.block_out_wl_x_to_ctx_x(ctx).unsqueeze(1)
+        ).squeeze(2)
+        ctx_x = activation_fn_ctx(ctx_x).mean(1)
+        ctx_x = self.block_out_wl_x_to_ctx_x_norm(ctx_x)
+        ctx_x = torch.cat([ctx_x, ctx], dim=1)
+        ctx_x = (ctx_x.unsqueeze(1) @ self.block_out_wl_x_to_ctx_xctx(ctx)).squeeze(1)
+        ctx_x = activation_fn_ctx(ctx_x)
+        ctx_x = self.block_out_wl_x_to_ctx_xctx_norm(ctx_x)
+        ctx = ctx + ctx_x
         ctx = self.block_out_norm_ctx_pre(ctx)
         ctx = self.noisein(ctx, self.noisein_rate_context)
         ctx = self.noiseover(ctx, self.noiseover_rate_context)
@@ -2259,7 +2612,7 @@ def train(
         images_path_dst=images_path_dst,
         prefix="initial_state",
     )
-    
+
     params_model = sum(p.numel() for p in model.parameters() if p.requires_grad)
 
     print("\n# --------------------------------------------------- #\n")
@@ -2899,6 +3252,7 @@ def model_perturb_small_weights(
     a: float = 0.0001,
     b: float = 0.0010,
 ) -> None:
+    print(f"model_perturb_small_weights: {a=}, {b=}")
     for name, param in model.named_parameters():
         if "data_cache" not in name:
             delta = torch.nn.init.uniform_(
@@ -3200,6 +3554,9 @@ def model_perturb_weights(
     for name, param in model.named_parameters():
         if not include_data_cache and "data_cache" in name:
             continue
+        std = param.data.std()
+        if std == 0.0 or std != std:
+            continue
         noise = torch.randn_like(param.data) * param.data.std() * rate
         param.data = param.data + noise
         print(f"model_perturb_weights (rate={rate:.5f}): {name}")
@@ -3267,10 +3624,34 @@ def clear() -> None:
     pass
 
 
+def model_siglog_alpha_fix(
+    model: DecoderOnlyModel,
+    lower_bound: float = 0.1,
+    mean: float = 1.0 / math.e,
+    std: float = 0.01,
+) -> None:
+    req_grad = model.siglog_params.requires_grad
+
+    model.siglog_params.requires_grad = False
+
+    fill_t = torch.nn.init.normal(
+        model.siglog_params[model.siglog_params <= lower_bound].clone(),
+        mean=mean,
+        std=std,
+    )
+
+    model.siglog_params[model.siglog_params <= lower_bound] = fill_t
+    model.siglog_params.requires_grad = req_grad
+
+    print(f"model_siglog_alpha_fix: {lower_bound=}, {mean=}, {std=}")
+    print(f"model_siglog_alpha_fix: values fixed: {fill_t.numel()}")
+    pass
+
+
 if __name__ == "__main__":
     train_mode = True
 
-    load_model = True
+    load_model = False
     load_optim = False
     drop_ctx_cache = False
     drop_latents_cache = False
@@ -3288,12 +3669,13 @@ if __name__ == "__main__":
         # model_freeze_latents,
         # model_data_cache_double,
         # model_data_cache_double,
-        # lambda m, d, t: model_change_data_cache_latents(m, d, t, [128, 16, 16, 16]),
-        # lambda m, d, t: model_change_data_cache_ctx(m, d, t, [128, 32]),
+        # lambda m, d, t: model_change_data_cache_latents(m, d, t, [512, 16, 16, 16]),
+        # lambda m, d, t: model_change_data_cache_ctx(m, d, t, [512, 32]),
         # model_unfreeze_model,
         # model_unfreeze_latents,
-        # model_perturb_small_weights,
-        # lambda m, d, t: model_perturb_weights(m, 0.01, False),
+        # lambda m, d, t: model_perturb_small_weights(m, a=0.001, b=0.005),
+        # lambda m, d, t: model_perturb_weights(m, 0.10, False),
+        # lambda m, d, t: model_siglog_alpha_fix(m, 0.1, 1.0 / math.e, 0.01),
         # model_perturb_small_weights,
         # lambda m, d, t: model_extend_data_cache(m, 128, 1.0e-6),
         # lambda m, d, t: model_reinit_weights_same_distribution(m, True),
@@ -3307,12 +3689,12 @@ if __name__ == "__main__":
         # lambda m, d, t: model_reinit_weights_same_distribution(m, target="block_04"),
         # lambda m, d, t: model_reinit_weights_same_distribution(m, target="block_05"),
         # lambda m, d, t: model_reinit_weights_same_distribution(m, target="data_cache"),
-        # lambda m, d, t: model_fill_data_cache_context(m, 1.0e-6),
-        # lambda m, d, t: model_fill_data_cache_latents(m, 1.0e-6),
+        # lambda m, d, t: model_fill_data_cache_context(m, 1.0e-5),
+        # lambda m, d, t: model_fill_data_cache_latents(m, 1.0e-5),
         # model_freeze_all,
         # model_unfreeze_ctx,
         # model_unfreeze_latents,
-        model_unfreeze_all,
+        # model_unfreeze_all,
         # model_freeze_model,
         # model_freeze_latents,
         # model_freeze_ctx,
@@ -3337,10 +3719,10 @@ if __name__ == "__main__":
 
     path_prefix_load = "/mnt/f/git_AIResearch/dyna/data/models"
     path_prefix_save = "/mnt/f/git_AIResearch/dyna/data/models"
-    load_path_model = f"{path_prefix_load}/model.Type-07.G01.AdamW.LAST.pth"
+    load_path_model = f"{path_prefix_load}/"
     load_path_optim = f"{path_prefix_load}/"
-    save_path_model = f"{path_prefix_save}/model.Type-07.G02.AdamW"
-    save_path_optim = f"{path_prefix_save}/optim.Type-07.G02.AdamW"
+    save_path_model = f"{path_prefix_save}/model.Type-08.G00.AdamW"
+    save_path_optim = f"{path_prefix_save}/optim.Type-08.G00.AdamW"
     save_model = True
     save_optim = False
     save_nth_iteration = 10_000
@@ -3360,7 +3742,7 @@ if __name__ == "__main__":
     adam_weight_decay = 0.0
     adam_eps = 1.0e-8
     # optimizer: torch.optim.AdamW
-    adamw_learning_rate = 1.0e-3
+    adamw_learning_rate = 1.0e-5
     adamw_amsgrad = True
     adamw_weight_decay = 1.0e-2
     adamw_eps = 1.0e-8
@@ -3381,7 +3763,7 @@ if __name__ == "__main__":
     optim_update_lr = False
     optim_target_lr = 1.0e-4
     optim_update_wd = False
-    optim_target_wd = 1.0e-7
+    optim_target_wd = 0.1
 
     data_cache_ctx_bound = 1.0e-4
     data_cache_latents_bound = 1.0e-4
@@ -3424,10 +3806,10 @@ if __name__ == "__main__":
     freeze_model_nth_epoch = 0
     freeze_model_epochs = 0
 
-    nelements = 128
+    nelements = 32
     data_cache_ctx_len = nelements
     data_cache_latents_len = nelements
-    data_cache_latents_shape = [16, 16, 16]
+    data_cache_latents_shape = [16, 8, 8]
 
     context_through = False
 
@@ -3449,7 +3831,7 @@ if __name__ == "__main__":
     noiseover_rate_context_output = 0.0
 
     total_steps = 200_000
-    batch_size = 16
+    batch_size = 32
     sliding_batch = False
     grad_accumulation_steps = nelements // batch_size
 
@@ -3457,7 +3839,7 @@ if __name__ == "__main__":
     starting_from = 1024 * 10
     images_path_src = "/mnt/f/Datasets/Images_512x512/dataset_01"
     images_path_dst = "/mnt/f/git_AIResearch/dyna/data/img_dst"
-    output_shape = [417, 417] # 16x16=[417, 417]; 8x8=[161, 161]
+    output_shape = [161, 161]  # 16x16=[417, 417]; 8x8=[161, 161]
     dtype_weights = torch.float32
     device = torch.device("cuda")
 
@@ -3647,7 +4029,7 @@ if __name__ == "__main__":
         factor=1.00,
         total_iters=4096 * 16,
     )
-    warmup_epochs = 512
+    warmup_epochs = 128
     warmup_scheduler = warmup.LinearWarmup(
         optimizer=optimizer,
         warmup_period=warmup_epochs,
