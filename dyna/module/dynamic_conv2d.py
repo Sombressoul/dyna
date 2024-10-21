@@ -5,7 +5,7 @@ import math
 
 from typing import Union, List, Optional
 
-from dyna.weights_lib_2d import WeightsLib2D
+from dyna.lib.weights_lib_2d import WeightsLib2D
 
 
 class DynamicConv2D(nn.Module):
