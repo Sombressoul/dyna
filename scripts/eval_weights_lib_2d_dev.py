@@ -6,14 +6,12 @@ import torch.nn as nn
 import torchvision.transforms as transforms
 
 from PIL import Image
-from madgrad import MADGRAD
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
-evals_dir = os.path.dirname(script_dir)
-project_dir = os.path.dirname(evals_dir)
+project_dir = os.path.dirname(script_dir)
 sys.path.append(project_dir)
 
-from dyna import WeightsLib2D
+from dyna.lib import WeightsLib2DDev
 
 
 model = None
@@ -22,48 +20,103 @@ model = None
 class Model(nn.Module):
     def __init__(
         self,
-        output_shape: list[int] = [128, 128],
-        mat_count: int = 16,
-        components_count: int = 16,
-        mod_rank: int = 8,
-        t_rank: int = 1,
+        shape: list[int] = [128, 128],
+        count_weights_variations: int = 16,
+        count_weights_components: int = 16,
+        complex_components: bool = True,
+        rank_mod: int = 8,
+        use_deltas: bool = True,
+        rank_deltas: int = 4,
+        complex: bool = True,
+        complex_output: bool = True,
+        use_exponentiation: bool = True,
+        trainable_exponents_base: bool = True,
+        trainable_exponents_mod: bool = True,
+        trainable_exponents_deltas: bool = True,
+        exponents_initial_value_real: float = 2.0,
+        exponents_initial_value_imag: float = 0.0,
+        use_bias: bool = True,
+        use_scale: bool = True,
         asymmetry: float = 1e-3,
-        dtype_weights: torch.dtype = torch.bfloat16,
+        activation_type: str = "identity",
+        transformation_type: str = "inversion",
+        preserve_i: bool = False,
+        dtype: torch.dtype = torch.bfloat16,
     ) -> None:
         super().__init__()
 
         # ================================================================================= #
+        # ____________________________> Initial checks.
+        # ================================================================================= #
+        if complex_output:
+            assert (
+                complex_components
+            ), "Complex output is only supported with complex components."
+
+        # ================================================================================= #
         # ____________________________> Parameters.
         # ================================================================================= #
-        self.mat_count = mat_count
-        self.components_count = components_count
-        self.output_shape = output_shape
+        self.count_weights_variations = count_weights_variations
+        self.count_weights_components = count_weights_components
+        self.preserve_i = preserve_i
+        self.shape = shape
 
         # ================================================================================= #
         # ____________________________> Weights.
         # ================================================================================= #
-        # Init WeightsLib2DLite.
-        self.weights = WeightsLib2D(
-            output_shape=output_shape,
-            mod_rank=mod_rank,
-            transformations_rank=t_rank,
-            components_count=components_count,
+        # Init WeightsLib2D.
+        self.weights = WeightsLib2DDev(
+            shape=shape,
+            rank_mod=rank_mod,
+            use_deltas=use_deltas,
+            rank_deltas=rank_deltas,
+            complex=complex,
+            complex_output=complex_output,
+            use_exponentiation=use_exponentiation,
+            trainable_exponents_base=trainable_exponents_base,
+            trainable_exponents_mod=trainable_exponents_mod,
+            trainable_exponents_deltas=trainable_exponents_deltas,
+            exponents_initial_value_real=exponents_initial_value_real,
+            exponents_initial_value_imag=exponents_initial_value_imag,
+            use_bias=use_bias,
+            use_scale=use_scale,
             asymmetry=asymmetry,
-            dtype_weights=dtype_weights,
+            activation_type=activation_type,
+            transformation_type=transformation_type,
+            dtype=dtype,
         )
 
         # Init coefficients.
-        coefficients = nn.init.uniform_(
-            tensor=torch.empty(
-                [
-                    self.mat_count,
-                    self.components_count,
-                ],
-                dtype=dtype_weights,
-            ),
-            a=-1.0,
-            b=+1.0,
+        coefficients_r = torch.empty(
+            [
+                self.count_weights_variations,
+                self.count_weights_components,
+                1,
+                1,
+            ],
+            dtype=self.weights.dtype_real,
         )
+        coefficients_r = nn.init.uniform_(
+            tensor=coefficients_r,
+            a=-2.0,
+            b=+2.0,
+        )
+
+        if complex_components:
+            coefficients_i = torch.empty_like(coefficients_r)
+            coefficients_i = nn.init.normal_(
+                tensor=coefficients_i,
+                mean=0.0,
+                std=self.weights.asymmetry,
+            )
+            coefficients = torch.complex(
+                real=coefficients_r,
+                imag=coefficients_i,
+            ).to(
+                dtype=self.weights.dtype_complex,
+            )
+        else:
+            coefficients = coefficients_r
 
         self.coefficients = nn.Parameter(coefficients)
 
@@ -72,7 +125,13 @@ class Model(nn.Module):
     def forward(
         self,
     ) -> torch.Tensor:
-        return self.weights(self.coefficients)
+        components_names = [f"x_{i}" for i in range(self.count_weights_components)]
+        components_weights = self.weights.get_weights(components_names).unsqueeze(0)
+        weights = components_weights.mul(self.coefficients)
+        weights = weights.sum(dim=1, keepdim=False)
+        weights = weights if self.preserve_i else weights.real
+
+        return weights
 
 
 def generate_data_deviative(
@@ -83,8 +142,7 @@ def generate_data_deviative(
 ) -> torch.Tensor:
     base = torch.nn.init.uniform_(
         tensor=torch.empty([1, *shape]),
-        a=+0.0,
-        # a=-1.0,
+        a=-1.0,
         b=+1.0,
     )
     mods = (
@@ -105,8 +163,7 @@ def generate_data_random(
 ) -> torch.Tensor:
     base = torch.nn.init.uniform_(
         tensor=torch.empty([mat_count, *shape]),
-        a=+0.0,
-        # a=-1.0,
+        a=-1.0,
         b=+1.0,
     ).to(dtype)
     return base
@@ -128,8 +185,8 @@ def generate_data_from_images(
         image = image.resize([shape[1], shape[0]], Image.LANCZOS)
         image = transforms.ToTensor()(image).mean(dim=0, keepdim=False)
         image = image.unsqueeze(0)
-        image = (image - image.min() + 1.0e-2) / (image.max() - image.min() + 2.0e-2)
-        # image = (image - 0.5) * 2.0
+        image = (image - image.min()) / (image.max() - image.min())
+        image = (image - 0.5) * 2.0
         data[i] = image
 
     return data
@@ -140,7 +197,6 @@ def generate_images_from_data(
     images_path_dst: str,
     prefix: str,
 ) -> None:
-    data = data.to(dtype=torch.float16)
     for i in range(data.shape[0]):
         image = data[i].squeeze(0)
         image = (image - image.min()) / (image.max() - image.min())
@@ -156,8 +212,6 @@ def sample_results(
     output: torch.Tensor,
     count_samples: int,
 ) -> None:
-    target = target.to(dtype=torch.float16)
-    output = output.to(dtype=torch.float16)
     for i in range(count_samples):
         print(f"\nMat #{i} samples:")
         print(f"Target: {target[i, 0, 0:16].cpu().detach().numpy().tolist()}")
@@ -184,28 +238,22 @@ def train(
     print(f"Ratio: {params_model / params_data}")
     print(f"Model weights data types:")
     print(f"{model.weights.weights_base.dtype=}")
-    print(f"{model.weights.mod_i.dtype=}")
-    print(f"{model.weights.mod_j.dtype=}")
+    print(f"{model.weights.weights_mod_i.dtype=}")
+    print(f"{model.weights.weights_mod_j.dtype=}")
     print(f"Model output data type: {preheat_output.dtype}")
 
     print("\n# --------------------------------------------------- #\n")
     for i in range(iterations):
         optimizer.zero_grad()
         output = model()
-        loss = torch.nn.functional.l1_loss(output, data)
+        loss = (data - output).std().sqrt()
         loss.backward()
         optimizer.step()
 
         if (i + 1) % log_nth_iteration == 0:
-        # if ((i + 1) % log_nth_iteration == 0) or (i > 2900 and (i + 1) % 10 == 0):
             print(
                 f"Iteration #{i+1}: \nLoss: {loss.item()}\nStdR: {(data - output).std()}"
             )
-            # print(f"\n# ===================================================================== {i+1}\n")
-            # model.weights._log_var(model.weights.inversions, "self.inversions", False)
-            # model.weights._log_var(model.weights.mod_i, "mod_i", False)
-            # model.weights._log_var(model.weights.mod_j, "mod_j", False)
-            # print("\n# ===================================================================== #\n")
             if mode == "images":
                 generate_images_from_data(
                     data=output,
@@ -217,7 +265,7 @@ def train(
     sample_results(
         target=data,
         output=output,
-        count_samples=min(model.mat_count, results_sample_count),
+        count_samples=min(model.count_weights_variations, results_sample_count),
     )
 
     if mode == "images":
@@ -254,11 +302,11 @@ def main():
         help="path to reconstructed images (default: None)",
     )
     parser.add_argument(
-        "--output-shape",
+        "--mat-shape",
         nargs=2,
         type=int,
-        default=[128, 128],
-        help="dimensionality of test matrices (default: [128, 128])",
+        default=[256, 256],
+        help="dimensionality of test matrices (default: [256, 256])",
     )
     parser.add_argument(
         "--mat-count",
@@ -267,10 +315,16 @@ def main():
         help="count of test matrices (default: 16)",
     )
     parser.add_argument(
-        "--components-count",
+        "--weights-count-components",
         type=int,
         default=16,
         help="count of components for dynamic weights (default: 16)",
+    )
+    parser.add_argument(
+        "--no-complex-components",
+        default=False,
+        action="store_true",
+        help="do not use complex numbers for the dynamic weights (default: False)",
     )
     parser.add_argument(
         "--random-data",
@@ -285,22 +339,108 @@ def main():
         help="standard deviation of test matrices (default: 0.1)",
     )
     parser.add_argument(
-        "--mod-rank",
+        "--lib-rank-mod",
         type=int,
-        default=16,
-        help="mod rank of the library matrices (default: 16)",
+        default=None,
+        help="mod rank of the library matrices (default: None (auto-select))",
     )
     parser.add_argument(
-        "--t-rank",
+        "--use-deltas",
+        default=False,
+        action="store_true",
+        help="use deltas (default: False)",
+    )
+    parser.add_argument(
+        "--lib-rank-deltas",
         type=int,
-        default=1,
-        help="transformations rank of the library matrices (default: 1)",
+        default=16,
+        help="deltas rank of the library matrices (default: 16)",
+    )
+    parser.add_argument(
+        "--no-complex",
+        default=False,
+        action="store_true",
+        help="do not use complex numbers (default: False)",
+    )
+    parser.add_argument(
+        "--no-complex-output",
+        default=False,
+        action="store_true",
+        help="do not use complex numbers for the model output (default: False)",
+    )
+    parser.add_argument(
+        "--use-exponentiation",
+        default=False,
+        action="store_true",
+        help="use exponentiation (default: False)",
+    )
+    parser.add_argument(
+        "--no-trainable-exponents-base",
+        default=False,
+        action="store_true",
+        help="do not train the base exponents (default: False)",
+    )
+    parser.add_argument(
+        "--no-trainable-exponents-mod",
+        default=False,
+        action="store_true",
+        help="do not train the mod exponents (default: False)",
+    )
+    parser.add_argument(
+        "--no-trainable-exponents-deltas",
+        default=False,
+        action="store_true",
+        help="do not train the deltas exponents (default: False)",
+    )
+    parser.add_argument(
+        "--exponents-initial-value-real",
+        type=float,
+        default=1.0,
+        help="initial value for the real part of the exponents (default: 1.0)",
+    )
+    parser.add_argument(
+        "--exponents-initial-value-imag",
+        type=float,
+        default=0.0,
+        help="initial value for the imaginary part of the exponents (default: 0.0)",
+    )
+    parser.add_argument(
+        "--no-bias",
+        default=False,
+        action="store_true",
+        help="do not use bias (default: False)",
+    )
+    parser.add_argument(
+        "--no-scale",
+        default=False,
+        action="store_true",
+        help="do not use scale (default: False)",
     )
     parser.add_argument(
         "--asymmetry",
         type=float,
         default=1e-3,
         help="asymmetry (default: 1e-3)",
+    )
+    parser.add_argument(
+        "--activation-type",
+        type=str,
+        default="identity",
+        choices=["identity", "cardioid"],
+        help="internal activation type (default: identity)",
+    )
+    parser.add_argument(
+        "--transformation-type",
+        type=str,
+        default="inversion",
+        choices=["inversion", "translation"],
+        help="transformation type (default: inversion)",
+    )
+    parser.add_argument(
+        "--preserve-i",
+        default=False,
+        action="store_true",
+        help="preserve imaginary part of the model output (default: False)",
     )
     parser.add_argument(
         "--iterations",
@@ -323,8 +463,8 @@ def main():
     parser.add_argument(
         "--dtype",
         type=str,
-        default="bfloat16",
-        help="dtype (default: bfloat16)",
+        default="float32",
+        help="dtype (default: float32)",
     )
     parser.add_argument(
         "--seed",
@@ -341,20 +481,8 @@ def main():
     parser.add_argument(
         "--lr",
         type=float,
-        default=1.0e-2,
-        help="learning rate (default: 1.0e-2)",
-    )
-    parser.add_argument(
-        "--mm",
-        type=float,
-        default=0.9,
-        help="momentum (default: 0.9)",
-    )
-    parser.add_argument(
-        "--wd",
-        type=float,
-        default=0.0,
-        help="weight decay (default: 0.0)",
+        default=1.0e-3,
+        help="learning rate (default: 1.0e-3)",
     )
     args = parser.parse_args()
 
@@ -381,37 +509,37 @@ def main():
     device = torch.device(args.device)
 
     if args.dtype == "bfloat16":
-        dtype_weights = torch.bfloat16
+        dtype = torch.bfloat16
     elif args.dtype == "float16":
-        dtype_weights = torch.float16
+        dtype = torch.float16
     elif args.dtype == "float32":
-        dtype_weights = torch.float32
+        dtype = torch.float32
     elif args.dtype == "float64":
-        dtype_weights = torch.float64
+        dtype = torch.float64
     else:
         raise ValueError(f"Unsupported dtype: {args.dtype}")
 
     if args.mode == "matrix":
         data = (
             generate_data_deviative(
-                shape=args.output_shape,
+                shape=args.mat_shape,
                 mat_count=args.mat_count,
                 mat_deviation=args.mat_deviation,
-                dtype=dtype_weights,
+                dtype=dtype,
             ).to(device)
             if not args.random_data
             else generate_data_random(
-                shape=args.output_shape,
+                shape=args.mat_shape,
                 mat_count=args.mat_count,
-                dtype=dtype_weights,
+                dtype=dtype,
             ).to(device)
         )
     elif args.mode == "images":
         data = generate_data_from_images(
-            shape=args.output_shape,
+            shape=args.mat_shape,
             images_path_src=args.images_path_src,
             mat_count=args.mat_count,
-            dtype=dtype_weights,
+            dtype=dtype,
         ).to(device)
     else:
         raise ValueError(f"Unsupported mode: {args.mode}")
@@ -424,15 +552,30 @@ def main():
     print(f"{data.std()=}")
 
     model = Model(
-        output_shape=args.output_shape,
-        mat_count=args.mat_count,
-        components_count=args.components_count,
-        mod_rank=args.mod_rank,
-        t_rank=args.t_rank,
+        shape=args.mat_shape,
+        count_weights_variations=args.mat_count,
+        count_weights_components=args.weights_count_components,
+        complex_components=not args.no_complex_components,
+        rank_mod=args.lib_rank_mod,
+        use_deltas=args.use_deltas,
+        rank_deltas=args.lib_rank_deltas,
+        complex=not args.no_complex,
+        complex_output=not args.no_complex_output,
+        use_exponentiation=args.use_exponentiation,
+        trainable_exponents_base=not args.no_trainable_exponents_base,
+        trainable_exponents_mod=not args.no_trainable_exponents_mod,
+        trainable_exponents_deltas=not args.no_trainable_exponents_deltas,
+        exponents_initial_value_real=args.exponents_initial_value_real,
+        exponents_initial_value_imag=args.exponents_initial_value_imag,
+        use_bias=not args.no_bias,
+        use_scale=not args.no_scale,
         asymmetry=args.asymmetry,
-        dtype_weights=dtype_weights,
+        activation_type=args.activation_type,
+        transformation_type=args.transformation_type,
+        preserve_i=args.preserve_i,
+        dtype=dtype,
     ).to(device)
-    optimizer = MADGRAD(model.parameters(), lr=args.lr, momentum=args.mm, weight_decay=args.wd)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr)
 
     train(
         data=data,

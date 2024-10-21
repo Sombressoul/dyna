@@ -1,32 +1,9 @@
 from dyna import functional
+from dyna import lib
 from dyna import module
 
-from dyna.modulated_activation import ModulatedActivation
-from dyna.modulated_activation_bell import ModulatedActivationBell
-from dyna.modulated_activation_sine import ModulatedActivationSine
-from dyna.signal import SignalModular, SignalComponential
-from dyna.sparse_ensemble import SparseEnsemble
-from dyna.theta_input import ThetaInput
-from dyna.theta_output import ThetaOutput
-from dyna.theta_linear import ThetaLinear
-from dyna.weights_lib_2d_dev import WeightsLib2DDev
-from dyna.weights_lib_2d import WeightsLib2D
-
 __all__ = [
-    # Modules
     "functional",
+    "lib",
     "module",
-    # Components
-    "ExponentialWarper1D",
-    "ModulatedActivation",
-    "ModulatedActivationBell",
-    "ModulatedActivationSine",
-    "SignalModular",
-    "SignalComponential",
-    "SparseEnsemble",
-    "ThetaInput",
-    "ThetaOutput",
-    "ThetaLinear",
-    "WeightsLib2DDev",
-    "WeightsLib2D",
 ]

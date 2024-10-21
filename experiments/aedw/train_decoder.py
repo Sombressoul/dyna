@@ -22,8 +22,8 @@ sys.path.append(project_dir)
 # torch.manual_seed(42)
 torch.manual_seed(10056)
 
-from dyna import WeightsLib2D
 from dyna.functional import siglog, siglog_parametric
+from dyna.lib import WeightsLib2D
 from dyna.module import DynamicConv2D
 
 
