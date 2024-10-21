@@ -22,7 +22,9 @@ sys.path.append(project_dir)
 # torch.manual_seed(42)
 torch.manual_seed(10056)
 
-from dyna import DynamicConv2D, WeightsLib2D, siglog, siglog_parametric
+from dyna import WeightsLib2D
+from dyna.functional import siglog, siglog_parametric
+from dyna.module import DynamicConv2D
 
 
 class DecoderOnlyModel(nn.Module):

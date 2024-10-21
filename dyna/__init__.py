@@ -1,7 +1,6 @@
 from dyna import functional
+from dyna import module
 
-from dyna.dynamic_conv2d import DynamicConv2D
-from dyna.exponential_warper_1d import ExponentialWarper1D
 from dyna.modulated_activation import ModulatedActivation
 from dyna.modulated_activation_bell import ModulatedActivationBell
 from dyna.modulated_activation_sine import ModulatedActivationSine
@@ -14,8 +13,10 @@ from dyna.weights_lib_2d_dev import WeightsLib2DDev
 from dyna.weights_lib_2d import WeightsLib2D
 
 __all__ = [
+    # Modules
     "functional",
-    "DynamicConv2D",
+    "module",
+    # Components
     "ExponentialWarper1D",
     "ModulatedActivation",
     "ModulatedActivationBell",

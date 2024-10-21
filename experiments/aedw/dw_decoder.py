@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import math
 
-from dyna import DynamicConv2D
+from dyna.module import DynamicConv2D
 
 
 class DWDecoder(nn.Module):

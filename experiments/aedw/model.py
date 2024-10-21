@@ -12,7 +12,7 @@ evals_dir = os.path.dirname(script_dir)
 project_dir = os.path.dirname(evals_dir)
 sys.path.append(project_dir)
 
-from dyna import DynamicConv2D
+from dyna.module import DynamicConv2D
 
 
 class AEDW(nn.Module):
