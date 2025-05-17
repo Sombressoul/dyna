@@ -3,6 +3,7 @@ import torch.nn as nn
 
 from typing import Union, List
 
+
 class WeightsLib2DAlpha(nn.Module):
     def __init__(
         self,
