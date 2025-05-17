@@ -25,7 +25,7 @@ class Coder2DDynamicAlpha(nn.Module):
         conv_padding_value: Union[int, float] = 0.0,
         interpolate_scale_factor: float = 1.0,
         interpolate_mode: str = "nearest-exact",
-        interpolate_align_corners: bool = False,
+        interpolate_align_corners: Union[bool, None] = None,
         interpolate_antialias: bool = False,
         batch_norm_affine: bool = True,
         batch_norm_momentum: float = 1.0e-1,
@@ -40,6 +40,7 @@ class Coder2DDynamicAlpha(nn.Module):
         dtypes = [torch.float16, torch.bfloat16, torch.float32]
         modes_padding = ["constant", "reflect", "replicate", "circular"]
         modes_interpolate = ["nearest", "linear", "bilinear", "bicubic", "trilinear", "area", "nearest-exact"]
+        modes_align_corners = ["linear", "bilinear", "bicubic", "trilinear"]
 
         # Helper functions.
         kernel_type_check = lambda x: type(x) == int or (all([type(em) == int and em > 1 for em in x]) if type(x) == list and len(x) == 2 else False)
@@ -66,7 +67,7 @@ class Coder2DDynamicAlpha(nn.Module):
         assert interpolate_scale_factor > 0.0, f"interpolate_scale_factor should be positive. {var_info(interpolate_scale_factor)}"
         assert type(interpolate_mode) == str, f"interpolate_mode should be a string. {var_info(interpolate_mode)}"
         assert interpolate_mode in modes_interpolate, f"interpolate_mode should one of: {modes_interpolate}. {var_info(interpolate_mode)}"
-        assert type(interpolate_align_corners) == bool, f"interpolate_align_corners should be a boolean. {var_info(interpolate_align_corners)}"
+        assert type(interpolate_align_corners) in [bool, type(None)], f"interpolate_align_corners should be a boolean or None. {var_info(interpolate_align_corners)}"
         assert type(interpolate_antialias) == bool, f"interpolate_antialias should be a boolean. {var_info(interpolate_antialias)}"
         assert type(batch_norm_affine) == bool, f"batch_norm_affine should be a boolean. {var_info(batch_norm_affine)}"
         assert type(batch_norm_momentum) == float, f"batch_norm_momentum should be a float. {var_info(batch_norm_momentum)}"
@@ -80,6 +81,9 @@ class Coder2DDynamicAlpha(nn.Module):
         assert kernel_val_check(conv_kernel_small), f"conv_kernel_small values should be odd. {var_info(conv_kernel_small)}"
         assert kernel_val_check(conv_kernel_large), f"conv_kernel_large values should be odd. {var_info(conv_kernel_large)}"
         assert kernel_val_check(conv_kernel_refine), f"conv_kernel_refine values should be odd. {var_info(conv_kernel_refine)}"
+
+        if interpolate_align_corners is not None:
+            assert interpolate_mode in modes_align_corners, f"To use interpolate_align_corners, an interpolate_mode should be one of {modes_align_corners}. {var_info(modes_align_corners)}"
 
         # Init instance vars.
         self.context_length = context_length
@@ -126,7 +130,7 @@ class Coder2DDynamicAlpha(nn.Module):
             context_use_bias=self.context_use_bias,
             kernel_size=self.conv_kernel_small,
             stride=[1, 1],
-            padding=[0, 0],
+            padding=[0, 0, 0, 0],
             dilation=[1, 1],
             transpose=False,
             output_padding=None,
@@ -140,7 +144,7 @@ class Coder2DDynamicAlpha(nn.Module):
             context_use_bias=self.context_use_bias,
             kernel_size=self.conv_kernel_large,
             stride=[1, 1],
-            padding=[0, 0],
+            padding=[0, 0, 0, 0],
             dilation=[1, 1],
             transpose=False,
             output_padding=None,
@@ -154,7 +158,7 @@ class Coder2DDynamicAlpha(nn.Module):
             context_use_bias=self.context_use_bias,
             kernel_size=self.conv_kernel_refine,
             stride=[1, 1],
-            padding=[0, 0],
+            padding=[0, 0, 0, 0],
             dilation=[1, 1],
             transpose=False,
             output_padding=None,
