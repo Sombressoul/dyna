@@ -32,7 +32,7 @@ class Coder2DDynamicAlpha(nn.Module):
         # Additional:
         activation_internal: Callable = siglog,
         eps: float = 1.0e-5,
-        dtype_weights: torch.dtype = torch.bfloat16,
+        dtype_weights: torch.dtype = torch.float32,
     ) -> None:
         super().__init__()
 
