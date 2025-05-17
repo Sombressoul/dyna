@@ -124,7 +124,8 @@ class WeightsLib2DAlpha(nn.Module):
         x_gate = self.context_transform_gate(x)
         x_gate = x_gate * torch.nn.functional.sigmoid(x_gate)
         mod = x_transformed * x_gate
-        mod = mod / mod.abs().mean(dim=-1).sqrt().unsqueeze(-1) # mean sqrt norm
+        mod = mod.reshape([mod.shape[0], 4, -1]) # split into meaningful components
+        mod = mod / mod.abs().mean(dim=[-1]).sqrt().unsqueeze(-1) # total mean sqrt norm
         mod = torch.reshape(
             input=mod,
             shape=[
@@ -149,6 +150,9 @@ class WeightsLib2DAlpha(nn.Module):
             ],
             dim=-1,
         )
+        mod_scaled_norm = torch.sqrt(mod_scaled[..., 0] ** 2 + mod_scaled[..., 1] ** 2 + self.eps).flatten(1).mean(dim=[-1]).sqrt()
+        mod_scaled_norm = mod_scaled_norm.reshape([mod_scaled_norm.shape[0], *[1]*len(mod_scaled.shape[1::])])
+        mod_scaled = mod_scaled / mod_scaled_norm
         mod_weights = A[::, 0, ...] + mod_scaled
         mod_proj = mod[::, 2::, ...].permute([0, 2, 3, 1])
 
