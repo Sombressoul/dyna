@@ -436,15 +436,10 @@ def train(
         accumulation_step = accumulation_step + 1
         decoded = model(sample, batch_ids)
 
-        # Loss MSE
-        loss_current_step = F.mse_loss(decoded, sample)
+        loss_base_targets = F.log_softmax(sample.flatten(), dim=0)
+        loss_base_decoded = F.log_softmax(decoded.flatten(), dim=0)
+        loss_current_step = F.kl_div(loss_base_decoded, loss_base_targets, reduction="sum", log_target=True)
 
-        # Loss KL divergence
-        # loss_base_targets = F.log_softmax(sample.flatten(1), dim=-1)
-        # loss_base_decoded = F.log_softmax(decoded.flatten(1), dim=-1)
-        # loss_current_step = F.kl_div(loss_base_decoded, loss_base_targets, reduction="sum", log_target=True)
-        # loss_current_step = loss_current_step / loss_base_targets.shape[0]
-        
         loss_logging_accumulator.append(loss_current_step.detach().item())
         loss_total = loss_current_step / grad_accumulation_steps
         loss_total.backward()
