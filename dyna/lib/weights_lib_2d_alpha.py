@@ -10,7 +10,8 @@ class WeightsLib2DAlpha(nn.Module):
         output_shape: Union[torch.Size, List[int]],
         context_length: int,
         context_rank: int = 4,
-        context_use_bias: bool = False,
+        context_use_bias: bool = True,
+        convolution_use_bias: bool = True,
         eps: float = 1.0e-4,
         dtype_weights: torch.dtype = torch.bfloat16,
     ) -> None:
@@ -19,6 +20,7 @@ class WeightsLib2DAlpha(nn.Module):
         self.output_shape = output_shape
         self.context_rank = context_rank
         self.context_use_bias = context_use_bias
+        self.convolution_use_bias = convolution_use_bias
         self.eps = eps
         self.dtype_weights = dtype_weights
 
@@ -111,7 +113,7 @@ class WeightsLib2DAlpha(nn.Module):
             stride=[1, 1],
             padding=[0, 0],
             dilation=[1, 1],
-            bias=True,
+            bias=self.convolution_use_bias,
             dtype=self.dtype_weights,
         )
 
