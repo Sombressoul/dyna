@@ -21,7 +21,7 @@ sys.path.append(project_dir)
 
 torch.manual_seed(10056)
 
-from dyna.functional import mean_proportional_error
+from dyna.functional import log_proportional_error, backward_gradient_normalization
 from dyna.module import DynamicConv2DAlpha
 from dyna.block import Coder2DDynamicAlpha
 
@@ -55,7 +55,7 @@ class DecoderOnlyModel(nn.Module):
         self.decoder_channels_out = 3
 
         self.kernel_size_c_sml = [3, 3]
-        self.kernel_size_c_lrg = [7, 7]
+        self.kernel_size_c_lrg = [5, 5]
         self.kernel_size_c_refine = [3, 3]
 
         self.dtype_weights = dtype_weights
@@ -271,25 +271,39 @@ class DecoderOnlyModel(nn.Module):
 
         # Block input
         x = self.block_input_x_conv(x, ctx)
+        x = backward_gradient_normalization(x)
+        ctx = backward_gradient_normalization(ctx)
         ctx = self.block_input_ctx_norm(ctx)
 
         # Encode
         x = self.encode_block_01(x, ctx)
+        x = backward_gradient_normalization(x)
         x = self.encode_block_02(x, ctx)
+        x = backward_gradient_normalization(x)
         x = self.encode_block_03(x, ctx)
+        x = backward_gradient_normalization(x)
         x = self.encode_block_04(x, ctx)
+        x = backward_gradient_normalization(x)
         x = self.encode_block_05(x, ctx)
+        x = backward_gradient_normalization(x)
 
         # Decode
         x = self.decode_block_05(x, ctx)
+        x = backward_gradient_normalization(x)
         x = self.decode_block_04(x, ctx)
+        x = backward_gradient_normalization(x)
         x = self.decode_block_03(x, ctx)
+        x = backward_gradient_normalization(x)
         x = self.decode_block_02(x, ctx)
+        x = backward_gradient_normalization(x)
         x = self.decode_block_01(x, ctx)
+        x = backward_gradient_normalization(x)
 
         # Block out
         x = self.block_out_norm(x)
+        x = backward_gradient_normalization(x)
         x = self.block_out_conv(x, ctx)
+        x = backward_gradient_normalization(x)
         x = torch.nn.functional.sigmoid(x)
 
         return x
@@ -434,12 +448,7 @@ def train(
         accumulation_step = accumulation_step + 1
         decoded = model(sample, batch_ids)
 
-        loss_base_targets = F.log_softmax(sample.flatten(1), dim=-1)
-        loss_base_decoded = F.log_softmax(decoded.flatten(1), dim=-1)
-        loss_current_step = F.kl_div(loss_base_decoded, loss_base_targets, reduction="none", log_target=True)
-        loss_current_step = loss_current_step.sum().div(loss_current_step.shape[0])
-
-        # loss_current_step = mean_proportional_error(decoded, sample)
+        loss_current_step = log_proportional_error(decoded, sample)
 
         loss_logging_accumulator.append(loss_current_step.detach().item())
         loss_total = loss_current_step / grad_accumulation_steps
@@ -471,6 +480,15 @@ def train(
                         f"LR: {optimizer.param_groups[0]['lr']:.10f}",
                         f"Loss current: {loss_current_step.item()}",
                         f"Loss mean: {(sum(loss_logging_accumulator)/len(loss_logging_accumulator)):.5f}",
+                        "Weigths:",
+                        f"{model.data_cache_ctx.abs().mean().tolist()=}",
+                        f"{model.block_input_x_conv.weights_lib.weights_static.abs().mean().tolist()=}",
+                        f"{model.block_input_x_conv.weights_lib.weights_mod.abs().mean().tolist()=}",
+                        f"{model.encode_block_01.coder_block_conv_small.weights_lib.weights_static.abs().mean().tolist()=}",
+                        f"{model.encode_block_01.coder_block_conv_small.weights_lib.weights_mod.abs().mean().tolist()=}",
+                        f"{model.encode_block_01.coder_block_conv_large.weights_lib.weights_static.abs().mean().tolist()=}",
+                        f"{model.encode_block_01.coder_block_conv_large.weights_lib.weights_mod.abs().mean().tolist()=}",
+                        "Grads:",
                         f"{model.data_cache_ctx.grad.abs().mean().tolist()=}",
                         f"{model.block_input_x_conv.weights_lib.weights_static.grad.abs().mean().tolist()=}",
                         f"{model.block_input_x_conv.weights_lib.weights_mod.grad.abs().mean().tolist()=}",
@@ -478,6 +496,20 @@ def train(
                         f"{model.encode_block_01.coder_block_conv_small.weights_lib.weights_mod.grad.abs().mean().tolist()=}",
                         f"{model.encode_block_01.coder_block_conv_large.weights_lib.weights_static.grad.abs().mean().tolist()=}",
                         f"{model.encode_block_01.coder_block_conv_large.weights_lib.weights_mod.grad.abs().mean().tolist()=}",
+                        "Grads in depth:",
+                        f"{model.encode_block_01.coder_block_conv_large.weights_lib.weights_mod.grad.abs().mean().tolist()=}",
+                        f"{model.encode_block_02.coder_block_conv_large.weights_lib.weights_mod.grad.abs().mean().tolist()=}",
+                        f"{model.encode_block_03.coder_block_conv_large.weights_lib.weights_mod.grad.abs().mean().tolist()=}",
+                        f"{model.encode_block_04.coder_block_conv_large.weights_lib.weights_mod.grad.abs().mean().tolist()=}",
+                        f"{model.encode_block_05.coder_block_conv_large.weights_lib.weights_mod.grad.abs().mean().tolist()=}",
+                        f"{model.decode_block_05.coder_block_conv_large.weights_lib.weights_mod.grad.abs().mean().tolist()=}",
+                        f"{model.decode_block_04.coder_block_conv_large.weights_lib.weights_mod.grad.abs().mean().tolist()=}",
+                        f"{model.decode_block_03.coder_block_conv_large.weights_lib.weights_mod.grad.abs().mean().tolist()=}",
+                        f"{model.decode_block_02.coder_block_conv_large.weights_lib.weights_mod.grad.abs().mean().tolist()=}",
+                        f"{model.decode_block_01.coder_block_conv_large.weights_lib.weights_mod.grad.abs().mean().tolist()=}",
+                        "Grads I/O:",
+                        f"{model.block_input_x_conv.weights_lib.weights_mod.grad.abs().mean().tolist()=}",
+                        f"    {model.block_out_conv.weights_lib.weights_mod.grad.abs().mean().tolist()=}",
                     ]
                 )
             )
@@ -775,8 +807,8 @@ def clear() -> None:
 if __name__ == "__main__":
     train_mode = True
 
-    load_model = True
-    load_optim = True
+    load_model = False
+    load_optim = False
     drop_ctx_cache = False
     onload_model_fn = [
         # model_constant_ctx,
@@ -847,7 +879,7 @@ if __name__ == "__main__":
     bnb_adamw8bit_betas=(0.9, 0.999)
     bnb_adamw8bit_eps=1e-8
     bnb_adamw8bit_weight_decay=1e-2
-    bnb_adamw8bit_amsgrad=True
+    bnb_adamw8bit_amsgrad=False
     bnb_adamw8bit_optim_bits=8
     bnb_adamw8bit_min_8bit_size=4096
     bnb_adamw8bit_percentile_clipping=100
@@ -858,26 +890,26 @@ if __name__ == "__main__":
     optim_target_lr = 1.0e-3
     optim_update_wd = False
     optim_target_wd = 0.1
-    warmup_active = False
-    warmup_epochs = 1024
+    warmup_active = True
+    warmup_epochs = 512
     clip_grad_value = None
-    clip_grad_norm = 1.0
+    clip_grad_norm = 100.0
 
-    data_cache_ctx_bound = [-1.0e-4, +1.0e-4]
+    data_cache_ctx_bound = [-1.0e-2, +1.0e-2]
 
-    nelements = 32 * 128
+    nelements = 192 * 16 # 3072
     data_cache_ctx_len = nelements
     data_cache_ctx_shape = [128]
 
     total_steps = 200_000
-    batch_size = 32
+    batch_size = 192
     grad_accumulation_steps = nelements // batch_size
 
     images_sample_count = nelements
     starting_from = 1024 * 0
     images_path_src = "f:\\git_AIResearch\\dyna\\data\\img_src_1"
     images_path_dst = "f:\\git_AIResearch\\dyna\\data\\img_dst_1"
-    output_shape = [512, 512]
+    output_shape = [256, 256]
     dtype_weights = torch.bfloat16
     device = torch.device("cuda")
 

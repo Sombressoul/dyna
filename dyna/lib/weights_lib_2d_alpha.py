@@ -3,6 +3,8 @@ import torch.nn as nn
 
 from typing import Union, List
 
+from dyna.functional import backward_gradient_normalization
+
 
 class WeightsLib2DAlpha(nn.Module):
     def __init__(
@@ -128,9 +130,11 @@ class WeightsLib2DAlpha(nn.Module):
 
         x_transformed = self.context_transform(x)
         x_gate = self.context_transform_gate(x)
+        x_gate = backward_gradient_normalization(x_gate)
         x_gate = x_gate * torch.nn.functional.sigmoid(x_gate)
         mod = x_transformed * x_gate
         mod = mod.reshape([mod.shape[0], 4, -1]) # split into meaningful components
+        mod = backward_gradient_normalization(mod)
         mod = mod / mod.abs().mean(dim=[-1]).add(self.eps).sqrt().unsqueeze(-1) # total mean sqrt norm
         mod = torch.reshape(
             input=mod,
@@ -160,20 +164,21 @@ class WeightsLib2DAlpha(nn.Module):
             ],
             dim=-1,
         )
+        mod_scaled = backward_gradient_normalization(mod_scaled)
         mod_magnitude = torch.sqrt(mod_scaled[..., 0] ** 2 + mod_scaled[..., 1] ** 2 + self.eps)
         mod_magnitude = mod_magnitude.mean(dim=[-1, -2]).add(self.eps).sqrt()
         mod_magnitude = mod_magnitude.reshape([mod_magnitude.shape[0], *[1]*len(mod_scaled.shape[1::])])
         mod_scaled = mod_scaled / mod_magnitude
         mod_weights = A[::, 0, ...] + mod_scaled
-        mod_proj = mod[::, 2::, ...].permute([0, 2, 3, 1])
 
+        mod = backward_gradient_normalization(mod)
+        mod_proj = mod[::, 2::, ...].permute([0, 2, 3, 1])
         proj_den = torch.sqrt(mod_proj[::, ..., 0] ** 2 + mod_proj[::, ..., 1] ** 2 + self.eps)
         theta_cos = mod_proj[::, ..., 0] / proj_den
         theta_sin = mod_proj[::, ..., 1] / proj_den
-        weights = (
-            mod_weights[::, ..., 0] * theta_cos + mod_weights[::, ..., 1] * theta_sin
-        )
+        weights = mod_weights[::, ..., 0] * theta_cos + mod_weights[::, ..., 1] * theta_sin
 
         x = weights if weights.dtype == input_dtype else weights.to(input_dtype)
+        x = backward_gradient_normalization(x)
 
         return x
