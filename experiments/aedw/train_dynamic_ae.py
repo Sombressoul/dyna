@@ -6,14 +6,13 @@ import torch.nn.functional as F
 import torchvision.transforms as transforms
 import pytorch_warmup as warmup
 import kornia
-import math
 import gc
 import bitsandbytes as bnb
 
 from PIL import Image
 from madgrad import MADGRAD
 
-from typing import Optional, Union, Callable, List
+from typing import Optional, Callable
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 evals_dir = os.path.dirname(script_dir)
@@ -22,9 +21,8 @@ sys.path.append(project_dir)
 
 torch.manual_seed(10056)
 
-from dyna.functional import siglog, siglog_parametric
-from dyna.lib import WeightsLib2D
-from dyna.module import DynamicConv2D, DynamicConv2DAlpha
+from dyna.functional import mean_proportional_error
+from dyna.module import DynamicConv2DAlpha
 from dyna.block import Coder2DDynamicAlpha
 
 
@@ -436,9 +434,11 @@ def train(
         accumulation_step = accumulation_step + 1
         decoded = model(sample, batch_ids)
 
-        loss_base_targets = F.log_softmax(sample.flatten(), dim=0)
-        loss_base_decoded = F.log_softmax(decoded.flatten(), dim=0)
-        loss_current_step = F.kl_div(loss_base_decoded, loss_base_targets, reduction="sum", log_target=True)
+        # loss_base_targets = F.log_softmax(sample.flatten(), dim=0)
+        # loss_base_decoded = F.log_softmax(decoded.flatten(), dim=0)
+        # loss_current_step = F.kl_div(loss_base_decoded, loss_base_targets, reduction="sum", log_target=True)
+
+        loss_current_step = mean_proportional_error(decoded, sample)
 
         loss_logging_accumulator.append(loss_current_step.detach().item())
         loss_total = loss_current_step / grad_accumulation_steps
@@ -774,7 +774,7 @@ def clear() -> None:
 if __name__ == "__main__":
     train_mode = True
 
-    load_model = False
+    load_model = True
     load_optim = False
     drop_ctx_cache = False
     onload_model_fn = [
@@ -809,10 +809,10 @@ if __name__ == "__main__":
 
     path_prefix_load = "f:\\git_AIResearch\\dyna\\data\\models"
     path_prefix_save = "f:\\git_AIResearch\\dyna\\data\\models"
-    load_path_model = f"{path_prefix_load}\\00\\model.Type-00.G00.57344.pth"
+    load_path_model = f"{path_prefix_load}\\02\\model.Type-00.G02.__LAST__.pth"
     load_path_optim = f"{path_prefix_load}\\"
-    save_path_model = f"{path_prefix_save}\\model.Type-00.G01"
-    save_path_optim = f"{path_prefix_save}\\optim.Type-00.G01"
+    save_path_model = f"{path_prefix_save}\\model.Type-00.G03"
+    save_path_optim = f"{path_prefix_save}\\optim.Type-00.G03"
     save_model = True
     save_optim = True
     save_nth_iteration = 8192
@@ -857,7 +857,7 @@ if __name__ == "__main__":
     optim_target_lr = 1.0e-3
     optim_update_wd = False
     optim_target_wd = 0.1
-    warmup_active = True
+    warmup_active = False
     warmup_epochs = 1024
     clip_grad_value = 1.0
     clip_grad_norm = 1.0
