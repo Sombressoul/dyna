@@ -28,25 +28,25 @@ class MeanProportionalError(torch.autograd.Function):
         (x, x_shape, y, y_shape, eps) = ctx.saved_tensors
         x, y = x.flatten(), y.flatten()
 
-        # # Exact solution leads to grad explosion on small differences or near-zero values:
-        # N = x.numel()
-        # sign = torch.sign((x - y) / (y + eps))
-        # dx = sign / (y + eps) / N
-        # dy = -sign * x / (y + eps)**2 / N
-
-        # Some kind of workaround...
+        # Exact solution leads to grad explosion on small differences or near-zero values:
         N = x.numel()
-        diff = x - y
-        safe_sign = diff / torch.sqrt(diff**2 + eps)
-        dx = safe_sign / (y + eps) / N
-        dy = -safe_sign * x / ((y + eps)**2 + eps) / N
+        sign = torch.sign((x - y) / (y + eps))
+        dx = sign / (y + eps) / N
+        dy = -sign * x / (y + eps)**2 / N
 
-        sign = lambda sign_x: torch.where(sign_x > 0.0, +1.0, -1.0).to(
-            dtype=sign_x.dtype,
-            device=sign_x.device,
-        )
-        dx = (torch.log(dx.abs() + torch.e + eps) - 1.0) * sign(dx)
-        dy = (torch.log(dy.abs() + torch.e + eps) - 1.0) * sign(dy)
+        # # Some kind of workaround...
+        # N = x.numel()
+        # diff = x - y
+        # safe_sign = diff / torch.sqrt(diff**2 + eps)
+        # dx = safe_sign / (y + eps) / N
+        # dy = -safe_sign * x / ((y + eps)**2 + eps) / N
+
+        # sign = lambda sign_x: torch.where(sign_x > 0.0, +1.0, -1.0).to(
+        #     dtype=sign_x.dtype,
+        #     device=sign_x.device,
+        # )
+        # dx = (torch.log(dx.abs() + torch.e + eps) - 1.0) * sign(dx)
+        # dy = (torch.log(dy.abs() + torch.e + eps) - 1.0) * sign(dy)
 
         dx = dx.reshape(x_shape.tolist())
         dy = dy.reshape(y_shape.tolist())
