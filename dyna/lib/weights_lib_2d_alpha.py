@@ -11,7 +11,7 @@ class WeightsLib2DAlpha(nn.Module):
         context_length: int,
         context_rank: int = 4,
         context_use_bias: bool = False,
-        eps: float = 1.0e-5,
+        eps: float = 1.0e-4,
         dtype_weights: torch.dtype = torch.bfloat16,
     ) -> None:
         super().__init__()
@@ -108,6 +108,16 @@ class WeightsLib2DAlpha(nn.Module):
                 ),
             ).contiguous(),
         )
+        self.mod_convolution = nn.Conv2d(
+            in_channels=self.context_rank,
+            out_channels=self.context_rank,
+            kernel_size=[1, 1],
+            stride=[1, 1],
+            padding=[0, 0],
+            dilation=[1, 1],
+            bias=True,
+            dtype=self.dtype_weights,
+        )
 
         pass
 
@@ -124,7 +134,7 @@ class WeightsLib2DAlpha(nn.Module):
         x_gate = x_gate * torch.nn.functional.sigmoid(x_gate)
         mod = x_transformed * x_gate
         mod = mod.reshape([mod.shape[0], 4, -1]) # split into meaningful components
-        mod = mod / mod.abs().mean(dim=[-1]).sqrt().unsqueeze(-1) # total mean sqrt norm
+        mod = mod / mod.abs().mean(dim=[-1]).add(self.eps).sqrt().unsqueeze(-1) # total mean sqrt norm
         mod = torch.reshape(
             input=mod,
             shape=[
@@ -134,11 +144,15 @@ class WeightsLib2DAlpha(nn.Module):
                 self.output_shape[0] + self.output_shape[1],
             ],
         )
-        mod = self.weights_mod * torch.einsum(
-            "...ri,...rj -> ...ij", 
+        mod = torch.einsum(
+            "...ri,...rj -> ...rij", 
             mod[..., 0:self.output_shape[0]], 
             mod[..., self.output_shape[0]::],
         )
+        mod = mod.reshape([mod.shape[0] * 4, self.context_rank, *self.output_shape])
+        mod = self.mod_convolution(mod).sum(dim=-3)
+        mod = mod.reshape([mod.shape[0] // 4, 4, *self.output_shape])
+        mod = self.weights_mod * mod
 
         A = self.weights_static.unsqueeze(0).repeat([mod.shape[0], 1, *[1]*(len(mod.shape)-1)])
         B = mod[::, 0:2:, ...].permute([0, 2, 3, 1])
@@ -149,9 +163,10 @@ class WeightsLib2DAlpha(nn.Module):
             ],
             dim=-1,
         )
-        mod_scaled_norm = torch.sqrt(mod_scaled[..., 0] ** 2 + mod_scaled[..., 1] ** 2 + self.eps).flatten(1).mean(dim=[-1]).sqrt()
-        mod_scaled_norm = mod_scaled_norm.reshape([mod_scaled_norm.shape[0], *[1]*len(mod_scaled.shape[1::])])
-        mod_scaled = mod_scaled / mod_scaled_norm
+        mod_magnitude = torch.sqrt(mod_scaled[..., 0] ** 2 + mod_scaled[..., 1] ** 2 + self.eps)
+        mod_magnitude = mod_magnitude.mean(dim=[-1, -2]).add(self.eps).sqrt()
+        mod_magnitude = mod_magnitude.reshape([mod_magnitude.shape[0], *[1]*len(mod_scaled.shape[1::])])
+        mod_scaled = mod_scaled / mod_magnitude
         mod_weights = A[::, 0, ...] + mod_scaled
         mod_proj = mod[::, 2::, ...].permute([0, 2, 3, 1])
 
