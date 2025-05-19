@@ -859,7 +859,7 @@ if __name__ == "__main__":
     optim_target_wd = 0.1
     warmup_active = False
     warmup_epochs = 1024
-    clip_grad_value = 1.0
+    clip_grad_value = None
     clip_grad_norm = 1.0
 
     data_cache_ctx_bound = [-1.0e-4, +1.0e-4]
