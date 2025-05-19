@@ -434,11 +434,12 @@ def train(
         accumulation_step = accumulation_step + 1
         decoded = model(sample, batch_ids)
 
-        # loss_base_targets = F.log_softmax(sample.flatten(), dim=0)
-        # loss_base_decoded = F.log_softmax(decoded.flatten(), dim=0)
-        # loss_current_step = F.kl_div(loss_base_decoded, loss_base_targets, reduction="sum", log_target=True)
+        loss_base_targets = F.log_softmax(sample.flatten(1), dim=-1)
+        loss_base_decoded = F.log_softmax(decoded.flatten(1), dim=-1)
+        loss_current_step = F.kl_div(loss_base_decoded, loss_base_targets, reduction="none", log_target=True)
+        loss_current_step = loss_current_step.sum().div(loss_current_step.shape[0])
 
-        loss_current_step = mean_proportional_error(decoded, sample)
+        # loss_current_step = mean_proportional_error(decoded, sample)
 
         loss_logging_accumulator.append(loss_current_step.detach().item())
         loss_total = loss_current_step / grad_accumulation_steps
@@ -775,7 +776,7 @@ if __name__ == "__main__":
     train_mode = True
 
     load_model = True
-    load_optim = False
+    load_optim = True
     drop_ctx_cache = False
     onload_model_fn = [
         # model_constant_ctx,
@@ -810,7 +811,7 @@ if __name__ == "__main__":
     path_prefix_load = "f:\\git_AIResearch\\dyna\\data\\models"
     path_prefix_save = "f:\\git_AIResearch\\dyna\\data\\models"
     load_path_model = f"{path_prefix_load}\\02\\model.Type-00.G02.__LAST__.pth"
-    load_path_optim = f"{path_prefix_load}\\"
+    load_path_optim = f"{path_prefix_load}\\02\\optim.Type-00.G02.__LAST__.pth"
     save_path_model = f"{path_prefix_save}\\model.Type-00.G03"
     save_path_optim = f"{path_prefix_save}\\optim.Type-00.G03"
     save_model = True
