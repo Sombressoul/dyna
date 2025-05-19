@@ -41,7 +41,7 @@ class WeightsLib2DAlpha(nn.Module):
                 [
                     torch.cat(
                         [
-                            torch.nn.init.kaiming_uniform_(
+                            torch.nn.init.xavier_uniform_(
                                 tensor=torch.empty(
                                     [
                                         1, # base real
@@ -51,7 +51,7 @@ class WeightsLib2DAlpha(nn.Module):
                                     dtype=self.dtype_weights,
                                 ),
                             ),
-                            torch.nn.init.kaiming_uniform_(
+                            torch.nn.init.xavier_uniform_(
                                 tensor=torch.empty(
                                     [
                                         1, # base imag
@@ -66,7 +66,7 @@ class WeightsLib2DAlpha(nn.Module):
                     ),
                     torch.cat(
                         [
-                            torch.nn.init.uniform_(
+                            torch.nn.init.xavier_uniform_(
                                 tensor=torch.empty(
                                     [
                                         1, # scale real
@@ -75,10 +75,8 @@ class WeightsLib2DAlpha(nn.Module):
                                     ],
                                     dtype=self.dtype_weights,
                                 ),
-                                a=+self.eps - 1.0,
-                                b=-self.eps + 1.0,
                             ),
-                            torch.nn.init.uniform_(
+                            torch.nn.init.xavier_uniform_(
                                 tensor=torch.empty(
                                     [
                                         1, # scale imag
@@ -87,8 +85,6 @@ class WeightsLib2DAlpha(nn.Module):
                                     ],
                                     dtype=self.dtype_weights,
                                 ),
-                                a=-self.eps,
-                                b=+self.eps,
                             ),
                         ],
                         dim=-1,
