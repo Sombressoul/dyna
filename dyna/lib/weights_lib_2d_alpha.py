@@ -110,7 +110,7 @@ class WeightsLib2DAlpha(nn.Module):
         )
         self.mod_convolution = nn.Conv2d(
             in_channels=self.context_rank,
-            out_channels=self.context_rank,
+            out_channels=1,
             kernel_size=[1, 1],
             stride=[1, 1],
             padding=[0, 0],
@@ -125,7 +125,6 @@ class WeightsLib2DAlpha(nn.Module):
         self,
         x: torch.Tensor,
     ) -> torch.Tensor:
-        
         input_dtype = x.dtype
         x = x if x.dtype == self.dtype_weights else x.to(self.dtype_weights)
 
@@ -150,7 +149,7 @@ class WeightsLib2DAlpha(nn.Module):
             mod[..., self.output_shape[0]::],
         )
         mod = mod.reshape([mod.shape[0] * 4, self.context_rank, *self.output_shape])
-        mod = self.mod_convolution(mod).sum(dim=-3)
+        mod = self.mod_convolution(mod)
         mod = mod.reshape([mod.shape[0] // 4, 4, *self.output_shape])
         mod = self.weights_mod * mod
 
