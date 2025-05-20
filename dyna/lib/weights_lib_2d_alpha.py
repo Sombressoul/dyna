@@ -45,7 +45,7 @@ class WeightsLib2DAlpha(nn.Module):
                 [
                     torch.cat(
                         [
-                            torch.nn.init.xavier_uniform_(
+                            torch.nn.init.normal_(
                                 tensor=torch.empty(
                                     [
                                         1, # base real
@@ -54,8 +54,10 @@ class WeightsLib2DAlpha(nn.Module):
                                     ],
                                     dtype=self.dtype_weights,
                                 ),
+                                mean=0.0,
+                                std=self.eps,
                             ),
-                            torch.nn.init.xavier_uniform_(
+                            torch.nn.init.normal_(
                                 tensor=torch.empty(
                                     [
                                         1, # base imag
@@ -64,13 +66,15 @@ class WeightsLib2DAlpha(nn.Module):
                                     ],
                                     dtype=self.dtype_weights,
                                 ),
+                                mean=0.0,
+                                std=self.eps,
                             ),
                         ],
                         dim=-1
                     ),
                     torch.cat(
                         [
-                            torch.nn.init.xavier_uniform_(
+                            torch.nn.init.normal_(
                                 tensor=torch.empty(
                                     [
                                         1, # scale real
@@ -79,8 +83,10 @@ class WeightsLib2DAlpha(nn.Module):
                                     ],
                                     dtype=self.dtype_weights,
                                 ),
+                                mean=1.0,
+                                std=self.eps,
                             ),
-                            torch.nn.init.xavier_uniform_(
+                            torch.nn.init.normal_(
                                 tensor=torch.empty(
                                     [
                                         1, # scale imag
@@ -89,6 +95,8 @@ class WeightsLib2DAlpha(nn.Module):
                                     ],
                                     dtype=self.dtype_weights,
                                 ),
+                                mean=0.0,
+                                std=self.eps,
                             ),
                         ],
                         dim=-1,
@@ -98,7 +106,7 @@ class WeightsLib2DAlpha(nn.Module):
             ).contiguous()
         )
         self.weights_mod = nn.Parameter(
-            data=torch.nn.init.xavier_uniform_(
+            data=torch.nn.init.normal_(
                 tensor=torch.empty(
                     [
                         4, # 4 - real, imag, proj a, proj b
@@ -106,6 +114,8 @@ class WeightsLib2DAlpha(nn.Module):
                     ],
                     dtype=self.dtype_weights,
                 ),
+                mean=0.0,
+                std=self.eps,
             ).contiguous(),
         )
         self.mod_convolution = nn.Conv2d(
@@ -116,6 +126,13 @@ class WeightsLib2DAlpha(nn.Module):
             padding=[0, 0],
             dilation=[1, 1],
             bias=self.context_conv_use_bias,
+            dtype=self.dtype_weights,
+        )
+        self.mod_norm = nn.BatchNorm2d(
+            num_features=4,
+            eps=self.eps,
+            momentum=0.1,
+            affine=True,
             dtype=self.dtype_weights,
         )
 
@@ -153,9 +170,10 @@ class WeightsLib2DAlpha(nn.Module):
         mod = mod.reshape([mod.shape[0] * 4, self.context_rank, *self.output_shape])
         mod = self.mod_convolution(mod)
         mod = backward_gradient_normalization(mod)
-        mod = torch.tanh(mod).sum(dim=-3)
+        mod = torch.tanh(mod).mul(2.0).sum(dim=-3)
         mod = mod.reshape([mod.shape[0] // 4, 4, *self.output_shape])
         mod = self.weights_mod * mod
+        mod = self.mod_norm(mod)
 
         A = self.weights_static.unsqueeze(0).repeat([mod.shape[0], 1, *[1]*(len(mod.shape)-1)])
         B = mod[::, 0:2:, ...].permute([0, 2, 3, 1])
