@@ -58,6 +58,9 @@ class DecoderOnlyModel(nn.Module):
         self.kernel_size_c_lrg = [5, 5]
         self.kernel_size_c_refine = [3, 3]
 
+        self.dynconv_context_use_bias = True
+        self.dynconv_context_conv_use_bias = True
+
         self.dtype_weights = dtype_weights
 
         # ====> Block: data cache
@@ -78,7 +81,8 @@ class DecoderOnlyModel(nn.Module):
             out_channels=self.encoder_channels_conv,
             context_length=self.context_length,
             context_rank=self.context_rank,
-            context_use_bias=False,
+            context_use_bias=self.dynconv_context_use_bias,
+            context_conv_use_bias=self.dynconv_context_conv_use_bias,
             kernel_size=[1, 1],
             stride=[1, 1],
             padding=[0, 0, 0, 0],
@@ -98,6 +102,8 @@ class DecoderOnlyModel(nn.Module):
         self.encode_block_01 = Coder2DDynamicAlpha(
             context_length=self.context_length,
             context_rank=self.context_rank,
+            context_use_bias=self.dynconv_context_use_bias,
+            context_conv_use_bias=self.dynconv_context_conv_use_bias,
             conv_channels_in=self.encoder_channels_conv,
             conv_channels_out=self.encoder_channels_conv,
             conv_channels_intermediate=self.encoder_channels_contextual,
@@ -112,6 +118,8 @@ class DecoderOnlyModel(nn.Module):
         self.encode_block_02 = Coder2DDynamicAlpha(
             context_length=self.context_length,
             context_rank=self.context_rank,
+            context_use_bias=self.dynconv_context_use_bias,
+            context_conv_use_bias=self.dynconv_context_conv_use_bias,
             conv_channels_in=self.encoder_channels_conv,
             conv_channels_out=self.encoder_channels_conv,
             conv_channels_intermediate=self.encoder_channels_contextual,
@@ -126,6 +134,8 @@ class DecoderOnlyModel(nn.Module):
         self.encode_block_03 = Coder2DDynamicAlpha(
             context_length=self.context_length,
             context_rank=self.context_rank,
+            context_use_bias=self.dynconv_context_use_bias,
+            context_conv_use_bias=self.dynconv_context_conv_use_bias,
             conv_channels_in=self.encoder_channels_conv,
             conv_channels_out=self.encoder_channels_conv,
             conv_channels_intermediate=self.encoder_channels_contextual,
@@ -140,6 +150,8 @@ class DecoderOnlyModel(nn.Module):
         self.encode_block_04 = Coder2DDynamicAlpha(
             context_length=self.context_length,
             context_rank=self.context_rank,
+            context_use_bias=self.dynconv_context_use_bias,
+            context_conv_use_bias=self.dynconv_context_conv_use_bias,
             conv_channels_in=self.encoder_channels_conv,
             conv_channels_out=self.encoder_channels_conv,
             conv_channels_intermediate=self.encoder_channels_contextual,
@@ -154,6 +166,8 @@ class DecoderOnlyModel(nn.Module):
         self.encode_block_05 = Coder2DDynamicAlpha(
             context_length=self.context_length,
             context_rank=self.context_rank,
+            context_use_bias=self.dynconv_context_use_bias,
+            context_conv_use_bias=self.dynconv_context_conv_use_bias,
             conv_channels_in=self.encoder_channels_conv,
             conv_channels_out=self.encoder_channels_out,
             conv_channels_intermediate=self.encoder_channels_contextual,
@@ -168,6 +182,8 @@ class DecoderOnlyModel(nn.Module):
         self.decode_block_05 = Coder2DDynamicAlpha(
             context_length=self.context_length,
             context_rank=self.context_rank,
+            context_use_bias=self.dynconv_context_use_bias,
+            context_conv_use_bias=self.dynconv_context_conv_use_bias,
             conv_channels_in=self.decoder_channels_in,
             conv_channels_out=self.decoder_channels_conv,
             conv_channels_intermediate=self.decoder_channels_contextual,
@@ -182,6 +198,8 @@ class DecoderOnlyModel(nn.Module):
         self.decode_block_04 = Coder2DDynamicAlpha(
             context_length=self.context_length,
             context_rank=self.context_rank,
+            context_use_bias=self.dynconv_context_use_bias,
+            context_conv_use_bias=self.dynconv_context_conv_use_bias,
             conv_channels_in=self.decoder_channels_conv,
             conv_channels_out=self.decoder_channels_conv,
             conv_channels_intermediate=self.decoder_channels_contextual,
@@ -196,6 +214,8 @@ class DecoderOnlyModel(nn.Module):
         self.decode_block_03 = Coder2DDynamicAlpha(
             context_length=self.context_length,
             context_rank=self.context_rank,
+            context_use_bias=self.dynconv_context_use_bias,
+            context_conv_use_bias=self.dynconv_context_conv_use_bias,
             conv_channels_in=self.decoder_channels_conv,
             conv_channels_out=self.decoder_channels_conv,
             conv_channels_intermediate=self.decoder_channels_contextual,
@@ -210,6 +230,8 @@ class DecoderOnlyModel(nn.Module):
         self.decode_block_02 = Coder2DDynamicAlpha(
             context_length=self.context_length,
             context_rank=self.context_rank,
+            context_use_bias=self.dynconv_context_use_bias,
+            context_conv_use_bias=self.dynconv_context_conv_use_bias,
             conv_channels_in=self.decoder_channels_conv,
             conv_channels_out=self.decoder_channels_conv,
             conv_channels_intermediate=self.decoder_channels_contextual,
@@ -224,6 +246,8 @@ class DecoderOnlyModel(nn.Module):
         self.decode_block_01 = Coder2DDynamicAlpha(
             context_length=self.context_length,
             context_rank=self.context_rank,
+            context_use_bias=self.dynconv_context_use_bias,
+            context_conv_use_bias=self.dynconv_context_conv_use_bias,
             conv_channels_in=self.decoder_channels_conv,
             conv_channels_out=self.decoder_channels_conv,
             conv_channels_intermediate=self.decoder_channels_contextual,
@@ -247,7 +271,8 @@ class DecoderOnlyModel(nn.Module):
             out_channels=self.decoder_channels_out,
             context_length=self.context_length,
             context_rank=self.context_rank,
-            context_use_bias=False,
+            context_use_bias=self.dynconv_context_use_bias,
+            context_conv_use_bias=self.dynconv_context_conv_use_bias,
             kernel_size=[1, 1],
             stride=[1, 1],
             padding=[0, 0, 0, 0],
@@ -270,6 +295,8 @@ class DecoderOnlyModel(nn.Module):
         ctx = base_ctx
 
         # Block input
+        x = backward_gradient_normalization(x)
+        ctx = backward_gradient_normalization(ctx)
         x = self.block_input_x_conv(x, ctx)
         x = backward_gradient_normalization(x)
         ctx = backward_gradient_normalization(ctx)
@@ -521,6 +548,9 @@ def train(
                 prefix=f"output_e{epoch_idx:0>4d}_i{(step_idx+1):0>7d}",
             )
 
+        if accumulation_step == grad_accumulation_steps:
+            optimizer.zero_grad()
+
         if (step_idx + 1) % save_nth_iteration == 0:
             for j, saver in enumerate(savers):
                 if to_save[j]:
@@ -540,9 +570,6 @@ def train(
         except NameError:
             loss_base_targets = None
         
-        if accumulation_step == grad_accumulation_steps:
-            optimizer.zero_grad()
-
     print("\n# --------------------------------------------------- #\n")
 
     generate_images_from_data(
@@ -842,13 +869,13 @@ if __name__ == "__main__":
 
     path_prefix_load = "f:\\git_AIResearch\\dyna\\data\\models"
     path_prefix_save = "f:\\git_AIResearch\\dyna\\data\\models"
-    load_path_model = f"{path_prefix_load}\\02\\model.Type-00.G02.__LAST__.pth"
-    load_path_optim = f"{path_prefix_load}\\02\\optim.Type-00.G02.__LAST__.pth"
-    save_path_model = f"{path_prefix_save}\\model.Type-00.G03"
-    save_path_optim = f"{path_prefix_save}\\optim.Type-00.G03"
+    load_path_model = f"{path_prefix_load}\\00\\model.Type-00.G00.__LAST__.pth"
+    load_path_optim = f"{path_prefix_load}\\00\\optim.Type-00.G00.__LAST__.pth"
+    save_path_model = f"{path_prefix_save}\\model.Type-00.G01"
+    save_path_optim = f"{path_prefix_save}\\optim.Type-00.G01"
     save_model = True
     save_optim = True
-    save_nth_iteration = 8192
+    save_nth_iteration = 1024
     log_nth_update_step = 1
 
     # optimizer type
@@ -875,7 +902,7 @@ if __name__ == "__main__":
     madgrad_weight_decay = 0.0
     madgrad_eps = 1.0e-6
     # optimizer: bnb.optim.AdamW8bit
-    bnb_adamw8bit_lr=1e-3
+    bnb_adamw8bit_lr=5.0e-7
     bnb_adamw8bit_betas=(0.9, 0.999)
     bnb_adamw8bit_eps=1e-8
     bnb_adamw8bit_weight_decay=1e-2
@@ -893,23 +920,23 @@ if __name__ == "__main__":
     warmup_active = True
     warmup_epochs = 512
     clip_grad_value = None
-    clip_grad_norm = 100.0
+    clip_grad_norm = 1.0
 
-    data_cache_ctx_bound = [-1.0e-2, +1.0e-2]
+    data_cache_ctx_bound = [-1.0e-5, +1.0e-5]
 
-    nelements = 192 * 16 # 3072
+    nelements = 64 * 64 # = 4096
     data_cache_ctx_len = nelements
     data_cache_ctx_shape = [128]
 
     total_steps = 200_000
-    batch_size = 192
+    batch_size = 64
     grad_accumulation_steps = nelements // batch_size
 
     images_sample_count = nelements
     starting_from = 1024 * 0
     images_path_src = "f:\\git_AIResearch\\dyna\\data\\img_src_1"
     images_path_dst = "f:\\git_AIResearch\\dyna\\data\\img_dst_1"
-    output_shape = [256, 256]
+    output_shape = [512, 512]
     dtype_weights = torch.bfloat16
     device = torch.device("cuda")
 
