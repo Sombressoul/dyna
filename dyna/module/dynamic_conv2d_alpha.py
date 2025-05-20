@@ -23,6 +23,7 @@ class DynamicConv2DAlpha(nn.Module):
         context_length: int,
         context_rank: int,
         context_use_bias: bool = False,
+        context_conv_use_bias: bool = False,
         kernel_size: Union[int, List[int]] = [3, 3],
         stride: Union[int, List[int]] = [1, 1],
         padding: Union[int, List[int]] = [0, 0, 0, 0],
@@ -103,6 +104,7 @@ class DynamicConv2DAlpha(nn.Module):
         self.context_length = context_length
         self.context_rank = context_rank
         self.context_use_bias = context_use_bias
+        self.context_conv_use_bias = context_conv_use_bias
         self.kernel_size = kernel_size
         self.stride = stride
         self.padding = padding
@@ -146,6 +148,7 @@ class DynamicConv2DAlpha(nn.Module):
             context_length=self.context_length,
             context_rank=self.context_rank,
             context_use_bias=self.context_use_bias,
+            context_conv_use_bias=self.context_conv_use_bias,
             dtype_weights=self.dtype_weights,
         )
         self.padding_dynamic_value = (

@@ -3,7 +3,7 @@ import torch.nn as nn
 
 from typing import Union, List, Callable
 
-from dyna.functional import siglog
+from dyna.functional import backward_gradient_normalization
 from dyna.module.dynamic_conv2d_alpha import DynamicConv2DAlpha
 
 
@@ -18,6 +18,7 @@ class Coder2DDynamicAlpha(nn.Module):
         conv_channels_intermediate: int,
         # Defaults:
         context_use_bias: bool = False,
+        context_conv_use_bias: bool = False,
         conv_kernel_small: Union[int, List[int]] = [3, 3],
         conv_kernel_large: Union[int, List[int]] = [5, 5],
         conv_kernel_refine: Union[int, List[int]] = [3, 3],
@@ -30,7 +31,7 @@ class Coder2DDynamicAlpha(nn.Module):
         batch_norm_affine: bool = True,
         batch_norm_momentum: float = 1.0e-1,
         # Additional:
-        activation_internal: Callable = siglog,
+        activation_internal: Callable = torch.tanh,
         eps: float = 1.0e-5,
         dtype_weights: torch.dtype = torch.float32,
     ) -> None:
@@ -60,6 +61,7 @@ class Coder2DDynamicAlpha(nn.Module):
         assert type(conv_channels_intermediate) == int, f"conv_channels_intermediate should be an integer. {var_info(conv_channels_intermediate)}"
         assert conv_channels_intermediate > 0, f"conv_channels_intermediate should be positive. {var_info(conv_channels_intermediate)}"
         assert type(context_use_bias) == bool, f"context_use_bias should be a boolean. {var_info(context_use_bias)}"
+        assert type(context_conv_use_bias) == bool, f"context_convolution_use_bias should be a boolean. {var_info(context_conv_use_bias)}"
         assert type(conv_padding_mode) == str, f"conv_padding_mode should be a string. {var_info(conv_padding_mode)}"
         assert conv_padding_mode in modes_padding, f"conv_padding_mode should be one of: {modes_padding}. {var_info(conv_padding_mode)}"
         assert type(conv_padding_value) in [int, float], f"conv_padding_value should be an integer or a float. {var_info(conv_padding_mode)}"
@@ -92,6 +94,7 @@ class Coder2DDynamicAlpha(nn.Module):
         self.conv_channels_out = conv_channels_out
         self.conv_channels_intermediate = conv_channels_intermediate
         self.context_use_bias = context_use_bias
+        self.context_conv_use_bias = context_conv_use_bias
         self.conv_kernel_small = kernel_format(conv_kernel_small)
         self.conv_kernel_large = kernel_format(conv_kernel_large)
         self.conv_kernel_refine = kernel_format(conv_kernel_refine)
@@ -128,6 +131,7 @@ class Coder2DDynamicAlpha(nn.Module):
             context_length=self.context_length,
             context_rank=self.context_rank,
             context_use_bias=self.context_use_bias,
+            context_conv_use_bias=self.context_conv_use_bias,
             kernel_size=self.conv_kernel_small,
             stride=[1, 1],
             padding=[0, 0, 0, 0],
@@ -142,6 +146,7 @@ class Coder2DDynamicAlpha(nn.Module):
             context_length=self.context_length,
             context_rank=self.context_rank,
             context_use_bias=self.context_use_bias,
+            context_conv_use_bias=self.context_conv_use_bias,
             kernel_size=self.conv_kernel_large,
             stride=[1, 1],
             padding=[0, 0, 0, 0],
@@ -156,6 +161,7 @@ class Coder2DDynamicAlpha(nn.Module):
             context_length=self.context_length,
             context_rank=self.context_rank,
             context_use_bias=self.context_use_bias,
+            context_conv_use_bias=self.context_conv_use_bias,
             kernel_size=self.conv_kernel_refine,
             stride=[1, 1],
             padding=[0, 0, 0, 0],
@@ -209,10 +215,12 @@ class Coder2DDynamicAlpha(nn.Module):
         x_large = pad(x_large, self.conv_kernel_large)
         x_large = self.coder_block_conv_large(x_large, context)
         x_refine = torch.cat([x_small, x_large], dim=-3)
+        x_refine = backward_gradient_normalization(x_refine)
         x_refine = self.activation_internal(x_refine)
         x_refine = self.coder_block_norm_post(x_refine)
         x_refine = pad(x_refine, self.conv_kernel_refine)
         x_refine = self.coder_block_conv_refine(x_refine, context)
+        x_refine = backward_gradient_normalization(x_refine)
         x_refine = self.activation_internal(x_refine)
         x = x_refine
 

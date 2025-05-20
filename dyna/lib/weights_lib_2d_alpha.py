@@ -3,7 +3,7 @@ import torch.nn as nn
 
 from typing import Union, List
 
-from dyna.functional import backward_gradient_normalization
+from dyna.functional import siglog, backward_gradient_normalization
 
 
 class WeightsLib2DAlpha(nn.Module):
@@ -13,7 +13,7 @@ class WeightsLib2DAlpha(nn.Module):
         context_length: int,
         context_rank: int = 4,
         context_use_bias: bool = True,
-        convolution_use_bias: bool = True,
+        context_conv_use_bias: bool = True,
         eps: float = 1.0e-4,
         dtype_weights: torch.dtype = torch.bfloat16,
     ) -> None:
@@ -22,7 +22,7 @@ class WeightsLib2DAlpha(nn.Module):
         self.output_shape = output_shape
         self.context_rank = context_rank
         self.context_use_bias = context_use_bias
-        self.convolution_use_bias = convolution_use_bias
+        self.context_conv_use_bias = context_conv_use_bias
         self.eps = eps
         self.dtype_weights = dtype_weights
 
@@ -110,12 +110,12 @@ class WeightsLib2DAlpha(nn.Module):
         )
         self.mod_convolution = nn.Conv2d(
             in_channels=self.context_rank,
-            out_channels=1,
+            out_channels=self.context_rank,
             kernel_size=[1, 1],
             stride=[1, 1],
             padding=[0, 0],
             dilation=[1, 1],
-            bias=self.convolution_use_bias,
+            bias=self.context_conv_use_bias,
             dtype=self.dtype_weights,
         )
 
@@ -152,6 +152,8 @@ class WeightsLib2DAlpha(nn.Module):
         )
         mod = mod.reshape([mod.shape[0] * 4, self.context_rank, *self.output_shape])
         mod = self.mod_convolution(mod)
+        mod = backward_gradient_normalization(mod)
+        mod = torch.tanh(mod).sum(dim=-3)
         mod = mod.reshape([mod.shape[0] // 4, 4, *self.output_shape])
         mod = self.weights_mod * mod
 
