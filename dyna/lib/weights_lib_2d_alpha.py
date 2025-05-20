@@ -177,6 +177,8 @@ class WeightsLib2DAlpha(nn.Module):
 
         A = self.weights_static.unsqueeze(0).repeat([mod.shape[0], 1, *[1]*(len(mod.shape)-1)])
         B = mod[::, 0:2:, ...].permute([0, 2, 3, 1])
+        A = backward_gradient_normalization(A)
+        B = backward_gradient_normalization(B)
         mod_scaled = torch.cat(
             tensors=[
                 (A[::, 1, ..., 0] * B[..., 0] - A[::, 1, ..., 1] * B[..., 1]).unsqueeze(-1),
