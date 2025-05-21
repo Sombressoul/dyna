@@ -3,8 +3,6 @@ import torch.nn as nn
 
 from typing import Union, List
 
-from dyna.functional import siglog, backward_gradient_normalization
-
 
 class WeightsLib2DAlpha(nn.Module):
     def __init__(
@@ -14,6 +12,7 @@ class WeightsLib2DAlpha(nn.Module):
         context_rank: int = 4,
         context_use_bias: bool = True,
         context_conv_use_bias: bool = True,
+        initialization_std: float = 1.0e-6,
         eps: float = 1.0e-4,
         dtype_weights: torch.dtype = torch.bfloat16,
     ) -> None:
@@ -23,6 +22,7 @@ class WeightsLib2DAlpha(nn.Module):
         self.context_rank = context_rank
         self.context_use_bias = context_use_bias
         self.context_conv_use_bias = context_conv_use_bias
+        self.initialization_std = initialization_std
         self.eps = eps
         self.dtype_weights = dtype_weights
 
@@ -55,7 +55,7 @@ class WeightsLib2DAlpha(nn.Module):
                                     dtype=self.dtype_weights,
                                 ),
                                 mean=0.0,
-                                std=self.eps,
+                                std=self.initialization_std,
                             ),
                             torch.nn.init.normal_(
                                 tensor=torch.empty(
@@ -67,7 +67,7 @@ class WeightsLib2DAlpha(nn.Module):
                                     dtype=self.dtype_weights,
                                 ),
                                 mean=0.0,
-                                std=self.eps,
+                                std=self.initialization_std,
                             ),
                         ],
                         dim=-1
@@ -84,7 +84,7 @@ class WeightsLib2DAlpha(nn.Module):
                                     dtype=self.dtype_weights,
                                 ),
                                 mean=1.0,
-                                std=self.eps,
+                                std=self.initialization_std,
                             ),
                             torch.nn.init.normal_(
                                 tensor=torch.empty(
@@ -96,7 +96,7 @@ class WeightsLib2DAlpha(nn.Module):
                                     dtype=self.dtype_weights,
                                 ),
                                 mean=0.0,
-                                std=self.eps,
+                                std=self.initialization_std,
                             ),
                         ],
                         dim=-1,
@@ -115,7 +115,7 @@ class WeightsLib2DAlpha(nn.Module):
                     dtype=self.dtype_weights,
                 ),
                 mean=0.0,
-                std=self.eps,
+                std=self.initialization_std,
             ).contiguous(),
         )
         self.mod_convolution = nn.Conv2d(
@@ -147,11 +147,9 @@ class WeightsLib2DAlpha(nn.Module):
 
         x_transformed = self.context_transform(x)
         x_gate = self.context_transform_gate(x)
-        x_gate = backward_gradient_normalization(x_gate)
         x_gate = x_gate * torch.nn.functional.sigmoid(x_gate)
         mod = x_transformed * x_gate
         mod = mod.reshape([mod.shape[0], 4, -1]) # split into meaningful components
-        mod = backward_gradient_normalization(mod)
         mod = mod / mod.abs().mean(dim=[-1]).add(self.eps).sqrt().unsqueeze(-1) # total mean sqrt norm
         mod = torch.reshape(
             input=mod,
@@ -169,7 +167,6 @@ class WeightsLib2DAlpha(nn.Module):
         )
         mod = mod.reshape([mod.shape[0] * 4, self.context_rank, *self.output_shape])
         mod = self.mod_convolution(mod)
-        mod = backward_gradient_normalization(mod)
         mod = torch.tanh(mod).mul(2.0).sum(dim=-3)
         mod = mod.reshape([mod.shape[0] // 4, 4, *self.output_shape])
         mod = self.weights_mod * mod
@@ -177,8 +174,6 @@ class WeightsLib2DAlpha(nn.Module):
 
         A = self.weights_static.unsqueeze(0).repeat([mod.shape[0], 1, *[1]*(len(mod.shape)-1)])
         B = mod[::, 0:2:, ...].permute([0, 2, 3, 1])
-        A = backward_gradient_normalization(A)
-        B = backward_gradient_normalization(B)
         mod_scaled = torch.cat(
             tensors=[
                 (A[::, 1, ..., 0] * B[..., 0] - A[::, 1, ..., 1] * B[..., 1]).unsqueeze(-1),
@@ -186,14 +181,12 @@ class WeightsLib2DAlpha(nn.Module):
             ],
             dim=-1,
         )
-        mod_scaled = backward_gradient_normalization(mod_scaled)
         mod_magnitude = torch.sqrt(mod_scaled[..., 0] ** 2 + mod_scaled[..., 1] ** 2 + self.eps)
         mod_magnitude = mod_magnitude.mean(dim=[-1, -2]).add(self.eps).sqrt()
         mod_magnitude = mod_magnitude.reshape([mod_magnitude.shape[0], *[1]*len(mod_scaled.shape[1::])])
         mod_scaled = mod_scaled / mod_magnitude
         mod_weights = A[::, 0, ...] + mod_scaled
 
-        mod = backward_gradient_normalization(mod)
         mod_proj = mod[::, 2::, ...].permute([0, 2, 3, 1])
         proj_den = torch.sqrt(mod_proj[::, ..., 0] ** 2 + mod_proj[::, ..., 1] ** 2 + self.eps)
         theta_cos = mod_proj[::, ..., 0] / proj_den
@@ -201,6 +194,5 @@ class WeightsLib2DAlpha(nn.Module):
         weights = mod_weights[::, ..., 0] * theta_cos + mod_weights[::, ..., 1] * theta_sin
 
         x = weights if weights.dtype == input_dtype else weights.to(input_dtype)
-        x = backward_gradient_normalization(x)
 
         return x

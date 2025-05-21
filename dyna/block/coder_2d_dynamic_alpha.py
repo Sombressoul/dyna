@@ -3,7 +3,6 @@ import torch.nn as nn
 
 from typing import Union, List, Callable
 
-from dyna.functional import backward_gradient_normalization
 from dyna.module.dynamic_conv2d_alpha import DynamicConv2DAlpha
 
 
@@ -17,8 +16,8 @@ class Coder2DDynamicAlpha(nn.Module):
         conv_channels_out: int,
         conv_channels_intermediate: int,
         # Defaults:
-        context_use_bias: bool = False,
-        context_conv_use_bias: bool = False,
+        context_use_bias: bool = True,
+        context_conv_use_bias: bool = True,
         conv_kernel_small: Union[int, List[int]] = [3, 3],
         conv_kernel_large: Union[int, List[int]] = [5, 5],
         conv_kernel_refine: Union[int, List[int]] = [3, 3],
@@ -215,12 +214,10 @@ class Coder2DDynamicAlpha(nn.Module):
         x_large = pad(x_large, self.conv_kernel_large)
         x_large = self.coder_block_conv_large(x_large, context)
         x_refine = torch.cat([x_small, x_large], dim=-3)
-        x_refine = backward_gradient_normalization(x_refine)
         x_refine = self.activation_internal(x_refine)
         x_refine = self.coder_block_norm_post(x_refine)
         x_refine = pad(x_refine, self.conv_kernel_refine)
         x_refine = self.coder_block_conv_refine(x_refine, context)
-        x_refine = backward_gradient_normalization(x_refine)
         x_refine = self.activation_internal(x_refine)
         x = x_refine
 
