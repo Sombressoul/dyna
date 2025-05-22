@@ -22,8 +22,10 @@ sys.path.append(project_dir)
 torch.manual_seed(10056)
 
 from dyna.functional import log_proportional_error, backward_gradient_normalization
-from dyna.module import DynamicConv2DAlpha
-from dyna.block import Coder2DDynamicAlpha
+# from dyna.module import DynamicConv2DAlpha
+from dyna.module import DynamicConv2DBeta
+# from dyna.block import Coder2DDynamicAlpha
+from dyna.block import Coder2DDynamicBeta
 
 
 class DecoderOnlyModel(nn.Module):
@@ -58,8 +60,9 @@ class DecoderOnlyModel(nn.Module):
         self.kernel_size_c_lrg = [5, 5]
         self.kernel_size_c_refine = [3, 3]
 
-        self.dynconv_context_use_bias = True
-        self.dynconv_context_conv_use_bias = True
+        self.dynconv_context_use_bias = False
+        self.dynconv_context_conv_use_bias = False
+        self.dynconv_context_dropout_rate = 0.0
 
         self.dtype_weights = dtype_weights
 
@@ -76,14 +79,15 @@ class DecoderOnlyModel(nn.Module):
         )
 
         # ====> Block: input
-        self.block_input_x_conv = DynamicConv2DAlpha(
+        self.block_input_x_conv = DynamicConv2DBeta(
             in_channels=self.encoder_channels_in,
             out_channels=self.encoder_channels_conv,
             context_length=self.context_length,
-            context_rank=self.context_rank,
+            # context_rank=self.context_rank,
             context_use_bias=self.dynconv_context_use_bias,
-            context_conv_use_bias=self.dynconv_context_conv_use_bias,
-            kernel_size=[1, 1],
+            # context_conv_use_bias=self.dynconv_context_conv_use_bias,
+            # context_dropout_rate=self.dynconv_context_dropout_rate,
+            kernel_size=[3, 3],
             stride=[1, 1],
             padding=[0, 0, 0, 0],
             dilation=[1, 1],
@@ -99,11 +103,12 @@ class DecoderOnlyModel(nn.Module):
         )
 
         # ====> Encode block: 01
-        self.encode_block_01 = Coder2DDynamicAlpha(
+        self.encode_block_01 = Coder2DDynamicBeta(
             context_length=self.context_length,
-            context_rank=self.context_rank,
+            # context_rank=self.context_rank,
             context_use_bias=self.dynconv_context_use_bias,
-            context_conv_use_bias=self.dynconv_context_conv_use_bias,
+            # context_conv_use_bias=self.dynconv_context_conv_use_bias,
+            # context_dropout_rate=self.dynconv_context_dropout_rate,
             conv_channels_in=self.encoder_channels_conv,
             conv_channels_out=self.encoder_channels_conv,
             conv_channels_intermediate=self.encoder_channels_contextual,
@@ -111,15 +116,31 @@ class DecoderOnlyModel(nn.Module):
             conv_kernel_large=self.kernel_size_c_lrg,
             conv_kernel_refine=self.kernel_size_c_sml,
             interpolate_scale_factor=0.5,
+            dtype_weights=self.dtype_weights,
+        )
+        self.encode_block_01_enchance = Coder2DDynamicBeta(
+            context_length=self.context_length,
+            # context_rank=self.context_rank,
+            context_use_bias=self.dynconv_context_use_bias,
+            # context_conv_use_bias=self.dynconv_context_conv_use_bias,
+            # context_dropout_rate=self.dynconv_context_dropout_rate,
+            conv_channels_in=self.encoder_channels_conv,
+            conv_channels_out=self.encoder_channels_conv,
+            conv_channels_intermediate=self.encoder_channels_contextual,
+            conv_kernel_small=self.kernel_size_c_sml,
+            conv_kernel_large=self.kernel_size_c_lrg,
+            conv_kernel_refine=self.kernel_size_c_sml,
+            interpolate_scale_factor=1.0,
             dtype_weights=self.dtype_weights,
         )
 
         # ====> Encode block: 02
-        self.encode_block_02 = Coder2DDynamicAlpha(
+        self.encode_block_02 = Coder2DDynamicBeta(
             context_length=self.context_length,
-            context_rank=self.context_rank,
+            # context_rank=self.context_rank,
             context_use_bias=self.dynconv_context_use_bias,
-            context_conv_use_bias=self.dynconv_context_conv_use_bias,
+            # context_conv_use_bias=self.dynconv_context_conv_use_bias,
+            # context_dropout_rate=self.dynconv_context_dropout_rate,
             conv_channels_in=self.encoder_channels_conv,
             conv_channels_out=self.encoder_channels_conv,
             conv_channels_intermediate=self.encoder_channels_contextual,
@@ -127,15 +148,31 @@ class DecoderOnlyModel(nn.Module):
             conv_kernel_large=self.kernel_size_c_lrg,
             conv_kernel_refine=self.kernel_size_c_sml,
             interpolate_scale_factor=0.5,
+            dtype_weights=self.dtype_weights,
+        )
+        self.encode_block_02_enchance = Coder2DDynamicBeta(
+            context_length=self.context_length,
+            # context_rank=self.context_rank,
+            context_use_bias=self.dynconv_context_use_bias,
+            # context_conv_use_bias=self.dynconv_context_conv_use_bias,
+            # context_dropout_rate=self.dynconv_context_dropout_rate,
+            conv_channels_in=self.encoder_channels_conv,
+            conv_channels_out=self.encoder_channels_conv,
+            conv_channels_intermediate=self.encoder_channels_contextual,
+            conv_kernel_small=self.kernel_size_c_sml,
+            conv_kernel_large=self.kernel_size_c_lrg,
+            conv_kernel_refine=self.kernel_size_c_sml,
+            interpolate_scale_factor=1.0,
             dtype_weights=self.dtype_weights,
         )
 
         # ====> Encode block: 03
-        self.encode_block_03 = Coder2DDynamicAlpha(
+        self.encode_block_03 = Coder2DDynamicBeta(
             context_length=self.context_length,
-            context_rank=self.context_rank,
+            # context_rank=self.context_rank,
             context_use_bias=self.dynconv_context_use_bias,
-            context_conv_use_bias=self.dynconv_context_conv_use_bias,
+            # context_conv_use_bias=self.dynconv_context_conv_use_bias,
+            # context_dropout_rate=self.dynconv_context_dropout_rate,
             conv_channels_in=self.encoder_channels_conv,
             conv_channels_out=self.encoder_channels_conv,
             conv_channels_intermediate=self.encoder_channels_contextual,
@@ -143,15 +180,31 @@ class DecoderOnlyModel(nn.Module):
             conv_kernel_large=self.kernel_size_c_lrg,
             conv_kernel_refine=self.kernel_size_c_sml,
             interpolate_scale_factor=0.5,
+            dtype_weights=self.dtype_weights,
+        )
+        self.encode_block_03_enchance = Coder2DDynamicBeta(
+            context_length=self.context_length,
+            # context_rank=self.context_rank,
+            context_use_bias=self.dynconv_context_use_bias,
+            # context_conv_use_bias=self.dynconv_context_conv_use_bias,
+            # context_dropout_rate=self.dynconv_context_dropout_rate,
+            conv_channels_in=self.encoder_channels_conv,
+            conv_channels_out=self.encoder_channels_conv,
+            conv_channels_intermediate=self.encoder_channels_contextual,
+            conv_kernel_small=self.kernel_size_c_sml,
+            conv_kernel_large=self.kernel_size_c_lrg,
+            conv_kernel_refine=self.kernel_size_c_sml,
+            interpolate_scale_factor=1.0,
             dtype_weights=self.dtype_weights,
         )
 
         # ====> Encode block: 04
-        self.encode_block_04 = Coder2DDynamicAlpha(
+        self.encode_block_04 = Coder2DDynamicBeta(
             context_length=self.context_length,
-            context_rank=self.context_rank,
+            # context_rank=self.context_rank,
             context_use_bias=self.dynconv_context_use_bias,
-            context_conv_use_bias=self.dynconv_context_conv_use_bias,
+            # context_conv_use_bias=self.dynconv_context_conv_use_bias,
+            # context_dropout_rate=self.dynconv_context_dropout_rate,
             conv_channels_in=self.encoder_channels_conv,
             conv_channels_out=self.encoder_channels_conv,
             conv_channels_intermediate=self.encoder_channels_contextual,
@@ -161,45 +214,125 @@ class DecoderOnlyModel(nn.Module):
             interpolate_scale_factor=0.5,
             dtype_weights=self.dtype_weights,
         )
+        self.encode_block_04_enchance = Coder2DDynamicBeta(
+            context_length=self.context_length,
+            # context_rank=self.context_rank,
+            context_use_bias=self.dynconv_context_use_bias,
+            # context_conv_use_bias=self.dynconv_context_conv_use_bias,
+            # context_dropout_rate=self.dynconv_context_dropout_rate,
+            conv_channels_in=self.encoder_channels_conv,
+            conv_channels_out=self.encoder_channels_conv,
+            conv_channels_intermediate=self.encoder_channels_contextual,
+            conv_kernel_small=self.kernel_size_c_sml,
+            conv_kernel_large=self.kernel_size_c_lrg,
+            conv_kernel_refine=self.kernel_size_c_sml,
+            interpolate_scale_factor=1.0,
+            dtype_weights=self.dtype_weights,
+        )
 
         # ====> Encode block: 05
-        self.encode_block_05 = Coder2DDynamicAlpha(
+        self.encode_block_05 = Coder2DDynamicBeta(
             context_length=self.context_length,
-            context_rank=self.context_rank,
+            # context_rank=self.context_rank,
             context_use_bias=self.dynconv_context_use_bias,
-            context_conv_use_bias=self.dynconv_context_conv_use_bias,
+            # context_conv_use_bias=self.dynconv_context_conv_use_bias,
+            # context_dropout_rate=self.dynconv_context_dropout_rate,
+            conv_channels_in=self.encoder_channels_conv,
+            conv_channels_out=self.encoder_channels_conv,
+            conv_channels_intermediate=self.encoder_channels_contextual,
+            conv_kernel_small=self.kernel_size_c_sml,
+            conv_kernel_large=self.kernel_size_c_lrg,
+            conv_kernel_refine=self.kernel_size_c_sml,
+            interpolate_scale_factor=0.5,
+            dtype_weights=self.dtype_weights,
+        )
+        self.encode_block_05_enchance = Coder2DDynamicBeta(
+            context_length=self.context_length,
+            # context_rank=self.context_rank,
+            context_use_bias=self.dynconv_context_use_bias,
+            # context_conv_use_bias=self.dynconv_context_conv_use_bias,
+            # context_dropout_rate=self.dynconv_context_dropout_rate,
+            conv_channels_in=self.encoder_channels_conv,
+            conv_channels_out=self.encoder_channels_conv,
+            conv_channels_intermediate=self.encoder_channels_contextual,
+            conv_kernel_small=self.kernel_size_c_sml,
+            conv_kernel_large=self.kernel_size_c_lrg,
+            conv_kernel_refine=self.kernel_size_c_sml,
+            interpolate_scale_factor=1.0,
+            dtype_weights=self.dtype_weights,
+        )
+
+        # ====> Decode block: bottleneck
+        self.encode_block_bottleneck_encode = Coder2DDynamicBeta(
+            context_length=self.context_length,
+            # context_rank=self.context_rank,
+            context_use_bias=self.dynconv_context_use_bias,
+            # context_conv_use_bias=self.dynconv_context_conv_use_bias,
+            # context_dropout_rate=self.dynconv_context_dropout_rate,
             conv_channels_in=self.encoder_channels_conv,
             conv_channels_out=self.encoder_channels_out,
             conv_channels_intermediate=self.encoder_channels_contextual,
             conv_kernel_small=self.kernel_size_c_sml,
             conv_kernel_large=self.kernel_size_c_lrg,
             conv_kernel_refine=self.kernel_size_c_sml,
-            interpolate_scale_factor=0.5,
+            interpolate_scale_factor=1.0,
             dtype_weights=self.dtype_weights,
         )
-
-        # ====> Decode block: 05
-        self.decode_block_05 = Coder2DDynamicAlpha(
+        self.encode_block_bottleneck_decode = Coder2DDynamicBeta(
             context_length=self.context_length,
-            context_rank=self.context_rank,
+            # context_rank=self.context_rank,
             context_use_bias=self.dynconv_context_use_bias,
-            context_conv_use_bias=self.dynconv_context_conv_use_bias,
+            # context_conv_use_bias=self.dynconv_context_conv_use_bias,
+            # context_dropout_rate=self.dynconv_context_dropout_rate,
             conv_channels_in=self.decoder_channels_in,
             conv_channels_out=self.decoder_channels_conv,
             conv_channels_intermediate=self.decoder_channels_contextual,
             conv_kernel_small=self.kernel_size_c_sml,
             conv_kernel_large=self.kernel_size_c_lrg,
             conv_kernel_refine=self.kernel_size_c_sml,
+            interpolate_scale_factor=1.0,
+            dtype_weights=self.dtype_weights,
+        )
+
+        # ====> Decode block: 05
+        self.decode_block_05 = Coder2DDynamicBeta(
+            context_length=self.context_length,
+            # context_rank=self.context_rank,
+            context_use_bias=self.dynconv_context_use_bias,
+            # context_conv_use_bias=self.dynconv_context_conv_use_bias,
+            # context_dropout_rate=self.dynconv_context_dropout_rate,
+            conv_channels_in=self.encoder_channels_conv,
+            conv_channels_out=self.decoder_channels_conv,
+            conv_channels_intermediate=self.decoder_channels_contextual,
+            conv_kernel_small=self.kernel_size_c_sml,
+            conv_kernel_large=self.kernel_size_c_lrg,
+            conv_kernel_refine=self.kernel_size_c_sml,
             interpolate_scale_factor=2.0,
+            dtype_weights=self.dtype_weights,
+        )
+        self.decode_block_05_enchance = Coder2DDynamicBeta(
+            context_length=self.context_length,
+            # context_rank=self.context_rank,
+            context_use_bias=self.dynconv_context_use_bias,
+            # context_conv_use_bias=self.dynconv_context_conv_use_bias,
+            # context_dropout_rate=self.dynconv_context_dropout_rate,
+            conv_channels_in=self.decoder_channels_conv,
+            conv_channels_out=self.decoder_channels_conv,
+            conv_channels_intermediate=self.decoder_channels_contextual,
+            conv_kernel_small=self.kernel_size_c_sml,
+            conv_kernel_large=self.kernel_size_c_lrg,
+            conv_kernel_refine=self.kernel_size_c_sml,
+            interpolate_scale_factor=1.0,
             dtype_weights=self.dtype_weights,
         )
 
         # ====> Decode block: 04
-        self.decode_block_04 = Coder2DDynamicAlpha(
+        self.decode_block_04 = Coder2DDynamicBeta(
             context_length=self.context_length,
-            context_rank=self.context_rank,
+            # context_rank=self.context_rank,
             context_use_bias=self.dynconv_context_use_bias,
-            context_conv_use_bias=self.dynconv_context_conv_use_bias,
+            # context_conv_use_bias=self.dynconv_context_conv_use_bias,
+            # context_dropout_rate=self.dynconv_context_dropout_rate,
             conv_channels_in=self.decoder_channels_conv,
             conv_channels_out=self.decoder_channels_conv,
             conv_channels_intermediate=self.decoder_channels_contextual,
@@ -207,15 +340,31 @@ class DecoderOnlyModel(nn.Module):
             conv_kernel_large=self.kernel_size_c_lrg,
             conv_kernel_refine=self.kernel_size_c_sml,
             interpolate_scale_factor=2.0,
+            dtype_weights=self.dtype_weights,
+        )
+        self.decode_block_04_enchance = Coder2DDynamicBeta(
+            context_length=self.context_length,
+            # context_rank=self.context_rank,
+            context_use_bias=self.dynconv_context_use_bias,
+            # context_conv_use_bias=self.dynconv_context_conv_use_bias,
+            # context_dropout_rate=self.dynconv_context_dropout_rate,
+            conv_channels_in=self.decoder_channels_conv,
+            conv_channels_out=self.decoder_channels_conv,
+            conv_channels_intermediate=self.decoder_channels_contextual,
+            conv_kernel_small=self.kernel_size_c_sml,
+            conv_kernel_large=self.kernel_size_c_lrg,
+            conv_kernel_refine=self.kernel_size_c_sml,
+            interpolate_scale_factor=1.0,
             dtype_weights=self.dtype_weights,
         )
 
         # ====> Decode block: 03
-        self.decode_block_03 = Coder2DDynamicAlpha(
+        self.decode_block_03 = Coder2DDynamicBeta(
             context_length=self.context_length,
-            context_rank=self.context_rank,
+            # context_rank=self.context_rank,
             context_use_bias=self.dynconv_context_use_bias,
-            context_conv_use_bias=self.dynconv_context_conv_use_bias,
+            # context_conv_use_bias=self.dynconv_context_conv_use_bias,
+            # context_dropout_rate=self.dynconv_context_dropout_rate,
             conv_channels_in=self.decoder_channels_conv,
             conv_channels_out=self.decoder_channels_conv,
             conv_channels_intermediate=self.decoder_channels_contextual,
@@ -223,15 +372,31 @@ class DecoderOnlyModel(nn.Module):
             conv_kernel_large=self.kernel_size_c_lrg,
             conv_kernel_refine=self.kernel_size_c_sml,
             interpolate_scale_factor=2.0,
+            dtype_weights=self.dtype_weights,
+        )
+        self.decode_block_03_enchance = Coder2DDynamicBeta(
+            context_length=self.context_length,
+            # context_rank=self.context_rank,
+            context_use_bias=self.dynconv_context_use_bias,
+            # context_conv_use_bias=self.dynconv_context_conv_use_bias,
+            # context_dropout_rate=self.dynconv_context_dropout_rate,
+            conv_channels_in=self.decoder_channels_conv,
+            conv_channels_out=self.decoder_channels_conv,
+            conv_channels_intermediate=self.decoder_channels_contextual,
+            conv_kernel_small=self.kernel_size_c_sml,
+            conv_kernel_large=self.kernel_size_c_lrg,
+            conv_kernel_refine=self.kernel_size_c_sml,
+            interpolate_scale_factor=1.0,
             dtype_weights=self.dtype_weights,
         )
 
         # ====> Decode block: 02
-        self.decode_block_02 = Coder2DDynamicAlpha(
+        self.decode_block_02 = Coder2DDynamicBeta(
             context_length=self.context_length,
-            context_rank=self.context_rank,
+            # context_rank=self.context_rank,
             context_use_bias=self.dynconv_context_use_bias,
-            context_conv_use_bias=self.dynconv_context_conv_use_bias,
+            # context_conv_use_bias=self.dynconv_context_conv_use_bias,
+            # context_dropout_rate=self.dynconv_context_dropout_rate,
             conv_channels_in=self.decoder_channels_conv,
             conv_channels_out=self.decoder_channels_conv,
             conv_channels_intermediate=self.decoder_channels_contextual,
@@ -241,13 +406,29 @@ class DecoderOnlyModel(nn.Module):
             interpolate_scale_factor=2.0,
             dtype_weights=self.dtype_weights,
         )
+        self.decode_block_02_enchance = Coder2DDynamicBeta(
+            context_length=self.context_length,
+            # context_rank=self.context_rank,
+            context_use_bias=self.dynconv_context_use_bias,
+            # context_conv_use_bias=self.dynconv_context_conv_use_bias,
+            # context_dropout_rate=self.dynconv_context_dropout_rate,
+            conv_channels_in=self.decoder_channels_conv,
+            conv_channels_out=self.decoder_channels_conv,
+            conv_channels_intermediate=self.decoder_channels_contextual,
+            conv_kernel_small=self.kernel_size_c_sml,
+            conv_kernel_large=self.kernel_size_c_lrg,
+            conv_kernel_refine=self.kernel_size_c_sml,
+            interpolate_scale_factor=1.0,
+            dtype_weights=self.dtype_weights,
+        )
 
         # ====> Decode block: 01
-        self.decode_block_01 = Coder2DDynamicAlpha(
+        self.decode_block_01 = Coder2DDynamicBeta(
             context_length=self.context_length,
-            context_rank=self.context_rank,
+            # context_rank=self.context_rank,
             context_use_bias=self.dynconv_context_use_bias,
-            context_conv_use_bias=self.dynconv_context_conv_use_bias,
+            # context_conv_use_bias=self.dynconv_context_conv_use_bias,
+            # context_dropout_rate=self.dynconv_context_dropout_rate,
             conv_channels_in=self.decoder_channels_conv,
             conv_channels_out=self.decoder_channels_conv,
             conv_channels_intermediate=self.decoder_channels_contextual,
@@ -255,6 +436,21 @@ class DecoderOnlyModel(nn.Module):
             conv_kernel_large=self.kernel_size_c_lrg,
             conv_kernel_refine=self.kernel_size_c_sml,
             interpolate_scale_factor=2.0,
+            dtype_weights=self.dtype_weights,
+        )
+        self.decode_block_01_enchance = Coder2DDynamicBeta(
+            context_length=self.context_length,
+            # context_rank=self.context_rank,
+            context_use_bias=self.dynconv_context_use_bias,
+            # context_conv_use_bias=self.dynconv_context_conv_use_bias,
+            # context_dropout_rate=self.dynconv_context_dropout_rate,
+            conv_channels_in=self.decoder_channels_conv,
+            conv_channels_out=self.decoder_channels_conv,
+            conv_channels_intermediate=self.decoder_channels_contextual,
+            conv_kernel_small=self.kernel_size_c_sml,
+            conv_kernel_large=self.kernel_size_c_lrg,
+            conv_kernel_refine=self.kernel_size_c_sml,
+            interpolate_scale_factor=1.0,
             dtype_weights=self.dtype_weights,
         )
 
@@ -266,14 +462,15 @@ class DecoderOnlyModel(nn.Module):
             momentum=0.1,
             dtype=self.dtype_weights,
         )
-        self.block_out_conv = DynamicConv2DAlpha(
+        self.block_out_conv = DynamicConv2DBeta(
             in_channels=self.decoder_channels_conv,
             out_channels=self.decoder_channels_out,
             context_length=self.context_length,
-            context_rank=self.context_rank,
+            # context_rank=self.context_rank,
             context_use_bias=self.dynconv_context_use_bias,
-            context_conv_use_bias=self.dynconv_context_conv_use_bias,
-            kernel_size=[1, 1],
+            # context_conv_use_bias=self.dynconv_context_conv_use_bias,
+            # context_dropout_rate=self.dynconv_context_dropout_rate,
+            kernel_size=[3, 3],
             stride=[1, 1],
             padding=[0, 0, 0, 0],
             dilation=[1, 1],
@@ -295,42 +492,80 @@ class DecoderOnlyModel(nn.Module):
         ctx = base_ctx
 
         # Block input
-        x = backward_gradient_normalization(x)
-        ctx = backward_gradient_normalization(ctx)
+        x = torch.nn.functional.pad(
+            input=x,
+            pad=[1, 1, 1, 1],
+            mode="replicate",
+            value=None,
+        )
         x = self.block_input_x_conv(x, ctx)
-        x = backward_gradient_normalization(x)
-        ctx = backward_gradient_normalization(ctx)
         ctx = self.block_input_ctx_norm(ctx)
 
+        interpolate = lambda x, scale: torch.nn.functional.interpolate(
+            input=x,
+            scale_factor=scale,
+            mode="nearest",
+            align_corners=None,
+            recompute_scale_factor=False,
+            antialias=False,
+        )
+
+
         # Encode
+        x_buf = interpolate(x, 0.5)
         x = self.encode_block_01(x, ctx)
-        x = backward_gradient_normalization(x)
+        x = x_buf + x + self.encode_block_01_enchance(x, ctx)
+
+        x_buf = interpolate(x, 0.5)
         x = self.encode_block_02(x, ctx)
-        x = backward_gradient_normalization(x)
+        x = x_buf + x + self.encode_block_02_enchance(x, ctx)
+
+        x_buf = interpolate(x, 0.5)
         x = self.encode_block_03(x, ctx)
-        x = backward_gradient_normalization(x)
+        x = x_buf + x + self.encode_block_03_enchance(x, ctx)
+
+        x_buf = interpolate(x, 0.5)
         x = self.encode_block_04(x, ctx)
-        x = backward_gradient_normalization(x)
+        x = x_buf + x + self.encode_block_04_enchance(x, ctx)
+
+        x_buf = interpolate(x, 0.5)
         x = self.encode_block_05(x, ctx)
-        x = backward_gradient_normalization(x)
+        x = x_buf + x + self.encode_block_05_enchance(x, ctx)
+
+        # Bottleneck
+        x = self.encode_block_bottleneck_encode(x, ctx)
+        x = self.encode_block_bottleneck_decode(x, ctx)
 
         # Decode
+        x_buf = interpolate(x, 2.0)
         x = self.decode_block_05(x, ctx)
-        x = backward_gradient_normalization(x)
+        x = x_buf + x + self.decode_block_05_enchance(x, ctx)
+
+        x_buf = interpolate(x, 2.0)
         x = self.decode_block_04(x, ctx)
-        x = backward_gradient_normalization(x)
+        x = x_buf + x + self.decode_block_04_enchance(x, ctx)
+
+        x_buf = interpolate(x, 2.0)
         x = self.decode_block_03(x, ctx)
-        x = backward_gradient_normalization(x)
+        x = x_buf + x + self.decode_block_03_enchance(x, ctx)
+
+        x_buf = interpolate(x, 2.0)
         x = self.decode_block_02(x, ctx)
-        x = backward_gradient_normalization(x)
+        x = x_buf + x + self.decode_block_02_enchance(x, ctx)
+
+        x_buf = interpolate(x, 2.0)
         x = self.decode_block_01(x, ctx)
-        x = backward_gradient_normalization(x)
+        x = x_buf + x + self.decode_block_01_enchance(x, ctx)
 
         # Block out
         x = self.block_out_norm(x)
-        x = backward_gradient_normalization(x)
+        x = torch.nn.functional.pad(
+            input=x,
+            pad=[1, 1, 1, 1],
+            mode="replicate",
+            value=None,
+        )
         x = self.block_out_conv(x, ctx)
-        x = backward_gradient_normalization(x)
         x = torch.nn.functional.sigmoid(x)
 
         return x
@@ -421,6 +656,7 @@ def train(
     optimizer: torch.optim.Optimizer,
     clip_grad_value: float,
     clip_grad_norm: float,
+    gradient_global_norm: bool,
     log_nth_update_step: int,
     images_path_dst: str = None,
     save_nth_iteration: int = 100,
@@ -475,7 +711,14 @@ def train(
         accumulation_step = accumulation_step + 1
         decoded = model(sample, batch_ids)
 
-        loss_current_step = log_proportional_error(decoded, sample)
+        # loss_current_step = log_proportional_error(decoded, sample)
+        # loss_current_step = F.mse_loss(decoded, sample)
+        loss_current_step = F.kl_div(
+            input=torch.softmax(decoded.flatten(-2), dim=-1).log(),
+            target=torch.softmax(sample.flatten(-2), dim=-1).log(),
+            reduction="sum",
+            log_target=True,
+        ).div(sample.shape[0])
 
         loss_logging_accumulator.append(loss_current_step.detach().item())
         loss_total = loss_current_step / grad_accumulation_steps
@@ -494,6 +737,9 @@ def train(
                 torch.nn.utils.clip_grad_value_(model.parameters(), clip_grad_value, foreach=True)
             if clip_grad_norm is not None:
                 torch.nn.utils.clip_grad_norm_(model.parameters(), clip_grad_norm, norm_type=2.0, error_if_nonfinite=False, foreach=True)
+            
+            if gradient_global_norm:
+                normalize_grad(model)
 
             optimizer.step()
 
@@ -509,37 +755,22 @@ def train(
                         f"Loss mean: {(sum(loss_logging_accumulator)/len(loss_logging_accumulator)):.5f}",
                         "Weigths:",
                         f"{model.data_cache_ctx.abs().mean().tolist()=}",
-                        f"{model.block_input_x_conv.weights_lib.weights_static.abs().mean().tolist()=}",
-                        f"{model.block_input_x_conv.weights_lib.weights_mod.abs().mean().tolist()=}",
-                        f"{model.encode_block_01.coder_block_conv_small.weights_lib.weights_static.abs().mean().tolist()=}",
-                        f"{model.encode_block_01.coder_block_conv_small.weights_lib.weights_mod.abs().mean().tolist()=}",
-                        f"{model.encode_block_01.coder_block_conv_large.weights_lib.weights_static.abs().mean().tolist()=}",
-                        f"{model.encode_block_01.coder_block_conv_large.weights_lib.weights_mod.abs().mean().tolist()=}",
-                        "Grads:",
-                        f"{model.data_cache_ctx.grad.abs().mean().tolist()=}",
-                        f"{model.block_input_x_conv.weights_lib.weights_static.grad.abs().mean().tolist()=}",
-                        f"{model.block_input_x_conv.weights_lib.weights_mod.grad.abs().mean().tolist()=}",
-                        f"{model.encode_block_01.coder_block_conv_small.weights_lib.weights_static.grad.abs().mean().tolist()=}",
-                        f"{model.encode_block_01.coder_block_conv_small.weights_lib.weights_mod.grad.abs().mean().tolist()=}",
-                        f"{model.encode_block_01.coder_block_conv_large.weights_lib.weights_static.grad.abs().mean().tolist()=}",
-                        f"{model.encode_block_01.coder_block_conv_large.weights_lib.weights_mod.grad.abs().mean().tolist()=}",
-                        "Grads in depth:",
-                        f"{model.encode_block_01.coder_block_conv_large.weights_lib.weights_mod.grad.abs().mean().tolist()=}",
-                        f"{model.encode_block_02.coder_block_conv_large.weights_lib.weights_mod.grad.abs().mean().tolist()=}",
-                        f"{model.encode_block_03.coder_block_conv_large.weights_lib.weights_mod.grad.abs().mean().tolist()=}",
-                        f"{model.encode_block_04.coder_block_conv_large.weights_lib.weights_mod.grad.abs().mean().tolist()=}",
-                        f"{model.encode_block_05.coder_block_conv_large.weights_lib.weights_mod.grad.abs().mean().tolist()=}",
-                        f"{model.decode_block_05.coder_block_conv_large.weights_lib.weights_mod.grad.abs().mean().tolist()=}",
-                        f"{model.decode_block_04.coder_block_conv_large.weights_lib.weights_mod.grad.abs().mean().tolist()=}",
-                        f"{model.decode_block_03.coder_block_conv_large.weights_lib.weights_mod.grad.abs().mean().tolist()=}",
-                        f"{model.decode_block_02.coder_block_conv_large.weights_lib.weights_mod.grad.abs().mean().tolist()=}",
-                        f"{model.decode_block_01.coder_block_conv_large.weights_lib.weights_mod.grad.abs().mean().tolist()=}",
-                        "Grads I/O:",
-                        f"{model.block_input_x_conv.weights_lib.weights_mod.grad.abs().mean().tolist()=}",
-                        f"    {model.block_out_conv.weights_lib.weights_mod.grad.abs().mean().tolist()=}",
                     ]
                 )
             )
+            # inspect_grad(model.block_input_x_conv   , "block_input_x_conv   ")
+            # inspect_grad(model.encode_block_01      , "encode_block_01      ")
+            # inspect_grad(model.encode_block_02      , "encode_block_02      ")
+            # inspect_grad(model.encode_block_03      , "encode_block_03      ")
+            # inspect_grad(model.encode_block_04      , "encode_block_04      ")
+            # inspect_grad(model.encode_block_05      , "encode_block_05      ")
+            # inspect_grad(model.decode_block_05      , "decode_block_05      ")
+            # inspect_grad(model.decode_block_04      , "decode_block_04      ")
+            # inspect_grad(model.decode_block_03      , "decode_block_03      ")
+            # inspect_grad(model.decode_block_02      , "decode_block_02      ")
+            # inspect_grad(model.decode_block_01      , "decode_block_01      ")
+            # inspect_grad(model.block_out_conv       , "block_out_conv       ")
+            # exit()
             loss_logging_accumulator = []
 
             generate_images_from_data(
@@ -675,84 +906,6 @@ def model_unfreeze_all(
     pass
 
 
-def model_constant_ctx(
-    model: DecoderOnlyModel,
-    device: Optional[torch.device] = None,
-    dtype: Optional[torch.dtype] = None,
-) -> None:
-    v = 0.0001
-    for name, param in model.named_parameters():
-        if "data_cache_ctx" in name:
-            param.data = torch.nn.init.constant_(
-                param.data,
-                val=v,
-            )
-            print(f"model_constant_ctx: {v}")
-    pass
-
-
-def model_perturb_small_weights(
-    model: DecoderOnlyModel,
-    device: Optional[torch.device] = None,
-    dtype: Optional[torch.dtype] = None,
-    a: float = 0.0001,
-    b: float = 0.0010,
-) -> None:
-    print(f"model_perturb_small_weights: {a=}, {b=}")
-    for name, param in model.named_parameters():
-        if "data_cache" not in name:
-            delta = torch.nn.init.uniform_(
-                torch.empty_like(param.data),
-                a=a,
-                b=b,
-            )
-            delta = delta * torch.randn_like(param.data).sign()
-            cnd = torch.where(param.data.abs() < a)
-            param.data[cnd] = (param.data + delta)[cnd]
-            cnd = torch.where(param.data.abs() < a)
-            param.data[cnd] = delta[cnd]
-            print(f"model_perturb_small_weights: {name}")
-    pass
-
-
-def eval_infer(
-    model: DecoderOnlyModel,
-    start_from: int = 0,
-    batches: int = 1,
-    batch_size: int = 16,
-) -> None:
-    training = model.training
-
-    if training:
-        model.eval()
-
-    for batch_id in range(0, batches, 1):
-        id_start = start_from
-        id_end = start_from + batch_size + batch_size * batch_id
-        with torch.no_grad():
-            model_output = model(torch.arange(id_start, id_end, 1))
-            data_rgb = data_lab_to_rgb(model_output)
-            generate_images_from_data(data_rgb, images_path_dst, f"infer_b{batch_id}")
-
-    if training:
-        model.train()
-
-    return None
-
-
-def eval_ctx_rand(
-    model: DecoderOnlyModel,
-) -> None:
-    with torch.no_grad():
-        ctx = model.data_cache_ctx.data.clone()
-        model.data_cache_ctx.data = torch.randn_like(ctx)
-        model_output = model(torch.arange(0, 16, 1))
-        model.data_cache_ctx.data = ctx
-        data_rgb = data_lab_to_rgb(model_output)
-        generate_images_from_data(data_rgb, images_path_dst, "ctx_rand")
-    pass
-
-
 def optim_change_momentum(
     optim: torch.optim.Optimizer,
     momentum: float,
@@ -807,29 +960,111 @@ def model_unfreeze_block(
     pass
 
 
-def model_perturb_weights(
-    model: DecoderOnlyModel,
-    rate: float = 0.025,
-    include_data_cache: bool = False,
-) -> None:
-
-    for name, param in model.named_parameters():
-        if not include_data_cache and "data_cache" in name:
-            continue
-        std = param.data.std()
-        if std == 0.0 or std != std:
-            continue
-        noise = torch.randn_like(param.data) * param.data.std() * rate
-        param.data = param.data + noise
-        print(f"model_perturb_weights (rate={rate:.5f}): {name}")
-
-    pass
-
-
 def clear() -> None:
     os.system("clear")
     pass
 
+
+def model_cast_to_dtype(model, dtype) -> None:
+    print("Begin parameters casting.")
+    n = 0
+    for name, param in model.named_parameters():
+        print(f"Casting {param.dtype}->{dtype} parameter '{name}'")
+        param = param.to(dtype)
+        n = n + 1
+    print(f"Parameters casting completed. Named parameters casted: {n}")
+    pass
+
+
+def model_perturb_small_weights(
+    model: DecoderOnlyModel,
+    a: float = 0.0001,
+    b: float = 0.0010,
+) -> None:
+    print(f"model_perturb_small_weights: {a=}, {b=}")
+    for name, param in model.named_parameters():
+        if "data_cache" not in name:
+            delta = torch.nn.init.uniform_(
+                torch.empty_like(param.data),
+                a=a,
+                b=b,
+            )
+            delta = delta * torch.randn_like(param.data).sign()
+            cnd = torch.where(param.data.abs() < a)
+            param.data[cnd] = (param.data + delta)[cnd]
+            cnd = torch.where(param.data.abs() < a)
+            param.data[cnd] = delta[cnd]
+            print(f"model_perturb_small_weights: {name}")
+    pass
+
+
+def model_remove_nulls(
+    model: DecoderOnlyModel,
+    eps: 1.0e-3,
+) -> None:
+    print(f"Removing null values from model parameters.")
+    for name, param in model.named_parameters():
+        if "data_cache" not in name:
+            noise = torch.nn.init.normal_(
+                torch.empty_like(param.data),
+                mean=0.0,
+                std=eps,
+            )
+            noise = (noise.abs() + eps) * torch.sign(noise)
+            condition = torch.where(param.data == 0.0)
+            param.data[condition] = noise[condition]
+            print(f"Nulls removed from '{name}'")
+    pass
+
+
+def model_partially_activate(
+    model: DecoderOnlyModel,
+    active_weights: list,
+) -> None:
+    print("Applying partial freeze.")
+
+    assert type(active_weights) == list
+    assert len(active_weights) > 0
+    
+    check_name = lambda name: any([name_part in name for name_part in active_weights])
+
+    total_activated = 0
+    total_deactivated = 0
+
+    for name, param in model.named_parameters():
+        param.requires_grad = False
+        if check_name(name):
+            total_activated = total_activated + 1
+            param.requires_grad = True
+            print(f"Activated: {name}")
+        else:
+            total_deactivated = total_deactivated + 1
+            print(f"Deactivated: {name}")
+    
+    print(f"Total params active/inactive: {total_activated}/{total_deactivated}")
+    pass
+
+
+def normalize_grad(model: DecoderOnlyModel) -> None:
+    eps: float = 1.0e-6
+
+    for name, param in model.named_parameters():
+        if param.grad is not None:
+            grad = param.grad
+            norm_dims = tuple(range(1, grad.dim()))
+            grad_norm = grad.norm(p=2, dim=norm_dims, keepdim=True)
+            grad_norm = grad_norm + eps
+            scaling_factor = grad[0].numel() ** 0.5
+            grad = (grad / grad_norm) * scaling_factor
+            param.grad = grad
+
+    pass
+
+def inspect_grad(module: torch.nn.Module, identifier: str) -> None:
+    for name, param in module.named_parameters():
+        if param.grad is not None:
+            g = param.grad
+            print(f"{identifier} -> grads for '{name}' min/max/mean/std: {g.min().item()}/{g.max().item()}/{g.mean().item()}/{g.std().item()}")
 
 if __name__ == "__main__":
     train_mode = True
@@ -840,8 +1075,6 @@ if __name__ == "__main__":
     onload_model_fn = [
         # model_constant_ctx,
         # lambda m, d, t: model_change_data_cache_ctx(m, d, t, [32, 256]),
-        # lambda m, d, t: model_perturb_small_weights(m, a=0.001, b=0.005),
-        # lambda m, d, t: model_perturb_weights(m, 0.10, False),
         # lambda m, d, t: model_extend_data_cache(m, 128, 1.0e-6),
         # lambda m, d, t: model_extend_data_cache(m, 512),
         # model_freeze_model,
@@ -850,18 +1083,24 @@ if __name__ == "__main__":
         # model_unfreeze_model,
         # model_unfreeze_ctx,
         # model_unfreeze_all,
-        # lambda m, d, t: model_unfreeze_block(m, d, t, "block_out"),
-        # lambda m, d, t: model_unfreeze_block(m, d, t, "block_01"),
-        # lambda m, d, t: model_unfreeze_block(m, d, t, "block_02"),
-        # lambda m, d, t: model_unfreeze_block(m, d, t, "block_03"),
-        # lambda m, d, t: model_unfreeze_block(m, d, t, "block_04"),
-        # lambda m, d, t: model_unfreeze_block(m, d, t, "block_05"),
+        # lambda m, d, t: model_freeze_block(m, d, t, "data_cache"),
         # lambda m, d, t: model_freeze_block(m, d, t, "block_out"),
         # lambda m, d, t: model_freeze_block(m, d, t, "block_01"),
         # lambda m, d, t: model_freeze_block(m, d, t, "block_02"),
         # lambda m, d, t: model_freeze_block(m, d, t, "block_03"),
         # lambda m, d, t: model_freeze_block(m, d, t, "block_04"),
         # lambda m, d, t: model_freeze_block(m, d, t, "block_05"),
+        # lambda m, d, t: model_unfreeze_block(m, d, t, "block_out"),
+        # lambda m, d, t: model_unfreeze_block(m, d, t, "block_01"),
+        # lambda m, d, t: model_unfreeze_block(m, d, t, "block_02"),
+        # lambda m, d, t: model_unfreeze_block(m, d, t, "block_03"),
+        # lambda m, d, t: model_unfreeze_block(m, d, t, "block_04"),
+        # lambda m, d, t: model_unfreeze_block(m, d, t, "block_05"),
+        # lambda m, d, t: model_cast_to_dtype(m, torch.bfloat16),
+        # lambda m, d, t: model_perturb_small_weights(m, 1.0e-3, 1.0e-2),
+        # lambda m, d, t: model_remove_nulls(m, 1.0e-3),
+        # lambda m, d, t: model_partially_activate(m, ["weights_static", "data_cache", "context_transform"]),
+        # lambda m, d, t: model_partially_activate(m, ["data_cache", "context_transform"]),
     ]
     onload_optim_fn = [
         # lambda o: optim_change_momentum(o, 0.9),
@@ -869,19 +1108,19 @@ if __name__ == "__main__":
 
     path_prefix_load = "f:\\git_AIResearch\\dyna\\data\\models"
     path_prefix_save = "f:\\git_AIResearch\\dyna\\data\\models"
-    load_path_model = f"{path_prefix_load}\\00\\model.Type-00.G00.__LAST__.pth"
-    load_path_optim = f"{path_prefix_load}\\00\\optim.Type-00.G00.__LAST__.pth"
+    load_path_model = f"{path_prefix_load}\\model.Type-00.G01.__LAST__01__.pth"
+    load_path_optim = f"{path_prefix_load}\\"
     save_path_model = f"{path_prefix_save}\\model.Type-00.G01"
     save_path_optim = f"{path_prefix_save}\\optim.Type-00.G01"
     save_model = True
     save_optim = True
-    save_nth_iteration = 1024
+    save_nth_iteration = 8192
     log_nth_update_step = 1
 
     # optimizer type
-    optimizer_type = bnb.optim.AdamW8bit
+    optimizer_type = torch.optim.AdamW
     # optimizer: torch.optim.SGD
-    sgd_learning_rate = 1.0e-1
+    sgd_learning_rate = 1.0e-3
     sgd_momentum = 0.0
     sgd_dampening = 0.0
     sgd_weight_decay = 0.0
@@ -892,19 +1131,19 @@ if __name__ == "__main__":
     adam_weight_decay = 0.0
     adam_eps = 1.0e-8
     # optimizer: torch.optim.AdamW
-    adamw_learning_rate = 1.0e-3
-    adamw_amsgrad = True
+    adamw_learning_rate = 1.0e-5
+    adamw_amsgrad = False
     adamw_weight_decay = 1.0e-2
-    adamw_eps = 1.0e-8
+    adamw_eps = 1.0e-6
     # optimizer: MADGRAD
     madgrad_learning_rate = 1.0e-2
     madgrad_momentum = 0.9
     madgrad_weight_decay = 0.0
     madgrad_eps = 1.0e-6
     # optimizer: bnb.optim.AdamW8bit
-    bnb_adamw8bit_lr=5.0e-7
+    bnb_adamw8bit_lr=1.0e-5
     bnb_adamw8bit_betas=(0.9, 0.999)
-    bnb_adamw8bit_eps=1e-8
+    bnb_adamw8bit_eps=1e-6
     bnb_adamw8bit_weight_decay=1e-2
     bnb_adamw8bit_amsgrad=False
     bnb_adamw8bit_optim_bits=8
@@ -918,18 +1157,19 @@ if __name__ == "__main__":
     optim_update_wd = False
     optim_target_wd = 0.1
     warmup_active = True
-    warmup_epochs = 512
+    warmup_epochs = 256
     clip_grad_value = None
     clip_grad_norm = 1.0
+    gradient_global_norm = False
 
-    data_cache_ctx_bound = [-1.0e-5, +1.0e-5]
+    data_cache_ctx_bound = [-1.0e-6, +1.0e-6]
 
-    nelements = 64 * 64 # = 4096
-    data_cache_ctx_len = nelements
+    nelements = 128
+    data_cache_ctx_len = 4096 # nelements
     data_cache_ctx_shape = [128]
 
     total_steps = 200_000
-    batch_size = 64
+    batch_size = 16
     grad_accumulation_steps = nelements // batch_size
 
     images_sample_count = nelements
@@ -937,7 +1177,7 @@ if __name__ == "__main__":
     images_path_src = "f:\\git_AIResearch\\dyna\\data\\img_src_1"
     images_path_dst = "f:\\git_AIResearch\\dyna\\data\\img_dst_1"
     output_shape = [512, 512]
-    dtype_weights = torch.bfloat16
+    dtype_weights = torch.float32
     device = torch.device("cuda")
 
     model = DecoderOnlyModel(
@@ -1109,6 +1349,7 @@ if __name__ == "__main__":
         optimizer=optimizer,
         clip_grad_value=clip_grad_value,
         clip_grad_norm=clip_grad_norm,
+        gradient_global_norm=gradient_global_norm,
         log_nth_update_step=log_nth_update_step,
         images_path_dst=images_path_dst,
         save_nth_iteration=save_nth_iteration,
