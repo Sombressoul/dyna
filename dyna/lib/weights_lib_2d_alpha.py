@@ -12,7 +12,7 @@ class WeightsLib2DAlpha(nn.Module):
         context_rank: int = 4,
         context_use_bias: bool = True,
         context_conv_use_bias: bool = True,
-        context_dropout_rate: float = 0.05,
+        context_dropout_rate: float = 0.0,
         initialization_std: float = 1.0e-3,
         eps: float = 1.0e-12,
         dtype_weights: torch.dtype = torch.bfloat16,
@@ -30,14 +30,20 @@ class WeightsLib2DAlpha(nn.Module):
 
         ff_out_features = (self.output_shape[0] + self.output_shape[1]) * self.context_rank * 4  # 4 - real, imag, proj a, proj b 
 
-        self.context_transform = nn.Linear(
+        self.context_transform_input = nn.Linear(
             in_features=context_length,
             out_features=ff_out_features,
             bias=self.context_use_bias,
             dtype=self.dtype_weights,
         )
-        self.context_transform_gate = nn.Linear(
+        self.context_transform_input_gate = nn.Linear(
             in_features=context_length,
+            out_features=ff_out_features,
+            bias=self.context_use_bias,
+            dtype=self.dtype_weights,
+        )
+        self.context_transform = nn.Linear(
+            in_features=ff_out_features,
             out_features=ff_out_features,
             bias=self.context_use_bias,
             dtype=self.dtype_weights,
@@ -130,7 +136,9 @@ class WeightsLib2DAlpha(nn.Module):
             bias=self.context_conv_use_bias,
             dtype=self.dtype_weights,
         )
-        self.context_transform_dropout = nn.Dropout1d(self.context_dropout_rate)
+        self.context_transform_input_dropout = nn.Dropout1d(
+            p=self.context_dropout_rate,
+        )
 
         pass
 
@@ -179,30 +187,32 @@ class WeightsLib2DAlpha(nn.Module):
         input_dtype = x.dtype
         x = x if x.dtype == self.dtype_weights else x.to(self.dtype_weights)
 
-        x_transformed = self.context_transform_dropout(x)
-        x_transformed = self.context_transform(x_transformed)
-        x_gate = self.context_transform_dropout(x)
-        x_gate = self.context_transform_gate(x_gate)
+        x_transformed = self.context_transform_input_dropout(x)
+        x_transformed = self.context_transform_input(x_transformed)
+        x_gate = self.context_transform_input_dropout(x)
+        x_gate = self.context_transform_input_gate(x_gate)
         x_stack = torch.stack([x_transformed, x_gate], dim=0)
         x_stack = x_stack.reshape([2, x_stack.shape[1], 4, -1])
         x_stack = self.norm_layer(x_stack, dim=[-1])
-        x_stack = x_stack.reshape(
+        context = x_stack[0] * torch.nn.functional.tanh(x_stack[1])
+        context = context.flatten(1)
+        context = self.context_transform(context)
+        context = context.reshape(
             [
-                2,
-                x_stack.shape[1],
+                context.shape[0],
                 4,
                 self.context_rank,
                 self.output_shape[0] + self.output_shape[1],
             ],
         )
-        mod = x_stack[0] * torch.nn.functional.tanh(x_stack[1])
-        mod = self.norm_layer(mod, dim=-1)
+        mod = self.norm_layer(context, dim=-1)
         mod = mod.reshape([mod.shape[0], 4, self.context_rank, self.output_shape[0] + self.output_shape[1]])
         mod = torch.einsum(
             "...ri,...rj -> ...rij", 
             mod[..., 0:self.output_shape[0]], 
             mod[..., self.output_shape[0]::],
         )
+        mod = torch.nn.functional.tanh(mod)
         mod_real = mod[::, 0, ...]
         mod_real = self.mod_convolution(mod_real)
         mod_real = mod_real.sum(dim=-3, keepdim=True)
