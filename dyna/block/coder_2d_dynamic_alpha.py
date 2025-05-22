@@ -18,6 +18,7 @@ class Coder2DDynamicAlpha(nn.Module):
         # Defaults:
         context_use_bias: bool = True,
         context_conv_use_bias: bool = True,
+        context_dropout_rate: float = 0.0,
         conv_kernel_small: Union[int, List[int]] = [3, 3],
         conv_kernel_large: Union[int, List[int]] = [5, 5],
         conv_kernel_refine: Union[int, List[int]] = [3, 3],
@@ -61,6 +62,8 @@ class Coder2DDynamicAlpha(nn.Module):
         assert conv_channels_intermediate > 0, f"conv_channels_intermediate should be positive. {var_info(conv_channels_intermediate)}"
         assert type(context_use_bias) == bool, f"context_use_bias should be a boolean. {var_info(context_use_bias)}"
         assert type(context_conv_use_bias) == bool, f"context_convolution_use_bias should be a boolean. {var_info(context_conv_use_bias)}"
+        assert type(context_dropout_rate) == float, f"context_dropout_rate should be a float. {var_info(context_dropout_rate)}"
+        assert context_dropout_rate >= 0.0, f"context_dropout_rate should be positive or equal to zero. {var_info(context_dropout_rate)}"
         assert type(conv_padding_mode) == str, f"conv_padding_mode should be a string. {var_info(conv_padding_mode)}"
         assert conv_padding_mode in modes_padding, f"conv_padding_mode should be one of: {modes_padding}. {var_info(conv_padding_mode)}"
         assert type(conv_padding_value) in [int, float], f"conv_padding_value should be an integer or a float. {var_info(conv_padding_mode)}"
@@ -94,6 +97,7 @@ class Coder2DDynamicAlpha(nn.Module):
         self.conv_channels_intermediate = conv_channels_intermediate
         self.context_use_bias = context_use_bias
         self.context_conv_use_bias = context_conv_use_bias
+        self.context_dropout_rate = context_dropout_rate
         self.conv_kernel_small = kernel_format(conv_kernel_small)
         self.conv_kernel_large = kernel_format(conv_kernel_large)
         self.conv_kernel_refine = kernel_format(conv_kernel_refine)
@@ -131,6 +135,7 @@ class Coder2DDynamicAlpha(nn.Module):
             context_rank=self.context_rank,
             context_use_bias=self.context_use_bias,
             context_conv_use_bias=self.context_conv_use_bias,
+            context_dropout_rate=self.context_dropout_rate,
             kernel_size=self.conv_kernel_small,
             stride=[1, 1],
             padding=[0, 0, 0, 0],
@@ -146,6 +151,7 @@ class Coder2DDynamicAlpha(nn.Module):
             context_rank=self.context_rank,
             context_use_bias=self.context_use_bias,
             context_conv_use_bias=self.context_conv_use_bias,
+            context_dropout_rate=self.context_dropout_rate,
             kernel_size=self.conv_kernel_large,
             stride=[1, 1],
             padding=[0, 0, 0, 0],
@@ -161,6 +167,7 @@ class Coder2DDynamicAlpha(nn.Module):
             context_rank=self.context_rank,
             context_use_bias=self.context_use_bias,
             context_conv_use_bias=self.context_conv_use_bias,
+            context_dropout_rate=self.context_dropout_rate,
             kernel_size=self.conv_kernel_refine,
             stride=[1, 1],
             padding=[0, 0, 0, 0],
