@@ -24,13 +24,13 @@ class WeightsLib2DBeta(nn.Module):
 
         self.context_transform_input = nn.Linear(
             in_features=context_length,
-            out_features=4,
+            out_features=12,
             bias=self.context_use_bias,
             dtype=self.dtype_weights,
         )
         self.context_transform_gate = nn.Linear(
             in_features=context_length,
-            out_features=4,
+            out_features=12,
             bias=self.context_use_bias,
             dtype=self.dtype_weights,
         )
@@ -111,6 +111,34 @@ class WeightsLib2DBeta(nn.Module):
         
         pass
 
+    def add(
+        self,
+        z1: torch.Tensor,
+        z2: torch.Tensor,
+    ) -> torch.Tensor:
+        z = torch.stack(
+            [
+                z1[..., 0] + z2[..., 0],
+                z1[..., 1] + z2[..., 1],
+            ],
+            dim=-1,
+        )
+        return z
+
+    def mul(
+        self,
+        z1: torch.Tensor,
+        z2: torch.Tensor,
+    ) -> torch.Tensor:
+        z = torch.stack(
+            [
+                z1[..., 0] * z2[..., 0] - z1[..., 1] * z2[..., 1],
+                z1[..., 0] * z2[..., 1] + z1[..., 1] * z2[..., 0],
+            ],
+            dim=-1,
+        )
+        return z
+
     def forward(
         self,
         x: torch.Tensor,
@@ -120,17 +148,32 @@ class WeightsLib2DBeta(nn.Module):
 
         x_transformed = self.context_transform_input(x)
         x_gate = self.context_transform_gate(x)
-        context = x_transformed * torch.nn.functional.tanh(x_gate) * 2.0
-        context = context.reshape([context.shape[0], 1, 1, 4]).repeat([1, *self.output_shape, 1])
+        mod = x_transformed * torch.nn.functional.tanh(x_gate) * 2.0
+        mod = mod.reshape([mod.shape[0], 1, 1, 12]).repeat([1, *self.output_shape, 1])
 
-        target_shape = [context.shape[0], 1, 1, 1]
+        scale_shift = torch.tensor([1.0, 0.0], dtype=x.dtype, device=x.device)
+        scale_shift = scale_shift.reshape([1, 1, 1, 2])
+
+        weights_l = mod[..., 0:2]
+        weights_b = mod[..., 2:4]
+        weights_s = scale_shift + mod[..., 4:6]
+
+        proj_l = mod[..., 6:8]
+        proj_b = mod[..., 8:10]
+        proj_s = scale_shift + mod[..., 10:12]
+
+        target_shape = [mod.shape[0], 1, 1, 1]
         weights_base_a = self.weights_base_a.repeat(target_shape)
         weights_base_b = self.weights_base_b.repeat(target_shape)
-        weights_base = torch.lerp(weights_base_a, weights_base_b, context[..., 0:2])
+        weights_base = torch.lerp(weights_base_a, weights_base_b, weights_l)
+        weights_base = self.add(weights_base, weights_b)
+        weights_base = self.mul(weights_base, weights_s)
 
         weights_projection_a = self.weights_projection_a.repeat(target_shape)
         weights_projection_b = self.weights_projection_b.repeat(target_shape)
-        weight_projection = torch.lerp(weights_projection_a, weights_projection_b, context[..., 2::])
+        weight_projection = torch.lerp(weights_projection_a, weights_projection_b, proj_l)
+        weight_projection = self.add(weight_projection, proj_b)
+        weight_projection = self.mul(weight_projection, proj_s)
 
         denom = torch.sqrt((weight_projection ** 2).sum(-1).add(self.eps)).unsqueeze(-1)
         theta = weight_projection / denom
