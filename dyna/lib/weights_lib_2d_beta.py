@@ -117,12 +117,14 @@ class WeightsLib2DBeta(nn.Module):
         mod = x_transformed * torch.tanh(x_gate)
         mod = mod.reshape([mod.shape[0], 3, 2, 1, 1, 2]).expand([-1, -1, -1, *self.output_shape, -1])
 
-        scale_shift = torch.tensor([1.0, 0.0], dtype=x.dtype, device=x.device)
-        scale_shift = scale_shift.reshape([1, 1, 1, 2])
+        shift_lerp = torch.tensor([0.5, 0.0], dtype=x.dtype, device=x.device)
+        shift_lerp = shift_lerp.reshape([1, 1, 1, 2])
+        shift_scale = torch.tensor([1.0, 0.0], dtype=x.dtype, device=x.device)
+        shift_scale = shift_scale.reshape([1, 1, 1, 2])
 
-        param_l = mod[::, 0]
+        param_l = mod[::, 0] + shift_lerp
         param_b = mod[::, 1]
-        param_s = scale_shift + mod[::, 2]
+        param_s = mod[::, 2] + shift_scale
 
         weights = self.weights.expand([mod.shape[0], -1, -1, -1, -1, -1])
         weights = self.lerp(weights[::, 0], weights[::, 1], param_l)
