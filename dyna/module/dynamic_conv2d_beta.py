@@ -5,7 +5,7 @@ import math
 
 from typing import Union, List, Optional
 
-from dyna.lib.weights_lib_2d_beta import WeightsLib2DBeta
+from dyna.lib import WeightsLib2DBeta, WeightsLib2DBetaSecondOrder
 
 
 class DynamicConv2DBeta(nn.Module):
@@ -29,6 +29,7 @@ class DynamicConv2DBeta(nn.Module):
         dilation: Union[int, List[int]] = [1, 1],
         transpose: bool = False,
         output_padding: Optional[Union[int, List[int]]] = None,
+        second_order_weights: bool = False,
         dtype_weights: torch.dtype = torch.bfloat16,
     ) -> None:
         super().__init__()
@@ -107,6 +108,7 @@ class DynamicConv2DBeta(nn.Module):
         self.output_padding = output_padding
         self.dilation = dilation
         self.transpose = transpose
+        self.second_order_weights = second_order_weights
         self.dtype_weights = dtype_weights
 
         # ================================================================================= #
@@ -138,12 +140,14 @@ class DynamicConv2DBeta(nn.Module):
         # ================================================================================= #
         # ____________________________> Init submodules and additional weights.
         # ================================================================================= #
-        self.weights_lib = WeightsLib2DBeta(
+        wl_params = dict(
             output_shape=self.dynamic_weights_shape,
             context_length=self.context_length,
             context_use_bias=self.context_use_bias,
             dtype_weights=self.dtype_weights,
         )
+        wl_class = WeightsLib2DBetaSecondOrder if self.second_order_weights else WeightsLib2DBeta
+        self.weights_lib = wl_class(**wl_params)
         self.padding_dynamic_value = (
             nn.Parameter(
                 data=nn.init.normal_(
