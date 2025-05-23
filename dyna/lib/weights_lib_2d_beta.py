@@ -17,19 +17,20 @@ class WeightsLib2DBeta(nn.Module):
         super().__init__()
 
         self.output_shape = output_shape
+        self.context_length = context_length
         self.context_use_bias = context_use_bias
         self.initialization_std = initialization_std
         self.eps = max(eps, 6.0e-8) if dtype_weights == torch.float16 else eps
         self.dtype_weights = dtype_weights
 
         self.context_transform_input = nn.Linear(
-            in_features=context_length,
+            in_features=self.context_length,
             out_features=12,
             bias=self.context_use_bias,
             dtype=self.dtype_weights,
         )
         self.context_transform_gate = nn.Linear(
-            in_features=context_length,
+            in_features=self.context_length,
             out_features=12,
             bias=self.context_use_bias,
             dtype=self.dtype_weights,
@@ -171,12 +172,12 @@ class WeightsLib2DBeta(nn.Module):
 
         weights_projection_a = self.weights_projection_a.repeat(target_shape)
         weights_projection_b = self.weights_projection_b.repeat(target_shape)
-        weight_projection = torch.lerp(weights_projection_a, weights_projection_b, proj_l)
-        weight_projection = self.add(weight_projection, proj_b)
-        weight_projection = self.mul(weight_projection, proj_s)
+        weights_projection = torch.lerp(weights_projection_a, weights_projection_b, proj_l)
+        weights_projection = self.add(weights_projection, proj_b)
+        weights_projection = self.mul(weights_projection, proj_s)
 
-        denom = (weight_projection ** 2).sum(-1).add(self.eps).sqrt().unsqueeze(-1)
-        theta = weight_projection / denom
+        denom = (weights_projection ** 2).sum(-1).add(self.eps).sqrt().unsqueeze(-1)
+        theta = weights_projection / denom
         weights = (weights_base * theta).sum(dim=-1)
 
         x = weights if weights.dtype == input_dtype else weights.to(input_dtype)
