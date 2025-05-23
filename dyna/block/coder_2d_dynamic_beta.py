@@ -28,6 +28,7 @@ class Coder2DDynamicBeta(nn.Module):
         batch_norm_affine: bool = True,
         batch_norm_momentum: float = 1.0e-1,
         # Additional:
+        second_order_weights: bool = False,
         activation_internal: Callable = torch.tanh,
         eps: float = 1.0e-5,
         dtype_weights: torch.dtype = torch.float32,
@@ -68,6 +69,7 @@ class Coder2DDynamicBeta(nn.Module):
         assert type(batch_norm_affine) == bool, f"batch_norm_affine should be a boolean. {var_info(batch_norm_affine)}"
         assert type(batch_norm_momentum) == float, f"batch_norm_momentum should be a float. {var_info(batch_norm_momentum)}"
         assert batch_norm_momentum >= 0, f"batch_norm_momentum should be positive or equal to 0.0. {var_info(batch_norm_momentum)}"
+        assert type(second_order_weights) == bool, f"second_order_weights should be a boolean. {var_info(second_order_weights)}"
         assert callable(activation_internal), f"activation_internal should be a function/callable. {var_info(activation_internal)}"
         assert type(eps) == float, f"eps should be a float. {var_info(eps)}"
         assert dtype_weights in dtypes, f"dtype_weights should be one of: {dtypes}. {var_info(dtype_weights)}"
@@ -98,6 +100,7 @@ class Coder2DDynamicBeta(nn.Module):
         self.interpolate_antialias = interpolate_antialias
         self.batch_norm_affine = batch_norm_affine
         self.batch_norm_momentum = batch_norm_momentum
+        self.second_order_weights = second_order_weights
         self.activation_internal = activation_internal
         self.eps = eps
         self.dtype_weights = dtype_weights
@@ -128,6 +131,7 @@ class Coder2DDynamicBeta(nn.Module):
             dilation=[1, 1],
             transpose=False,
             output_padding=None,
+            second_order_weights=self.second_order_weights,
             dtype_weights=self.dtype_weights,
         )
         self.coder_block_conv_large = DynamicConv2DBeta(
@@ -141,6 +145,7 @@ class Coder2DDynamicBeta(nn.Module):
             dilation=[1, 1],
             transpose=False,
             output_padding=None,
+            second_order_weights=self.second_order_weights,
             dtype_weights=self.dtype_weights,
         )
         self.coder_block_conv_refine = DynamicConv2DBeta(
@@ -154,6 +159,7 @@ class Coder2DDynamicBeta(nn.Module):
             dilation=[1, 1],
             transpose=False,
             output_padding=None,
+            second_order_weights=self.second_order_weights,
             dtype_weights=self.dtype_weights,
         )
         
