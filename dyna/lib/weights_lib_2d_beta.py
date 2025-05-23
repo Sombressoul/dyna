@@ -175,7 +175,7 @@ class WeightsLib2DBeta(nn.Module):
         weight_projection = self.add(weight_projection, proj_b)
         weight_projection = self.mul(weight_projection, proj_s)
 
-        denom = torch.sqrt((weight_projection ** 2).sum(-1).add(self.eps)).unsqueeze(-1)
+        denom = (weight_projection ** 2).sum(-1).add(self.eps).sqrt().unsqueeze(-1)
         theta = weight_projection / denom
         weights = (weights_base * theta).sum(dim=-1)
 
