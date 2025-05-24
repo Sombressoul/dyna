@@ -11,7 +11,7 @@ class WeightsLib2DGamma(nn.Module):
         context_length: int,
         context_use_bias: bool = True,
         rank: int = 4,
-        initialization_std: float = 1.0e-2,
+        initialization_std: float = 1.0e-3,
         eps: float = 1.0e-12,
         dtype_weights: torch.dtype = torch.bfloat16,
     ) -> None:
@@ -113,7 +113,6 @@ class WeightsLib2DGamma(nn.Module):
 
         x_transformed = self.context_transform(x)
         x_transformed = x_transformed[::, 0:(12 * self.rank + self.rank)] * torch.tanh(x_transformed[::, (12 * self.rank + self.rank)::])
-        rank_weights = torch.softmax(x_transformed[::, (12 * self.rank)::], dim=-1)
         mod = x_transformed[::, 0:(12 * self.rank)]
         mod = mod.reshape([mod.shape[0], self.rank, 3, 2, 1, 1, 2]).expand([-1, -1, -1, -1, *self.output_shape, -1])
 
@@ -133,7 +132,14 @@ class WeightsLib2DGamma(nn.Module):
         denom = (weights[::, ::, 1] ** 2).sum(-1).add(self.eps).sqrt().unsqueeze(-1)
         theta = weights[::, ::, 1] / denom
         weights = (weights[::, ::, 0] * theta).sum(dim=-1)
-        weights = weights * rank_weights.reshape([*rank_weights.shape, *[1]*len(weights.shape[2::])])
+
+        probs = weights.abs() / (weights.abs().sum(dim=[-2, -1], keepdim=True) + self.eps)
+        entropy = -(probs * probs.clamp(min=self.eps).log()).sum(dim=[-2, -1]).clamp(min=self.eps)
+        weight_rank = x_transformed[::, (12 * self.rank)::]
+        weight_rank = weight_rank * entropy.detach() # Scale, but do not increase entropy!
+        weight_rank = torch.softmax(weight_rank, dim=-1)
+
+        weights = weights * weight_rank.reshape([*weight_rank.shape, *[1]*len(weights.shape[2::])])
         weights = weights.sum(1)
 
         x = weights if weights.dtype == input_dtype else weights.to(input_dtype)
