@@ -148,8 +148,9 @@ class DynamicConv2DBeta(nn.Module):
         )
         wl_class = WeightsLib2DBetaSecondOrder if self.second_order_weights else WeightsLib2DBeta
         self.weights_lib = wl_class(**wl_params)
-        self.padding_dynamic_value = (
-            nn.Parameter(
+
+        if self.padding_dynamic:
+            self.padding_dynamic_value = nn.Parameter(
                 data=nn.init.normal_(
                     tensor=torch.empty(
                         [1],
@@ -159,9 +160,6 @@ class DynamicConv2DBeta(nn.Module):
                     std=1.0e-3,
                 )
             )
-            if self.padding_dynamic
-            else None
-        )
 
         pass
 
@@ -328,7 +326,7 @@ class DynamicConv2DBeta(nn.Module):
                 dilation=self.dilation,
             )
 
-        if self.padding_dynamic_value:
+        if self.padding_dynamic:
             x_padded_ones = F.pad(
                 input=x,
                 pad=(
@@ -366,7 +364,7 @@ class DynamicConv2DBeta(nn.Module):
                 input=x,
                 pad=self.padding,
                 mode="constant",
-                value=self.padding_dynamic_value if self.padding_dynamic else None,
+                value=None,
             )
 
         batched_fn = torch.vmap(wrapped_fn)
