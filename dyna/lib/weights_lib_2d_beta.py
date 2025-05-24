@@ -3,8 +3,6 @@ import torch.nn as nn
 
 from typing import Union, List
 
-from dyna.functional import siglog
-
 
 class WeightsLib2DBeta(nn.Module):
     def __init__(
