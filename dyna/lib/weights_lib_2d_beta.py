@@ -12,7 +12,7 @@ class WeightsLib2DBeta(nn.Module):
         output_shape: Union[torch.Size, List[int]],
         context_length: int,
         context_use_bias: bool = True,
-        initialization_std: float = 1.0e-3,
+        initialization_std: float = 1.0e-4,
         eps: float = 1.0e-12,
         dtype_weights: torch.dtype = torch.bfloat16,
     ) -> None:
