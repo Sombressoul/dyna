@@ -60,6 +60,7 @@ class DecoderOnlyModel(nn.Module):
         self.kernel_size_c_lrg = [5, 5]
         self.kernel_size_c_refine = [3, 3]
 
+        self.dynconv_second_order_weights = True
         self.dynconv_context_use_bias = False
         self.dynconv_context_conv_use_bias = False
         self.dynconv_context_dropout_rate = 0.0
@@ -83,16 +84,14 @@ class DecoderOnlyModel(nn.Module):
             in_channels=self.encoder_channels_in,
             out_channels=self.encoder_channels_conv,
             context_length=self.context_length,
-            # context_rank=self.context_rank,
             context_use_bias=self.dynconv_context_use_bias,
-            # context_conv_use_bias=self.dynconv_context_conv_use_bias,
-            # context_dropout_rate=self.dynconv_context_dropout_rate,
             kernel_size=[3, 3],
             stride=[1, 1],
             padding=[0, 0, 0, 0],
             dilation=[1, 1],
             transpose=False,
             output_padding=None,
+            second_order_weights=self.dynconv_second_order_weights,
             dtype_weights=self.dtype_weights,
         )
         self.block_input_ctx_norm = nn.LayerNorm(
@@ -105,10 +104,7 @@ class DecoderOnlyModel(nn.Module):
         # ====> Encode block: 01
         self.encode_block_01 = Coder2DDynamicBeta(
             context_length=self.context_length,
-            # context_rank=self.context_rank,
             context_use_bias=self.dynconv_context_use_bias,
-            # context_conv_use_bias=self.dynconv_context_conv_use_bias,
-            # context_dropout_rate=self.dynconv_context_dropout_rate,
             conv_channels_in=self.encoder_channels_conv,
             conv_channels_out=self.encoder_channels_conv,
             conv_channels_intermediate=self.encoder_channels_contextual,
@@ -116,14 +112,12 @@ class DecoderOnlyModel(nn.Module):
             conv_kernel_large=self.kernel_size_c_lrg,
             conv_kernel_refine=self.kernel_size_c_sml,
             interpolate_scale_factor=0.5,
+            second_order_weights=self.dynconv_second_order_weights,
             dtype_weights=self.dtype_weights,
         )
         self.encode_block_01_enchance = Coder2DDynamicBeta(
             context_length=self.context_length,
-            # context_rank=self.context_rank,
             context_use_bias=self.dynconv_context_use_bias,
-            # context_conv_use_bias=self.dynconv_context_conv_use_bias,
-            # context_dropout_rate=self.dynconv_context_dropout_rate,
             conv_channels_in=self.encoder_channels_conv,
             conv_channels_out=self.encoder_channels_conv,
             conv_channels_intermediate=self.encoder_channels_contextual,
@@ -131,16 +125,14 @@ class DecoderOnlyModel(nn.Module):
             conv_kernel_large=self.kernel_size_c_lrg,
             conv_kernel_refine=self.kernel_size_c_sml,
             interpolate_scale_factor=1.0,
+            second_order_weights=self.dynconv_second_order_weights,
             dtype_weights=self.dtype_weights,
         )
 
         # ====> Encode block: 02
         self.encode_block_02 = Coder2DDynamicBeta(
             context_length=self.context_length,
-            # context_rank=self.context_rank,
             context_use_bias=self.dynconv_context_use_bias,
-            # context_conv_use_bias=self.dynconv_context_conv_use_bias,
-            # context_dropout_rate=self.dynconv_context_dropout_rate,
             conv_channels_in=self.encoder_channels_conv,
             conv_channels_out=self.encoder_channels_conv,
             conv_channels_intermediate=self.encoder_channels_contextual,
@@ -148,14 +140,12 @@ class DecoderOnlyModel(nn.Module):
             conv_kernel_large=self.kernel_size_c_lrg,
             conv_kernel_refine=self.kernel_size_c_sml,
             interpolate_scale_factor=0.5,
+            second_order_weights=self.dynconv_second_order_weights,
             dtype_weights=self.dtype_weights,
         )
         self.encode_block_02_enchance = Coder2DDynamicBeta(
             context_length=self.context_length,
-            # context_rank=self.context_rank,
             context_use_bias=self.dynconv_context_use_bias,
-            # context_conv_use_bias=self.dynconv_context_conv_use_bias,
-            # context_dropout_rate=self.dynconv_context_dropout_rate,
             conv_channels_in=self.encoder_channels_conv,
             conv_channels_out=self.encoder_channels_conv,
             conv_channels_intermediate=self.encoder_channels_contextual,
@@ -163,16 +153,14 @@ class DecoderOnlyModel(nn.Module):
             conv_kernel_large=self.kernel_size_c_lrg,
             conv_kernel_refine=self.kernel_size_c_sml,
             interpolate_scale_factor=1.0,
+            second_order_weights=self.dynconv_second_order_weights,
             dtype_weights=self.dtype_weights,
         )
 
         # ====> Encode block: 03
         self.encode_block_03 = Coder2DDynamicBeta(
             context_length=self.context_length,
-            # context_rank=self.context_rank,
             context_use_bias=self.dynconv_context_use_bias,
-            # context_conv_use_bias=self.dynconv_context_conv_use_bias,
-            # context_dropout_rate=self.dynconv_context_dropout_rate,
             conv_channels_in=self.encoder_channels_conv,
             conv_channels_out=self.encoder_channels_conv,
             conv_channels_intermediate=self.encoder_channels_contextual,
@@ -180,14 +168,12 @@ class DecoderOnlyModel(nn.Module):
             conv_kernel_large=self.kernel_size_c_lrg,
             conv_kernel_refine=self.kernel_size_c_sml,
             interpolate_scale_factor=0.5,
+            second_order_weights=self.dynconv_second_order_weights,
             dtype_weights=self.dtype_weights,
         )
         self.encode_block_03_enchance = Coder2DDynamicBeta(
             context_length=self.context_length,
-            # context_rank=self.context_rank,
             context_use_bias=self.dynconv_context_use_bias,
-            # context_conv_use_bias=self.dynconv_context_conv_use_bias,
-            # context_dropout_rate=self.dynconv_context_dropout_rate,
             conv_channels_in=self.encoder_channels_conv,
             conv_channels_out=self.encoder_channels_conv,
             conv_channels_intermediate=self.encoder_channels_contextual,
@@ -195,16 +181,14 @@ class DecoderOnlyModel(nn.Module):
             conv_kernel_large=self.kernel_size_c_lrg,
             conv_kernel_refine=self.kernel_size_c_sml,
             interpolate_scale_factor=1.0,
+            second_order_weights=self.dynconv_second_order_weights,
             dtype_weights=self.dtype_weights,
         )
 
         # ====> Encode block: 04
         self.encode_block_04 = Coder2DDynamicBeta(
             context_length=self.context_length,
-            # context_rank=self.context_rank,
             context_use_bias=self.dynconv_context_use_bias,
-            # context_conv_use_bias=self.dynconv_context_conv_use_bias,
-            # context_dropout_rate=self.dynconv_context_dropout_rate,
             conv_channels_in=self.encoder_channels_conv,
             conv_channels_out=self.encoder_channels_conv,
             conv_channels_intermediate=self.encoder_channels_contextual,
@@ -212,14 +196,12 @@ class DecoderOnlyModel(nn.Module):
             conv_kernel_large=self.kernel_size_c_lrg,
             conv_kernel_refine=self.kernel_size_c_sml,
             interpolate_scale_factor=0.5,
+            second_order_weights=self.dynconv_second_order_weights,
             dtype_weights=self.dtype_weights,
         )
         self.encode_block_04_enchance = Coder2DDynamicBeta(
             context_length=self.context_length,
-            # context_rank=self.context_rank,
             context_use_bias=self.dynconv_context_use_bias,
-            # context_conv_use_bias=self.dynconv_context_conv_use_bias,
-            # context_dropout_rate=self.dynconv_context_dropout_rate,
             conv_channels_in=self.encoder_channels_conv,
             conv_channels_out=self.encoder_channels_conv,
             conv_channels_intermediate=self.encoder_channels_contextual,
@@ -227,16 +209,14 @@ class DecoderOnlyModel(nn.Module):
             conv_kernel_large=self.kernel_size_c_lrg,
             conv_kernel_refine=self.kernel_size_c_sml,
             interpolate_scale_factor=1.0,
+            second_order_weights=self.dynconv_second_order_weights,
             dtype_weights=self.dtype_weights,
         )
 
         # ====> Encode block: 05
         self.encode_block_05 = Coder2DDynamicBeta(
             context_length=self.context_length,
-            # context_rank=self.context_rank,
             context_use_bias=self.dynconv_context_use_bias,
-            # context_conv_use_bias=self.dynconv_context_conv_use_bias,
-            # context_dropout_rate=self.dynconv_context_dropout_rate,
             conv_channels_in=self.encoder_channels_conv,
             conv_channels_out=self.encoder_channels_conv,
             conv_channels_intermediate=self.encoder_channels_contextual,
@@ -244,14 +224,12 @@ class DecoderOnlyModel(nn.Module):
             conv_kernel_large=self.kernel_size_c_lrg,
             conv_kernel_refine=self.kernel_size_c_sml,
             interpolate_scale_factor=0.5,
+            second_order_weights=self.dynconv_second_order_weights,
             dtype_weights=self.dtype_weights,
         )
         self.encode_block_05_enchance = Coder2DDynamicBeta(
             context_length=self.context_length,
-            # context_rank=self.context_rank,
             context_use_bias=self.dynconv_context_use_bias,
-            # context_conv_use_bias=self.dynconv_context_conv_use_bias,
-            # context_dropout_rate=self.dynconv_context_dropout_rate,
             conv_channels_in=self.encoder_channels_conv,
             conv_channels_out=self.encoder_channels_conv,
             conv_channels_intermediate=self.encoder_channels_contextual,
@@ -259,16 +237,14 @@ class DecoderOnlyModel(nn.Module):
             conv_kernel_large=self.kernel_size_c_lrg,
             conv_kernel_refine=self.kernel_size_c_sml,
             interpolate_scale_factor=1.0,
+            second_order_weights=self.dynconv_second_order_weights,
             dtype_weights=self.dtype_weights,
         )
 
         # ====> Decode block: bottleneck
-        self.encode_block_bottleneck_encode = Coder2DDynamicBeta(
+        self.bottleneck_block_encode = Coder2DDynamicBeta(
             context_length=self.context_length,
-            # context_rank=self.context_rank,
             context_use_bias=self.dynconv_context_use_bias,
-            # context_conv_use_bias=self.dynconv_context_conv_use_bias,
-            # context_dropout_rate=self.dynconv_context_dropout_rate,
             conv_channels_in=self.encoder_channels_conv,
             conv_channels_out=self.encoder_channels_out,
             conv_channels_intermediate=self.encoder_channels_contextual,
@@ -276,14 +252,12 @@ class DecoderOnlyModel(nn.Module):
             conv_kernel_large=self.kernel_size_c_lrg,
             conv_kernel_refine=self.kernel_size_c_sml,
             interpolate_scale_factor=1.0,
+            second_order_weights=self.dynconv_second_order_weights,
             dtype_weights=self.dtype_weights,
         )
-        self.encode_block_bottleneck_decode = Coder2DDynamicBeta(
+        self.bottleneck_block_decode = Coder2DDynamicBeta(
             context_length=self.context_length,
-            # context_rank=self.context_rank,
             context_use_bias=self.dynconv_context_use_bias,
-            # context_conv_use_bias=self.dynconv_context_conv_use_bias,
-            # context_dropout_rate=self.dynconv_context_dropout_rate,
             conv_channels_in=self.decoder_channels_in,
             conv_channels_out=self.decoder_channels_conv,
             conv_channels_intermediate=self.decoder_channels_contextual,
@@ -291,16 +265,14 @@ class DecoderOnlyModel(nn.Module):
             conv_kernel_large=self.kernel_size_c_lrg,
             conv_kernel_refine=self.kernel_size_c_sml,
             interpolate_scale_factor=1.0,
+            second_order_weights=self.dynconv_second_order_weights,
             dtype_weights=self.dtype_weights,
         )
 
         # ====> Decode block: 05
         self.decode_block_05 = Coder2DDynamicBeta(
             context_length=self.context_length,
-            # context_rank=self.context_rank,
             context_use_bias=self.dynconv_context_use_bias,
-            # context_conv_use_bias=self.dynconv_context_conv_use_bias,
-            # context_dropout_rate=self.dynconv_context_dropout_rate,
             conv_channels_in=self.encoder_channels_conv,
             conv_channels_out=self.decoder_channels_conv,
             conv_channels_intermediate=self.decoder_channels_contextual,
@@ -308,14 +280,12 @@ class DecoderOnlyModel(nn.Module):
             conv_kernel_large=self.kernel_size_c_lrg,
             conv_kernel_refine=self.kernel_size_c_sml,
             interpolate_scale_factor=2.0,
+            second_order_weights=self.dynconv_second_order_weights,
             dtype_weights=self.dtype_weights,
         )
         self.decode_block_05_enchance = Coder2DDynamicBeta(
             context_length=self.context_length,
-            # context_rank=self.context_rank,
             context_use_bias=self.dynconv_context_use_bias,
-            # context_conv_use_bias=self.dynconv_context_conv_use_bias,
-            # context_dropout_rate=self.dynconv_context_dropout_rate,
             conv_channels_in=self.decoder_channels_conv,
             conv_channels_out=self.decoder_channels_conv,
             conv_channels_intermediate=self.decoder_channels_contextual,
@@ -323,16 +293,14 @@ class DecoderOnlyModel(nn.Module):
             conv_kernel_large=self.kernel_size_c_lrg,
             conv_kernel_refine=self.kernel_size_c_sml,
             interpolate_scale_factor=1.0,
+            second_order_weights=self.dynconv_second_order_weights,
             dtype_weights=self.dtype_weights,
         )
 
         # ====> Decode block: 04
         self.decode_block_04 = Coder2DDynamicBeta(
             context_length=self.context_length,
-            # context_rank=self.context_rank,
             context_use_bias=self.dynconv_context_use_bias,
-            # context_conv_use_bias=self.dynconv_context_conv_use_bias,
-            # context_dropout_rate=self.dynconv_context_dropout_rate,
             conv_channels_in=self.decoder_channels_conv,
             conv_channels_out=self.decoder_channels_conv,
             conv_channels_intermediate=self.decoder_channels_contextual,
@@ -340,14 +308,12 @@ class DecoderOnlyModel(nn.Module):
             conv_kernel_large=self.kernel_size_c_lrg,
             conv_kernel_refine=self.kernel_size_c_sml,
             interpolate_scale_factor=2.0,
+            second_order_weights=self.dynconv_second_order_weights,
             dtype_weights=self.dtype_weights,
         )
         self.decode_block_04_enchance = Coder2DDynamicBeta(
             context_length=self.context_length,
-            # context_rank=self.context_rank,
             context_use_bias=self.dynconv_context_use_bias,
-            # context_conv_use_bias=self.dynconv_context_conv_use_bias,
-            # context_dropout_rate=self.dynconv_context_dropout_rate,
             conv_channels_in=self.decoder_channels_conv,
             conv_channels_out=self.decoder_channels_conv,
             conv_channels_intermediate=self.decoder_channels_contextual,
@@ -355,16 +321,14 @@ class DecoderOnlyModel(nn.Module):
             conv_kernel_large=self.kernel_size_c_lrg,
             conv_kernel_refine=self.kernel_size_c_sml,
             interpolate_scale_factor=1.0,
+            second_order_weights=self.dynconv_second_order_weights,
             dtype_weights=self.dtype_weights,
         )
 
         # ====> Decode block: 03
         self.decode_block_03 = Coder2DDynamicBeta(
             context_length=self.context_length,
-            # context_rank=self.context_rank,
             context_use_bias=self.dynconv_context_use_bias,
-            # context_conv_use_bias=self.dynconv_context_conv_use_bias,
-            # context_dropout_rate=self.dynconv_context_dropout_rate,
             conv_channels_in=self.decoder_channels_conv,
             conv_channels_out=self.decoder_channels_conv,
             conv_channels_intermediate=self.decoder_channels_contextual,
@@ -372,14 +336,12 @@ class DecoderOnlyModel(nn.Module):
             conv_kernel_large=self.kernel_size_c_lrg,
             conv_kernel_refine=self.kernel_size_c_sml,
             interpolate_scale_factor=2.0,
+            second_order_weights=self.dynconv_second_order_weights,
             dtype_weights=self.dtype_weights,
         )
         self.decode_block_03_enchance = Coder2DDynamicBeta(
             context_length=self.context_length,
-            # context_rank=self.context_rank,
             context_use_bias=self.dynconv_context_use_bias,
-            # context_conv_use_bias=self.dynconv_context_conv_use_bias,
-            # context_dropout_rate=self.dynconv_context_dropout_rate,
             conv_channels_in=self.decoder_channels_conv,
             conv_channels_out=self.decoder_channels_conv,
             conv_channels_intermediate=self.decoder_channels_contextual,
@@ -387,16 +349,14 @@ class DecoderOnlyModel(nn.Module):
             conv_kernel_large=self.kernel_size_c_lrg,
             conv_kernel_refine=self.kernel_size_c_sml,
             interpolate_scale_factor=1.0,
+            second_order_weights=self.dynconv_second_order_weights,
             dtype_weights=self.dtype_weights,
         )
 
         # ====> Decode block: 02
         self.decode_block_02 = Coder2DDynamicBeta(
             context_length=self.context_length,
-            # context_rank=self.context_rank,
             context_use_bias=self.dynconv_context_use_bias,
-            # context_conv_use_bias=self.dynconv_context_conv_use_bias,
-            # context_dropout_rate=self.dynconv_context_dropout_rate,
             conv_channels_in=self.decoder_channels_conv,
             conv_channels_out=self.decoder_channels_conv,
             conv_channels_intermediate=self.decoder_channels_contextual,
@@ -404,14 +364,12 @@ class DecoderOnlyModel(nn.Module):
             conv_kernel_large=self.kernel_size_c_lrg,
             conv_kernel_refine=self.kernel_size_c_sml,
             interpolate_scale_factor=2.0,
+            second_order_weights=self.dynconv_second_order_weights,
             dtype_weights=self.dtype_weights,
         )
         self.decode_block_02_enchance = Coder2DDynamicBeta(
             context_length=self.context_length,
-            # context_rank=self.context_rank,
             context_use_bias=self.dynconv_context_use_bias,
-            # context_conv_use_bias=self.dynconv_context_conv_use_bias,
-            # context_dropout_rate=self.dynconv_context_dropout_rate,
             conv_channels_in=self.decoder_channels_conv,
             conv_channels_out=self.decoder_channels_conv,
             conv_channels_intermediate=self.decoder_channels_contextual,
@@ -419,16 +377,14 @@ class DecoderOnlyModel(nn.Module):
             conv_kernel_large=self.kernel_size_c_lrg,
             conv_kernel_refine=self.kernel_size_c_sml,
             interpolate_scale_factor=1.0,
+            second_order_weights=self.dynconv_second_order_weights,
             dtype_weights=self.dtype_weights,
         )
 
         # ====> Decode block: 01
         self.decode_block_01 = Coder2DDynamicBeta(
             context_length=self.context_length,
-            # context_rank=self.context_rank,
             context_use_bias=self.dynconv_context_use_bias,
-            # context_conv_use_bias=self.dynconv_context_conv_use_bias,
-            # context_dropout_rate=self.dynconv_context_dropout_rate,
             conv_channels_in=self.decoder_channels_conv,
             conv_channels_out=self.decoder_channels_conv,
             conv_channels_intermediate=self.decoder_channels_contextual,
@@ -436,14 +392,12 @@ class DecoderOnlyModel(nn.Module):
             conv_kernel_large=self.kernel_size_c_lrg,
             conv_kernel_refine=self.kernel_size_c_sml,
             interpolate_scale_factor=2.0,
+            second_order_weights=self.dynconv_second_order_weights,
             dtype_weights=self.dtype_weights,
         )
         self.decode_block_01_enchance = Coder2DDynamicBeta(
             context_length=self.context_length,
-            # context_rank=self.context_rank,
             context_use_bias=self.dynconv_context_use_bias,
-            # context_conv_use_bias=self.dynconv_context_conv_use_bias,
-            # context_dropout_rate=self.dynconv_context_dropout_rate,
             conv_channels_in=self.decoder_channels_conv,
             conv_channels_out=self.decoder_channels_conv,
             conv_channels_intermediate=self.decoder_channels_contextual,
@@ -451,6 +405,7 @@ class DecoderOnlyModel(nn.Module):
             conv_kernel_large=self.kernel_size_c_lrg,
             conv_kernel_refine=self.kernel_size_c_sml,
             interpolate_scale_factor=1.0,
+            second_order_weights=self.dynconv_second_order_weights,
             dtype_weights=self.dtype_weights,
         )
 
@@ -466,16 +421,14 @@ class DecoderOnlyModel(nn.Module):
             in_channels=self.decoder_channels_conv,
             out_channels=self.decoder_channels_out,
             context_length=self.context_length,
-            # context_rank=self.context_rank,
             context_use_bias=self.dynconv_context_use_bias,
-            # context_conv_use_bias=self.dynconv_context_conv_use_bias,
-            # context_dropout_rate=self.dynconv_context_dropout_rate,
             kernel_size=[3, 3],
             stride=[1, 1],
             padding=[0, 0, 0, 0],
             dilation=[1, 1],
             transpose=False,
             output_padding=None,
+            second_order_weights=self.dynconv_second_order_weights,
             dtype_weights=self.dtype_weights,
         )
 
@@ -533,8 +486,8 @@ class DecoderOnlyModel(nn.Module):
         x = x_buf + x + self.encode_block_05_enchance(x, ctx)
 
         # Bottleneck
-        x = self.encode_block_bottleneck_encode(x, ctx)
-        x = self.encode_block_bottleneck_decode(x, ctx)
+        x = self.bottleneck_block_encode(x, ctx)
+        x = self.bottleneck_block_decode(x, ctx)
 
         # Decode
         x_buf = interpolate(x, 2.0)
@@ -751,28 +704,31 @@ def train(
                     [
                         f"Iteration #{step_idx+1}:",
                         f"LR: {optimizer.param_groups[0]['lr']:.10f}",
-                        f"Loss current: {loss_current_step.item()}",
-                        f"Loss mean: {(sum(loss_logging_accumulator)/len(loss_logging_accumulator)):.5f}",
+                        f"Loss current: {loss_current_step.item():.20f}",
+                        f"Loss mean: {(sum(loss_logging_accumulator)/len(loss_logging_accumulator)):.20f}",
                         "Weigths:",
                         f"{model.data_cache_ctx.abs().mean().tolist()=}",
                     ]
                 )
             )
-            # inspect_grad(model.block_input_x_conv   , "block_input_x_conv   ")
-            # inspect_grad(model.encode_block_01      , "encode_block_01      ")
-            # inspect_grad(model.encode_block_02      , "encode_block_02      ")
-            # inspect_grad(model.encode_block_03      , "encode_block_03      ")
-            # inspect_grad(model.encode_block_04      , "encode_block_04      ")
-            # inspect_grad(model.encode_block_05      , "encode_block_05      ")
-            # inspect_grad(model.decode_block_05      , "decode_block_05      ")
-            # inspect_grad(model.decode_block_04      , "decode_block_04      ")
-            # inspect_grad(model.decode_block_03      , "decode_block_03      ")
-            # inspect_grad(model.decode_block_02      , "decode_block_02      ")
-            # inspect_grad(model.decode_block_01      , "decode_block_01      ")
-            # inspect_grad(model.block_out_conv       , "block_out_conv       ")
+            # inspect_grad(model.block_input_x_conv       , "block_input_x_conv   ")
+            # inspect_grad(model.encode_block_01          , "encode_block_01      ")
+            # inspect_grad(model.encode_block_02          , "encode_block_02      ")
+            # inspect_grad(model.encode_block_03          , "encode_block_03      ")
+            # inspect_grad(model.encode_block_04          , "encode_block_04      ")
+            # inspect_grad(model.encode_block_05          , "encode_block_05      ")
+            # inspect_grad(model.bottleneck_block_encode  , "encode_block_05      ")
+            # inspect_grad(model.bottleneck_block_decode  , "encode_block_05      ")
+            # inspect_grad(model.decode_block_05          , "decode_block_05      ")
+            # inspect_grad(model.decode_block_04          , "decode_block_04      ")
+            # inspect_grad(model.decode_block_03          , "decode_block_03      ")
+            # inspect_grad(model.decode_block_02          , "decode_block_02      ")
+            # inspect_grad(model.decode_block_01          , "decode_block_01      ")
+            # inspect_grad(model.block_out_conv           , "block_out_conv       ")
             # exit()
             loss_logging_accumulator = []
 
+            decoded = torch.clamp(decoded, 0.0, 1.0)
             generate_images_from_data(
                 data=data_lab_to_rgb(decoded[-1].unsqueeze(0).clamp(0.0, 1.0)),
                 images_path_dst=images_path_dst,
@@ -1074,9 +1030,7 @@ if __name__ == "__main__":
     drop_ctx_cache = False
     onload_model_fn = [
         # model_constant_ctx,
-        # lambda m, d, t: model_change_data_cache_ctx(m, d, t, [32, 256]),
-        # lambda m, d, t: model_extend_data_cache(m, 128, 1.0e-6),
-        # lambda m, d, t: model_extend_data_cache(m, 512),
+        # lambda m, d, t: model_change_data_cache_ctx(m, d, t, [64, 256]),
         # model_freeze_model,
         # model_freeze_ctx,
         # model_freeze_all,
@@ -1098,7 +1052,7 @@ if __name__ == "__main__":
         # lambda m, d, t: model_unfreeze_block(m, d, t, "block_05"),
         # lambda m, d, t: model_cast_to_dtype(m, torch.bfloat16),
         # lambda m, d, t: model_perturb_small_weights(m, 1.0e-3, 1.0e-2),
-        # lambda m, d, t: model_remove_nulls(m, 1.0e-3),
+        # lambda m, d, t: model_remove_nulls(m, 1.0e-5),
         # lambda m, d, t: model_partially_activate(m, ["weights_static", "data_cache", "context_transform"]),
         # lambda m, d, t: model_partially_activate(m, ["data_cache", "context_transform"]),
     ]
@@ -1108,10 +1062,10 @@ if __name__ == "__main__":
 
     path_prefix_load = "f:\\git_AIResearch\\dyna\\data\\models"
     path_prefix_save = "f:\\git_AIResearch\\dyna\\data\\models"
-    load_path_model = f"{path_prefix_load}\\model.Type-00.G01.__LAST__01__.pth"
+    load_path_model = f"{path_prefix_load}\\model.Type-00.G02.__LAST__BUF__.pth"
     load_path_optim = f"{path_prefix_load}\\"
-    save_path_model = f"{path_prefix_save}\\model.Type-00.G01"
-    save_path_optim = f"{path_prefix_save}\\optim.Type-00.G01"
+    save_path_model = f"{path_prefix_save}\\model.Type-00.G02"
+    save_path_optim = f"{path_prefix_save}\\optim.Type-00.G02"
     save_model = True
     save_optim = True
     save_nth_iteration = 8192
@@ -1131,12 +1085,12 @@ if __name__ == "__main__":
     adam_weight_decay = 0.0
     adam_eps = 1.0e-8
     # optimizer: torch.optim.AdamW
-    adamw_learning_rate = 1.0e-5
-    adamw_amsgrad = False
-    adamw_weight_decay = 1.0e-2
-    adamw_eps = 1.0e-6
+    adamw_learning_rate = 1.0e-8 # Pretrain: 1.0e-8
+    adamw_amsgrad = True # Pretrain: False
+    adamw_weight_decay = 1.0e-2 # Pretrain: 1.0e-2
+    adamw_eps = 1.0e-6 # Pretrain: 1.0e-6
     # optimizer: MADGRAD
-    madgrad_learning_rate = 1.0e-2
+    madgrad_learning_rate = 1.0e-9
     madgrad_momentum = 0.9
     madgrad_weight_decay = 0.0
     madgrad_eps = 1.0e-6
@@ -1156,20 +1110,20 @@ if __name__ == "__main__":
     optim_target_lr = 1.0e-3
     optim_update_wd = False
     optim_target_wd = 0.1
-    warmup_active = True
+    warmup_active = False
     warmup_epochs = 256
     clip_grad_value = None
-    clip_grad_norm = 1.0
+    clip_grad_norm = None
     gradient_global_norm = False
 
-    data_cache_ctx_bound = [-1.0e-6, +1.0e-6]
+    data_cache_ctx_bound = [-1.0e-12, +1.0e-12]
 
-    nelements = 128
-    data_cache_ctx_len = 4096 # nelements
-    data_cache_ctx_shape = [128]
+    nelements = 64
+    data_cache_ctx_len = nelements
+    data_cache_ctx_shape = [256]
 
     total_steps = 200_000
-    batch_size = 16
+    batch_size = 8
     grad_accumulation_steps = nelements // batch_size
 
     images_sample_count = nelements
