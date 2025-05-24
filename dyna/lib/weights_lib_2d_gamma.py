@@ -129,14 +129,16 @@ class WeightsLib2DGamma(nn.Module):
         weights = self.lerp(weights[::, ::, 0], weights[::, ::, 1], param_l)
         weights = self.addmul(weights, param_s, param_b)
 
-        denom = (weights[::, ::, 1] ** 2).sum(-1).add(self.eps).sqrt().unsqueeze(-1)
+        denom = (weights[::, ::, 1] ** 2).sum(-1).clamp(min=self.eps).sqrt().unsqueeze(-1)
         theta = weights[::, ::, 1] / denom
         weights = (weights[::, ::, 0] * theta).sum(dim=-1)
 
-        probs = weights.abs() / (weights.abs().sum(dim=[-2, -1], keepdim=True) + self.eps)
-        entropy = -(probs * probs.clamp(min=self.eps).log()).sum(dim=[-2, -1]).clamp(min=self.eps)
+        probs = weights.abs() / weights.abs().sum(dim=[-2, -1], keepdim=True).clamp(min=self.eps)
+        entropy = -(probs * probs.clamp(min=self.eps).log()).sum(dim=[-2, -1])
+        entropy = entropy / entropy.mean(dim=-1, keepdim=True).clamp(min=self.eps)
         weight_rank = x_transformed[::, (12 * self.rank)::]
-        weight_rank = weight_rank * entropy.detach() # Scale, but do not increase entropy!
+        weight_rank = weight_rank + entropy.detach() # Scale, but do not increase entropy!
+        weight_rank = torch.nn.functional.normalize(weight_rank, p=2, dim=-1) # Less peaky softmax -> better generalization.
         weight_rank = torch.softmax(weight_rank, dim=-1)
 
         weights = weights * weight_rank.reshape([*weight_rank.shape, *[1]*len(weights.shape[2::])])
