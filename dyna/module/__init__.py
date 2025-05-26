@@ -3,6 +3,7 @@ from dyna.module.exponential_warper_1d import ExponentialWarper1D
 from dyna.module.dynamic_conv2d import DynamicConv2D
 from dyna.module.dynamic_conv2d_alpha import DynamicConv2DAlpha
 from dyna.module.dynamic_conv2d_beta import DynamicConv2DBeta
+from dyna.module.dynamic_conv2d_gamma import DynamicConv2DGamma
 
 __all__ = [
     "BGNLayer",
@@ -10,4 +11,5 @@ __all__ = [
     "DynamicConv2D",
     "DynamicConv2DAlpha",
     "DynamicConv2DBeta",
+    "DynamicConv2DGamma",
 ]
