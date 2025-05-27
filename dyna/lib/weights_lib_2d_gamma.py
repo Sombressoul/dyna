@@ -11,6 +11,7 @@ class WeightsLib2DGamma(nn.Module):
         context_length: int,
         context_use_bias: bool = True,
         rank: int = 4,
+        entropy_regularization: bool = False,
         initialization_std: float = 1.0e-3,
         eps: float = 1.0e-12,
         dtype_weights: torch.dtype = torch.bfloat16,
@@ -21,6 +22,7 @@ class WeightsLib2DGamma(nn.Module):
         self.context_length = context_length
         self.context_use_bias = context_use_bias
         self.rank = rank
+        self.entropy_regularization = entropy_regularization
         self.initialization_std = initialization_std
         self.eps = max(eps, 6.0e-8) if dtype_weights == torch.float16 else eps
         self.dtype_weights = dtype_weights
@@ -133,11 +135,14 @@ class WeightsLib2DGamma(nn.Module):
         theta = weights[::, ::, 1] / denom
         weights = (weights[::, ::, 0] * theta).sum(dim=-1)
 
-        probs = weights.abs() / weights.abs().sum(dim=[-2, -1], keepdim=True).clamp(min=self.eps)
-        entropy = -(probs * probs.clamp(min=self.eps).log()).sum(dim=[-2, -1])
-        entropy = entropy / entropy.mean(dim=-1, keepdim=True).clamp(min=self.eps)
         weight_rank = x_transformed[::, (12 * self.rank)::]
-        weight_rank = weight_rank + entropy.detach() # Scale, but do not increase entropy!
+        
+        if self.entropy_regularization:
+            probs = weights.abs() / weights.abs().sum(dim=[-2, -1], keepdim=True).clamp(min=self.eps)
+            entropy = -(probs * probs.clamp(min=self.eps).log()).sum(dim=[-2, -1])
+            entropy = entropy / entropy.mean(dim=-1, keepdim=True).clamp(min=self.eps)
+            weight_rank = weight_rank + entropy.detach() # Scale, but do not increase entropy!
+
         weight_rank = torch.nn.functional.normalize(weight_rank, p=2, dim=-1) # Less peaky softmax -> better generalization.
         weight_rank = torch.softmax(weight_rank, dim=-1)
 
