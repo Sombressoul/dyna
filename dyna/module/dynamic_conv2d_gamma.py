@@ -23,6 +23,7 @@ class DynamicConv2DGamma(nn.Module):
         context_length: int,
         context_use_bias: bool = False,
         rank: int = 4,
+        entropy_regularization: bool = False,
         kernel_size: Union[int, List[int]] = [3, 3],
         stride: Union[int, List[int]] = [1, 1],
         padding: Union[int, List[int]] = [0, 0, 0, 0],
@@ -103,6 +104,7 @@ class DynamicConv2DGamma(nn.Module):
         self.context_length = context_length
         self.context_use_bias = context_use_bias
         self.rank = rank
+        self.entropy_regularization = entropy_regularization
         self.kernel_size = kernel_size
         self.stride = stride
         self.padding = padding
@@ -147,6 +149,7 @@ class DynamicConv2DGamma(nn.Module):
             context_length=self.context_length,
             context_use_bias=self.context_use_bias,
             rank=self.rank,
+            entropy_regularization=self.entropy_regularization,
             dtype_weights=self.dtype_weights,
         )
 
