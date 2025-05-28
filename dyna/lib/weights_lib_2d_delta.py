@@ -11,7 +11,7 @@ class WeightsLib2DDelta(nn.Module):
         context_length: int,
         context_use_bias: bool = True,
         rank: int = 4,
-        initialization_std: float = 1.0e-3,
+        initialization_std: float = 1.0e-5,
         eps: float = 1.0e-12,
         dtype_weights: torch.dtype = torch.bfloat16,
     ) -> None:
