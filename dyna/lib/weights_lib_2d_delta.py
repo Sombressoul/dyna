@@ -128,7 +128,7 @@ class WeightsLib2DDelta(nn.Module):
         mat_diagonal = torch.eye(mat_sim.shape[1], dtype=torch.bool, device=mat_sim.device)
         mat_sim = mat_sim * (~mat_diagonal)
         repulsion = torch.matmul(mat_sim, weights_flat) / (self.rank - 1)
-        weights_flat = weights_flat - (self.repulsion_strength / math.sqrt(self.rank)) * repulsion
+        weights_flat = weights_flat - repulsion * (self.repulsion_strength / math.sqrt(self.rank))
         weights_stable = torch.where(weights_flat.abs() < self.eps, weights_flat.sign() * self.eps, weights_flat)
         weights_flat = weights_flat + (weights_stable - weights_flat).detach()
         weights_flat = torch.nn.functional.normalize(weights_flat, p=2, dim=-1)
