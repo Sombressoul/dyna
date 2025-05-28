@@ -36,12 +36,7 @@ class WeightsLib2DDelta(nn.Module):
             bias=self.context_use_bias,
             dtype=self.dtype_weights,
         )
-        self.context_transform.weight = nn.Parameter(
-            data=torch.nn.init.xavier_uniform_(
-                tensor=torch.empty_like(self.context_transform.weight),
-            ),
-            requires_grad=True,
-        )
+        nn.init.xavier_uniform_(self.context_transform.weight)
         self.weights = nn.Parameter(
             data=torch.nn.init.normal_(
                 tensor=torch.empty(
