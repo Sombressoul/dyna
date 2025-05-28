@@ -36,6 +36,12 @@ class WeightsLib2DDelta(nn.Module):
             bias=self.context_use_bias,
             dtype=self.dtype_weights,
         )
+        self.context_transform.weight = nn.Parameter(
+            data=torch.nn.init.xavier_uniform_(
+                tensor=torch.empty_like(self.context_transform.weight),
+            ),
+            requires_grad=True,
+        )
         self.weights = nn.Parameter(
             data=torch.nn.init.normal_(
                 tensor=torch.empty(
@@ -131,7 +137,10 @@ class WeightsLib2DDelta(nn.Module):
         weights_stable = torch.where(weights_flat.abs() < self.eps, weights_flat.sign() * self.eps, weights_flat)
         weights_flat = weights_flat + (weights_stable - weights_flat).detach()
         weights_flat = torch.nn.functional.normalize(weights_flat, p=2, dim=-1)
-        weights_flat = weights_flat + self.noise_strength * torch.randn_like(weights_flat) if self.training else weights_flat
+        weights_flat_mean = weights_flat.mean(dim=-1, keepdim=True)
+        weights_flat_std = weights_flat.std(dim=-1, keepdim=True).clamp(min=self.eps)
+        vector_noise = (torch.randn_like(weights_flat) * weights_flat_std + weights_flat_mean) * self.noise_strength
+        weights_flat = weights_flat + (vector_noise - weights_flat).detach() if self.training else weights_flat
         weights = weights_flat.reshape(weights.shape)
 
         # Add null-weight for attention drain.
@@ -142,12 +151,13 @@ class WeightsLib2DDelta(nn.Module):
         )
         weights = torch.cat([weights, attention_drain], dim=1)
 
+        # Weight components ranking.
         weight_rank = x_transformed[::, slice_params::]
         weight_rank_active = weight_rank[..., :-1]
         weight_rank_drain = weight_rank[..., -1:]
         weight_rank = torch.cat([
             weight_rank_active,
-            weight_rank_drain + (1.0 / self.rank),
+            weight_rank_drain + (1.0 / math.sqrt(self.rank)),
         ], dim=-1)
         weight_rank = torch.nn.functional.normalize(weight_rank, p=2, dim=-1)
         weight_rank = torch.softmax(weight_rank, dim=-1)
