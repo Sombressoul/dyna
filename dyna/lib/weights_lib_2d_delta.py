@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import math
 
 from typing import Union, List
 
@@ -12,6 +13,8 @@ class WeightsLib2DDelta(nn.Module):
         context_use_bias: bool = True,
         rank: int = 4,
         initialization_std: float = 1.0e-5,
+        repulsion_strength: float = 0.1,
+        noise_strength: float = 0.01,
         eps: float = 1.0e-12,
         dtype_weights: torch.dtype = torch.bfloat16,
     ) -> None:
@@ -22,6 +25,8 @@ class WeightsLib2DDelta(nn.Module):
         self.context_use_bias = context_use_bias
         self.rank = rank
         self.initialization_std = initialization_std
+        self.repulsion_strength = repulsion_strength
+        self.noise_strength = noise_strength
         self.eps = max(eps, 6.0e-8) if dtype_weights == torch.float16 else eps
         self.dtype_weights = dtype_weights
 
@@ -113,6 +118,23 @@ class WeightsLib2DDelta(nn.Module):
         theta = weights[::, ::, 1] / denom
         weights = (weights[::, ::, 0] * theta).sum(dim=-1)
 
+        # Cosine similarity decorellation.
+        weights_flat = weights.view(weights.shape[0], weights.shape[1], -1)
+        weights_stable = torch.where(weights_flat.abs() < self.eps, weights_flat.sign() * self.eps, weights_flat)
+        weights_flat = weights_flat + (weights_stable - weights_flat).detach()
+        weights_flat = torch.nn.functional.normalize(weights_flat, p=2, dim=-1)
+        mat_sim = torch.matmul(weights_flat, weights_flat.transpose(1, 2))
+        mat_diagonal = torch.eye(mat_sim.shape[1], dtype=torch.bool, device=mat_sim.device)
+        mat_sim = mat_sim * (~mat_diagonal)
+        repulsion = torch.matmul(mat_sim, weights_flat) / (self.rank - 1)
+        weights_flat = weights_flat - (self.repulsion_strength / math.sqrt(self.rank)) * repulsion
+        weights_stable = torch.where(weights_flat.abs() < self.eps, weights_flat.sign() * self.eps, weights_flat)
+        weights_flat = weights_flat + (weights_stable - weights_flat).detach()
+        weights_flat = torch.nn.functional.normalize(weights_flat, p=2, dim=-1)
+        weights_flat = weights_flat + self.noise_strength * torch.randn_like(weights_flat) if self.training else weights_flat
+        weights = weights_flat.reshape(weights.shape)
+
+        # Add null-weight for attention drain.
         attention_drain = torch.zeros(
             size=[weights.shape[0], 1, *self.output_shape],
             dtype=self.dtype_weights,
