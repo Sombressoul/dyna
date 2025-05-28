@@ -94,12 +94,12 @@ class WeightsLib2DDelta(nn.Module):
 
         x = x if x.dtype == self.dtype_weights else x.to(self.dtype_weights)
 
-        slice_gate = (12 * self.rank + self.rank + 1)
-        slice_params = (12 * self.rank)
+        slice_attention = 12 * self.rank + self.rank + 1
+        slice_modulation = 12 * self.rank
 
         x_transformed = self.context_transform(x)
-        x_transformed = x_transformed[::, 0:slice_gate] * torch.tanh(x_transformed[::, slice_gate::])
-        mod = x_transformed[::, 0:slice_params]
+        x_transformed = x_transformed[::, 0:slice_attention] * torch.tanh(x_transformed[::, slice_attention::])
+        mod = x_transformed[::, 0:slice_modulation]
         mod = mod.reshape([mod.shape[0], self.rank, 3, 2, 1, 1, 2]).expand([-1, -1, -1, -1, *self.output_shape, -1])
 
         shift_lerp = torch.tensor([0.5, 0.0], dtype=x.dtype, device=x.device)
@@ -147,7 +147,7 @@ class WeightsLib2DDelta(nn.Module):
         weights = torch.cat([weights, attention_drain], dim=1)
 
         # Weight components ranking.
-        weight_rank = x_transformed[::, slice_params::]
+        weight_rank = x_transformed[::, slice_modulation::]
         weight_rank_active = weight_rank[..., :-1]
         weight_rank_drain = weight_rank[..., -1:]
         weight_rank = torch.cat([
