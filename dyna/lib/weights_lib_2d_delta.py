@@ -12,6 +12,7 @@ class WeightsLib2DDelta(nn.Module):
         context_use_bias: bool = True,
         rank: int = 4,
         initialization_std: float = 1.0e-3,
+        entropy_regularization: bool = True,
         eps: float = 1.0e-12,
         dtype_weights: torch.dtype = torch.bfloat16,
     ) -> None:
@@ -22,6 +23,7 @@ class WeightsLib2DDelta(nn.Module):
         self.context_use_bias = context_use_bias
         self.rank = rank
         self.initialization_std = initialization_std
+        self.entropy_regularization = entropy_regularization
         self.eps = max(eps, 6.0e-8) if dtype_weights == torch.float16 else eps
         self.dtype_weights = dtype_weights
 
@@ -121,6 +123,14 @@ class WeightsLib2DDelta(nn.Module):
         weights = torch.cat([weights, attention_drain], dim=1)
 
         weight_rank = x_transformed[::, slice_params::]
+        if self.entropy_regularization:
+            weight_rank_active = weight_rank[..., :-1] # ranks w/o drain
+            weight_rank_drain = weight_rank[..., -1:]
+            weight_rank_entropy = -(weight_rank_active * weight_rank_active.clamp(min=self.eps).log()).detach()
+            weight_rank = torch.cat([
+                weight_rank_active + weight_rank_entropy,
+                weight_rank_drain,
+            ], dim=-1)
         weight_rank = torch.nn.functional.normalize(weight_rank, p=2, dim=-1)
         weight_rank = torch.softmax(weight_rank, dim=-1)
 
