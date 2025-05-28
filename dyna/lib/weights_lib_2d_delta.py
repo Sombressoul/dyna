@@ -132,10 +132,10 @@ class WeightsLib2DDelta(nn.Module):
         weights_stable = torch.where(weights_flat.abs() < self.eps, weights_flat.sign() * self.eps, weights_flat)
         weights_flat = weights_flat + (weights_stable - weights_flat).detach()
         weights_flat = torch.nn.functional.normalize(weights_flat, p=2, dim=-1)
-        weights_flat_mean = weights_flat.mean(dim=-1, keepdim=True)
-        weights_flat_std = weights_flat.std(dim=-1, keepdim=True).clamp(min=self.eps)
+        weights_flat_mean = weights_flat.mean(dim=-1, keepdim=True).detach()
+        weights_flat_std = weights_flat.std(dim=-1, keepdim=True).clamp(min=self.eps).detach()
         vector_noise = (torch.randn_like(weights_flat) * weights_flat_std + weights_flat_mean) * self.noise_strength
-        weights_flat = weights_flat + (vector_noise - weights_flat).detach() if self.training else weights_flat
+        weights_flat = weights_flat + vector_noise if self.training else weights_flat
         weights = weights_flat.reshape(weights.shape)
 
         # Add null-weight for attention drain.
