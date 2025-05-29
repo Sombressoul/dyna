@@ -14,10 +14,11 @@ class WeightsLib2DDelta(nn.Module):
         context_length: int,
         context_use_bias: bool = True,
         rank: int = 4,
-        initialization_std: float = 1.0e-5,
-        weights_repulsion_strength: float = 0.01,
-        weights_noise_strength: float = 0.001,
-        rank_noise_strength: float = 0.001,
+        initialization_std: float = 1.0e-4,
+        weights_repulsion_strength: float = 0.3,
+        weights_noise_strength: float = 0.01,
+        rank_noise_strength: float = 0.01,
+        similarity_penalty_strength: float = 0.1,
         eps: float = 1.0e-12,
         dtype_weights: torch.dtype = torch.bfloat16,
     ) -> None:
@@ -31,6 +32,7 @@ class WeightsLib2DDelta(nn.Module):
         self.weights_repulsion_strength = weights_repulsion_strength
         self.weights_noise_strength = weights_noise_strength
         self.rank_noise_strength = rank_noise_strength
+        self.similarity_penalty_strength = similarity_penalty_strength
         self.eps = max(eps, 6.0e-8) if dtype_weights == torch.float16 else eps
         self.dtype_weights = dtype_weights
 
@@ -135,14 +137,16 @@ class WeightsLib2DDelta(nn.Module):
         weights_flat = weights.view(weights.shape[0], weights.shape[1], -1)
         weights_stable = torch.where(weights_flat.abs() < self.eps, weights_flat.sign() * self.eps, weights_flat)
         weights_flat = weights_flat + (weights_stable - weights_flat).detach()
-        weights_flat = torch.nn.functional.normalize(weights_flat, p=2, dim=-1)
+        weights_flat_norm = weights_flat.norm(p=2, dim=-1, keepdim=True).add(self.eps)
+        weights_flat_scale = torch.clamp(1.0 / weights_flat_norm, max=1.0)
+        weights_flat = weights_flat * weights_flat_scale
         mat_sim = torch.matmul(weights_flat, weights_flat.transpose(1, 2))
         mat_diagonal = torch.eye(mat_sim.shape[1], dtype=torch.bool, device=mat_sim.device)
         mat_sim = mat_sim * (~mat_diagonal)
-        repulsion = torch.matmul(mat_sim, weights_flat) / (self.rank - 1)
-        similarity_penalty = mat_sim.pow(2).mean(dim=[-1, -2], keepdim=True)
+        repulsion = torch.matmul(mat_sim, weights_flat) / max((self.rank - 1), 1.0)
+        similarity_penalty = mat_sim.pow(2).mean(dim=[-1], keepdim=True)
         similarity_penalty_grad_delta = similarity_penalty - similarity_penalty.detach()
-        weights_flat = weights_flat + similarity_penalty_grad_delta
+        weights_flat = weights_flat + similarity_penalty_grad_delta * self.similarity_penalty_strength
         weights_flat = weights_flat - repulsion * (self.weights_repulsion_strength / math.sqrt(self.rank))
         weights_stable = torch.where(weights_flat.abs() < self.eps, weights_flat.sign() * self.eps, weights_flat)
         weights_flat = weights_flat + (weights_stable - weights_flat).detach()
