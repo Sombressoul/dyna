@@ -134,7 +134,7 @@ class WeightsLib2DDelta(nn.Module):
         weights = (weights[::, ::, 0] * theta).sum(dim=-1).contiguous()
 
         # Weights decorellation.
-        weights_flat = weights.view(weights.shape[0], weights.shape[1], -1)
+        weights_flat = weights.reshape(weights.shape[0], weights.shape[1], -1)
         weights_stable = torch.where(weights_flat.abs() < self.eps, weights_flat.sign() * self.eps, weights_flat)
         weights_flat = weights_flat + (weights_stable - weights_flat).detach()
         weights_flat_norm = weights_flat.norm(p=2, dim=-1, keepdim=True).add(self.eps)
@@ -172,7 +172,7 @@ class WeightsLib2DDelta(nn.Module):
             weight_rank_active,
             weight_rank_drain + (1.0 / math.sqrt(self.rank)),
         ], dim=-1)
-        weight_rank_noise = torch.randn_like(weight_rank) * weight_rank.std(dim=-1, keepdim=True) * self.rank_noise_strength
+        weight_rank_noise = torch.randn_like(weight_rank) * weight_rank.std(dim=-1, keepdim=True).add(self.eps) * self.rank_noise_strength
         weight_rank_logits = weight_rank + weight_rank_noise
         weight_rank_probs = torch.softmax(weight_rank_logits, dim=-1)
         weight_rank_entropy = -(weight_rank_probs * weight_rank_probs.add(self.eps).log()).sum(dim=-1, keepdim=True)
