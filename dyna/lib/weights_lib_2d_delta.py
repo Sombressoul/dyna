@@ -4,7 +4,7 @@ import math
 
 from typing import Union, List
 
-from dyna.functional import siglog
+from dyna.functional import siglog, backward_gradient_normalization
 
 
 class WeightsLib2DDelta(nn.Module):
@@ -131,6 +131,7 @@ class WeightsLib2DDelta(nn.Module):
 
         denom = (weights[::, ::, 1] ** 2).sum(-1).add(self.eps).sqrt().unsqueeze(-1)
         theta = weights[::, ::, 1] / denom
+        theta = backward_gradient_normalization(theta)
         weights = (weights[::, ::, 0] * theta).sum(dim=-1).contiguous()
 
         # Weights decorellation.
@@ -180,6 +181,7 @@ class WeightsLib2DDelta(nn.Module):
         weight_rank_logits = weight_rank_logits + weight_rank_grad_delta
         weight_rank = siglog(weight_rank_logits / self.extras[0])
         weight_rank = torch.softmax(weight_rank, dim=-1)
+        weight_rank = backward_gradient_normalization(weight_rank)
 
         # Weighting.
         weights = weights * weight_rank.reshape([*weight_rank.shape, *[1]*len(weights.shape[2::])])
