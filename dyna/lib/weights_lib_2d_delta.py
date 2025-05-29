@@ -13,8 +13,9 @@ class WeightsLib2DDelta(nn.Module):
         context_use_bias: bool = True,
         rank: int = 4,
         initialization_std: float = 1.0e-5,
-        repulsion_strength: float = 0.1,
-        noise_strength: float = 0.01,
+        weights_repulsion_strength: float = 0.1,
+        weights_noise_strength: float = 0.01,
+        rank_noise_strength: float = 0.01,
         eps: float = 1.0e-12,
         dtype_weights: torch.dtype = torch.bfloat16,
     ) -> None:
@@ -25,8 +26,9 @@ class WeightsLib2DDelta(nn.Module):
         self.context_use_bias = context_use_bias
         self.rank = rank
         self.initialization_std = initialization_std
-        self.repulsion_strength = repulsion_strength
-        self.noise_strength = noise_strength
+        self.weights_repulsion_strength = weights_repulsion_strength
+        self.weights_noise_strength = weights_noise_strength
+        self.rank_noise_strength = rank_noise_strength
         self.eps = max(eps, 6.0e-8) if dtype_weights == torch.float16 else eps
         self.dtype_weights = dtype_weights
 
@@ -53,6 +55,14 @@ class WeightsLib2DDelta(nn.Module):
                 mean=0.0,
                 std=self.initialization_std,
             ).contiguous()
+        )
+        self.extras = nn.Parameter(
+            data=torch.cat(
+                [
+                    torch.tensor([1.5]), # temperature
+                ],
+                dim=0,
+            )
         )
         pass
 
@@ -119,7 +129,7 @@ class WeightsLib2DDelta(nn.Module):
         theta = weights[::, ::, 1] / denom
         weights = (weights[::, ::, 0] * theta).sum(dim=-1)
 
-        # Cosine similarity decorellation.
+        # Weights decorellation.
         weights_flat = weights.view(weights.shape[0], weights.shape[1], -1)
         weights_stable = torch.where(weights_flat.abs() < self.eps, weights_flat.sign() * self.eps, weights_flat)
         weights_flat = weights_flat + (weights_stable - weights_flat).detach()
@@ -128,13 +138,16 @@ class WeightsLib2DDelta(nn.Module):
         mat_diagonal = torch.eye(mat_sim.shape[1], dtype=torch.bool, device=mat_sim.device)
         mat_sim = mat_sim * (~mat_diagonal)
         repulsion = torch.matmul(mat_sim, weights_flat) / (self.rank - 1)
-        weights_flat = weights_flat - repulsion * (self.repulsion_strength / math.sqrt(self.rank))
+        similarity_penalty = mat_sim.pow(2).mean(dim=[-1, -2], keepdim=True)
+        similarity_penalty_grad_delta = similarity_penalty - similarity_penalty.detach()
+        weights_flat = weights_flat + similarity_penalty_grad_delta
+        weights_flat = weights_flat - repulsion * (self.weights_repulsion_strength / math.sqrt(self.rank))
         weights_stable = torch.where(weights_flat.abs() < self.eps, weights_flat.sign() * self.eps, weights_flat)
         weights_flat = weights_flat + (weights_stable - weights_flat).detach()
         weights_flat = torch.nn.functional.normalize(weights_flat, p=2, dim=-1)
         weights_flat_mean = weights_flat.mean(dim=-1, keepdim=True).detach()
         weights_flat_std = weights_flat.std(dim=-1, keepdim=True).clamp(min=self.eps).detach()
-        vector_noise = (torch.randn_like(weights_flat) * weights_flat_std + weights_flat_mean) * self.noise_strength
+        vector_noise = (torch.randn_like(weights_flat) * weights_flat_std + weights_flat_mean) * self.weights_noise_strength
         weights_flat = weights_flat + vector_noise if self.training else weights_flat
         weights = weights_flat.reshape(weights.shape)
 
@@ -146,7 +159,7 @@ class WeightsLib2DDelta(nn.Module):
         )
         weights = torch.cat([weights, attention_drain], dim=1)
 
-        # Weight components ranking.
+        # Ranks decorellation and components weighting.
         weight_rank = x_transformed[::, slice_modulation::]
         weight_rank_active = weight_rank[..., :-1]
         weight_rank_drain = weight_rank[..., -1:]
@@ -154,9 +167,17 @@ class WeightsLib2DDelta(nn.Module):
             weight_rank_active,
             weight_rank_drain + (1.0 / math.sqrt(self.rank)),
         ], dim=-1)
-        weight_rank = torch.nn.functional.normalize(weight_rank, p=2, dim=-1)
-        weight_rank = torch.softmax(weight_rank, dim=-1)
-
+        weight_rank_logits = torch.nn.functional.normalize(weight_rank, p=2, dim=-1)
+        weight_rank_logits = weight_rank_logits + torch.randn_like(weight_rank_logits) * self.rank_noise_strength
+        weight_rank_probs = torch.softmax(weight_rank_logits, dim=-1)
+        weight_rank_entropy = -(weight_rank_probs * weight_rank_probs.clamp(min=self.eps).log()).sum(dim=-1, keepdim=True)
+        weight_rank_grad_delta = weight_rank_entropy - weight_rank_entropy.detach()
+        weight_rank_logits = weight_rank_logits + weight_rank_grad_delta
+        weight_rank = torch.nn.functional.normalize(weight_rank_logits, p=2, dim=-1)
+        weight_rank_temperature = self.extras[0].abs().clamp(min=self.eps)
+        weight_rank = torch.softmax(weight_rank / weight_rank_temperature, dim=-1)
+        
+        # Weighting.
         weights = weights * weight_rank.reshape([*weight_rank.shape, *[1]*len(weights.shape[2::])])
         weights = weights.sum(1)
 
