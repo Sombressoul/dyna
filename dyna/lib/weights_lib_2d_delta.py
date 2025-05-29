@@ -18,7 +18,7 @@ class WeightsLib2DDelta(nn.Module):
         weights_repulsion_strength: float = 0.3,
         weights_noise_strength: float = 0.01,
         rank_noise_strength: float = 0.01,
-        similarity_penalty_strength: float = 0.1,
+        similarity_penalty_strength: float = 0.01,
         eps: float = 1.0e-12,
         dtype_weights: torch.dtype = torch.bfloat16,
     ) -> None:
