@@ -26,11 +26,18 @@ class GradientFieldStabilizer(torch.nn.Module):
     - Tensor of the same shape, dynamically regularized and gradient-stabilized
     """
 
-    def __init__(self, eps: float = 1e-12):
+    def __init__(
+        self,
+        eps: float = 1e-12,
+    ) -> None:
         super().__init__()
         self.eps = eps
+        pass
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(
+        self,
+        x: torch.Tensor,
+    ) -> torch.Tensor:
         x = backward_gradient_normalization(x)
         x = torch.sigmoid(x) * siglog(x)
         x = backward_gradient_normalization(x)
