@@ -2,6 +2,14 @@ import torch
 
 
 class SigLog(torch.autograd.Function):
+    """
+    SigLog
+    ------
+
+    Autograd-compatible nonlinear function for signal compression with asymmetric gradient shaping.
+
+    Use via `siglog(x)` wrapper function.
+    """
     eps: float = 1.0e-4
 
     @staticmethod
@@ -33,4 +41,24 @@ class SigLog(torch.autograd.Function):
 
 
 def siglog(x: torch.Tensor) -> torch.Tensor:
+    """
+    siglog(x)
+    ---------
+
+    Nonlinear activation function that combines logarithmic compression with sign preservation.
+    Smoothly suppresses large magnitudes while preserving small-scale signal variation.
+
+    Forward:
+        y = sign(x) * (log(|x| + e + eps) - 1)
+
+    Backward:
+        Custom gradient with smooth decay for small values:
+        dy/dx = 1 / (|x|^p + 1), where p = 1 + sqrt(|x|) if |x| < 1, else p = 1
+
+    Args:
+        x (Tensor): Input tensor
+
+    Returns:
+        Tensor: Transformed tensor with same shape as input
+    """    
     return SigLog.apply(x)
