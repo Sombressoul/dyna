@@ -145,12 +145,13 @@ class WeightsLib2DDelta(nn.Module):
 
         # Weights decorellation.
         weights_flat = weights.reshape(weights.shape[0], weights.shape[1], -1)
-        weights_stable = torch.where(weights_flat.abs() < self.eps, weights_flat.sign() * self.eps, weights_flat)
-        weights_flat = weights_flat + (weights_stable - weights_flat).detach()
-        weights_flat_norm = weights_flat.norm(p=2, dim=-1, keepdim=True).add(self.eps)
-        weights_flat_scale = torch.clamp(1.0 / weights_flat_norm, max=1.0)
-        weights_flat = weights_flat * weights_flat_scale
+        weights_flat = backward_gradient_normalization(weights_flat)
+        weights_flat = weights_flat * siglog(weights_flat)
+        weights_flat = backward_gradient_normalization(weights_flat)
+        weights_flat = weights_flat * weights_flat.abs().mean(-1, keepdim=True).rsqrt()
+        weights_flat = backward_gradient_normalization(weights_flat)
         mat_sim = torch.matmul(weights_flat, weights_flat.transpose(1, 2))
+        weights_flat = backward_gradient_normalization(weights_flat)
         mat_diagonal = torch.eye(mat_sim.shape[1], dtype=torch.bool, device=mat_sim.device)
         mat_sim = mat_sim * (~mat_diagonal)
         repulsion = torch.matmul(mat_sim, weights_flat) / max((self.rank - 1), 1.0)
