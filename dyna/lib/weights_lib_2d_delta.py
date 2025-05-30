@@ -31,7 +31,6 @@ class WeightsLib2DDelta(nn.Module):
     Returns:
     - Tensor of shape [batch_size, *output_shape] representing dynamically constructed weights
     """
-    # TODO: add documentation
     # TODO: experiment with torch.nn.init.orthogonal_() initialization of self.weights
     # TODO: add bool flags for: repulsion, similarity penalty, weght/rank noise
     # TODO: check performance of torch.einsum instead of torch.matmul for w @ w_transposed
