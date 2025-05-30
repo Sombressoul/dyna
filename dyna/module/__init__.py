@@ -4,6 +4,7 @@ from dyna.module.dynamic_conv2d import DynamicConv2D
 from dyna.module.dynamic_conv2d_alpha import DynamicConv2DAlpha
 from dyna.module.dynamic_conv2d_beta import DynamicConv2DBeta
 from dyna.module.dynamic_conv2d_gamma import DynamicConv2DGamma
+from dyna.module.dynamic_conv2d_delta import DynamicConv2DDelta
 from dyna.module.gradient_field_stabilizer import GradientFieldStabilizer
 
 __all__ = [
@@ -13,5 +14,6 @@ __all__ = [
     "DynamicConv2DAlpha",
     "DynamicConv2DBeta",
     "DynamicConv2DGamma",
+    "DynamicConv2DDelta",
     "GradientFieldStabilizer",
 ]
