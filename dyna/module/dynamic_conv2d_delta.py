@@ -35,7 +35,6 @@ class DynamicConv2DDelta(nn.Module):
         dilation: Union[int, List[int]] = [1, 1],
         transpose: bool = False,
         output_padding: Optional[Union[int, List[int]]] = None,
-        second_order_weights: bool = False,
         eps: float = 1.0e-12,
         dtype_weights: torch.dtype = torch.bfloat16,
     ) -> None:
@@ -126,7 +125,6 @@ class DynamicConv2DDelta(nn.Module):
         self.output_padding = output_padding
         self.dilation = dilation
         self.transpose = transpose
-        self.second_order_weights = second_order_weights
         self.eps = eps
         self.dtype_weights = dtype_weights
 
