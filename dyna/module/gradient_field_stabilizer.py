@@ -7,22 +7,23 @@ class GradientFieldStabilizer(torch.nn.Module):
     """
     GradientFieldStabilizer
     ------------------------
+
     A dynamic vector-field transformation module designed to:
     - preserve directional expressiveness
-    - suppress amplitude explosion
-    - stabilize gradients during backpropagation
+    - suppress uncontrolled amplitude growth
+    - stabilize gradients through repeated normalization
 
     Core mechanisms:
-    - sigmoid pre-squashing to limit magnitude escalation
-    - custom nonlinear warping (siglog)
-    - repeated backward gradient normalization (BGN)
-    - soft amplitude balancing via inverse RMS
+    - Sigmoid-based masking to softly suppress large activations
+    - Custom nonlinear transformation (siglog) to reshape signal distribution
+    - Repeated backward gradient normalization (BGN) to ensure uniform update dynamics
+    - Soft amplitude normalization via inverse root-mean-square scaling
 
     Inputs:
-    - x: Tensor of arbitrary shape
+    - x: Tensor of shape [..., vector_dim], where the last dimension(s) represent the feature vector
 
     Returns:
-    - Regularized tensor of same shape
+    - Tensor of the same shape, dynamically regularized and gradient-stabilized
     """
 
     def __init__(self, eps: float = 1e-12):
