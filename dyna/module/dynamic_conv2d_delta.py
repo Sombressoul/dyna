@@ -9,6 +9,31 @@ from dyna.lib import WeightsLib2DDelta
 
 
 class DynamicConv2DDelta(nn.Module):
+    """
+    DynamicConv2DDelta
+    ------------------
+
+    A convolutional layer with dynamically generated weights conditioned on external context.
+
+    This module uses a learned context vector to generate sample-specific convolution kernels
+    through the WeightsLib2DDelta mechanism. The generated weights are projected onto a reshaped
+    convolutional kernel space and applied independently to each input in the batch.
+
+    Key features:
+    - Context-aware dynamic kernel generation
+    - Optional soft learnable padding
+    - Flexible handling of 2D convolution and transposed convolution
+    - Built-in repulsion, similarity penalty, and rank-weighted mixing via WeightsLib2DDelta
+    - Efficient batched convolution using torch.vmap
+
+    Inputs:
+    - x: Input tensor of shape [B, C_in, H, W]
+    - context: Tensor of shape [B, context_length] or [1, context_length]
+
+    Returns:
+    - Tensor of shape [B, C_out, H_out, W_out] after dynamic convolution
+    """
+        
     dtypes: List[torch.dtype] = [
         torch.bfloat16,
         torch.float16,
