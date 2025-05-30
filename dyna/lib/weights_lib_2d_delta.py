@@ -9,6 +9,28 @@ from dyna.module.gradient_field_stabilizer import GradientFieldStabilizer
 
 
 class WeightsLib2DDelta(nn.Module):
+    """
+    WeightsLib2DDelta
+    -----------------
+
+    A 2D dynamic weight generation module with modulation, decorellation, and adaptive weighting.
+
+    This module uses learned context vectors to generate a bank of rank-weighted spatial filters.
+    Core mechanisms include:
+    - Context-driven parameterization of weight interpolation, scaling, and bias
+    - Complex-valued transformations with learnable modulation
+    - Projection onto normalized orientation fields
+    - Stabilization via GradientFieldStabilizer
+    - Repulsion and similarity penalty to encourage weight diversity
+    - Entropy-influenced softmax weighting of ranks
+    - Optional Gaussian noise for weights and rank logits during training
+
+    Inputs:
+    - x: Tensor of shape [batch_size, context_length]
+
+    Returns:
+    - Tensor of shape [batch_size, *output_shape] representing dynamically constructed weights
+    """
     # TODO: add documentation
     # TODO: experiment with torch.nn.init.orthogonal_() initialization of self.weights
     # TODO: add bool flags for: repulsion, similarity penalty, weght/rank noise
