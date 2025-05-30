@@ -5,6 +5,7 @@ import math
 from typing import Union, List
 
 from dyna.functional import siglog, backward_gradient_normalization
+from dyna.module.gradient_field_stabilizer import GradientFieldStabilizer
 
 
 class WeightsLib2DDelta(nn.Module):
@@ -45,6 +46,7 @@ class WeightsLib2DDelta(nn.Module):
         self.eps = max(eps, 6.0e-8) if dtype_weights == torch.float16 else eps
         self.dtype_weights = dtype_weights
 
+        self.stabilizer = GradientFieldStabilizer(eps=self.eps)
         self.context_transform = nn.Linear(
             in_features=self.context_length,
             out_features=24 * self.rank + (self.rank * 2) + 2,
@@ -144,12 +146,8 @@ class WeightsLib2DDelta(nn.Module):
         weights = (weights[::, ::, 0] * theta).sum(dim=-1).contiguous()
 
         # Weights decorellation.
+        weights = self.stabilizer(weights)
         weights_flat = weights.reshape(weights.shape[0], weights.shape[1], -1)
-        weights_flat = backward_gradient_normalization(weights_flat)
-        weights_flat = weights_flat * siglog(weights_flat)
-        weights_flat = backward_gradient_normalization(weights_flat)
-        weights_flat = weights_flat * weights_flat.abs().mean(-1, keepdim=True).rsqrt()
-        weights_flat = backward_gradient_normalization(weights_flat)
         mat_sim = torch.matmul(weights_flat, weights_flat.transpose(1, 2))
         weights_flat = backward_gradient_normalization(weights_flat)
         mat_diagonal = torch.eye(mat_sim.shape[1], dtype=torch.bool, device=mat_sim.device)
