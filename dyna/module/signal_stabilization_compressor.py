@@ -3,10 +3,10 @@ import torch
 from dyna.functional import siglog, backward_gradient_normalization
 
 
-class GradientFieldStabilizer(torch.nn.Module):
+class SignalStabilizationCompressor(torch.nn.Module):
     """
-    GradientFieldStabilizer
-    ------------------------
+    SignalStabilizationCompressor
+    -----------------------------
 
     A dynamic vector-field transformation module designed to:
     - preserve directional expressiveness
@@ -40,6 +40,7 @@ class GradientFieldStabilizer(torch.nn.Module):
     ) -> torch.Tensor:
         x = backward_gradient_normalization(x)
         x = torch.sigmoid(x) * siglog(x)
+        x = backward_gradient_normalization(x) # TODO: Needs investigation: discovered empirically - prevents explosions.
         x = x * x.abs().mean(dim=-1, keepdim=True).add(self.eps).rsqrt()
         x = backward_gradient_normalization(x)
         return x

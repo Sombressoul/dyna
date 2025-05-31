@@ -5,7 +5,7 @@ import math
 from typing import Union, List
 
 from dyna.functional import siglog, backward_gradient_normalization
-from dyna.module.gradient_field_stabilizer import GradientFieldStabilizer
+from dyna.module.signal_stabilization_compressor import SignalStabilizationCompressor
 
 
 class WeightsLib2DDelta(nn.Module):
@@ -20,7 +20,7 @@ class WeightsLib2DDelta(nn.Module):
     - Context-driven parameterization of weight interpolation, scaling, and bias
     - Complex-valued transformations with learnable modulation
     - Projection onto normalized orientation fields
-    - Stabilization via GradientFieldStabilizer
+    - Stabilization via SignalStabilizationCompressor
     - Repulsion and similarity penalty to encourage weight diversity
     - Entropy-influenced softmax weighting of ranks
     - Optional Gaussian noise for weights and rank logits during training
@@ -67,7 +67,7 @@ class WeightsLib2DDelta(nn.Module):
         self.eps = max(eps, 6.0e-8) if dtype_weights == torch.float16 else eps
         self.dtype_weights = dtype_weights
 
-        self.stabilizer = GradientFieldStabilizer(eps=self.eps)
+        self.stabilizer = SignalStabilizationCompressor(eps=self.eps)
         self.context_transform = nn.Linear(
             in_features=self.context_length,
             out_features=24 * self.rank + (self.rank * 2) + 2,
