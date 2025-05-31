@@ -1,7 +1,15 @@
 import torch
 import math
 
+from typing import Union
+from enum import Enum
+
 from dyna.functional import siglog, backward_gradient_normalization
+
+
+class SignalStabilizationCompressorMode(Enum):
+    GATING = "gating"
+    DAMPENING = "dampening"
 
 
 class SignalStabilizationCompressor(torch.nn.Module):
@@ -9,40 +17,67 @@ class SignalStabilizationCompressor(torch.nn.Module):
     SignalStabilizationCompressor
     -----------------------------
 
-    A nonlinear signal regularization module designed to:
-    - suppress uncontrolled amplitude growth
-    - reshape and compress signal distribution
-    - preserve directional expressiveness
-    - stabilize gradients through repeated normalization
+    A nonlinear signal conditioning layer designed to reshape, stabilize, and compress feature distributions,
+    while preserving directional expressiveness and maintaining controllable gradient flow.
 
-    Core mechanisms:
-    - Sigmoid-based gating to softly attenuate extreme values
-    - Logarithmic remapping via custom `siglog` transformation
-    - Recurrent backward gradient normalization (BGN) to maintain uniform sensitivity
-    - Inverse RMS-based scaling to compress and normalize signal energy
+    This module is useful in situations where signal energy, gradient propagation, or value ranges
+    tend to become unstable — for example, in deep or dynamic architectures with highly nonlinear blocks.
 
-    This module is suitable as a preprocessing or intermediate layer in deep architectures,
-    particularly when input signals or features tend to exhibit heavy-tailed or unstable distributions.
+    Functional highlights:
+    - Sigmoid-based gating (signed) or dampening (absolute) for soft control of signal pass-through
+    - Logarithmic warping (`siglog`) to flatten high-amplitude ranges
+    - Residual leak injection (fixed or trainable via `softplus`) to prevent vanishing dynamics
+    - Optional backward gradient normalization at input, mid, and output stages
+    - Inverse RMS-based rescaling to ensure bounded amplitude growth
+
+    Modes:
+        - "gating": allows signed leak passthrough, asymmetric and selective
+        - "dampening": uses absolute leak, enforcing smooth positive stabilization
 
     Args:
-        leak (float): Small coefficient for residual passthrough of original signal (default: 1e-3).
-        eps (float): Epsilon to prevent division by zero and stabilize inverse operations (default: 1e-12).
+        bgn_input (bool): Whether to apply BGN before any transformation.
+        bgn_mid (bool): Whether to apply BGN after nonlinear composition (before RMS).
+        bgn_output (bool): Whether to apply BGN after RMS normalization.
+        mode (str or SignalStabilizationCompressorMode): Mode for leak injection (gating or dampening).
+        trainable (bool): If True, leak scaling becomes a learnable softplus-transformed parameter.
+        leak (float): Scalar factor for residual leak injection (default: 1e-3).
+        eps (float): Small epsilon added to prevent division-by-zero in inverse RMS (default: 1e-12).
 
     Input:
-        x (Tensor): Input tensor of shape [..., D], where the last dimension represents feature vectors.
+        x (Tensor): Input tensor of shape [..., D], where D is the feature dimension.
 
     Returns:
-        Tensor: Transformed tensor of the same shape, with regularized amplitude and stabilized gradients.
+        Tensor: Regularized and compressed tensor of the same shape.
     """
 
     def __init__(
         self,
+        bgn_input: bool = False,
+        bgn_mid: bool = False,
+        bgn_output: bool = False,
+        mode: Union[SignalStabilizationCompressorMode, str] = "gating",
+        trainable: bool = False,
         leak: float = 1.0e-3,
         eps: float = 1e-12,
     ) -> None:
         super().__init__()
+        self.input_bgn = bgn_input
+        self.bgn_mid = bgn_mid
+        self.bgn_output = bgn_output
+        self.mode = SignalStabilizationCompressorMode(mode)
+        self.trainable = trainable
         self.leak = leak
         self.eps = eps
+
+        if self.trainable:
+            self.leak_scale = torch.nn.Parameter(
+                data=torch.tensor(
+                    [1.0],
+                    dtype=torch.float32,
+                    requires_grad=True,
+                ),
+            )
+
         pass
 
     def forward(
@@ -53,12 +88,35 @@ class SignalStabilizationCompressor(torch.nn.Module):
         eps = self.eps if precision_pass else torch.finfo(x.dtype).smallest_normal
         leak = self.leak if precision_pass else math.sqrt(eps)
 
-        x = backward_gradient_normalization(x) # Normalizes backward flow to prevent unstable gradient propagation.
-        x_leak = x * leak # Injects a small residual of the original signal to prevent vanishing.
-        x_a = torch.sigmoid(x) + x_leak
+        # Normalize backward flow to prevent unstable gradient propagation if needed.
+        if self.input_bgn:
+            x = backward_gradient_normalization(x)
+
+        # Inject a small residual of the original signal to prevent vanishing.
+        if self.trainable:
+            x_leak = x * self.leak * torch.nn.functional.softplus(self.leak_scale.to(x.dtype))
+        else:
+            x_leak = x * leak
+
+        if self.mode == SignalStabilizationCompressorMode.GATING:
+            x_leak_sigmoid = x_leak
+        elif self.mode == SignalStabilizationCompressorMode.DAMPENING:
+            x_leak_sigmoid = x_leak.abs()
+        else:
+            raise ValueError(f"Unknown SignalStabilizationCompressorMode: {self.mode}")
+        
+        x_a = torch.sigmoid(x) + x_leak_sigmoid
         x_b = siglog(x) + x_leak
         x = x_a * x_b
-        x = backward_gradient_normalization(x) # Prevents unstable gradient scaling introduced by subsequent RMS normalization.
+
+        # Prevent unstable gradient scaling introduced by subsequent RMS normalization if needed.
+        if self.bgn_mid:
+            x = backward_gradient_normalization(x)
+
         x = x * x.abs().mean(dim=-1, keepdim=True).add(eps).rsqrt()
-        x = backward_gradient_normalization(x) # On backward: stabilizes input ranges for differentiation.
+
+        # Ensures uniform backward sensitivity after amplitude normalization.
+        if self.bgn_output:
+            x = backward_gradient_normalization(x)
+
         return x
