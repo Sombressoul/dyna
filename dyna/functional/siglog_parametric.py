@@ -102,4 +102,48 @@ def siglog_parametric(
     smoothing: Optional[float] = SigLogParametric.smoothing,
     smooth_grad: Optional[bool] = SigLogParametric.smooth_grad,
 ) -> torch.Tensor:
+    """
+    Parametric sigmoid-logarithmic transformation with optional gradient smoothing.
+
+    Applies a scaled logarithmic mapping to the input tensor:
+        y = sign(x) * (log(|x| + mod) - log(mod)),
+    where `mod = e * alpha`.
+
+    This transformation behaves similarly to a logarithmic squashing function,
+    with tunable curvature controlled by `alpha`. It supports smooth symmetric
+    numerical gradient estimation via central differences when `smooth_grad=True`.
+
+    Parameters
+    ----------
+    x : torch.Tensor
+        Input tensor to transform.
+    alpha : float or torch.Tensor, optional
+        Curvature scale factor. Controls sensitivity near zero.
+        Larger alpha makes the function flatter; smaller alpha sharpens it.
+        Default is 1 / e.
+    smoothing : float, optional
+        Small positive constant used as delta in finite difference
+        approximations for smooth gradients. Ignored if `smooth_grad=False`.
+        Default is 1e-3.
+    smooth_grad : bool, optional
+        Whether to enable smooth symmetric gradient estimation (for both x and alpha).
+        If False, uses exact gradient for x and smooth approximation only for alpha.
+        Default is False.
+
+    Returns
+    -------
+    torch.Tensor
+        Transformed tensor with the same shape as `x`.
+
+    Notes
+    -----
+    - The function is strictly monotonic and zero-centered.
+    - The transformation is safe around x=0 due to added modulus.
+    - Gradients are well-behaved and controllable, even in low-precision setups.
+    - If `alpha <= 0`, the function will raise a runtime error.
+
+    See Also
+    --------
+    SigLogParametric : Internal autograd implementation.
+    """    
     return SigLogParametric.apply(x, alpha, smoothing, smooth_grad)
