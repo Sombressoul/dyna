@@ -44,14 +44,46 @@ def log_proportional_error(
         y: torch.Tensor,
         reduction: str = "mean",
     ) -> torch.Tensor:
-    r"""
-    Computes the log-proportional error:
+    """
+    Computes the log-proportional error between x and y.
+
+    The error is defined as:
         err = |log(x_shifted) - log(y_shifted)| / |log(y_shifted)|
 
-    Where:
+    where:
         x_shifted = x - min(x, y) + e
+        y_shifted = y - min(x, y) + e
 
-    This loss is useful when relative errors are important but needs to be smoothed to avoid gradient explosion near zero.
+    This formulation ensures numerical stability around zero and allows
+    for a logarithmic sensitivity to proportional differences between tensors.
+
+    Parameters
+    ----------
+    x : torch.Tensor
+        Predicted values or estimated tensor.
+    y : torch.Tensor
+        Target or reference tensor.
+    reduction : str, optional
+        Specifies the reduction to apply to the output:
+        - 'none': no reduction
+        - 'mean': average of all elements
+        - 'sum' : sum of all elements
+        Default is 'mean'.
+
+    Returns
+    -------
+    torch.Tensor
+        The computed element-wise error (if reduction='none'), or a reduced scalar.
+
+    Notes
+    -----
+    - The shift by `+e` ensures all arguments inside `log(...)` remain positive.
+    - Gradients are explicitly implemented to avoid autograd instability near zero.
+    - Useful in applications where relative scale and smooth logarithmic differences matter.
+
+    See Also
+    --------
+    LogProportionalError : Internal autograd implementation.
     """
     reduction_types = ["mean", "sum", "none"]
 
