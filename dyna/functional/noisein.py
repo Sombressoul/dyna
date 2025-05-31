@@ -4,6 +4,34 @@ def noisein(
     x: torch.Tensor,
     rate: float,
 ) -> torch.Tensor:
+    """
+    Injects noise into randomly selected elements of the input tensor.
+
+    For each sample in the batch, a subset of elements is selected
+    and replaced by noisy values constructed as:
+        -x[i] + noise(mean=x.mean, std=x.std)
+
+    All other elements remain unchanged. The injection rate controls
+    the fraction of perturbed elements.
+
+    Parameters
+    ----------
+    x : torch.Tensor
+        Input tensor of shape [B, ...]. The first dimension is treated as batch.
+    rate : float
+        Fraction of features per sample to be replaced with noise (0.0 to 1.0).
+
+    Returns
+    -------
+    torch.Tensor
+        Tensor with partial injection of noise into randomly chosen positions.
+
+    Notes
+    -----
+    - Noise is generated independently for each sample.
+    - Only a subset of features is affected per instance.
+    - For `rate=0.0`, the function is a no-op.
+    """    
     if rate <= 0.0:
         return x
 
