@@ -4,6 +4,27 @@ from typing import Optional, Union
 
 
 class SigLogParametric(torch.autograd.Function):
+    """
+    Autograd implementation of the parametric sigmoid-logarithmic transform.
+
+    This function implements a signed logarithmic mapping:
+        f(x) = sign(x) * (log(|x| + mod) - log(mod)),
+    where mod = e * alpha.
+
+    The class supports two gradient computation modes:
+    - Exact gradient for input x: df/dx = 1 / (|x| + mod)
+    - Finite-difference approximation for df/dalpha (always),
+      and optionally for df/dx when `smooth_grad=True`.
+
+    Class Attributes
+    ----------------
+    alpha : float
+        Default curvature parameter (1 / e).
+    smoothing : float
+        Default delta value for numerical differentiation (1e-3).
+    smooth_grad : bool
+        Whether to use finite-difference gradient estimation.
+    """    
     alpha: float = 1.0 / torch.e
     smoothing: float = 0.001
     smooth_grad: bool = False
@@ -13,6 +34,23 @@ class SigLogParametric(torch.autograd.Function):
         x: torch.Tensor,
         mod: torch.Tensor,
     ) -> torch.Tensor:
+        """
+        Core transformation: computes signed log-scaled activation.
+
+        This is the actual mathematical function:
+            f(x) = sign(x) * (log(|x| + mod) - log(mod))
+
+        It is used in both forward and backward passes — including
+        finite-difference gradient approximations — to ensure that
+        all transformations remain consistent and differentiable.
+
+        Parameters
+        ----------
+        x : torch.Tensor
+            Input tensor.
+        mod : torch.Tensor
+            Additive offset inside the logarithm. Usually `e * alpha`.
+        """
         x_sign = torch.where(x > 0.0, +1.0, -1.0).to(
             dtype=x.dtype,
             device=x.device,
