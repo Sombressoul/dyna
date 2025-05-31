@@ -5,6 +5,9 @@ from typing import Optional, Union
 
 class SigLogParametric(torch.autograd.Function):
     """
+    SigLogParametric
+    ----------------
+
     Autograd implementation of the parametric sigmoid-logarithmic transform.
 
     This function implements a signed logarithmic mapping:
