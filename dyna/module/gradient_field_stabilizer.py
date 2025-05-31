@@ -40,7 +40,6 @@ class GradientFieldStabilizer(torch.nn.Module):
     ) -> torch.Tensor:
         x = backward_gradient_normalization(x)
         x = torch.sigmoid(x) * siglog(x)
-        x = backward_gradient_normalization(x)
         x = x * x.abs().mean(dim=-1, keepdim=True).add(self.eps).rsqrt()
         x = backward_gradient_normalization(x)
         return x
