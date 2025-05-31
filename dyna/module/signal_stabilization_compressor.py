@@ -1,4 +1,5 @@
 import torch
+import math
 
 from dyna.functional import siglog, backward_gradient_normalization
 
@@ -40,12 +41,16 @@ class SignalStabilizationCompressor(torch.nn.Module):
         self,
         x: torch.Tensor,
     ) -> torch.Tensor:
-        x = backward_gradient_normalization(x) # Normalizes grad for further backward computations.
-        x_leak = x * self.leak # Small leak of shrinked original signal.
+        precision_pass = x.dtype in [torch.bfloat16, torch.float32]
+        eps = self.eps if precision_pass else torch.finfo(x.dtype).smallest_normal
+        leak = self.leak if precision_pass else math.sqrt(eps)
+
+        x = backward_gradient_normalization(x) # Normalizes backward flow to prevent unstable gradient propagation.
+        x_leak = x * leak # Injects a small residual of the original signal to prevent vanishing.
         x_a = torch.sigmoid(x) + x_leak
         x_b = siglog(x) + x_leak
         x = x_a * x_b
-        x = backward_gradient_normalization(x) # Prevents grad explosions after deriving 1/(2 * sqrt(x))
-        x = x * x.abs().mean(dim=-1, keepdim=True).add(self.eps).rsqrt()
+        x = backward_gradient_normalization(x) # Prevents unstable gradient scaling introduced by subsequent RMS normalization.
+        x = x * x.abs().mean(dim=-1, keepdim=True).add(eps).rsqrt()
         x = backward_gradient_normalization(x) # On backward: stabilizes input ranges for differentiation.
         return x
