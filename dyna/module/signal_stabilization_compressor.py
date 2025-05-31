@@ -28,9 +28,11 @@ class SignalStabilizationCompressor(torch.nn.Module):
 
     def __init__(
         self,
+        leak: float = 1.0e-3,
         eps: float = 1e-12,
     ) -> None:
         super().__init__()
+        self.leak = leak
         self.eps = eps
         pass
 
@@ -38,9 +40,12 @@ class SignalStabilizationCompressor(torch.nn.Module):
         self,
         x: torch.Tensor,
     ) -> torch.Tensor:
-        x = backward_gradient_normalization(x)
-        x = torch.sigmoid(x) * siglog(x)
-        x = backward_gradient_normalization(x) # TODO: Needs investigation: discovered empirically - prevents explosions.
+        x = backward_gradient_normalization(x) # Normalizes grad for further backward computations.
+        x_leak = x * self.leak # Small leak of shrinked original signal.
+        x_a = torch.sigmoid(x) + x_leak
+        x_b = siglog(x) + x_leak
+        x = x_a * x_b
+        x = backward_gradient_normalization(x) # Prevents grad explosions after deriving 1/(2 * sqrt(x))
         x = x * x.abs().mean(dim=-1, keepdim=True).add(self.eps).rsqrt()
-        x = backward_gradient_normalization(x)
+        x = backward_gradient_normalization(x) # On backward: stabilizes input ranges for differentiation.
         return x
