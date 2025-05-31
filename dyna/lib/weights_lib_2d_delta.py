@@ -5,7 +5,7 @@ import math
 from typing import Union, List
 
 from dyna.functional import siglog, backward_gradient_normalization
-from dyna.module.signal_stabilization_compressor import SignalStabilizationCompressor
+from dyna.module.signal_stabilization_compressor import SignalStabilizationCompressor, SignalStabilizationCompressorMode
 
 
 class WeightsLib2DDelta(nn.Module):
@@ -67,7 +67,15 @@ class WeightsLib2DDelta(nn.Module):
         self.eps = max(eps, 6.0e-8) if dtype_weights == torch.float16 else eps
         self.dtype_weights = dtype_weights
 
-        self.stabilizer = SignalStabilizationCompressor(eps=self.eps)
+        self.stabilizer = SignalStabilizationCompressor(
+            bgn_input=True,
+            bgn_mid=True,
+            bgn_output=True,
+            mode=SignalStabilizationCompressorMode.GATING,
+            trainable=False,
+            leak=1.0e-3,
+            eps=self.eps,
+        )
         self.context_transform = nn.Linear(
             in_features=self.context_length,
             out_features=24 * self.rank + (self.rank * 2) + 2,
