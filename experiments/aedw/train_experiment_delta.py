@@ -10,7 +10,6 @@ import gc
 import bitsandbytes as bnb
 
 from PIL import Image
-from madgrad import MADGRAD
 
 from typing import Optional, Callable
 from enum import Enum
@@ -22,12 +21,13 @@ sys.path.append(project_dir)
 
 torch.manual_seed(10056)
 
-from dyna.module import DynamicConv2DDelta
+from dyna.module import DynamicConv2DDelta, SignalStabilizationCompressor
 from dyna.functional import siglog, backward_gradient_normalization
 
 class DynamicAutoencoderModes(Enum):
     CLASSIC = 0
     DYNAMIC = 1
+    CLASSIC2DYNAMIC = 2
 
 class DynamicAutoencoder(nn.Module):
     def __init__(
@@ -40,48 +40,67 @@ class DynamicAutoencoder(nn.Module):
         self.model_mode = model_mode
 
         self.dtype_weights = dtype_weights
-        self.output_shape = [3, 64, 64]
+        self.output_shape = [3, 256, 256]
         self.ctx_len = 256
 
-        channels_static = 16
-        channels_dynamic = 16
+        convolution_channels = 16
         dynamic_conv_rank = 16
         dynamic_conv_context_use_bias = True
-        cfg_conv_dn_a = dict(in_channels=channels_static, out_channels=channels_static, kernel_size=3, stride=1, padding=0, dtype=self.dtype_weights)
-        cfg_conv_dn_b = dict(in_channels=channels_static, out_channels=channels_static, kernel_size=3, stride=2, padding=0, dtype=self.dtype_weights)
-        cfg_conv_up_a = dict(in_channels=channels_static, out_channels=channels_static, kernel_size=3, stride=1, padding=0, dtype=self.dtype_weights)
-        cfg_conv_up_b = dict(in_channels=channels_static, out_channels=channels_static, kernel_size=3, stride=2, padding=0, dtype=self.dtype_weights)
-        cfg_norm = dict(num_features=channels_static, dtype=self.dtype_weights)
+        cfg_conv_dn_a = dict(in_channels=convolution_channels, out_channels=convolution_channels, kernel_size=3, stride=1, padding=0, dtype=self.dtype_weights)
+        cfg_conv_dn_b = dict(in_channels=convolution_channels, out_channels=convolution_channels, kernel_size=3, stride=2, padding=0, dtype=self.dtype_weights)
+        cfg_conv_up_a = dict(in_channels=convolution_channels, out_channels=convolution_channels, kernel_size=3, stride=1, padding=0, dtype=self.dtype_weights)
+        cfg_conv_up_b = dict(in_channels=convolution_channels, out_channels=convolution_channels, kernel_size=3, stride=2, padding=0, dtype=self.dtype_weights)
+        cfg_norm = dict(num_features=convolution_channels, dtype=self.dtype_weights)
 
         # Classical autoencoder
         # =====> ENCODE
-        # 128>64
+        # 256>128
         self.cl_encode_01_a_conv = nn.Conv2d(**cfg_conv_dn_a | dict(in_channels=3))
         self.cl_encode_01_b_conv = nn.Conv2d(**cfg_conv_dn_b)
         self.cl_encode_01_norm = nn.BatchNorm2d(**cfg_norm)
 
-        # 64>32
+        # 128>64
         self.cl_encode_02_a_conv = nn.Conv2d(**cfg_conv_dn_a)
         self.cl_encode_02_b_conv = nn.Conv2d(**cfg_conv_dn_b)
         self.cl_encode_02_norm = nn.BatchNorm2d(**cfg_norm)
 
-        # 32>16
+        # 64>32
         self.cl_encode_03_a_conv = nn.Conv2d(**cfg_conv_dn_a)
         self.cl_encode_03_b_conv = nn.Conv2d(**cfg_conv_dn_b)
         self.cl_encode_03_norm = nn.BatchNorm2d(**cfg_norm)
 
+        # 32>16
+        self.cl_encode_04_a_conv = nn.Conv2d(**cfg_conv_dn_a)
+        self.cl_encode_04_b_conv = nn.Conv2d(**cfg_conv_dn_b)
+        self.cl_encode_04_norm = nn.BatchNorm2d(**cfg_norm)
+
+        # 16>8
+        self.cl_encode_05_a_conv = nn.Conv2d(**cfg_conv_dn_a)
+        self.cl_encode_05_b_conv = nn.Conv2d(**cfg_conv_dn_b)
+        self.cl_encode_05_norm = nn.BatchNorm2d(**cfg_norm)
+
         # =====> DECODE
+        # 8>16
+        self.cl_decode_05_a_conv = nn.Conv2d(**cfg_conv_up_a)
+        self.cl_decode_05_b_conv = nn.Conv2d(**cfg_conv_up_b)
+        self.cl_decode_05_norm = nn.BatchNorm2d(**cfg_norm)
+
         # 16>32
+        self.cl_decode_04_a_conv = nn.Conv2d(**cfg_conv_up_a)
+        self.cl_decode_04_b_conv = nn.Conv2d(**cfg_conv_up_b)
+        self.cl_decode_04_norm = nn.BatchNorm2d(**cfg_norm)
+
+        # 32>64
         self.cl_decode_03_a_conv = nn.Conv2d(**cfg_conv_up_a)
         self.cl_decode_03_b_conv = nn.Conv2d(**cfg_conv_up_b)
         self.cl_decode_03_norm = nn.BatchNorm2d(**cfg_norm)
 
-        # 32>64
+        # 64>128
         self.cl_decode_02_a_conv = nn.Conv2d(**cfg_conv_up_a)
         self.cl_decode_02_b_conv = nn.Conv2d(**cfg_conv_up_b)
         self.cl_decode_02_norm = nn.BatchNorm2d(**cfg_norm)
 
-        # 64>128
+        # 128>256
         self.cl_decode_01_a_conv = nn.Conv2d(**cfg_conv_up_a)
         self.cl_decode_01_b_conv = nn.Conv2d(**cfg_conv_up_b | dict(out_channels=3))
 
@@ -99,11 +118,15 @@ class DynamicAutoencoder(nn.Module):
 
         # Dynamic autoencoder
         cfg_dyn_conv_ds = dict(
-            in_channels=channels_dynamic,
-            out_channels=channels_dynamic,
+            in_channels=convolution_channels,
+            out_channels=convolution_channels,
             context_length=self.ctx_len,
             context_use_bias=dynamic_conv_context_use_bias,
             rank=dynamic_conv_rank,
+            weights_repulsion_strength=0.0, # 0.3,
+            weights_noise_strength=0.0, # 0.01,
+            rank_noise_strength=0.0, # 0.01,
+            similarity_penalty_strength=0.0, # 0.1,
             kernel_size=[3, 3],
             stride=[2, 2],
             padding=[0, 0, 0, 0],
@@ -111,15 +134,18 @@ class DynamicAutoencoder(nn.Module):
             dilation=[1, 1],
             transpose=False,
             output_padding=None,
-            second_order_weights=True,
             dtype_weights=self.dtype_weights,
         )
         cfg_dyn_conv_us = dict(
-            in_channels=channels_dynamic,
-            out_channels=channels_dynamic,
+            in_channels=convolution_channels,
+            out_channels=convolution_channels,
             context_length=self.ctx_len,
             context_use_bias=dynamic_conv_context_use_bias,
             rank=dynamic_conv_rank,
+            weights_repulsion_strength=0.0, # 0.3,
+            weights_noise_strength=0.0, # 0.01,
+            rank_noise_strength=0.0, # 0.01,
+            similarity_penalty_strength=0.0, # 0.1,
             kernel_size=[3, 3],
             stride=[1, 1],
             padding=[0, 0, 0, 0],
@@ -127,33 +153,52 @@ class DynamicAutoencoder(nn.Module):
             dilation=[1, 1],
             transpose=False,
             output_padding=None,
-            second_order_weights=True,
             dtype_weights=self.dtype_weights,
         )
-        cfg_dyn_norm = dict(num_features=channels_dynamic, dtype=self.dtype_weights)
+        cfg_dyn_norm = dict(num_features=convolution_channels, dtype=self.dtype_weights)
 
-        # 128>64
+        # =====> ENCODE
+        # 256>128
         self.dyn_encode_01 = DynamicConv2DDelta(**cfg_dyn_conv_ds | dict(in_channels=3))
         self.dyn_encode_01_norm = nn.BatchNorm2d(**cfg_dyn_norm)
 
-        # 64>32
+        # 128>64
         self.dyn_encode_02 = DynamicConv2DDelta(**cfg_dyn_conv_ds)
         self.dyn_encode_02_norm = nn.BatchNorm2d(**cfg_dyn_norm)
 
-        # 32>16
+        # 64>32
         self.dyn_encode_03 = DynamicConv2DDelta(**cfg_dyn_conv_ds)
         self.dyn_encode_03_norm = nn.BatchNorm2d(**cfg_dyn_norm)
 
+        # 32>16
+        self.dyn_encode_04 = DynamicConv2DDelta(**cfg_dyn_conv_ds)
+        self.dyn_encode_04_norm = nn.BatchNorm2d(**cfg_dyn_norm)
+
+        # 16>8
+        self.dyn_encode_05 = DynamicConv2DDelta(**cfg_dyn_conv_ds)
+        self.dyn_encode_05_norm = nn.BatchNorm2d(**cfg_dyn_norm)
+
+        # =====> DECODE
+        # 8>16
+        self.dyn_decode_05 = DynamicConv2DDelta(**cfg_dyn_conv_us)
+        self.dyn_decode_05_norm = nn.BatchNorm2d(**cfg_dyn_norm)
+
         # 16>32
+        self.dyn_decode_04 = DynamicConv2DDelta(**cfg_dyn_conv_us)
+        self.dyn_decode_04_norm = nn.BatchNorm2d(**cfg_dyn_norm)
+
+        # 32>64
         self.dyn_decode_03 = DynamicConv2DDelta(**cfg_dyn_conv_us)
         self.dyn_decode_03_norm = nn.BatchNorm2d(**cfg_dyn_norm)
 
-        # 32>64
+        # 64>128
         self.dyn_decode_02 = DynamicConv2DDelta(**cfg_dyn_conv_us)
         self.dyn_decode_02_norm = nn.BatchNorm2d(**cfg_dyn_norm)
 
-        # 64>128
-        self.dyn_decode_01 = DynamicConv2DDelta(**cfg_dyn_conv_us | dict(out_channels=3))
+        # 128>256
+        self.dyn_decode_01_a = DynamicConv2DDelta(**cfg_dyn_conv_us)
+        self.dyn_decode_01_b = DynamicConv2DDelta(**cfg_dyn_conv_ds | dict(out_channels=3))
+        self.dyn_decode_01_norm = nn.BatchNorm2d(**cfg_dyn_norm)
 
         pass
 
@@ -162,6 +207,8 @@ class DynamicAutoencoder(nn.Module):
             return self.forward_classic(*args, **kwargs)
         elif self.model_mode == DynamicAutoencoderModes.DYNAMIC:
             return self.forward_dynamic(*args, **kwargs)
+        elif self.model_mode == DynamicAutoencoderModes.CLASSIC2DYNAMIC:
+            return self.forward_classic2dynamic(*args, **kwargs)
         else:
             raise ValueError(f"Unknown model_mode: {self.model_mode}")
         
@@ -197,28 +244,128 @@ class DynamicAutoencoder(nn.Module):
         x = siglog(self.cl_encode_03_a_conv(pad(x, 1)))
         x = siglog(self.cl_encode_03_b_conv(pad(x, 1)))
         x = self.cl_encode_03_norm(x)
-        x = backward_gradient_normalization(x)
+        
+        x = siglog(self.cl_encode_04_a_conv(pad(x, 1)))
+        x = siglog(self.cl_encode_04_b_conv(pad(x, 1)))
+        x = self.cl_encode_04_norm(x)
+
+        x = siglog(self.cl_encode_05_a_conv(pad(x, 1)))
+        x = siglog(self.cl_encode_05_b_conv(pad(x, 1)))
+        x = self.cl_encode_05_norm(x)
 
         # Decode
         x = interpolate(x, [16, 16])
-        x = siglog(self.cl_decode_03_a_conv(pad(x, 1)))
+        x = siglog(self.cl_decode_05_a_conv(pad(x, 1)))
         x = interpolate(x, [32, 32])
+        x = siglog(self.cl_decode_05_b_conv(pad(x, 1)))
+        x = self.cl_decode_05_norm(x)
+
+        x = interpolate(x, [32, 32])
+        x = siglog(self.cl_decode_04_a_conv(pad(x, 1)))
+        x = interpolate(x, [64, 64])
+        x = siglog(self.cl_decode_04_b_conv(pad(x, 1)))
+        x = self.cl_decode_04_norm(x)
+
+        x = interpolate(x, [64, 64])
+        x = siglog(self.cl_decode_03_a_conv(pad(x, 1)))
+        x = interpolate(x, [128, 128])
         x = siglog(self.cl_decode_03_b_conv(pad(x, 1)))
         x = self.cl_decode_03_norm(x)
 
-        x = interpolate(x, [32, 32])
+        x = interpolate(x, [128, 128])
         x = siglog(self.cl_decode_02_a_conv(pad(x, 1)))
-        x = interpolate(x, [64, 64])
+        x = interpolate(x, [256, 256])
         x = siglog(self.cl_decode_02_b_conv(pad(x, 1)))
         x = self.cl_decode_02_norm(x)
 
-        x = interpolate(x, [64, 64])
+        x = interpolate(x, [256, 256])
         x = siglog(self.cl_decode_01_a_conv(pad(x, 1)))
-        x = interpolate(x, [128, 128])
+        x = interpolate(x, [512, 512])
         x = torch.sigmoid(self.cl_decode_01_b_conv(pad(x, 1)))
-        x = backward_gradient_normalization(x)
 
         return x
+
+    def forward_classic2dynamic(
+        self,
+        x: torch.Tensor,
+    ) -> torch.Tensor:
+        
+        pad = lambda t, p: torch.nn.functional.pad(
+            input=t,
+            pad=[p, p, p, p],
+            mode="replicate",
+            value=None,
+        )
+        interpolate = lambda x, s: torch.nn.functional.interpolate(
+            input=x,
+            size=s,
+            mode="nearest",
+            align_corners=None,
+            recompute_scale_factor=False,
+            antialias=False,
+        )
+
+        # Classic encoder
+        code = x
+        code = siglog(self.cl_encode_01_a_conv(pad(code, 1)))
+        code = siglog(self.cl_encode_01_b_conv(pad(code, 1)))
+        code = self.cl_encode_01_norm(code)
+
+        code = siglog(self.cl_encode_02_a_conv(pad(code, 1)))
+        code = siglog(self.cl_encode_02_b_conv(pad(code, 1)))
+        code = self.cl_encode_02_norm(code)
+
+        code = siglog(self.cl_encode_03_a_conv(pad(code, 1)))
+        code = siglog(self.cl_encode_03_b_conv(pad(code, 1)))
+        code = self.cl_encode_03_norm(code)
+        
+        code = siglog(self.cl_encode_04_a_conv(pad(code, 1)))
+        code = siglog(self.cl_encode_04_b_conv(pad(code, 1)))
+        code = self.cl_encode_04_norm(code)
+
+        code = siglog(self.cl_encode_05_a_conv(pad(code, 1)))
+        code = siglog(self.cl_encode_05_b_conv(pad(code, 1)))
+        code = self.cl_encode_05_norm(code)
+
+        # Bridge for context encoding
+        ctx = code
+        ctx = ctx.flatten(1)
+        ctx = self.bridge_dropout(ctx)
+        ctx = siglog(self.bridge_fc_1(ctx))
+        ctx = self.bridge_fc_1_ln(ctx)
+        ctx = siglog(self.bridge_fc_2(ctx))
+        ctx = self.bridge_fc_2_ln(ctx)
+        ctx = siglog(self.bridge_fc_3(ctx))
+        ctx = self.bridge_fc_3_ln(ctx)
+        ctx = siglog(self.bridge_fc_4(ctx))
+        ctx = self.bridge_fc_4_ln(ctx)
+        ctx = siglog(self.bridge_fc_5(ctx))
+
+        # Dynamic decoder
+        code = interpolate(code, [16, 16])
+        code = siglog(self.dyn_decode_05(pad(code, 1), ctx))
+        code = self.dyn_decode_05_norm(code)
+
+        code = interpolate(code, [32, 32])
+        code = siglog(self.dyn_decode_04(pad(code, 1), ctx))
+        code = self.dyn_decode_04_norm(code)
+
+        code = interpolate(code, [64, 64])
+        code = siglog(self.dyn_decode_03(pad(code, 1), ctx))
+        code = self.dyn_decode_03_norm(code)
+
+        code = interpolate(code, [128, 128])
+        code = siglog(self.dyn_decode_02(pad(code, 1), ctx))
+        code = self.dyn_decode_02_norm(code)
+
+        code = interpolate(code, [256, 256])
+        code = siglog(self.dyn_decode_01_a(pad(code, 1), ctx))
+        code = self.dyn_decode_01_norm(code)
+        code = interpolate(code, [512, 512])
+        code = torch.sigmoid(self.dyn_decode_01_b(pad(code, 1), ctx))
+
+        return code
+
 
     def forward_dynamic(
         self,
@@ -241,7 +388,7 @@ class DynamicAutoencoder(nn.Module):
         )
 
         # Context encoder
-        ctx = backward_gradient_normalization(x)
+        ctx = x
         ctx = siglog(self.cl_encode_01_a_conv(pad(ctx, 1)))
         ctx = siglog(self.cl_encode_01_b_conv(pad(ctx, 1)))
         ctx = self.cl_encode_01_norm(ctx)
@@ -253,9 +400,16 @@ class DynamicAutoencoder(nn.Module):
         ctx = siglog(self.cl_encode_03_a_conv(pad(ctx, 1)))
         ctx = siglog(self.cl_encode_03_b_conv(pad(ctx, 1)))
         ctx = self.cl_encode_03_norm(ctx)
+        
+        ctx = siglog(self.cl_encode_04_a_conv(pad(ctx, 1)))
+        ctx = siglog(self.cl_encode_04_b_conv(pad(ctx, 1)))
+        ctx = self.cl_encode_04_norm(ctx)
 
-        ctx = backward_gradient_normalization(ctx)
+        ctx = siglog(self.cl_encode_05_a_conv(pad(ctx, 1)))
+        ctx = siglog(self.cl_encode_05_b_conv(pad(ctx, 1)))
+        ctx = self.cl_encode_05_norm(ctx)
 
+        # Bridge
         ctx = ctx.flatten(1)
         ctx = self.bridge_dropout(ctx)
         ctx = siglog(self.bridge_fc_1(ctx))
@@ -267,11 +421,9 @@ class DynamicAutoencoder(nn.Module):
         ctx = siglog(self.bridge_fc_4(ctx))
         ctx = self.bridge_fc_4_ln(ctx)
         ctx = siglog(self.bridge_fc_5(ctx))
-        
-        ctx = backward_gradient_normalization(ctx)
 
         # Dynamic encoder
-        code = backward_gradient_normalization(x)
+        code = x
         code = siglog(self.dyn_encode_01(pad(code, 1), ctx))
         code = self.dyn_encode_01_norm(code)
 
@@ -281,17 +433,34 @@ class DynamicAutoencoder(nn.Module):
         code = siglog(self.dyn_encode_03(pad(code, 1), ctx))
         code = self.dyn_encode_03_norm(code)
 
+        code = siglog(self.dyn_encode_04(pad(code, 1), ctx))
+        code = self.dyn_encode_04_norm(code)
+
+        code = siglog(self.dyn_encode_05(pad(code, 1), ctx))
+        code = self.dyn_encode_05_norm(code)
+
         # Dynamic decoder
         code = interpolate(code, [16, 16])
+        code = siglog(self.dyn_decode_05(pad(code, 1), ctx))
+        code = self.dyn_decode_05_norm(code)
+
+        code = interpolate(code, [32, 32])
+        code = siglog(self.dyn_decode_04(pad(code, 1), ctx))
+        code = self.dyn_decode_04_norm(code)
+
+        code = interpolate(code, [64, 64])
         code = siglog(self.dyn_decode_03(pad(code, 1), ctx))
         code = self.dyn_decode_03_norm(code)
 
-        code = interpolate(code, [32, 32])
+        code = interpolate(code, [128, 128])
         code = siglog(self.dyn_decode_02(pad(code, 1), ctx))
         code = self.dyn_decode_02_norm(code)
 
-        code = interpolate(code, [64, 64])
-        code = torch.sigmoid(self.dyn_decode_01(pad(code, 1), ctx))
+        code = interpolate(code, [256, 256])
+        code = siglog(self.dyn_decode_01_a(pad(code, 1), ctx))
+        code = self.dyn_decode_01_norm(code)
+        code = interpolate(code, [512, 512])
+        code = torch.sigmoid(self.dyn_decode_01_b(pad(code, 1), ctx))
 
         return code
 
@@ -412,6 +581,9 @@ def train(
     savers: list = [],
     to_save: list[bool] = [],
     show_grads: bool = False,
+    show_grads_detailed: bool = False,
+    show_max_weights: bool = False,
+    show_max_weights_detailed: bool = False,
     warmup_scheduler: Optional[Callable] = None,
     warmup_steps: Optional[int] = None,
     lr_scheduler: Optional[Callable] = None,
@@ -502,10 +674,30 @@ def train(
             )
 
             if show_grads:
+                absolute_max = 0.0
+                absolute_name = ""
                 for name, param in model.named_parameters():
                     if param.requires_grad and param.grad is not None:
                         g = param.grad.data
-                        print(f"Grads for '{name}' min/max/mean/std: {g.min().item()}/{g.max().item()}/{g.mean().item()}/{g.std().item()}")
+                        max_g = g.abs().max()
+                        if absolute_max < max_g:
+                            absolute_max = max_g
+                            absolute_name = name
+                        if show_grads_detailed:
+                            print(f"Grads for '{name}' min/max/mean/std: {g.min().item()}/{g.max().item()}/{g.mean().item()}/{g.std().item()}")
+                print(f"Absolute max grad: '{absolute_name}' -> {absolute_max}")
+            
+            if show_max_weights:
+                absolute_max = 0.0
+                absolute_name = ""
+                for name, param in model.named_parameters():
+                    max_w = param.data.abs().max()
+                    if absolute_max < max_w:
+                        absolute_max = max_w
+                        absolute_name = name
+                    if show_max_weights_detailed:
+                        print(f"Max weight for '{name}': {max_w}")
+                print(f"Absolute max weight: '{absolute_name}' -> {absolute_max}")
 
             # inspect_grad(model.block_input_x_conv       , "block_input_x_conv   ")
             # inspect_grad(model.encode_block_01          , "encode_block_01      ")
@@ -746,10 +938,10 @@ def model_unfreeze_block(
 if __name__ == "__main__":
     train_mode = True
 
-    load_model = False
+    load_model = True
     load_optim = False
     onload_model_fn = [
-        # model_unfreeze_all,
+        model_unfreeze_all,
         # model_freeze_all,
         # lambda m, d, t: model_unfreeze_block(m, d, t, "cl_encode"),
         # lambda m, d, t: model_unfreeze_block(m, d, t, "cl_decode"),
@@ -769,75 +961,43 @@ if __name__ == "__main__":
 
     path_prefix_load = "f:\\git_AIResearch\\dyna\\data\\models"
     path_prefix_save = "f:\\git_AIResearch\\dyna\\data\\models"
-    load_path_model = f"{path_prefix_load}\\01\\model.01.__LAST__.pth"
-    load_path_optim = f"{path_prefix_load}\\01\\optim.01.__LAST__.pth"
-    save_path_model = f"{path_prefix_save}\\model.02"
-    save_path_optim = f"{path_prefix_save}\\optim.02"
+    load_path_model = f"{path_prefix_load}\\01.model.__CLASSIC__.pth"
+    load_path_optim = f"{path_prefix_load}\\"
+    save_path_model = f"{path_prefix_save}\\02.model"
+    save_path_optim = f"{path_prefix_save}\\02.optim"
     save_model = True
     save_optim = True
     save_initial_model = False
     save_initial_optim = False
     save_nth_iteration = 8192
-    log_nth_update_step = 64
 
-    # optimizer type
-    optimizer_type = torch.optim.AdamW
-    # optimizer: torch.optim.SGD
-    sgd_learning_rate = 1.0e-3
-    sgd_momentum = 0.0
-    sgd_dampening = 0.0
-    sgd_weight_decay = 0.0
-    sgd_nesterov = False
-    # optimizer: torch.optim.Adam
-    adam_learning_rate = 2.5e-4
-    adam_amsgrad = True
-    adam_weight_decay = 0.0
-    adam_eps = 1.0e-8
-    # optimizer: torch.optim.AdamW
-    adamw_learning_rate = 1.0e-4
-    adamw_amsgrad = True
-    adamw_weight_decay = 1.0e-2
-    adamw_eps = 1.0e-6
-    # optimizer: MADGRAD
-    madgrad_learning_rate = 1.0e-4
-    madgrad_momentum = 0.0
-    madgrad_weight_decay = 0.0
-    madgrad_eps = 1.0e-6
-    # optimizer: bnb.optim.AdamW8bit
-    bnb_adamw8bit_lr=1.0e-5
-    bnb_adamw8bit_betas=(0.9, 0.999)
-    bnb_adamw8bit_eps=1e-6
-    bnb_adamw8bit_weight_decay=1e-2
-    bnb_adamw8bit_amsgrad=True
-    bnb_adamw8bit_optim_bits=8
-    bnb_adamw8bit_min_8bit_size=4096
-    bnb_adamw8bit_percentile_clipping=100
-    bnb_adamw8bit_block_wise=True
-    bnb_adamw8bit_is_paged=False
     # various for optimizers
     optim_update_lr = False
     optim_target_lr = 1.0e-3
     optim_update_wd = False
     optim_target_wd = 0.1
-    warmup_active = True
-    warmup_steps = 4096
+    warmup_active = False
+    warmup_steps = 2048
     clip_grad_value = None
     clip_grad_norm = 1.0
     gradient_global_norm = False
     show_grads = False
+    show_grads_detailed = False
+    show_max_weights = False
+    show_max_weights_detailed = False
 
-    model_mode = DynamicAutoencoderModes.DYNAMIC
-    nelements = 4096
+    model_mode = DynamicAutoencoderModes.CLASSIC2DYNAMIC
+    batch_size = 96
+    nelements = batch_size * 32
     total_steps = 10**6
-    batch_size = 64
     grad_accumulation_steps = 1 # nelements // batch_size
+    log_nth_update_step = (nelements // batch_size) * grad_accumulation_steps
 
     images_sample_count = nelements
     starting_from = 0
-    # images_path_src = "f:\\git_AIResearch\\dyna\\data\\img_src_1"
     images_path_src = "f:\\Datasets\\Images_512x512\\dataset_01"
     images_path_dst = "f:\\git_AIResearch\\dyna\\data\\img_dst_1"
-    output_shape = [64, 64]
+    output_shape = [256, 256]
     dtype_weights = torch.float32
     device = torch.device("cuda")
 
@@ -873,60 +1033,52 @@ if __name__ == "__main__":
         model = model.eval()
         print("Evaluation mode")
 
-    if optimizer_type is torch.optim.Adam:
-        print("Using Adam")
-        optimizer = torch.optim.Adam(
-            model.parameters(),
-            lr=adam_learning_rate,
-            weight_decay=adam_weight_decay,
-            amsgrad=adam_amsgrad,
-            eps=adam_eps,
-        )
-    elif optimizer_type is torch.optim.AdamW:
-        print("Using AdamW")
+    print("Using AdamW")
+    params_encode_classic = []
+    params_decode_classic = []
+    params_bridge = []
+    params_transform = []
+    params_encode_dynamic = []
+    params_decode_dynamic = []
+    params_other = []
+
+    for name, param in model.named_parameters():
+        if "cl_encode" in name:
+            params_encode_classic.append(param)
+        elif "cl_decode" in name:
+            params_decode_classic.append(param)
+        elif "bridge" in name:
+            params_bridge.append(param)
+        elif "context_transform" in name:
+            params_transform.append(param)
+        elif "dyn_encode" in name and "context_transform" not in name:
+            params_encode_dynamic.append(param)
+        elif "dyn_decode" in name and "context_transform" not in name:
+            params_decode_dynamic.append(param)
+        else:
+            print(f"Unknown/Unaccounted parameter: {name}")
+            params_other.append(param)
+
+    if model_mode == DynamicAutoencoderModes.CLASSIC:
         optimizer = torch.optim.AdamW(
             model.parameters(),
-            lr=adamw_learning_rate,
-            weight_decay=adamw_weight_decay,
-            amsgrad=adamw_amsgrad,
-            eps=adamw_eps,
+            lr=1.0e-4,
+            weight_decay=1.0e-2,
+            amsgrad=True,
+            eps=1.0e-8,
         )
-    elif optimizer_type is MADGRAD:
-        print("Using MADGRAD")
-        optimizer = MADGRAD(
-            model.parameters(),
-            lr=madgrad_learning_rate,
-            weight_decay=madgrad_weight_decay,
-            momentum=madgrad_momentum,
-            eps=madgrad_eps,
-        )
-    elif optimizer_type is torch.optim.SGD:
-        print("Using SGD")
-        optimizer = torch.optim.SGD(
-            model.parameters(),
-            lr=sgd_learning_rate,
-            momentum=sgd_momentum,
-            dampening=sgd_dampening,
-            weight_decay=sgd_weight_decay,
-            nesterov=sgd_nesterov,
-        )
-    elif optimizer_type is bnb.optim.AdamW8bit:
-        print("Using bnb.optim.AdamW8bit")
-        optimizer = bnb.optim.AdamW8bit(
-            model.parameters(),
-            lr=bnb_adamw8bit_lr,
-            betas=bnb_adamw8bit_betas,
-            eps=bnb_adamw8bit_eps,
-            weight_decay=bnb_adamw8bit_weight_decay,
-            amsgrad=bnb_adamw8bit_amsgrad,
-            optim_bits=bnb_adamw8bit_optim_bits,
-            min_8bit_size=bnb_adamw8bit_min_8bit_size,
-            percentile_clipping=bnb_adamw8bit_percentile_clipping,
-            block_wise=bnb_adamw8bit_block_wise,
-            is_paged=bnb_adamw8bit_is_paged,
+    elif model_mode == DynamicAutoencoderModes.CLASSIC2DYNAMIC:
+        optimizer = torch.optim.AdamW(
+            [
+                {'params': params_encode_classic, 'lr': 1.0e-5, 'weight_decay': 1.0e-3},
+                {'params': params_bridge, 'lr': 1.0e-4, 'weight_decay': 1.0e-2},
+                {'params': params_transform, 'lr': 1.0e-4, 'weight_decay': 1.0e-2},
+                {'params': params_decode_dynamic, 'lr': 1.0e-3, 'weight_decay': 1.0e-5},
+                {'params': params_other, 'lr': 1.0e-5, 'weight_decay': 1.0e-2},
+            ],
         )
     else:
-        raise ValueError(f"Unknown optimizer type: {optimizer_type}")
+        raise ValueError(f"Unsupported model_mode: {model_mode}")
 
     if load_optim:
         optimizer.load_state_dict(torch.load(load_path_optim))
@@ -1006,6 +1158,8 @@ if __name__ == "__main__":
         savers=savers,
         to_save=[save_model, save_optim],
         show_grads=show_grads,
+        show_max_weights=show_max_weights,
+        show_max_weights_detailed=show_max_weights_detailed,
         warmup_scheduler=warmup_scheduler,
         warmup_steps=warmup_steps,
         lr_scheduler=lr_scheduler,
