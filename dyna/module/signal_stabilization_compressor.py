@@ -9,22 +9,30 @@ class SignalStabilizationCompressor(torch.nn.Module):
     SignalStabilizationCompressor
     -----------------------------
 
-    A dynamic vector-field transformation module designed to:
-    - preserve directional expressiveness
+    A nonlinear signal regularization module designed to:
     - suppress uncontrolled amplitude growth
+    - reshape and compress signal distribution
+    - preserve directional expressiveness
     - stabilize gradients through repeated normalization
 
     Core mechanisms:
-    - Sigmoid-based masking to softly suppress large activations
-    - Custom nonlinear transformation (siglog) to reshape signal distribution
-    - Repeated backward gradient normalization (BGN) to ensure uniform update dynamics
-    - Soft amplitude normalization via inverse root-mean-square scaling
+    - Sigmoid-based gating to softly attenuate extreme values
+    - Logarithmic remapping via custom `siglog` transformation
+    - Recurrent backward gradient normalization (BGN) to maintain uniform sensitivity
+    - Inverse RMS-based scaling to compress and normalize signal energy
 
-    Inputs:
-    - x: Tensor of shape [..., vector_dim], where the last dimension(s) represent the feature vector
+    This module is suitable as a preprocessing or intermediate layer in deep architectures,
+    particularly when input signals or features tend to exhibit heavy-tailed or unstable distributions.
+
+    Args:
+        leak (float): Small coefficient for residual passthrough of original signal (default: 1e-3).
+        eps (float): Epsilon to prevent division by zero and stabilize inverse operations (default: 1e-12).
+
+    Input:
+        x (Tensor): Input tensor of shape [..., D], where the last dimension represents feature vectors.
 
     Returns:
-    - Tensor of the same shape, dynamically regularized and gradient-stabilized
+        Tensor: Transformed tensor of the same shape, with regularized amplitude and stabilized gradients.
     """
 
     def __init__(
