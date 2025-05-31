@@ -3,9 +3,7 @@ import torch.nn as nn
 from dyna.functional import backward_gradient_normalization
 
 class BGNLayer(nn.Module):
-    r"""
-    Backward Gradient Normalization (BGN) Layer
-
+    """
     An implementation of the paper "Backward Gradient Normalization in Deep Neural Networks"
     from June 18, 2021 by Alejandro Cabana and Luis F. Lago-Fernández.
 
