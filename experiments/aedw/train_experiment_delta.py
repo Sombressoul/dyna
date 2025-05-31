@@ -123,10 +123,10 @@ class DynamicAutoencoder(nn.Module):
             context_length=self.ctx_len,
             context_use_bias=dynamic_conv_context_use_bias,
             rank=dynamic_conv_rank,
-            weights_repulsion_strength=0.0, # 0.3,
-            weights_noise_strength=0.0, # 0.01,
-            rank_noise_strength=0.0, # 0.01,
-            similarity_penalty_strength=0.0, # 0.1,
+            weights_repulsion_strength=0.10,
+            weights_noise_strength=0.01,
+            rank_noise_strength=0.01,
+            similarity_penalty_strength=0.10,
             kernel_size=[3, 3],
             stride=[2, 2],
             padding=[0, 0, 0, 0],
@@ -142,10 +142,10 @@ class DynamicAutoencoder(nn.Module):
             context_length=self.ctx_len,
             context_use_bias=dynamic_conv_context_use_bias,
             rank=dynamic_conv_rank,
-            weights_repulsion_strength=0.0, # 0.3,
-            weights_noise_strength=0.0, # 0.01,
-            rank_noise_strength=0.0, # 0.01,
-            similarity_penalty_strength=0.0, # 0.1,
+            weights_repulsion_strength=0.10,
+            weights_noise_strength=0.01,
+            rank_noise_strength=0.01,
+            similarity_penalty_strength=0.10,
             kernel_size=[3, 3],
             stride=[1, 1],
             padding=[0, 0, 0, 0],
@@ -614,7 +614,7 @@ def train(
     for step_idx in range(total_steps):
         if len(epoch_ids) < batch_size:
             epoch_idx = epoch_idx + 1
-            # print(f"\n# ==============> New epoch: #{epoch_idx}")
+            print(f"\n# ==============> New epoch: #{epoch_idx}")
             epoch_ids = torch.randperm(data_lab.shape[0])
 
         batch_ids = epoch_ids[0:batch_size]
@@ -661,12 +661,17 @@ def train(
 
         if (weights_update_step_idx > 0 and (weights_update_step_idx) % log_nth_update_step == 0):
             weights_update_step_idx = 0
+            lrs = []
+            for g in optimizer.param_groups:
+                if g['lr'] not in lrs:
+                    lrs.append(g['lr'])
+            lrs = [f"{v:.10f}" for v in lrs]
             print(
                 "\n# ==============> "
                 + "\n".join(
                     [
                         f"Iteration #{step_idx+1}:",
-                        f"LR: {optimizer.param_groups[0]['lr']:.10f}",
+                        "\n".join([f"LR #{idx}: {v}" for idx,v in enumerate(lrs)]),
                         f"Loss current: {loss_current_step.item():.20f}",
                         f"Loss mean: {(sum(loss_logging_accumulator)/len(loss_logging_accumulator)):.20f}",
                     ]
@@ -938,7 +943,7 @@ def model_unfreeze_block(
 if __name__ == "__main__":
     train_mode = True
 
-    load_model = True
+    load_model = False
     load_optim = False
     onload_model_fn = [
         model_unfreeze_all,
@@ -976,10 +981,10 @@ if __name__ == "__main__":
     optim_target_lr = 1.0e-3
     optim_update_wd = False
     optim_target_wd = 0.1
-    warmup_active = False
-    warmup_steps = 2048
+    warmup_active = True
+    warmup_steps = 1024
     clip_grad_value = None
-    clip_grad_norm = 1.0
+    clip_grad_norm = 10.0
     gradient_global_norm = False
     show_grads = False
     show_grads_detailed = False
@@ -987,11 +992,11 @@ if __name__ == "__main__":
     show_max_weights_detailed = False
 
     model_mode = DynamicAutoencoderModes.CLASSIC2DYNAMIC
-    batch_size = 96
-    nelements = batch_size * 32
+    batch_size = 48
+    nelements = batch_size * 256
     total_steps = 10**6
-    grad_accumulation_steps = 1 # nelements // batch_size
-    log_nth_update_step = (nelements // batch_size) * grad_accumulation_steps
+    grad_accumulation_steps = 2 # nelements // batch_size
+    log_nth_update_step = (nelements // batch_size) // grad_accumulation_steps
 
     images_sample_count = nelements
     starting_from = 0
@@ -1070,11 +1075,11 @@ if __name__ == "__main__":
     elif model_mode == DynamicAutoencoderModes.CLASSIC2DYNAMIC:
         optimizer = torch.optim.AdamW(
             [
-                {'params': params_encode_classic, 'lr': 1.0e-5, 'weight_decay': 1.0e-3},
-                {'params': params_bridge, 'lr': 1.0e-4, 'weight_decay': 1.0e-2},
-                {'params': params_transform, 'lr': 1.0e-4, 'weight_decay': 1.0e-2},
-                {'params': params_decode_dynamic, 'lr': 1.0e-3, 'weight_decay': 1.0e-5},
-                {'params': params_other, 'lr': 1.0e-5, 'weight_decay': 1.0e-2},
+                {'params': params_encode_classic, 'lr': 1.0e-7, 'weight_decay': 1.0e-2},
+                {'params': params_bridge, 'lr': 1.0e-5, 'weight_decay': 1.0e-2},
+                {'params': params_transform, 'lr': 1.0e-5, 'weight_decay': 1.0e-2},
+                {'params': params_decode_dynamic, 'lr': 1.0e-4, 'weight_decay': 1.0e-2},
+                {'params': params_other, 'lr': 1.0e-6, 'weight_decay': 1.0e-2},
             ],
         )
     else:
