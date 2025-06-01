@@ -4,9 +4,7 @@ import math
 
 from typing import Union, List
 
-from dyna.functional.siglog import siglog
-from dyna.functional.backward_gradient_normalization import backward_gradient_normalization
-from dyna.module.signal_stabilization_compressor import SignalStabilizationCompressor, SignalStabilizationCompressorMode
+import dyna
 
 
 class WeightsLib2DDelta(nn.Module):
@@ -64,11 +62,11 @@ class WeightsLib2DDelta(nn.Module):
         self.eps = max(eps, 6.0e-8) if dtype_weights == torch.float16 else eps
         self.dtype_weights = dtype_weights
 
-        self.stabilizer = SignalStabilizationCompressor(
+        self.stabilizer = dyna.module.SignalStabilizationCompressor(
             bgn_input=True,
             bgn_mid=True,
             bgn_output=True,
-            mode=SignalStabilizationCompressorMode.GATING,
+            mode=dyna.module.SignalStabilizationCompressorMode.GATING,
             trainable=False,
             leak=1.0e-3,
             eps=self.eps,
@@ -149,7 +147,7 @@ class WeightsLib2DDelta(nn.Module):
         slice_modulation = 12 * self.rank
 
         x_transformed = self.context_transform(x)
-        x_transformed = x_transformed[::, 0:slice_attention] * siglog(x_transformed[::, slice_attention::])
+        x_transformed = x_transformed[::, 0:slice_attention] * dyna.functional.siglog(x_transformed[::, slice_attention::])
         mod = x_transformed[::, 0:slice_modulation]
         mod = mod.reshape([mod.shape[0], self.rank, 3, 2, 1, 1, 2]).expand([-1, -1, -1, -1, *self.output_shape, -1])
 
@@ -168,14 +166,14 @@ class WeightsLib2DDelta(nn.Module):
 
         denom = (weights[::, ::, 1] ** 2).sum(-1).add(self.eps).sqrt().unsqueeze(-1)
         theta = weights[::, ::, 1] / denom
-        theta = backward_gradient_normalization(theta)
+        theta = dyna.functional.backward_gradient_normalization(theta)
         weights = (weights[::, ::, 0] * theta).sum(dim=-1).contiguous()
 
         # Weights decorellation.
         weights = self.stabilizer(weights)
         weights_flat = weights.reshape(weights.shape[0], weights.shape[1], -1)
         mat_sim = torch.matmul(weights_flat, weights_flat.transpose(1, 2))
-        weights_flat = backward_gradient_normalization(weights_flat)
+        weights_flat = dyna.functional.backward_gradient_normalization(weights_flat)
         mat_diagonal = torch.eye(mat_sim.shape[1], dtype=torch.bool, device=mat_sim.device)
         mat_sim = mat_sim * (~mat_diagonal)
         repulsion = torch.matmul(mat_sim, weights_flat) / max((self.rank - 1), 1.0)
@@ -213,9 +211,9 @@ class WeightsLib2DDelta(nn.Module):
         weight_rank_entropy = -(weight_rank_probs * weight_rank_probs.add(self.eps).log()).sum(dim=-1, keepdim=True)
         weight_rank_grad_delta = weight_rank_entropy - weight_rank_entropy.detach()
         weight_rank_logits = weight_rank_logits + weight_rank_grad_delta
-        weight_rank = siglog(weight_rank_logits / self.extras[0])
+        weight_rank = dyna.functional.siglog(weight_rank_logits / self.extras[0])
         weight_rank = torch.softmax(weight_rank, dim=-1)
-        weight_rank = backward_gradient_normalization(weight_rank)
+        weight_rank = dyna.functional.backward_gradient_normalization(weight_rank)
 
         # Weighting.
         weights = weights * weight_rank.reshape([*weight_rank.shape, *[1]*len(weights.shape[2::])])

@@ -1,5 +1,6 @@
 import torch
 
+
 def noiseover(
     x: torch.Tensor,
     rate: float,
@@ -40,4 +41,3 @@ def noiseover(
     x = x + (x_noise * rate)
 
     return x
-

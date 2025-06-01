@@ -19,8 +19,8 @@ sys.path.append(project_dir)
 
 torch.manual_seed(10056)
 
-from dyna.module.dynamic_conv2d_delta import DynamicConv2DDelta
-from dyna.functional.siglog import siglog
+import dyna
+
 
 class DynamicAutoencoderModes(Enum):
     CLASSIC = 0
@@ -125,7 +125,6 @@ class DynamicAutoencoder(nn.Module):
             weights_noise_strength=0.01,
             rank_noise_strength=0.01,
             similarity_penalty_strength=0.10,
-            weights_local_coupling=True,
             kernel_size=[3, 3],
             stride=[2, 2],
             padding=[0, 0, 0, 0],
@@ -145,7 +144,6 @@ class DynamicAutoencoder(nn.Module):
             weights_noise_strength=0.01,
             rank_noise_strength=0.01,
             similarity_penalty_strength=0.10,
-            weights_local_coupling=True,
             kernel_size=[3, 3],
             stride=[1, 1],
             padding=[0, 0, 0, 0],
@@ -159,45 +157,45 @@ class DynamicAutoencoder(nn.Module):
 
         # =====> ENCODE
         # 256>128
-        self.dyn_encode_01 = DynamicConv2DDelta(**cfg_dyn_conv_ds | dict(in_channels=3))
+        self.dyn_encode_01 = dyna.module.DynamicConv2DDelta(**cfg_dyn_conv_ds | dict(in_channels=3))
         self.dyn_encode_01_norm = nn.BatchNorm2d(**cfg_dyn_norm)
 
         # 128>64
-        self.dyn_encode_02 = DynamicConv2DDelta(**cfg_dyn_conv_ds)
+        self.dyn_encode_02 = dyna.module.DynamicConv2DDelta(**cfg_dyn_conv_ds)
         self.dyn_encode_02_norm = nn.BatchNorm2d(**cfg_dyn_norm)
 
         # 64>32
-        self.dyn_encode_03 = DynamicConv2DDelta(**cfg_dyn_conv_ds)
+        self.dyn_encode_03 = dyna.module.DynamicConv2DDelta(**cfg_dyn_conv_ds)
         self.dyn_encode_03_norm = nn.BatchNorm2d(**cfg_dyn_norm)
 
         # 32>16
-        self.dyn_encode_04 = DynamicConv2DDelta(**cfg_dyn_conv_ds)
+        self.dyn_encode_04 = dyna.module.DynamicConv2DDelta(**cfg_dyn_conv_ds)
         self.dyn_encode_04_norm = nn.BatchNorm2d(**cfg_dyn_norm)
 
         # 16>8
-        self.dyn_encode_05 = DynamicConv2DDelta(**cfg_dyn_conv_ds)
+        self.dyn_encode_05 = dyna.module.DynamicConv2DDelta(**cfg_dyn_conv_ds)
         self.dyn_encode_05_norm = nn.BatchNorm2d(**cfg_dyn_norm)
 
         # =====> DECODE
         # 8>16
-        self.dyn_decode_05 = DynamicConv2DDelta(**cfg_dyn_conv_us)
+        self.dyn_decode_05 = dyna.module.DynamicConv2DDelta(**cfg_dyn_conv_us)
         self.dyn_decode_05_norm = nn.BatchNorm2d(**cfg_dyn_norm)
 
         # 16>32
-        self.dyn_decode_04 = DynamicConv2DDelta(**cfg_dyn_conv_us)
+        self.dyn_decode_04 = dyna.module.DynamicConv2DDelta(**cfg_dyn_conv_us)
         self.dyn_decode_04_norm = nn.BatchNorm2d(**cfg_dyn_norm)
 
         # 32>64
-        self.dyn_decode_03 = DynamicConv2DDelta(**cfg_dyn_conv_us)
+        self.dyn_decode_03 = dyna.module.DynamicConv2DDelta(**cfg_dyn_conv_us)
         self.dyn_decode_03_norm = nn.BatchNorm2d(**cfg_dyn_norm)
 
         # 64>128
-        self.dyn_decode_02 = DynamicConv2DDelta(**cfg_dyn_conv_us)
+        self.dyn_decode_02 = dyna.module.DynamicConv2DDelta(**cfg_dyn_conv_us)
         self.dyn_decode_02_norm = nn.BatchNorm2d(**cfg_dyn_norm)
 
         # 128>256
-        self.dyn_decode_01_a = DynamicConv2DDelta(**cfg_dyn_conv_us)
-        self.dyn_decode_01_b = DynamicConv2DDelta(**cfg_dyn_conv_ds | dict(out_channels=3))
+        self.dyn_decode_01_a = dyna.module.DynamicConv2DDelta(**cfg_dyn_conv_us)
+        self.dyn_decode_01_b = dyna.module.DynamicConv2DDelta(**cfg_dyn_conv_ds | dict(out_channels=3))
         self.dyn_decode_01_norm = nn.BatchNorm2d(**cfg_dyn_norm)
 
         pass
@@ -233,53 +231,53 @@ class DynamicAutoencoder(nn.Module):
         )
 
         # Encode
-        x = siglog(self.cl_encode_01_a_conv(pad(x, 1)))
-        x = siglog(self.cl_encode_01_b_conv(pad(x, 1)))
+        x = dyna.functional.siglog(self.cl_encode_01_a_conv(pad(x, 1)))
+        x = dyna.functional.siglog(self.cl_encode_01_b_conv(pad(x, 1)))
         x = self.cl_encode_01_norm(x)
 
-        x = siglog(self.cl_encode_02_a_conv(pad(x, 1)))
-        x = siglog(self.cl_encode_02_b_conv(pad(x, 1)))
+        x = dyna.functional.siglog(self.cl_encode_02_a_conv(pad(x, 1)))
+        x = dyna.functional.siglog(self.cl_encode_02_b_conv(pad(x, 1)))
         x = self.cl_encode_02_norm(x)
 
-        x = siglog(self.cl_encode_03_a_conv(pad(x, 1)))
-        x = siglog(self.cl_encode_03_b_conv(pad(x, 1)))
+        x = dyna.functional.siglog(self.cl_encode_03_a_conv(pad(x, 1)))
+        x = dyna.functional.siglog(self.cl_encode_03_b_conv(pad(x, 1)))
         x = self.cl_encode_03_norm(x)
         
-        x = siglog(self.cl_encode_04_a_conv(pad(x, 1)))
-        x = siglog(self.cl_encode_04_b_conv(pad(x, 1)))
+        x = dyna.functional.siglog(self.cl_encode_04_a_conv(pad(x, 1)))
+        x = dyna.functional.siglog(self.cl_encode_04_b_conv(pad(x, 1)))
         x = self.cl_encode_04_norm(x)
 
-        x = siglog(self.cl_encode_05_a_conv(pad(x, 1)))
-        x = siglog(self.cl_encode_05_b_conv(pad(x, 1)))
+        x = dyna.functional.siglog(self.cl_encode_05_a_conv(pad(x, 1)))
+        x = dyna.functional.siglog(self.cl_encode_05_b_conv(pad(x, 1)))
         x = self.cl_encode_05_norm(x)
 
         # Decode
         x = interpolate(x, [16, 16])
-        x = siglog(self.cl_decode_05_a_conv(pad(x, 1)))
+        x = dyna.functional.siglog(self.cl_decode_05_a_conv(pad(x, 1)))
         x = interpolate(x, [32, 32])
-        x = siglog(self.cl_decode_05_b_conv(pad(x, 1)))
+        x = dyna.functional.siglog(self.cl_decode_05_b_conv(pad(x, 1)))
         x = self.cl_decode_05_norm(x)
 
         x = interpolate(x, [32, 32])
-        x = siglog(self.cl_decode_04_a_conv(pad(x, 1)))
+        x = dyna.functional.siglog(self.cl_decode_04_a_conv(pad(x, 1)))
         x = interpolate(x, [64, 64])
-        x = siglog(self.cl_decode_04_b_conv(pad(x, 1)))
+        x = dyna.functional.siglog(self.cl_decode_04_b_conv(pad(x, 1)))
         x = self.cl_decode_04_norm(x)
 
         x = interpolate(x, [64, 64])
-        x = siglog(self.cl_decode_03_a_conv(pad(x, 1)))
+        x = dyna.functional.siglog(self.cl_decode_03_a_conv(pad(x, 1)))
         x = interpolate(x, [128, 128])
-        x = siglog(self.cl_decode_03_b_conv(pad(x, 1)))
+        x = dyna.functional.siglog(self.cl_decode_03_b_conv(pad(x, 1)))
         x = self.cl_decode_03_norm(x)
 
         x = interpolate(x, [128, 128])
-        x = siglog(self.cl_decode_02_a_conv(pad(x, 1)))
+        x = dyna.functional.siglog(self.cl_decode_02_a_conv(pad(x, 1)))
         x = interpolate(x, [256, 256])
-        x = siglog(self.cl_decode_02_b_conv(pad(x, 1)))
+        x = dyna.functional.siglog(self.cl_decode_02_b_conv(pad(x, 1)))
         x = self.cl_decode_02_norm(x)
 
         x = interpolate(x, [256, 256])
-        x = siglog(self.cl_decode_01_a_conv(pad(x, 1)))
+        x = dyna.functional.siglog(self.cl_decode_01_a_conv(pad(x, 1)))
         x = interpolate(x, [512, 512])
         x = torch.sigmoid(self.cl_decode_01_b_conv(pad(x, 1)))
 
@@ -307,59 +305,59 @@ class DynamicAutoencoder(nn.Module):
 
         # Classic encoder
         code = x
-        code = siglog(self.cl_encode_01_a_conv(pad(code, 1)))
-        code = siglog(self.cl_encode_01_b_conv(pad(code, 1)))
+        code = dyna.functional.siglog(self.cl_encode_01_a_conv(pad(code, 1)))
+        code = dyna.functional.siglog(self.cl_encode_01_b_conv(pad(code, 1)))
         code = self.cl_encode_01_norm(code)
 
-        code = siglog(self.cl_encode_02_a_conv(pad(code, 1)))
-        code = siglog(self.cl_encode_02_b_conv(pad(code, 1)))
+        code = dyna.functional.siglog(self.cl_encode_02_a_conv(pad(code, 1)))
+        code = dyna.functional.siglog(self.cl_encode_02_b_conv(pad(code, 1)))
         code = self.cl_encode_02_norm(code)
 
-        code = siglog(self.cl_encode_03_a_conv(pad(code, 1)))
-        code = siglog(self.cl_encode_03_b_conv(pad(code, 1)))
+        code = dyna.functional.siglog(self.cl_encode_03_a_conv(pad(code, 1)))
+        code = dyna.functional.siglog(self.cl_encode_03_b_conv(pad(code, 1)))
         code = self.cl_encode_03_norm(code)
         
-        code = siglog(self.cl_encode_04_a_conv(pad(code, 1)))
-        code = siglog(self.cl_encode_04_b_conv(pad(code, 1)))
+        code = dyna.functional.siglog(self.cl_encode_04_a_conv(pad(code, 1)))
+        code = dyna.functional.siglog(self.cl_encode_04_b_conv(pad(code, 1)))
         code = self.cl_encode_04_norm(code)
 
-        code = siglog(self.cl_encode_05_a_conv(pad(code, 1)))
-        code = siglog(self.cl_encode_05_b_conv(pad(code, 1)))
+        code = dyna.functional.siglog(self.cl_encode_05_a_conv(pad(code, 1)))
+        code = dyna.functional.siglog(self.cl_encode_05_b_conv(pad(code, 1)))
         code = self.cl_encode_05_norm(code)
 
         # Bridge for context encoding
         ctx = code
         ctx = ctx.flatten(1)
         ctx = self.bridge_dropout(ctx)
-        ctx = siglog(self.bridge_fc_1(ctx))
+        ctx = dyna.functional.siglog(self.bridge_fc_1(ctx))
         ctx = self.bridge_fc_1_ln(ctx)
-        ctx = siglog(self.bridge_fc_2(ctx))
+        ctx = dyna.functional.siglog(self.bridge_fc_2(ctx))
         ctx = self.bridge_fc_2_ln(ctx)
-        ctx = siglog(self.bridge_fc_3(ctx))
+        ctx = dyna.functional.siglog(self.bridge_fc_3(ctx))
         ctx = self.bridge_fc_3_ln(ctx)
-        ctx = siglog(self.bridge_fc_4(ctx))
+        ctx = dyna.functional.siglog(self.bridge_fc_4(ctx))
         ctx = self.bridge_fc_4_ln(ctx)
-        ctx = siglog(self.bridge_fc_5(ctx))
+        ctx = dyna.functional.siglog(self.bridge_fc_5(ctx))
 
         # Dynamic decoder
         code = interpolate(code, [16, 16])
-        code = siglog(self.dyn_decode_05(pad(code, 1), ctx))
+        code = dyna.functional.siglog(self.dyn_decode_05(pad(code, 1), ctx))
         code = self.dyn_decode_05_norm(code)
 
         code = interpolate(code, [32, 32])
-        code = siglog(self.dyn_decode_04(pad(code, 1), ctx))
+        code = dyna.functional.siglog(self.dyn_decode_04(pad(code, 1), ctx))
         code = self.dyn_decode_04_norm(code)
 
         code = interpolate(code, [64, 64])
-        code = siglog(self.dyn_decode_03(pad(code, 1), ctx))
+        code = dyna.functional.siglog(self.dyn_decode_03(pad(code, 1), ctx))
         code = self.dyn_decode_03_norm(code)
 
         code = interpolate(code, [128, 128])
-        code = siglog(self.dyn_decode_02(pad(code, 1), ctx))
+        code = dyna.functional.siglog(self.dyn_decode_02(pad(code, 1), ctx))
         code = self.dyn_decode_02_norm(code)
 
         code = interpolate(code, [256, 256])
-        code = siglog(self.dyn_decode_01_a(pad(code, 1), ctx))
+        code = dyna.functional.siglog(self.dyn_decode_01_a(pad(code, 1), ctx))
         code = self.dyn_decode_01_norm(code)
         code = interpolate(code, [512, 512])
         code = torch.sigmoid(self.dyn_decode_01_b(pad(code, 1), ctx))
@@ -389,75 +387,75 @@ class DynamicAutoencoder(nn.Module):
 
         # Context encoder
         ctx = x
-        ctx = siglog(self.cl_encode_01_a_conv(pad(ctx, 1)))
-        ctx = siglog(self.cl_encode_01_b_conv(pad(ctx, 1)))
+        ctx = dyna.functional.siglog(self.cl_encode_01_a_conv(pad(ctx, 1)))
+        ctx = dyna.functional.siglog(self.cl_encode_01_b_conv(pad(ctx, 1)))
         ctx = self.cl_encode_01_norm(ctx)
 
-        ctx = siglog(self.cl_encode_02_a_conv(pad(ctx, 1)))
-        ctx = siglog(self.cl_encode_02_b_conv(pad(ctx, 1)))
+        ctx = dyna.functional.siglog(self.cl_encode_02_a_conv(pad(ctx, 1)))
+        ctx = dyna.functional.siglog(self.cl_encode_02_b_conv(pad(ctx, 1)))
         ctx = self.cl_encode_02_norm(ctx)
 
-        ctx = siglog(self.cl_encode_03_a_conv(pad(ctx, 1)))
-        ctx = siglog(self.cl_encode_03_b_conv(pad(ctx, 1)))
+        ctx = dyna.functional.siglog(self.cl_encode_03_a_conv(pad(ctx, 1)))
+        ctx = dyna.functional.siglog(self.cl_encode_03_b_conv(pad(ctx, 1)))
         ctx = self.cl_encode_03_norm(ctx)
         
-        ctx = siglog(self.cl_encode_04_a_conv(pad(ctx, 1)))
-        ctx = siglog(self.cl_encode_04_b_conv(pad(ctx, 1)))
+        ctx = dyna.functional.siglog(self.cl_encode_04_a_conv(pad(ctx, 1)))
+        ctx = dyna.functional.siglog(self.cl_encode_04_b_conv(pad(ctx, 1)))
         ctx = self.cl_encode_04_norm(ctx)
 
-        ctx = siglog(self.cl_encode_05_a_conv(pad(ctx, 1)))
-        ctx = siglog(self.cl_encode_05_b_conv(pad(ctx, 1)))
+        ctx = dyna.functional.siglog(self.cl_encode_05_a_conv(pad(ctx, 1)))
+        ctx = dyna.functional.siglog(self.cl_encode_05_b_conv(pad(ctx, 1)))
         ctx = self.cl_encode_05_norm(ctx)
 
         # Bridge
         ctx = ctx.flatten(1)
         ctx = self.bridge_dropout(ctx)
-        ctx = siglog(self.bridge_fc_1(ctx))
+        ctx = dyna.functional.siglog(self.bridge_fc_1(ctx))
         ctx = self.bridge_fc_1_ln(ctx)
-        ctx = siglog(self.bridge_fc_2(ctx))
+        ctx = dyna.functional.siglog(self.bridge_fc_2(ctx))
         ctx = self.bridge_fc_2_ln(ctx)
-        ctx = siglog(self.bridge_fc_3(ctx))
+        ctx = dyna.functional.siglog(self.bridge_fc_3(ctx))
         ctx = self.bridge_fc_3_ln(ctx)
-        ctx = siglog(self.bridge_fc_4(ctx))
+        ctx = dyna.functional.siglog(self.bridge_fc_4(ctx))
         ctx = self.bridge_fc_4_ln(ctx)
-        ctx = siglog(self.bridge_fc_5(ctx))
+        ctx = dyna.functional.siglog(self.bridge_fc_5(ctx))
 
         # Dynamic encoder
         code = x
-        code = siglog(self.dyn_encode_01(pad(code, 1), ctx))
+        code = dyna.functional.siglog(self.dyn_encode_01(pad(code, 1), ctx))
         code = self.dyn_encode_01_norm(code)
 
-        code = siglog(self.dyn_encode_02(pad(code, 1), ctx))
+        code = dyna.functional.siglog(self.dyn_encode_02(pad(code, 1), ctx))
         code = self.dyn_encode_02_norm(code)
 
-        code = siglog(self.dyn_encode_03(pad(code, 1), ctx))
+        code = dyna.functional.siglog(self.dyn_encode_03(pad(code, 1), ctx))
         code = self.dyn_encode_03_norm(code)
 
-        code = siglog(self.dyn_encode_04(pad(code, 1), ctx))
+        code = dyna.functional.siglog(self.dyn_encode_04(pad(code, 1), ctx))
         code = self.dyn_encode_04_norm(code)
 
-        code = siglog(self.dyn_encode_05(pad(code, 1), ctx))
+        code = dyna.functional.siglog(self.dyn_encode_05(pad(code, 1), ctx))
         code = self.dyn_encode_05_norm(code)
 
         # Dynamic decoder
         code = interpolate(code, [16, 16])
-        code = siglog(self.dyn_decode_05(pad(code, 1), ctx))
+        code = dyna.functional.siglog(self.dyn_decode_05(pad(code, 1), ctx))
         code = self.dyn_decode_05_norm(code)
 
         code = interpolate(code, [32, 32])
-        code = siglog(self.dyn_decode_04(pad(code, 1), ctx))
+        code = dyna.functional.siglog(self.dyn_decode_04(pad(code, 1), ctx))
         code = self.dyn_decode_04_norm(code)
 
         code = interpolate(code, [64, 64])
-        code = siglog(self.dyn_decode_03(pad(code, 1), ctx))
+        code = dyna.functional.siglog(self.dyn_decode_03(pad(code, 1), ctx))
         code = self.dyn_decode_03_norm(code)
 
         code = interpolate(code, [128, 128])
-        code = siglog(self.dyn_decode_02(pad(code, 1), ctx))
+        code = dyna.functional.siglog(self.dyn_decode_02(pad(code, 1), ctx))
         code = self.dyn_decode_02_norm(code)
 
         code = interpolate(code, [256, 256])
-        code = siglog(self.dyn_decode_01_a(pad(code, 1), ctx))
+        code = dyna.functional.siglog(self.dyn_decode_01_a(pad(code, 1), ctx))
         code = self.dyn_decode_01_norm(code)
         code = interpolate(code, [512, 512])
         code = torch.sigmoid(self.dyn_decode_01_b(pad(code, 1), ctx))
@@ -943,7 +941,7 @@ def model_unfreeze_block(
 if __name__ == "__main__":
     train_mode = True
 
-    load_model = True
+    load_model = False
     load_optim = False
     onload_model_fn = [
         model_unfreeze_all,
@@ -966,10 +964,10 @@ if __name__ == "__main__":
 
     path_prefix_load = "f:\\git_AIResearch\\dyna\\data\\models"
     path_prefix_save = "f:\\git_AIResearch\\dyna\\data\\models"
-    load_path_model = f"{path_prefix_load}\\06.model.__LAST__.pth"
+    load_path_model = f"{path_prefix_load}\\"
     load_path_optim = f"{path_prefix_load}\\"
-    save_path_model = f"{path_prefix_save}\\07.model"
-    save_path_optim = f"{path_prefix_save}\\07.optim"
+    save_path_model = f"{path_prefix_save}\\00.model"
+    save_path_optim = f"{path_prefix_save}\\00.optim"
     save_model = True
     save_optim = True
     save_initial_model = False
@@ -991,7 +989,7 @@ if __name__ == "__main__":
     show_max_weights = False
     show_max_weights_detailed = False
 
-    model_mode = DynamicAutoencoderModes.CLASSIC2DYNAMIC
+    model_mode = DynamicAutoencoderModes.DYNAMIC
     batch_size = 32
     nelements = batch_size * 8 # 256
     total_steps = 10**6
@@ -1078,37 +1076,21 @@ if __name__ == "__main__":
     elif model_mode == DynamicAutoencoderModes.CLASSIC2DYNAMIC:
         optimizer = torch.optim.AdamW(
             [
-                # # STAGE 1
-                # {'params': params_encode_classic, 'lr': 1.0e-5, 'weight_decay': 1.0e-2},
-                # {'params': params_bridge, 'lr': 1.0e-4, 'weight_decay': 1.0e-2},
-                # {'params': params_decode_transform, 'lr': 1.0e-4, 'weight_decay': 1.0e-2},
-                # {'params': params_decode_dynamic, 'lr': 1.0e-3, 'weight_decay': 1.0e-2},
-
-                # # STAGE 2
-                # {'params': params_encode_classic, 'lr': 1.0e-6, 'weight_decay': 1.0e-2},
-                # {'params': params_bridge, 'lr': 1.0e-5, 'weight_decay': 1.0e-2},
-                # {'params': params_decode_transform, 'lr': 1.0e-5, 'weight_decay': 1.0e-2},
-                # {'params': params_decode_dynamic, 'lr': 1.0e-4, 'weight_decay': 1.0e-2},
-
-                # STAGE 3
-                {'params': params_encode_classic, 'lr': 1.0e-7, 'weight_decay': 1.0e-3},
-                {'params': params_bridge, 'lr': 1.0e-6, 'weight_decay': 1.0e-3},
-                {'params': params_decode_transform, 'lr': 1.0e-5, 'weight_decay': 1.0e-3},
-                {'params': params_decode_dynamic, 'lr': 1.0e-4, 'weight_decay': 1.0e-3},
+                # STAGE 1
+                {'params': params_encode_classic, 'lr': 1.0e-5, 'weight_decay': 1.0e-2},
+                {'params': params_bridge, 'lr': 1.0e-4, 'weight_decay': 1.0e-2},
+                {'params': params_decode_transform, 'lr': 1.0e-4, 'weight_decay': 1.0e-2},
+                {'params': params_decode_dynamic, 'lr': 1.0e-3, 'weight_decay': 1.0e-2},
             ],
         )
     elif model_mode == DynamicAutoencoderModes.DYNAMIC:
         optimizer = torch.optim.AdamW(
             [
-                # # STAGE 1
-                # {'params': params_encode_transform, 'lr': 1.0e-4, 'weight_decay': 1.0e-2},
-                # {'params': params_encode_dynamic, 'lr': 1.0e-3, 'weight_decay': 1.0e-2},
-
-                # STAGE 2
-                {'params': params_bridge, 'lr': 1.0e-7, 'weight_decay': 1.0e-3},
+                {'params': params_encode_classic, 'lr': 1.0e-6, 'weight_decay': 1.0e-3},
+                {'params': params_bridge, 'lr': 1.0e-6, 'weight_decay': 1.0e-3},
                 {'params': params_encode_transform, 'lr': 1.0e-5, 'weight_decay': 1.0e-2},
-                {'params': params_encode_dynamic, 'lr': 1.0e-3, 'weight_decay': 1.0e-2},
-                {'params': params_decode_dynamic, 'lr': 1.0e-6, 'weight_decay': 1.0e-3},
+                {'params': params_encode_dynamic, 'lr': 1.0e-4, 'weight_decay': 1.0e-2},
+                {'params': params_decode_dynamic, 'lr': 1.0e-4, 'weight_decay': 1.0e-3},
             ],
         )
     else:

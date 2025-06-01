@@ -4,8 +4,7 @@ import math
 from typing import Union
 from enum import Enum
 
-from dyna.functional.siglog import siglog
-from dyna.functional.backward_gradient_normalization import backward_gradient_normalization
+import dyna
 
 
 class SignalStabilizationCompressorMode(Enum):
@@ -91,7 +90,7 @@ class SignalStabilizationCompressor(torch.nn.Module):
 
         # Normalize backward flow to prevent unstable gradient propagation if needed.
         if self.input_bgn:
-            x = backward_gradient_normalization(x)
+            x = dyna.functional.backward_gradient_normalization(x)
 
         # Inject a small residual of the original signal to prevent vanishing.
         if self.trainable:
@@ -107,17 +106,17 @@ class SignalStabilizationCompressor(torch.nn.Module):
             raise ValueError(f"Unknown SignalStabilizationCompressorMode: {self.mode}")
         
         x_a = torch.sigmoid(x) + x_leak_sigmoid
-        x_b = siglog(x) + x_leak
+        x_b = dyna.functional.siglog(x) + x_leak
         x = x_a * x_b
 
         # Prevent unstable gradient scaling introduced by subsequent RMS normalization if needed.
         if self.bgn_mid:
-            x = backward_gradient_normalization(x)
+            x = dyna.functional.backward_gradient_normalization(x)
 
         x = x * x.abs().mean(dim=-1, keepdim=True).add(eps).rsqrt()
 
         # Ensures uniform backward sensitivity after amplitude normalization.
         if self.bgn_output:
-            x = backward_gradient_normalization(x)
+            x = dyna.functional.backward_gradient_normalization(x)
 
         return x

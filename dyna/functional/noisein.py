@@ -1,5 +1,6 @@
 import torch
 
+
 def noisein(
     x: torch.Tensor,
     rate: float,

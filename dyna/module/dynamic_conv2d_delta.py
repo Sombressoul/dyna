@@ -5,7 +5,7 @@ import math
 
 from typing import Union, List, Optional
 
-from dyna.lib.weights_lib_2d_delta import WeightsLib2DDelta
+import dyna
 
 
 class DynamicConv2DDelta(nn.Module):
@@ -182,7 +182,7 @@ class DynamicConv2DDelta(nn.Module):
         # ================================================================================= #
         # ____________________________> Init submodules and additional weights.
         # ================================================================================= #
-        self.weights_lib = WeightsLib2DDelta(
+        self.weights_lib = dyna.lib.WeightsLib2DDelta(
             output_shape=self.dynamic_weights_shape,
             context_length=self.wl_context_length,
             context_use_bias=self.wl_context_use_bias,

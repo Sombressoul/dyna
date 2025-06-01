@@ -1,5 +1,6 @@
 import torch
 
+
 class LogProportionalError(torch.autograd.Function):
     @staticmethod
     def forward(

@@ -2,6 +2,7 @@ import torch
 
 from typing import Optional
 
+
 class BackwardGradientNormalization(torch.autograd.Function):
     """
     An implementation of the paper "Backward Gradient Normalization in Deep Neural Networks"
