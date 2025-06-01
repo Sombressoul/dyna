@@ -32,7 +32,7 @@ class WeightsLib2DDelta(nn.Module):
     - Tensor of shape [batch_size, *output_shape] representing dynamically constructed weights
     """
     # TODO: experiment with torch.nn.init.orthogonal_() initialization of self.weights
-    # TODO: export decorellation\repulsion login into external modules
+    # TODO: export decorellation\repulsion logic into external modules
     # TODO: try JIT - wrap heavy operations into @torch.jit.script
 
     def __init__(
