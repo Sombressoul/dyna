@@ -7,7 +7,6 @@ import torchvision.transforms as transforms
 import pytorch_warmup as warmup
 import kornia
 import gc
-import bitsandbytes as bnb
 
 from PIL import Image
 
@@ -15,14 +14,13 @@ from typing import Optional, Callable
 from enum import Enum
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
-evals_dir = os.path.dirname(script_dir)
-project_dir = os.path.dirname(evals_dir)
+project_dir = os.path.dirname(script_dir)
 sys.path.append(project_dir)
 
 torch.manual_seed(10056)
 
-from dyna.module import DynamicConv2DDelta, SignalStabilizationCompressor
-from dyna.functional import siglog, backward_gradient_normalization
+from dyna.module.dynamic_conv2d_delta import DynamicConv2DDelta
+from dyna.functional.siglog import siglog
 
 class DynamicAutoencoderModes(Enum):
     CLASSIC = 0
@@ -127,6 +125,7 @@ class DynamicAutoencoder(nn.Module):
             weights_noise_strength=0.01,
             rank_noise_strength=0.01,
             similarity_penalty_strength=0.10,
+            weights_local_coupling=True,
             kernel_size=[3, 3],
             stride=[2, 2],
             padding=[0, 0, 0, 0],
@@ -146,6 +145,7 @@ class DynamicAutoencoder(nn.Module):
             weights_noise_strength=0.01,
             rank_noise_strength=0.01,
             similarity_penalty_strength=0.10,
+            weights_local_coupling=True,
             kernel_size=[3, 3],
             stride=[1, 1],
             padding=[0, 0, 0, 0],
@@ -946,14 +946,14 @@ if __name__ == "__main__":
     load_model = True
     load_optim = False
     onload_model_fn = [
-        # model_unfreeze_all,
-        model_freeze_all,
+        model_unfreeze_all,
+        # model_freeze_all,
         # lambda m, d, t: model_unfreeze_block(m, d, t, "cl_encode"),
         # lambda m, d, t: model_unfreeze_block(m, d, t, "cl_decode"),
-        lambda m, d, t: model_unfreeze_block(m, d, t, "dyn_encode"),
-        lambda m, d, t: model_unfreeze_block(m, d, t, "dyn_decode"),
-        lambda m, d, t: model_unfreeze_block(m, d, t, "bridge"),
-        lambda m, d, t: model_unfreeze_block(m, d, t, "context_transform"),
+        # lambda m, d, t: model_unfreeze_block(m, d, t, "dyn_encode"),
+        # lambda m, d, t: model_unfreeze_block(m, d, t, "dyn_decode"),
+        # lambda m, d, t: model_unfreeze_block(m, d, t, "bridge"),
+        # lambda m, d, t: model_unfreeze_block(m, d, t, "context_transform"),
         # lambda m, d, t: model_freeze_block(m, d, t, "context_transform"),
         # lambda m, d, t: model_cast_to_dtype(m, torch.bfloat16),
         # lambda m, d, t: model_perturb_weights(m, 5.0e-2, exclude=["bridge", "context_transform"]),
@@ -966,10 +966,10 @@ if __name__ == "__main__":
 
     path_prefix_load = "f:\\git_AIResearch\\dyna\\data\\models"
     path_prefix_save = "f:\\git_AIResearch\\dyna\\data\\models"
-    load_path_model = f"{path_prefix_load}\\03.model.__LAST__.pth"
+    load_path_model = f"{path_prefix_load}\\06.model.__LAST__.pth"
     load_path_optim = f"{path_prefix_load}\\"
-    save_path_model = f"{path_prefix_save}\\04.model"
-    save_path_optim = f"{path_prefix_save}\\04.optim"
+    save_path_model = f"{path_prefix_save}\\07.model"
+    save_path_optim = f"{path_prefix_save}\\07.optim"
     save_model = True
     save_optim = True
     save_initial_model = False
@@ -982,7 +982,7 @@ if __name__ == "__main__":
     optim_update_wd = False
     optim_target_wd = 0.1
     warmup_active = True
-    warmup_steps = 1024
+    warmup_steps = 2048
     clip_grad_value = None
     clip_grad_norm = 10.0
     gradient_global_norm = False
@@ -991,9 +991,9 @@ if __name__ == "__main__":
     show_max_weights = False
     show_max_weights_detailed = False
 
-    model_mode = DynamicAutoencoderModes.DYNAMIC
-    batch_size = 48
-    nelements = batch_size * 256
+    model_mode = DynamicAutoencoderModes.CLASSIC2DYNAMIC
+    batch_size = 32
+    nelements = batch_size * 8 # 256
     total_steps = 10**6
     grad_accumulation_steps = 2 # nelements // batch_size
     log_nth_update_step = (nelements // batch_size) // grad_accumulation_steps
@@ -1042,8 +1042,8 @@ if __name__ == "__main__":
     params_encode_classic = []
     params_decode_classic = []
     params_bridge = []
-    params_transform_encode = []
-    params_transform_decode = []
+    params_encode_transform = []
+    params_decode_transform = []
     params_encode_dynamic = []
     params_decode_dynamic = []
     params_other = []
@@ -1056,9 +1056,9 @@ if __name__ == "__main__":
         elif "bridge" in name:
             params_bridge.append(param)
         elif "dyn_encode" in name and "context_transform" in name:
-            params_transform_encode.append(param)
+            params_encode_transform.append(param)
         elif "dyn_decode" in name and "context_transform" in name:
-            params_transform_decode.append(param)
+            params_decode_transform.append(param)
         elif "dyn_encode" in name and "context_transform" not in name:
             params_encode_dynamic.append(param)
         elif "dyn_decode" in name and "context_transform" not in name:
@@ -1079,30 +1079,34 @@ if __name__ == "__main__":
         optimizer = torch.optim.AdamW(
             [
                 # # STAGE 1
-                # {'params': params_encode_classic, 'lr': 1.0e-7, 'weight_decay': 1.0e-2},
-                # {'params': params_bridge, 'lr': 1.0e-5, 'weight_decay': 1.0e-2},
-                # {'params': params_transform_decode, 'lr': 1.0e-5, 'weight_decay': 1.0e-2},
-                # {'params': params_encode_dynamic, 'lr': 1.0e-3, 'weight_decay': 1.0e-2},
+                # {'params': params_encode_classic, 'lr': 1.0e-5, 'weight_decay': 1.0e-2},
+                # {'params': params_bridge, 'lr': 1.0e-4, 'weight_decay': 1.0e-2},
+                # {'params': params_decode_transform, 'lr': 1.0e-4, 'weight_decay': 1.0e-2},
                 # {'params': params_decode_dynamic, 'lr': 1.0e-3, 'weight_decay': 1.0e-2},
-                
-                # STAGE 2
-                {'params': params_encode_classic, 'lr': 1.0e-5, 'weight_decay': 1.0e-2},
-                {'params': params_bridge, 'lr': 1.0e-4, 'weight_decay': 1.0e-2},
-                {'params': params_transform_decode, 'lr': 1.0e-4, 'weight_decay': 1.0e-2},
-                {'params': params_encode_dynamic, 'lr': 1.0e-3, 'weight_decay': 1.0e-2},
-                {'params': params_decode_dynamic, 'lr': 1.0e-3, 'weight_decay': 1.0e-2},
+
+                # # STAGE 2
+                # {'params': params_encode_classic, 'lr': 1.0e-6, 'weight_decay': 1.0e-2},
+                # {'params': params_bridge, 'lr': 1.0e-5, 'weight_decay': 1.0e-2},
+                # {'params': params_decode_transform, 'lr': 1.0e-5, 'weight_decay': 1.0e-2},
+                # {'params': params_decode_dynamic, 'lr': 1.0e-4, 'weight_decay': 1.0e-2},
+
+                # STAGE 3
+                {'params': params_encode_classic, 'lr': 1.0e-7, 'weight_decay': 1.0e-3},
+                {'params': params_bridge, 'lr': 1.0e-6, 'weight_decay': 1.0e-3},
+                {'params': params_decode_transform, 'lr': 1.0e-5, 'weight_decay': 1.0e-3},
+                {'params': params_decode_dynamic, 'lr': 1.0e-4, 'weight_decay': 1.0e-3},
             ],
         )
     elif model_mode == DynamicAutoencoderModes.DYNAMIC:
         optimizer = torch.optim.AdamW(
             [
                 # # STAGE 1
-                # {'params': params_transform_encode, 'lr': 1.0e-4, 'weight_decay': 1.0e-2},
+                # {'params': params_encode_transform, 'lr': 1.0e-4, 'weight_decay': 1.0e-2},
                 # {'params': params_encode_dynamic, 'lr': 1.0e-3, 'weight_decay': 1.0e-2},
 
                 # STAGE 2
                 {'params': params_bridge, 'lr': 1.0e-7, 'weight_decay': 1.0e-3},
-                {'params': params_transform_encode, 'lr': 1.0e-5, 'weight_decay': 1.0e-2},
+                {'params': params_encode_transform, 'lr': 1.0e-5, 'weight_decay': 1.0e-2},
                 {'params': params_encode_dynamic, 'lr': 1.0e-3, 'weight_decay': 1.0e-2},
                 {'params': params_decode_dynamic, 'lr': 1.0e-6, 'weight_decay': 1.0e-3},
             ],
