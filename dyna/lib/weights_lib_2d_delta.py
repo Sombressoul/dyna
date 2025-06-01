@@ -32,12 +32,8 @@ class WeightsLib2DDelta(nn.Module):
     - Tensor of shape [batch_size, *output_shape] representing dynamically constructed weights
     """
     # TODO: experiment with torch.nn.init.orthogonal_() initialization of self.weights
-    # TODO: add bool flags for: repulsion, similarity penalty, weght/rank noise
-    # TODO: check performance of torch.einsum instead of torch.matmul for w @ w_transposed
+    # TODO: export decorellation\repulsion login into external modules
     # TODO: try JIT - wrap heavy operations into @torch.jit.script
-    # TODO: try trainable coefficients (Adam-like) for repulsion/penalty through self.register_full_backward_hook()
-    #       OR
-    #       try to adjust these parameters using the optimizer (the boring way)
 
     def __init__(
         self,
