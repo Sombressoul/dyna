@@ -5,7 +5,7 @@ from dyna.module.dynamic_conv2d_alpha import DynamicConv2DAlpha
 from dyna.module.dynamic_conv2d_beta import DynamicConv2DBeta
 from dyna.module.dynamic_conv2d_gamma import DynamicConv2DGamma
 from dyna.module.dynamic_conv2d_delta import DynamicConv2DDelta
-from dyna.module.signal_stabilization_compressor import SignalStabilizationCompressor
+from dyna.module.signal_stabilization_compressor import SignalStabilizationCompressor, SignalStabilizationCompressorMode
 
 __all__ = [
     "BGNLayer",
@@ -16,4 +16,5 @@ __all__ = [
     "DynamicConv2DGamma",
     "DynamicConv2DDelta",
     "SignalStabilizationCompressor",
+    "SignalStabilizationCompressorMode",
 ]
