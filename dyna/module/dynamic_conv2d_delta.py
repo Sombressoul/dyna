@@ -5,7 +5,7 @@ import math
 
 from typing import Union, List, Optional
 
-from dyna.lib import WeightsLib2DDelta
+from dyna.lib.weights_lib_2d_delta import WeightsLib2DDelta
 
 
 class DynamicConv2DDelta(nn.Module):

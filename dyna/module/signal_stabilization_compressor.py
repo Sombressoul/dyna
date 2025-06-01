@@ -4,7 +4,8 @@ import math
 from typing import Union
 from enum import Enum
 
-from dyna.functional import siglog, backward_gradient_normalization
+from dyna.functional.siglog import siglog
+from dyna.functional.backward_gradient_normalization import backward_gradient_normalization
 
 
 class SignalStabilizationCompressorMode(Enum):
