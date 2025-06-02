@@ -68,15 +68,33 @@ class WeightsLib2DMobius(nn.Module):
             ),
         )
 
-        # Total number of transformation projections per input: shifts + z-controls
+        # -------------------------------------------------------------
+        # Transformation decoder (factorised bilinear-form, low rank K)  
+        # -------------------------------------------------------------
+        #   A-factor : [T, C, L, K, 2 C, 2]   – projects latent component lᵢ
+        #   B-factor : [T, C, K, L,     2]    – projects back to latent lⱼ
+        #
+        #   where
+        #       T = 2 + 2 * rank_transformations      # shifts + z-controls
+        #       C = n_subspaces                       # independent weight subspaces
+        #       L = latent_dim                        # width of latent modulation
+        #       K = int(math.sqrt(L))                 # chosen low-rank dimension
+        #
+        #   Both factors keep the complex channel (Re/Im) in the last axis.
         T = 2 + 2 * self.rank_transformations
-
-        # Transformation decoder: context_subspace x transformation -> complex vector
-        # Shape: [T, C, L, 2C, 2] = [T, n_subspaces, latent_dim, 2 * n_subspaces, complex[2]]
-        self.spaces_transformations = nn.Parameter(
+        K = int(math.sqrt(self.latent_dim))
+        self.spaces_transformations_factor_A = nn.Parameter(
             torch.nn.init.xavier_uniform_(
                 torch.empty(
-                    [T, self.n_subspaces, self.latent_dim, 2 * self.n_subspaces, 2],
+                    [T, self.n_subspaces, self.latent_dim, K, 2 * self.n_subspaces, 2],
+                    dtype=self.dtype_weights,
+                )
+            )
+        )
+        self.spaces_transformations_factor_B = nn.Parameter(
+            torch.nn.init.xavier_uniform_(
+                torch.empty(
+                    [T, self.n_subspaces, K, self.latent_dim, 2 * self.n_subspaces, 2],
                     dtype=self.dtype_weights,
                 )
             )
@@ -101,11 +119,26 @@ class WeightsLib2DMobius(nn.Module):
         x_modulated = x_transformed[::, :slice_subspaces:] * dyna.functional.siglog(x_transformed[::, slice_subspaces::])
         x_modulated = x_modulated.reshape([x_modulated.shape[0], self.latent_dim, 2]) # [B, latent_dim, complex[2]]
 
-        # Complex projection: apply latent representation to transformation kernels
-        Re = torch.einsum("bl,tclj->btclj", x_modulated[..., 0], self.spaces_transformations[..., 0])
-        Re = Re - torch.einsum("bl,tclj->btclj", x_modulated[..., 1], self.spaces_transformations[..., 1])
-        Im = torch.einsum("bl,tclj->btclj", x_modulated[..., 0], self.spaces_transformations[..., 1])
-        Im = Im + torch.einsum("bl,tclj->btclj", x_modulated[..., 1], self.spaces_transformations[..., 0])
+        # Complex bilinear projection: apply latent representation to transformation kernels
+        # Contraction over latent Li
+        i_Re = torch.einsum("bl,tclki->btclki", x_modulated[..., 0], self.spaces_transformations_factor_A[..., 0]).sub_(
+            torch.einsum("bl,tclki->btclki", x_modulated[..., 1], self.spaces_transformations_factor_A[..., 1])
+        ).contiguous()
+        i_Im = torch.einsum("bl,tclki->btclki", x_modulated[..., 0], self.spaces_transformations_factor_A[..., 1]).add_(
+            torch.einsum("bl,tclki->btclki", x_modulated[..., 1], self.spaces_transformations_factor_A[..., 0])
+        ).contiguous()
+
+        # Contraction over latent Lj
+        j_Re = torch.einsum("bl,tcklj->btclkj", x_modulated[..., 0], self.spaces_transformations_factor_B[..., 0]).sub_(
+            torch.einsum("bl,tcklj->btclkj", x_modulated[..., 1], self.spaces_transformations_factor_B[..., 1])
+        ).contiguous()
+        j_Im = torch.einsum("bl,tcklj->btclkj", x_modulated[..., 0], self.spaces_transformations_factor_B[..., 1]).add_(
+            torch.einsum("bl,tcklj->btclkj", x_modulated[..., 1], self.spaces_transformations_factor_B[..., 0])
+        ).contiguous()
+
+        # Complex product, collapse K
+        Re = (i_Re * j_Re - i_Im * j_Im).sum(dim=4)  # [B,T,C,L,M]
+        Im = (i_Re * j_Im + i_Im * j_Re).sum(dim=4)  # [B,T,C,L,M]
 
         # Normalize to unit circle direction
         cos_theta = Re / (Re**2 + Im**2 + self.eps).sqrt()
@@ -126,7 +159,14 @@ class WeightsLib2DMobius(nn.Module):
 
 
         print(f"{x_modulated.shape=}")
-        print(f"{self.spaces_transformations.shape=}")
+        print(f"{self.spaces_transformations_factor_A.shape=}")
+        print(f"{self.spaces_transformations_factor_A.numel()=}")
+        print(f"{self.spaces_transformations_factor_B.shape=}")
+        print(f"{self.spaces_transformations_factor_B.numel()=}")
+        print(f"{i_Re.shape=}")
+        print(f"{i_Im.shape=}")
+        print(f"{j_Re.shape=}")
+        print(f"{j_Im.shape=}")
         print(f"{Re.shape=}")
         print(f"{Im.shape=}")
         print(f"{cos_theta.shape=}")
