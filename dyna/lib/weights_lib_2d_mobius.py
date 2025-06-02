@@ -146,6 +146,8 @@ class WeightsLib2DMobius(nn.Module):
         mag = (Re ** 2 + Im ** 2 + self.eps).sqrt()
 
         # Weighted average direction using magnitude as importance weight; 3 - is latent_dim
+        # TODO: add learnable weights over L-dim or softmax-like weights for L-dim (derived from context)
+        #       - sum()/mean() is only a placeholder here...
         cos_weighted = (cos_theta * mag).sum(dim=3) / (mag.sum(dim=3) + self.eps)
         sin_weighted = (sin_theta * mag).sum(dim=3) / (mag.sum(dim=3) + self.eps)
         mag_mean = mag.mean(dim=3)
@@ -157,30 +159,9 @@ class WeightsLib2DMobius(nn.Module):
         # Final transformation tensor: [B, T, C, 2C, 2] -> complex output weights
         transformations = torch.stack([Re_out, Im_out], dim=-1)
 
-
-        print(f"{x_modulated.shape=}")
-        print(f"{self.spaces_transformations_factor_A.shape=}")
-        print(f"{self.spaces_transformations_factor_A.numel()=}")
-        print(f"{self.spaces_transformations_factor_B.shape=}")
-        print(f"{self.spaces_transformations_factor_B.numel()=}")
-        print(f"{i_Re.shape=}")
-        print(f"{i_Im.shape=}")
-        print(f"{j_Re.shape=}")
-        print(f"{j_Im.shape=}")
-        print(f"{Re.shape=}")
-        print(f"{Im.shape=}")
-        print(f"{cos_theta.shape=}")
-        print(f"{sin_theta.shape=}")
-        print(f"{mag.shape=}")
-        print(f"{cos_weighted.shape=}")
-        print(f"{sin_weighted.shape=}")
-        print(f"{mag_mean.shape=}")
-        print(f"{Re_out.shape=}")
-        print(f"{Im_out.shape=}")
-        print(f"{transformations.shape=}")
-        exit()
-
         # TODO: Apply transformations to space_i and space_j to generate final dynamic weights
+
+        raise NotImplementedError("Not implemented yet...")
 
         weights = torch.empty_like(x) # TEMP PLACEHOLDER
 
