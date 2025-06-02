@@ -133,7 +133,7 @@ class WeightsLib2DMobius(nn.Module):
             torch.einsum("bl,tcklj->btclkj", x_modulated[..., 1], self.spaces_transformations_factor_B[..., 1])
         ).contiguous()
         j_Im = torch.einsum("bl,tcklj->btclkj", x_modulated[..., 0], self.spaces_transformations_factor_B[..., 1]).add_(
-            torch.einsum("bl,tcklj->btclkj", x_modulated[..., 1], self.spaces_transformations_factor_B[..., 0])
+            torch.einsum("bm,kilme->bkimle", x_modulated[..., 1], self.spaces_transformations_factor_B[..., 0])
         ).contiguous()
 
         # Complex product, collapse K
