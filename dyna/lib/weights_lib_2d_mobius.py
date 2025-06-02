@@ -119,6 +119,8 @@ class WeightsLib2DMobius(nn.Module):
         x_modulated = x_transformed[::, :slice_subspaces:] * dyna.functional.siglog(x_transformed[::, slice_subspaces::])
         x_modulated = x_modulated.reshape([x_modulated.shape[0], self.latent_dim, 2]) # [B, latent_dim, complex[2]]
 
+        # TODO: custom kernel for the following monstrous operation:
+        # ===> MONSTROUS OPERATION (START)
         # Complex bilinear projection: apply latent representation to transformation kernels
         # Contraction over latent Li
         i_Re = torch.einsum("bl,tclki->btclki", x_modulated[..., 0], self.spaces_transformations_factor_A[..., 0]).sub_(
@@ -133,12 +135,13 @@ class WeightsLib2DMobius(nn.Module):
             torch.einsum("bl,tcklj->btclkj", x_modulated[..., 1], self.spaces_transformations_factor_B[..., 1])
         ).contiguous()
         j_Im = torch.einsum("bl,tcklj->btclkj", x_modulated[..., 0], self.spaces_transformations_factor_B[..., 1]).add_(
-            torch.einsum("bm,kilme->bkimle", x_modulated[..., 1], self.spaces_transformations_factor_B[..., 0])
+            torch.einsum("bl,tcklj->btclkj", x_modulated[..., 1], self.spaces_transformations_factor_B[..., 0])
         ).contiguous()
 
         # Complex product, collapse K
         Re = (i_Re * j_Re - i_Im * j_Im).sum(dim=4)  # [B,T,C,L,M]
         Im = (i_Re * j_Im + i_Im * j_Re).sum(dim=4)  # [B,T,C,L,M]
+        # <=== MONSTROUS OPERATION (END)
 
         # Normalize to unit circle direction
         cos_theta = Re / (Re**2 + Im**2 + self.eps).sqrt()
