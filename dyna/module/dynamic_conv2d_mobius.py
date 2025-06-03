@@ -407,7 +407,7 @@ class DynamicConv2DMobius(nn.Module):
 
         x = x + self.offset_dynamic_value if self.offset_dynamic else x
 
-        if self.padding_dynamic_value:
+        if self.padding_dynamic_value is not None:
             x_padded_ones = F.pad(
                 input=x,
                 pad=(
@@ -436,7 +436,7 @@ class DynamicConv2DMobius(nn.Module):
                     ]
                 ),
                 mode="constant",
-                value=1.0,
+                value=0.0,
             )
             x_padding = (x_padded_ones - x_padded_zeros) * self.padding_dynamic_value
             x = x_padded_zeros + x_padding
@@ -445,7 +445,7 @@ class DynamicConv2DMobius(nn.Module):
                 input=x,
                 pad=self.padding,
                 mode="constant",
-                value=self.padding_dynamic_value if self.padding_dynamic else None,
+                value=0.0,
             )
 
         batched_fn = torch.vmap(wrapped_fn)

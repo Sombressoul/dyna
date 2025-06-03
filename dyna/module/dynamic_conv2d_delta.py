@@ -401,7 +401,7 @@ class DynamicConv2DDelta(nn.Module):
                     ]
                 ),
                 mode="constant",
-                value=1.0,
+                value=0.0,
             )
             x_padding = (x_padded_ones - x_padded_zeros) * self.padding_dynamic_value
             x = x_padded_zeros + x_padding
@@ -410,7 +410,7 @@ class DynamicConv2DDelta(nn.Module):
                 input=x,
                 pad=self.padding,
                 mode="constant",
-                value=None,
+                value=0.0,
             )
 
         batched_fn = torch.vmap(wrapped_fn)
