@@ -71,14 +71,15 @@ class WeightsLib2DMobius(nn.Module):
         # -------------------------------------------------------------
         # Transformation decoder (factorised bilinear-form, low rank K)  
         # -------------------------------------------------------------
-        #   A-factor : [T, C, L, K, 2 C, 2]   – projects latent component lᵢ
-        #   B-factor : [T, C, K, L,     2]    – projects back to latent lⱼ
+        #   A-factor : [T, C, L, K, R,  2]   – projects latent component lᵢ
+        #   B-factor : [T, C, K, L, R,  2]   – projects back to latent lⱼ
         #
         #   where
-        #       T = 2 + 2 * rank_transformations      # shifts + z-controls
-        #       C = n_subspaces                       # independent weight subspaces
-        #       L = latent_dim                        # width of latent modulation
-        #       K = int(math.sqrt(L))                 # chosen low-rank dimension
+        #       T = 2 + 2 * rank_transformations        # shifts + z-controls
+        #       C = n_subspaces                         # independent weight subspaces
+        #       L = latent_dim                          # width of latent modulation
+        #       R = rank_subspace                       # independent ranks within subspaces
+        #       K = int(math.sqrt(L))                   # chosen low-rank dimension
         #
         #   Both factors keep the complex channel (Re/Im) in the last axis.
         T = 2 + 2 * self.rank_transformations
@@ -86,7 +87,7 @@ class WeightsLib2DMobius(nn.Module):
         self.spaces_transformations_factor_A = nn.Parameter(
             torch.nn.init.xavier_uniform_(
                 torch.empty(
-                    [T, self.n_subspaces, self.latent_dim, K, 2 * self.n_subspaces, 2],
+                    [T, self.n_subspaces, self.latent_dim, K, self.rank_subspace, 2],
                     dtype=self.dtype_weights,
                 )
             )
@@ -94,7 +95,7 @@ class WeightsLib2DMobius(nn.Module):
         self.spaces_transformations_factor_B = nn.Parameter(
             torch.nn.init.xavier_uniform_(
                 torch.empty(
-                    [T, self.n_subspaces, K, self.latent_dim, 2 * self.n_subspaces, 2],
+                    [T, self.n_subspaces, K, self.latent_dim, self.rank_subspace, 2],
                     dtype=self.dtype_weights,
                 )
             )
@@ -139,8 +140,8 @@ class WeightsLib2DMobius(nn.Module):
         ).contiguous()
 
         # Complex product, collapse K
-        Re = (i_Re * j_Re - i_Im * j_Im).sum(dim=4)  # [B,T,C,L,M]
-        Im = (i_Re * j_Im + i_Im * j_Re).sum(dim=4)  # [B,T,C,L,M]
+        Re = (i_Re * j_Re - i_Im * j_Im).sum(dim=4)  # [B,T,C,L,R]
+        Im = (i_Re * j_Im + i_Im * j_Re).sum(dim=4)  # [B,T,C,L,R]
         # <=== MONSTROUS OPERATION (END)
 
         # Normalize to unit circle direction
@@ -159,10 +160,74 @@ class WeightsLib2DMobius(nn.Module):
         Re_out = cos_weighted * mag_mean
         Im_out = sin_weighted * mag_mean
 
-        # Final transformation tensor: [B, T, C, 2C, 2] -> complex output weights
+        # Final transformation tensor: [B, T, C, R, 2] -> complex output weights
         transformations = torch.stack([Re_out, Im_out], dim=-1)
 
-        # TODO: Apply transformations to space_i and space_j to generate final dynamic weights
+        # -------------------------------------
+        # Apply shift and modulation to space_i
+        # -------------------------------------
+        #   Dimension legend:
+        #       B = batch                               # batch dimension
+        #       T = 2 + 2 * rank_transformations        # shifts + z-controls
+        #       C = n_subspaces                         # independent weight subspaces
+        #       R = rank_subspace                       # independent ranks within subspaces
+        #       Rz = rank_transformations               # low-res control points
+        #
+        # Extracting shift vector and z-controller vectors for space_i
+        space_i_shift = transformations[::, 0] # [B, C, R, 2]
+        space_i_z = transformations[::, 2:2+self.rank_transformations] # [B, Rz, C, R, 2]
+
+        # Broadcast shift to space_i spatial dimension and shift the space (space_i = [1, C, R, H, 2])
+        space_i_shift = space_i_shift.unsqueeze(-2) # [B, C, R, 2] -> [B, C, R, 1, 2]
+        space_i = self.space_i.expand(space_i_shift.shape[0], -1, -1, -1, -1) # Expand batch dim
+        space_i = space_i + space_i_shift # [B, C, R, H, 2]
+
+        # Rearrange space_i_z so that Rz is the last dimension (required by interpolate)
+        space_i_z = space_i_z.permute([0, 4, 2, 3, 1]).contiguous() # [B, Rz, C, R, 2] -> [B, 2, C, R, Rz]
+        B, _, C, R, Rz = space_i_z.shape
+        space_i_z = space_i_z.reshape([B, 2 * C * R, Rz]) # flatten channel dims -> [B, channels, Rz]
+        space_i_z = nn.functional.interpolate(
+            space_i_z,
+            size=space_i.shape[-2], # Interpolate to target dimension length
+            mode="linear",
+            align_corners=False,
+        )
+        space_i_z = space_i_z.reshape([B, 2, C, R, space_i.shape[-2]]) # Restore original channels
+        space_i_z = space_i_z.permute([0, 2, 3, 4, 1]).contiguous() # Restore original axes
+
+        # Complex multiplication between shifted space itself and its modulator
+        space_i_Re = (space_i * space_i_z).diff(dim=-1) # ac − bd
+        space_i_Im = (space_i * space_i_z[..., [1, 0]]).sum(dim=-1, keepdim=True) # ad + bc
+        space_i = torch.cat([space_i_Re, space_i_Im], dim=-1) # [B, C, R, H, 2]
+
+        # -------------------------------------
+        # Apply shift and modulation to space_j
+        # -------------------------------------
+        space_j_shift = transformations[::, 1]
+        space_j_z = transformations[::, 2+self.rank_transformations:2+(self.rank_transformations*2)]
+        space_j_shift = space_j_shift.unsqueeze(-2)
+        space_j = self.space_j.expand(space_j_shift.shape[0], -1, -1, -1, -1)
+        space_j = space_j + space_j_shift
+        space_j_z = space_j_z.permute([0, 4, 2, 3, 1]).contiguous()
+        B, _, C, R, Rz = space_j_z.shape
+        space_j_z = space_j_z.reshape([B, 2 * C * R, Rz])
+        space_j_z = nn.functional.interpolate(space_j_z, size=space_j.shape[-2], mode="linear", align_corners=False)
+        space_j_z = space_j_z.reshape([B, 2, C, R, space_j.shape[-2]])
+        space_j_z = space_j_z.permute([0, 2, 3, 4, 1]).contiguous()
+        space_j_Re = (space_j * space_j_z).diff(dim=-1) # ac − bd
+        space_j_Im = (space_j * space_j_z[..., [1, 0]]).sum(dim=-1, keepdim=True) # ad + bc
+        space_j = torch.cat([space_j_Re, space_j_Im], dim=-1) # [B, C, R, H, 2]
+
+        # print(f"{transformations.shape=}")
+        # print(f"{space_i_shift.shape=}")
+        # print(f"{space_i_z.shape=}")
+        # print(f"{self.space_i.shape=}")
+        # print(f"{space_i.shape=}")
+        # print(f"{space_j_shift.shape=}")
+        # print(f"{space_j_z.shape=}")
+        # print(f"{self.space_j.shape=}")
+        # print(f"{space_j.shape=}")
+        # exit()
 
         raise NotImplementedError("Not implemented yet...")
 
