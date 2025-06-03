@@ -367,7 +367,7 @@ class WeightsLib2D(nn.Module):
                 ],
                 mod=mod_i,
             )
-        r = (mod_i * z).diff(dim=-1)
+        r = (mod_i * z).diff(dim=-1).neg()
         i = (mod_i * z[..., [1, 0]]).sum(dim=-1, keepdim=True)
         mod_i = torch.cat([r, i], dim=-1)
 
@@ -390,13 +390,13 @@ class WeightsLib2D(nn.Module):
                 ],
                 mod=mod_j,
             )
-        r = (mod_j * z).diff(dim=-1)
+        r = (mod_j * z).diff(dim=-1).neg()
         i = (mod_j * z[..., [1, 0]]).sum(dim=-1, keepdim=True)
         mod_j = torch.cat([r, i], dim=-1)
 
         # Apply some kind of generalized Mobius-like transformation with inversions.
         # Calculate normal mod_i matrix.
-        r = (mod_i * self.inversions).diff(dim=-1)
+        r = (mod_i * self.inversions).diff(dim=-1).neg()
         i = (mod_i * self.inversions[..., [1, 0]]).sum(dim=-1, keepdim=True)
         mod_i = torch.cat([r, i], dim=-1)
         mod_i = mod_i.sum(dim=1, keepdim=True).contiguous()
@@ -437,7 +437,7 @@ class WeightsLib2D(nn.Module):
         i = mod[..., 1].unsqueeze(-1)
         mod = torch.cat([r, i], dim=-1)
 
-        r = (self.weights_base * mod).diff(dim=-1)
+        r = (self.weights_base * mod).diff(dim=-1).neg()
         i = (self.weights_base * mod[..., [1, 0]]).sum(dim=-1, keepdim=True)
         weights_dynamic = torch.cat([r, i], dim=-1)
 
@@ -460,7 +460,7 @@ class WeightsLib2D(nn.Module):
         weights_dynamic = weights_dynamic.squeeze(1)
         weights_dynamic = weights_dynamic + self.translate_dynamic
         r = weights_dynamic * self.rotate_dynamic
-        r = r.diff(dim=-1)
+        r = r.diff(dim=-1).neg()
         i = weights_dynamic * self.rotate_dynamic[..., [1, 0]]
         i = i.sum(dim=-1, keepdim=True)
         weights_dynamic = torch.cat([r, i], dim=-1)
