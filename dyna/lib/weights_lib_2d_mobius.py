@@ -142,8 +142,12 @@ class WeightsLib2DMobius(nn.Module):
                 [1, self.n_subspaces, *self.output_shape, 2],
                 dtype=self.dtype_weights,
             )
-            self.dirichlet_init_(proj[..., 0], 0.5)
-            proj[..., 1].zero_()
+            if self.dtype_weights in [torch.float32, torch.float64]:
+                self.dirichlet_init_(proj[..., 0], 0.5)
+                proj[..., 1].normal_(0.0, 0.001)
+            else:
+                torch.nn.init.normal_(proj[..., 0], 0.0, 0.01)
+                proj[..., 1].zero_()
 
         self.projections = nn.Parameter(
             data=proj,
@@ -255,7 +259,6 @@ class WeightsLib2DMobius(nn.Module):
         i_Im = torch.einsum("bl,tclki->btclki", x_modulated[..., 0], spaces_transformations_factor_A[..., 1]).add_(
             torch.einsum("bl,tclki->btclki", x_modulated[..., 1], spaces_transformations_factor_A[..., 0])
         ).contiguous()
-        
 
         # Contraction over latent Lj
         spaces_transformations_factor_B = self.spaces_transformations_factor_B
@@ -334,7 +337,8 @@ class WeightsLib2DMobius(nn.Module):
         w_Im = torch.einsum('bch,bcw->bchw', gamma_I[...,0], gamma_J[...,1]).add_(
             torch.einsum('bch,bcw->bchw', gamma_I[...,1], gamma_J[...,0])
         )
-        # 6) Project
+
+        # Final projection.
         proj = self.projections
         proj = dyna.functional.backward_gradient_normalization(proj)
         denom = torch.sqrt((proj**2).sum(dim=-1, keepdim=True) + self.eps)
