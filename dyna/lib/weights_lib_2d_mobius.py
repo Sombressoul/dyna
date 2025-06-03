@@ -47,35 +47,40 @@ class WeightsLib2DMobius(nn.Module):
         # Initialize mod_i: base modulation filters along height
         # Shape: [1, C, R, H, 2] -> (batch_dim, subspaces, basis_rank, height, complex[2])
         self.space_i = nn.Parameter(
-            data=torch.nn.init.normal_(
+            data=torch.nn.init.uniform_(
                 torch.empty(
                     [1, self.n_subspaces, self.rank_subspace, self.output_shape[0], 2],
                     dtype=self.dtype_weights,
                 ),
-                mean=0.0,
-                std=1.0,
+                a=-1.0,
+                b=+1.0,
             ),
         )
 
         # Initialize mod_j: base modulation filters along width
         # Shape: [1, C, R, W, 2] -> (batch_dim, subspaces, basis_rank, width, complex[2])
         self.space_j = nn.Parameter(
-            data=torch.nn.init.normal_(
+            data=torch.nn.init.uniform_(
                 torch.empty(
                     [1, self.n_subspaces, self.rank_subspace, self.output_shape[1], 2],
                     dtype=self.dtype_weights,
                 ),
-                mean=0.0,
-                std=1.0,
+                a=-1.0,
+                b=+1.0,
             ),
         )
 
         # Inversions filter for Mobius-like transformation
         self.inversions = nn.Parameter(
-            data=torch.empty([1, self.n_subspaces, 1, 1, 2], dtype=self.dtype_weights),
+            data=torch.nn.init.uniform_(
+                torch.empty(
+                    [1, self.n_subspaces, 1, 1, 2],
+                    dtype=self.dtype_weights,
+                ),
+                a=-1.0,
+                b=+1.0,
+            ),
         )
-        nn.init.uniform_(self.inversions[..., 0], -1.0, +1.0) # Re
-        nn.init.uniform_(self.inversions[..., 1], -1.0, +1.0) # Im
 
         # -------------------------------------------------------------
         # Transformation decoder (factorised bilinear-form, low rank K)  
@@ -131,18 +136,33 @@ class WeightsLib2DMobius(nn.Module):
             )
         )
 
-        self.projections = nn.Parameter(
-            torch.nn.init.normal_(
-                torch.empty(
-                    [1, self.n_subspaces, *self.output_shape, 2],
-                    dtype=self.dtype_weights,
-                ),
-                mean=0.0,
-                std=0.02,
+        # Trainable projection planes.
+        with torch.no_grad():
+            proj = torch.empty(
+                [1, self.n_subspaces, *self.output_shape, 2],
+                dtype=self.dtype_weights,
             )
+            self.dirichlet_init_(proj[..., 0], 0.5)
+            proj[..., 1].zero_()
+
+        self.projections = nn.Parameter(
+            data=proj,
         )
 
         pass
+
+    def dirichlet_init_(
+        self,
+        t: torch.Tensor,
+        alpha: float = 0.5,
+    ) -> torch.Tensor:
+        t_shape = t.shape
+        t_flat = t.reshape([-1, t_shape[-1]])
+        alpha = torch.full_like(t_flat, alpha)
+        sample = torch.distributions.Dirichlet(alpha).sample()
+        t.copy_(sample.reshape(t_shape))
+        return t
+
 
     def complex_mul(
         self,
