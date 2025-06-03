@@ -1,7 +1,7 @@
 **Important note**
 
 This repository contains the work‑in‑progress research and implementation of the
-biologically inspired signal propagation framework **DyNA**.
+biologically inspired signal propagation framework **DyNA** (Dynamic Neural Architecture).
 
 ## Philosophy
 
