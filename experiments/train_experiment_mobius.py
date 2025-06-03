@@ -103,7 +103,7 @@ class DynamicAutoencoder(nn.Module):
         self.cl_decode_01_a_conv = nn.Conv2d(**cfg_conv_up_a)
         self.cl_decode_01_b_conv = nn.Conv2d(**cfg_conv_up_b | dict(out_channels=3))
 
-        # =====> BRIDGE: Calssical-to-Dynamical
+        # =====> BRIDGE: Classical-to-Dynamical
         self.bridge_dropout = nn.Dropout(p=0.1)
         self.bridge_fc_1 = nn.Linear(in_features=1024, out_features=self.ctx_len * 4, bias=True)
         self.bridge_fc_1_ln = nn.LayerNorm(normalized_shape=[self.ctx_len * 4])
