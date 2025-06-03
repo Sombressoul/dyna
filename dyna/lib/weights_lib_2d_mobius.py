@@ -16,6 +16,7 @@ class WeightsLib2DMobius(nn.Module):
         n_subspaces: int = 16,                          # Number of independent weight components (subspaces)
         rank_subspace: int = 16,                        # Rank of internal modulation basis (basis vectors per subspace)
         rank_transformations: int = 16,                 # Number of interpolation control vectors (z) per axis (for subspace components)
+        asymmetry: float = 1.0e-4,                      # min |z|^2 to avoid /0
         eps: float = 1.0e-12,
         dtype_weights: torch.dtype = torch.bfloat16,
     ) -> None:
@@ -28,6 +29,7 @@ class WeightsLib2DMobius(nn.Module):
         self.n_subspaces = n_subspaces
         self.rank_subspace = rank_subspace
         self.rank_transformations = rank_transformations
+        self.asymmetry = asymmetry
         self.eps = eps
         self.dtype_weights = dtype_weights
 
@@ -68,6 +70,13 @@ class WeightsLib2DMobius(nn.Module):
             ),
         )
 
+        # Inversions filter for Mobius-like transformation
+        self.inversions = nn.Parameter(
+            data=torch.empty([1, self.n_subspaces, 1, 1, 2], dtype=self.dtype_weights),
+        )
+        nn.init.uniform_(self.inversions[..., 0], -1.0, +1.0) # Re
+        nn.init.uniform_(self.inversions[..., 1], -1.0, +1.0) # Im
+
         # -------------------------------------------------------------
         # Transformation decoder (factorised bilinear-form, low rank K)  
         # -------------------------------------------------------------
@@ -85,23 +94,116 @@ class WeightsLib2DMobius(nn.Module):
         T = 2 + 2 * self.rank_transformations
         K = int(math.sqrt(self.latent_dim))
         self.spaces_transformations_factor_A = nn.Parameter(
-            torch.nn.init.xavier_uniform_(
+            data=torch.nn.init.xavier_uniform_(
                 torch.empty(
                     [T, self.n_subspaces, self.latent_dim, K, self.rank_subspace, 2],
                     dtype=self.dtype_weights,
                 )
-            )
+            ),
         )
         self.spaces_transformations_factor_B = nn.Parameter(
-            torch.nn.init.xavier_uniform_(
+            data=torch.nn.init.xavier_uniform_(
                 torch.empty(
                     [T, self.n_subspaces, K, self.latent_dim, self.rank_subspace, 2],
                     dtype=self.dtype_weights,
                 )
+            ),
+        )
+
+        # Trainable weights for resulting weights ranking
+        self.w_mix = nn.Parameter(
+            data=torch.cat(
+                [
+                    torch.nn.init.ones_(
+                        tensor=torch.empty(
+                            [self.latent_dim, self.n_subspaces*self.rank_subspace, 1],
+                            dtype=self.dtype_weights,
+                        )
+                    ),
+                    torch.nn.init.zeros_(
+                        tensor=torch.empty(
+                            [self.latent_dim, self.n_subspaces*self.rank_subspace, 1],
+                            dtype=self.dtype_weights,
+                        )
+                    ),
+                ],
+                dim=-1,
+            )
+        )
+
+        self.projections = nn.Parameter(
+            torch.nn.init.normal_(
+                torch.empty(
+                    [1, self.n_subspaces, *self.output_shape, 2],
+                    dtype=self.dtype_weights,
+                ),
+                mean=0.0,
+                std=0.02,
             )
         )
 
         pass
+
+    def complex_mul(
+        self,
+        a: torch.Tensor,
+        b: torch.Tensor,
+    ) -> torch.Tensor:
+        re = a[..., 0] * b[..., 0] - a[..., 1] * b[..., 1]
+        im = a[..., 0] * b[..., 1] + a[..., 1] * b[..., 0]
+        return torch.stack([re, im], dim=-1)
+    
+    def complex_div(
+        self,
+        a: torch.Tensor,
+        b: torch.Tensor,
+        eps: float,
+    ) -> torch.Tensor:
+        denom = b[..., 0] ** 2 + b[..., 1] ** 2
+        denom = denom.clamp_min(eps)
+        re = (a[..., 0] * b[..., 0] + a[..., 1] * b[..., 1]) / denom
+        im = (a[..., 1] * b[..., 0] - a[..., 0] * b[..., 1]) / denom
+        return torch.stack([re, im], dim=-1)
+
+    def transform_space(
+        self,
+        space: torch.Tensor,
+        shift: torch.Tensor,
+        z: torch.Tensor,
+    ) -> torch.Tensor:
+        # -------------------------------------
+        # Apply shift and modulation to space
+        # -------------------------------------
+        #   Dimension legend:
+        #       B = batch                               # batch dimension
+        #       T = 2 + 2 * rank_transformations        # shifts + z-controls
+        #       C = n_subspaces                         # independent weight subspaces
+        #       R = rank_subspace                       # independent ranks within subspaces
+        #       Rz = rank_transformations               # low-res control points
+        #
+        # Broadcast shift to space spatial dimension and shift the space (space = [1, C, R, H/W, 2])
+        shift = shift.unsqueeze(-2) # [B, C, R, 2] -> [B, C, R, 1, 2]
+        space = space.expand(shift.shape[0], -1, -1, -1, -1) # Expand batch dim
+        space = space + shift # [B, C, R, H/W, 2]
+
+        # Rearrange z so that Rz is the last dimension (required by interpolate)
+        z = z.permute([0, 4, 2, 3, 1]).contiguous() # [B, Rz, C, R, 2] -> [B, 2, C, R, Rz]
+        B, _, C, R, Rz = z.shape
+        z = z.reshape([B, 2 * C * R, Rz]) # flatten channel dims -> [B, channels, Rz]
+        z = nn.functional.interpolate(
+            z,
+            size=space.shape[-2], # Interpolate to target dimension length
+            mode="linear",
+            align_corners=False,
+        )
+        z = z.reshape([B, 2, C, R, space.shape[-2]]) # Restore original channels
+        z = z.permute([0, 2, 3, 4, 1]).contiguous() # Restore original axes
+
+        # Complex multiplication between shifted space itself and its modulator
+        space = self.complex_mul(space, z) # [B, C, R, H/W, 2]
+
+        return space
+
 
     def forward(
         self,
@@ -119,6 +221,7 @@ class WeightsLib2DMobius(nn.Module):
         x_transformed = self.context_transform(x)
         x_modulated = x_transformed[::, :slice_subspaces:] * dyna.functional.siglog(x_transformed[::, slice_subspaces::])
         x_modulated = x_modulated.reshape([x_modulated.shape[0], self.latent_dim, 2]) # [B, latent_dim, complex[2]]
+        x_modulated = dyna.functional.backward_gradient_normalization(x_modulated)
 
         # TODO: custom kernel for the following monstrous operation:
         # ===> MONSTROUS OPERATION (START)
@@ -130,6 +233,8 @@ class WeightsLib2DMobius(nn.Module):
         i_Im = torch.einsum("bl,tclki->btclki", x_modulated[..., 0], self.spaces_transformations_factor_A[..., 1]).add_(
             torch.einsum("bl,tclki->btclki", x_modulated[..., 1], self.spaces_transformations_factor_A[..., 0])
         ).contiguous()
+        i_Re = dyna.functional.backward_gradient_normalization(i_Re)
+        i_Im = dyna.functional.backward_gradient_normalization(i_Im)
 
         # Contraction over latent Lj
         j_Re = torch.einsum("bl,tcklj->btclkj", x_modulated[..., 0], self.spaces_transformations_factor_B[..., 0]).sub_(
@@ -138,13 +243,17 @@ class WeightsLib2DMobius(nn.Module):
         j_Im = torch.einsum("bl,tcklj->btclkj", x_modulated[..., 0], self.spaces_transformations_factor_B[..., 1]).add_(
             torch.einsum("bl,tcklj->btclkj", x_modulated[..., 1], self.spaces_transformations_factor_B[..., 0])
         ).contiguous()
+        j_Re = dyna.functional.backward_gradient_normalization(j_Re)
+        j_Im = dyna.functional.backward_gradient_normalization(j_Im)
 
         # Complex product, collapse K
-        Re = (i_Re * j_Re - i_Im * j_Im).sum(dim=4)  # [B,T,C,L,R]
-        Im = (i_Re * j_Im + i_Im * j_Re).sum(dim=4)  # [B,T,C,L,R]
+        Re = (i_Re * j_Re - i_Im * j_Im).sum(dim=4)  # [B, T, C, L, R]
+        Im = (i_Re * j_Im + i_Im * j_Re).sum(dim=4)  # [B, T, C, L, R]
         # <=== MONSTROUS OPERATION (END)
 
         # Normalize to unit circle direction
+        Re = dyna.functional.backward_gradient_normalization(Re)
+        Im = dyna.functional.backward_gradient_normalization(Im)
         cos_theta = Re / (Re**2 + Im**2 + self.eps).sqrt()
         sin_theta = Im / (Re**2 + Im**2 + self.eps).sqrt()
         mag = (Re ** 2 + Im ** 2 + self.eps).sqrt()
@@ -163,75 +272,54 @@ class WeightsLib2DMobius(nn.Module):
         # Final transformation tensor: [B, T, C, R, 2] -> complex output weights
         transformations = torch.stack([Re_out, Im_out], dim=-1)
 
-        # -------------------------------------
-        # Apply shift and modulation to space_i
-        # -------------------------------------
-        #   Dimension legend:
-        #       B = batch                               # batch dimension
-        #       T = 2 + 2 * rank_transformations        # shifts + z-controls
-        #       C = n_subspaces                         # independent weight subspaces
-        #       R = rank_subspace                       # independent ranks within subspaces
-        #       Rz = rank_transformations               # low-res control points
-        #
-        # Extracting shift vector and z-controller vectors for space_i
+        # Shift and modulate space i
         space_i_shift = transformations[::, 0] # [B, C, R, 2]
         space_i_z = transformations[::, 2:2+self.rank_transformations] # [B, Rz, C, R, 2]
+        space_i = self.transform_space(space=self.space_i, shift=space_i_shift, z=space_i_z)
+        space_i = dyna.functional.backward_gradient_normalization(space_i)
 
-        # Broadcast shift to space_i spatial dimension and shift the space (space_i = [1, C, R, H, 2])
-        space_i_shift = space_i_shift.unsqueeze(-2) # [B, C, R, 2] -> [B, C, R, 1, 2]
-        space_i = self.space_i.expand(space_i_shift.shape[0], -1, -1, -1, -1) # Expand batch dim
-        space_i = space_i + space_i_shift # [B, C, R, H, 2]
-
-        # Rearrange space_i_z so that Rz is the last dimension (required by interpolate)
-        space_i_z = space_i_z.permute([0, 4, 2, 3, 1]).contiguous() # [B, Rz, C, R, 2] -> [B, 2, C, R, Rz]
-        B, _, C, R, Rz = space_i_z.shape
-        space_i_z = space_i_z.reshape([B, 2 * C * R, Rz]) # flatten channel dims -> [B, channels, Rz]
-        space_i_z = nn.functional.interpolate(
-            space_i_z,
-            size=space_i.shape[-2], # Interpolate to target dimension length
-            mode="linear",
-            align_corners=False,
-        )
-        space_i_z = space_i_z.reshape([B, 2, C, R, space_i.shape[-2]]) # Restore original channels
-        space_i_z = space_i_z.permute([0, 2, 3, 4, 1]).contiguous() # Restore original axes
-
-        # Complex multiplication between shifted space itself and its modulator
-        space_i_Re = (space_i * space_i_z).diff(dim=-1) # ac − bd
-        space_i_Im = (space_i * space_i_z[..., [1, 0]]).sum(dim=-1, keepdim=True) # ad + bc
-        space_i = torch.cat([space_i_Re, space_i_Im], dim=-1) # [B, C, R, H, 2]
-
-        # -------------------------------------
-        # Apply shift and modulation to space_j
-        # -------------------------------------
+        # Shift and modulate space j
         space_j_shift = transformations[::, 1]
         space_j_z = transformations[::, 2+self.rank_transformations:2+(self.rank_transformations*2)]
-        space_j_shift = space_j_shift.unsqueeze(-2)
-        space_j = self.space_j.expand(space_j_shift.shape[0], -1, -1, -1, -1)
-        space_j = space_j + space_j_shift
-        space_j_z = space_j_z.permute([0, 4, 2, 3, 1]).contiguous()
-        B, _, C, R, Rz = space_j_z.shape
-        space_j_z = space_j_z.reshape([B, 2 * C * R, Rz])
-        space_j_z = nn.functional.interpolate(space_j_z, size=space_j.shape[-2], mode="linear", align_corners=False)
-        space_j_z = space_j_z.reshape([B, 2, C, R, space_j.shape[-2]])
-        space_j_z = space_j_z.permute([0, 2, 3, 4, 1]).contiguous()
-        space_j_Re = (space_j * space_j_z).diff(dim=-1) # ac − bd
-        space_j_Im = (space_j * space_j_z[..., [1, 0]]).sum(dim=-1, keepdim=True) # ad + bc
-        space_j = torch.cat([space_j_Re, space_j_Im], dim=-1) # [B, C, R, H, 2]
+        space_j = self.transform_space(space=self.space_j, shift=space_j_shift, z=space_j_z)
+        space_j = dyna.functional.backward_gradient_normalization(space_j)
 
-        # print(f"{transformations.shape=}")
-        # print(f"{space_i_shift.shape=}")
-        # print(f"{space_i_z.shape=}")
-        # print(f"{self.space_i.shape=}")
-        # print(f"{space_i.shape=}")
-        # print(f"{space_j_shift.shape=}")
-        # print(f"{space_j_z.shape=}")
-        # print(f"{self.space_j.shape=}")
-        # print(f"{space_j.shape=}")
-        # exit()
-
-        raise NotImplementedError("Not implemented yet...")
-
-        weights = torch.empty_like(x) # TEMP PLACEHOLDER
+        # Mobius‑inversion binding
+        # 1) gamma * i
+        gamma_I = self.complex_mul(space_i, self.inversions) # [B, C, R, H, 2]
+        # 2) gamma / j
+        gamma = self.inversions.expand_as(space_j)
+        gamma_div_J = self.complex_div(gamma, space_j, self.asymmetry)
+        # 3) calculate components weights
+        theta_Re = torch.einsum("bl,lk->bk", x_modulated[..., 0],  self.w_mix[..., 0]).sub_(
+            torch.einsum("bl,lk->bk", x_modulated[..., 1],  self.w_mix[..., 1])
+        )
+        theta_Im = torch.einsum("bl,lk->bk", x_modulated[..., 0],  self.w_mix[..., 1]).add_(
+            torch.einsum("bl,lk->bk", x_modulated[..., 1],  self.w_mix[..., 0])
+        )
+        theta_Re = dyna.functional.backward_gradient_normalization(theta_Re)
+        theta_Im = dyna.functional.backward_gradient_normalization(theta_Im)
+        beta = torch.softmax((theta_Re**2 + theta_Im**2 + self.eps).sqrt().view([x_modulated.shape[0], self.n_subspaces, self.rank_subspace]), dim=-1)
+        beta = beta[..., None, None]
+        # 4) reweight gammas and sum over rank_subspaces
+        gamma_I = (beta * gamma_I).sum(dim=2)
+        gamma_J = (beta * gamma_div_J).sum(dim=2)
+        gamma_I = dyna.functional.backward_gradient_normalization(gamma_I)
+        gamma_J = dyna.functional.backward_gradient_normalization(gamma_J)
+        # 5) einsum outer product
+        w_Re = torch.einsum('bch,bcw->bchw', gamma_I[...,0], gamma_J[...,0]).sub_(
+            torch.einsum('bch,bcw->bchw', gamma_I[...,1], gamma_J[...,1])
+        )
+        w_Im = torch.einsum('bch,bcw->bchw', gamma_I[...,0], gamma_J[...,1]).add_(
+            torch.einsum('bch,bcw->bchw', gamma_I[...,1], gamma_J[...,0])
+        )
+        # 6) Project
+        proj = self.projections
+        denom = torch.sqrt((proj**2).sum(dim=-1, keepdim=True) + self.eps)
+        theta_cos = proj[..., 0:1] / denom
+        theta_sin = proj[..., 1:2] / denom
+        weights = (w_Re.unsqueeze(-1) * theta_cos + w_Im.unsqueeze(-1) * theta_sin).squeeze(-1)
+        weights = weights.sum(dim=1) # Sum over subspaces
 
         x = weights if weights.dtype == input_dtype else weights.to(input_dtype)
 
