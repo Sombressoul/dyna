@@ -12,8 +12,7 @@ principle:
 > semantics itself.*
 
 The library focuses on dynamic weight generation, stable signal compression and
-gradient control techniques. Autoencoders are used merely as straightforward
-benchmarks to test the ideas and are not the project’s primary goal.
+gradient control techniques.
 
 ## Project structure
 
