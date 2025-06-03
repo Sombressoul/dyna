@@ -11,3 +11,4 @@ __pycache__
 pretrained_weights
 TODO.txt
 *__test__*
+/__experiments__
