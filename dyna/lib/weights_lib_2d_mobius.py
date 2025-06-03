@@ -219,41 +219,42 @@ class WeightsLib2DMobius(nn.Module):
 
         # Projection of input context into latent modulation space with elementwise gated modulation of linear component
         x_transformed = self.context_transform(x)
+        x_transformed = dyna.functional.backward_gradient_normalization(x_transformed)
         x_modulated = x_transformed[::, :slice_subspaces:] * dyna.functional.siglog(x_transformed[::, slice_subspaces::])
         x_modulated = x_modulated.reshape([x_modulated.shape[0], self.latent_dim, 2]) # [B, latent_dim, complex[2]]
-        x_modulated = dyna.functional.backward_gradient_normalization(x_modulated)
 
         # TODO: custom kernel for the following monstrous operation:
         # ===> MONSTROUS OPERATION (START)
         # Complex bilinear projection: apply latent representation to transformation kernels
         # Contraction over latent Li
-        i_Re = torch.einsum("bl,tclki->btclki", x_modulated[..., 0], self.spaces_transformations_factor_A[..., 0]).sub_(
-            torch.einsum("bl,tclki->btclki", x_modulated[..., 1], self.spaces_transformations_factor_A[..., 1])
+        spaces_transformations_factor_A = self.spaces_transformations_factor_A
+        spaces_transformations_factor_A = dyna.functional.backward_gradient_normalization(spaces_transformations_factor_A)
+        i_Re = torch.einsum("bl,tclki->btclki", x_modulated[..., 0], spaces_transformations_factor_A[..., 0]).sub_(
+            torch.einsum("bl,tclki->btclki", x_modulated[..., 1], spaces_transformations_factor_A[..., 1])
         ).contiguous()
-        i_Im = torch.einsum("bl,tclki->btclki", x_modulated[..., 0], self.spaces_transformations_factor_A[..., 1]).add_(
-            torch.einsum("bl,tclki->btclki", x_modulated[..., 1], self.spaces_transformations_factor_A[..., 0])
+        i_Im = torch.einsum("bl,tclki->btclki", x_modulated[..., 0], spaces_transformations_factor_A[..., 1]).add_(
+            torch.einsum("bl,tclki->btclki", x_modulated[..., 1], spaces_transformations_factor_A[..., 0])
         ).contiguous()
-        i_Re = dyna.functional.backward_gradient_normalization(i_Re)
-        i_Im = dyna.functional.backward_gradient_normalization(i_Im)
+        
 
         # Contraction over latent Lj
-        j_Re = torch.einsum("bl,tcklj->btclkj", x_modulated[..., 0], self.spaces_transformations_factor_B[..., 0]).sub_(
-            torch.einsum("bl,tcklj->btclkj", x_modulated[..., 1], self.spaces_transformations_factor_B[..., 1])
+        spaces_transformations_factor_B = self.spaces_transformations_factor_B
+        spaces_transformations_factor_B = dyna.functional.backward_gradient_normalization(spaces_transformations_factor_B)
+        j_Re = torch.einsum("bl,tcklj->btclkj", x_modulated[..., 0], spaces_transformations_factor_B[..., 0]).sub_(
+            torch.einsum("bl,tcklj->btclkj", x_modulated[..., 1], spaces_transformations_factor_B[..., 1])
         ).contiguous()
-        j_Im = torch.einsum("bl,tcklj->btclkj", x_modulated[..., 0], self.spaces_transformations_factor_B[..., 1]).add_(
-            torch.einsum("bl,tcklj->btclkj", x_modulated[..., 1], self.spaces_transformations_factor_B[..., 0])
+        j_Im = torch.einsum("bl,tcklj->btclkj", x_modulated[..., 0], spaces_transformations_factor_B[..., 1]).add_(
+            torch.einsum("bl,tcklj->btclkj", x_modulated[..., 1], spaces_transformations_factor_B[..., 0])
         ).contiguous()
-        j_Re = dyna.functional.backward_gradient_normalization(j_Re)
-        j_Im = dyna.functional.backward_gradient_normalization(j_Im)
 
         # Complex product, collapse K
         Re = (i_Re * j_Re - i_Im * j_Im).sum(dim=4)  # [B, T, C, L, R]
         Im = (i_Re * j_Im + i_Im * j_Re).sum(dim=4)  # [B, T, C, L, R]
+        Re = dyna.functional.backward_gradient_normalization(Re)
+        Im = dyna.functional.backward_gradient_normalization(Im)
         # <=== MONSTROUS OPERATION (END)
 
         # Normalize to unit circle direction
-        Re = dyna.functional.backward_gradient_normalization(Re)
-        Im = dyna.functional.backward_gradient_normalization(Im)
         cos_theta = Re / (Re**2 + Im**2 + self.eps).sqrt()
         sin_theta = Im / (Re**2 + Im**2 + self.eps).sqrt()
         mag = (Re ** 2 + Im ** 2 + self.eps).sqrt()
@@ -275,37 +276,39 @@ class WeightsLib2DMobius(nn.Module):
         # Shift and modulate space i
         space_i_shift = transformations[::, 0] # [B, C, R, 2]
         space_i_z = transformations[::, 2:2+self.rank_transformations] # [B, Rz, C, R, 2]
-        space_i = self.transform_space(space=self.space_i, shift=space_i_shift, z=space_i_z)
+        space_i = self.space_i
         space_i = dyna.functional.backward_gradient_normalization(space_i)
+        space_i = self.transform_space(space=space_i, shift=space_i_shift, z=space_i_z)
 
         # Shift and modulate space j
         space_j_shift = transformations[::, 1]
         space_j_z = transformations[::, 2+self.rank_transformations:2+(self.rank_transformations*2)]
-        space_j = self.transform_space(space=self.space_j, shift=space_j_shift, z=space_j_z)
+        space_j = self.space_j
         space_j = dyna.functional.backward_gradient_normalization(space_j)
+        space_j = self.transform_space(space=space_j, shift=space_j_shift, z=space_j_z)
 
         # Mobius‑inversion binding
+        inversions = self.inversions
+        inversions = dyna.functional.backward_gradient_normalization(inversions)
         # 1) gamma * i
-        gamma_I = self.complex_mul(space_i, self.inversions) # [B, C, R, H, 2]
+        gamma_I = self.complex_mul(space_i, inversions) # [B, C, R, H, 2]
         # 2) gamma / j
-        gamma = self.inversions.expand_as(space_j)
+        gamma = inversions.expand_as(space_j)
         gamma_div_J = self.complex_div(gamma, space_j, self.asymmetry)
         # 3) calculate components weights
-        theta_Re = torch.einsum("bl,lk->bk", x_modulated[..., 0],  self.w_mix[..., 0]).sub_(
-            torch.einsum("bl,lk->bk", x_modulated[..., 1],  self.w_mix[..., 1])
+        w_mix = self.w_mix
+        w_mix = dyna.functional.backward_gradient_normalization(w_mix)
+        theta_Re = torch.einsum("bl,lk->bk", x_modulated[..., 0],  w_mix[..., 0]).sub_(
+            torch.einsum("bl,lk->bk", x_modulated[..., 1], w_mix[..., 1])
         )
-        theta_Im = torch.einsum("bl,lk->bk", x_modulated[..., 0],  self.w_mix[..., 1]).add_(
-            torch.einsum("bl,lk->bk", x_modulated[..., 1],  self.w_mix[..., 0])
+        theta_Im = torch.einsum("bl,lk->bk", x_modulated[..., 0], w_mix[..., 1]).add_(
+            torch.einsum("bl,lk->bk", x_modulated[..., 1], w_mix[..., 0])
         )
-        theta_Re = dyna.functional.backward_gradient_normalization(theta_Re)
-        theta_Im = dyna.functional.backward_gradient_normalization(theta_Im)
         beta = torch.softmax((theta_Re**2 + theta_Im**2 + self.eps).sqrt().view([x_modulated.shape[0], self.n_subspaces, self.rank_subspace]), dim=-1)
         beta = beta[..., None, None]
         # 4) reweight gammas and sum over rank_subspaces
         gamma_I = (beta * gamma_I).sum(dim=2)
         gamma_J = (beta * gamma_div_J).sum(dim=2)
-        gamma_I = dyna.functional.backward_gradient_normalization(gamma_I)
-        gamma_J = dyna.functional.backward_gradient_normalization(gamma_J)
         # 5) einsum outer product
         w_Re = torch.einsum('bch,bcw->bchw', gamma_I[...,0], gamma_J[...,0]).sub_(
             torch.einsum('bch,bcw->bchw', gamma_I[...,1], gamma_J[...,1])
@@ -315,6 +318,7 @@ class WeightsLib2DMobius(nn.Module):
         )
         # 6) Project
         proj = self.projections
+        proj = dyna.functional.backward_gradient_normalization(proj)
         denom = torch.sqrt((proj**2).sum(dim=-1, keepdim=True) + self.eps)
         theta_cos = proj[..., 0:1] / denom
         theta_sin = proj[..., 1:2] / denom
