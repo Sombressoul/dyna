@@ -85,8 +85,8 @@ class WeightsLib2DMobius(nn.Module):
         # -------------------------------------------------------------
         # Transformation decoder (factorised bilinear-form, low rank K)  
         # -------------------------------------------------------------
-        #   A-factor : [T, C, L, K, R,  2]   – projects latent component lᵢ
-        #   B-factor : [T, C, K, L, R,  2]   – projects back to latent lⱼ
+        #   A-factor : [T, C, L, K, R,  2]   – projects latent component Li
+        #   B-factor : [T, C, K, L, R,  2]   – projects back to latent Lj
         #
         #   where
         #       T = 2 + 2 * rank_transformations        # shifts + z-controls
