@@ -280,8 +280,6 @@ class WeightsLib2DMobius(nn.Module):
         mag = (Re ** 2 + Im ** 2 + self.eps).sqrt()
 
         # Weighted average direction using magnitude as importance weight; 3 - is latent_dim
-        # TODO: add learnable weights over L-dim or softmax-like weights for L-dim (derived from context)
-        #       - sum()/mean() is only a placeholder here...
         cos_weighted = (cos_theta * mag).sum(dim=3) / (mag.sum(dim=3) + self.eps)
         sin_weighted = (sin_theta * mag).sum(dim=3) / (mag.sum(dim=3) + self.eps)
         mag_mean = mag.mean(dim=3)
