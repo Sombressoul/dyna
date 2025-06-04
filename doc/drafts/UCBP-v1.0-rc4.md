@@ -239,11 +239,11 @@ Orthogonal projections enforce ![eq](https://latex.codecogs.com/svg.image?\mathb
 
 ### 4.2 Training vs Inference
 
-| Phase                 | Parameter form                                                           | Forward cost            | Gradient flow                              |
-| --------------------- | ------------------------------------------------------------------------ | ----------------------- | ------------------------------------------ |
-| **Training**          | Dense complex **A**, **B** (fp16/fp32)                                   | ![eq](https://latex.codecogs.com/svg.image?B\cdot&space;G\cdot&space;d'\cdot\log_2&space;d') (FFT)  | Full autograd through FFT & projector.     |
-| **Bake** *(offline)*  | Greedy/ILP quantisation: pick max-mag bin per row → ![eq](https://latex.codecogs.com/svg.image?(h,s)) ‹int16/int8› | –                       | No gradients; one-time step.               |
-| **Inference (baked)** | Only ![eq](https://latex.codecogs.com/svg.image?(h,s)) tables + int16 scatter-add                                  | ![eq](https://latex.codecogs.com/svg.image?\mathcal{O}(\text{batch}\times&space;d_\text{in})) + FFT | Gradients disabled; layer set to `eval()`. |
+| Phase | Parameter form | Forward cost | Gradient flow |
+| ----- | -------------- | ------------ | ------------- |
+| **Training** | Dense complex **A**, **B** (fp16/fp32) | ![eq](https://latex.codecogs.com/svg.image?B\cdot&space;G\cdot&space;d'\cdot\log_2&space;d') (FFT) | Full autograd through FFT & projector. |
+| **Bake** *(offline)* | Greedy/ILP quantisation: pick max-mag bin per row → ![eq](https://latex.codecogs.com/svg.image?(h,s)) ‹int16/int8› | – | No gradients; one-time step. |
+| **Inference (baked)** | Only ![eq](https://latex.codecogs.com/svg.image?(h,s)) tables + int16 scatter-add | ![eq](https://latex.codecogs.com/svg.image?\mathcal{O}(\text{batch}\times&space;d_\text{in})) + FFT | Gradients disabled; layer set to `eval()`. |
 
 After bake the layer contains just *lookup indices and signs*; activations dominate memory, not parameters.
 
