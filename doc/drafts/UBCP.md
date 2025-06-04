@@ -300,7 +300,8 @@ attn_logits = cbp(Q, K) / math.sqrt(D)
 ## 17 · Licensing
 
 Released under **MIT** licence (compatible with PyTorch).
-Algorithm credit: *Fukui et al., “Multimodal Compact Bilinear Pooling”, ECCV 2016 (arXiv: ************************[1606.01847](https://arxiv.org/abs/1606.01847)************************)*
+
+Algorithm credit: *Fukui et al., “Multimodal Compact Bilinear Pooling”, ECCV 2016 (arXiv: [1606.01847](https://arxiv.org/abs/1606.01847))*
 
 ---
 
