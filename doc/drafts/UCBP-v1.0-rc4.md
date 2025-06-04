@@ -48,7 +48,7 @@ In short, UCBP brings the expressive strength of bilinear pooling to large-scale
 Compact (a.k.a. **Count-Sketch-based) Bilinear Pooling** was introduced by Fukui et al. for visual-question answering in 2016. The key idea is to replace an explicit outer-product with a **random feature map**
 
 $$
-\phi(x,y)\;=\;\mathop{\text{IFFT}}\!\bigl(\mathop{\text{FFT}}(\text{CS}(x))\odot \mathop{\text{FFT}}(\text{CS}(y))\bigr),
+\phi(x,y) = \mathop{\text{IFFT}}\bigl(\mathop{\text{FFT}}(\text{CS}(x))\odot \mathop{\text{FFT}}(\text{CS}(y))\bigr),
 $$
 
 where **CS** is a Count-Sketch that hashes each input coordinate to one of *d′* bins with a random sign.  This trick yields an **unbiased estimator**
@@ -80,17 +80,17 @@ so the mean-square error decays as **O(1/d′)**.  The same pipeline underlies v
 | Limitation | UCBP fix   | Mathematical / engineering justification |
 | ---------- | ---------- | ---------------------------------------- |
 | **L1**     | **Parametric Count-Sketch** - replace frozen sign & bin with **A,B ∈ ℂ^{d\_in×d′}** that are trainable and later quantised. | Learning lets the optimiser minimise variance on the *actual* data distribution; greedy bake then stores only the maximally-used bin per row, preserving accuracy while collapsing to *(h,s)*. |
-| **L2**     | **Multi-input fusion** via Hadamard product in Fourier domain and generalised AxisGather to any axis pairs. | Bilinearity extends by associativity:  $\prod_{k=1}^{K}\mathop{\text{FFT}}(\text{CS}(x_k))$. <br> Variance scales **multiplicatively** with `∏ₖ‖𝐱ₖ‖²‖𝐲ₖ‖²` (exponential in `K`); clarification: dependence on `d′` is `O(1/d′)` (not linear in `K`). |
-| **L3**     | **Adjustable sketch size `d′` + group routing**. Heads/ranks are routed to independent projectors and can share or prune bins adaptively. | - **Variance bound**: `Var[⟨Φ(𝐱), Φ(𝐲)⟩] ≤ (∏ₖ‖𝐱ₖ‖²‖𝐲ₖ‖²)/d′` for `K` inputs, decaying as `O(1/d′)` for fixed inputs. <br> - **d′ heuristic**: Set `d′ ≥ (∏ₖ‖𝐱ₖ‖²‖𝐲ₖ‖²)/ε²` to achieve standard deviation `≤ ε` for kernel estimates. <br> - **Practical scaling**: For bounded-norm inputs (e.g., `‖𝐱ₖ‖≤1`), `d′ = O(1/ε²)` per group. |
-| **L4**     | **Binary / orthogonal projections + BGN**. Orthogonality reduces collision bias; Backward-Gradient-Normalisation tames large residuals. | For binary ±1 matrices the collision error’s second moment halves; BGN keeps per-row gradient ℓ₂-norm ≈ √d′, preventing explosion. |
-| **L5**     | **Greedy or ILP-based bake** - quantise complex weights to 8-bit sign and 16-bit index; per-head storage ≤ 1 KiB. | After bake the forward uses integer `scatter_add`, so memory drops by ×32 and inference latency falls because no dense GEMM is executed. |
+| **L2**     | **Multi-input fusion** via Hadamard product in Fourier domain and generalised AxisGather to any axis pairs. | Bilinearity extends by associativity:  $\prod_{k=1}^{K}\mathop{\text{FFT}}(\text{CS}(x_k))$. <br> Variance scales **multiplicatively** with $\prod_k \|\mathbf{x}_k\|^2 \|\mathbf{y}_k\|^2$ (exponential in `K`); clarification: dependence on `d′` is `O(1/d′)` (not linear in `K`). |
+| **L3**     | **Adjustable sketch size `d′` + group routing**. Heads/ranks are routed to independent projectors and can share or prune bins adaptively. | - **Variance bound**: $\mathrm{Var}[\langle \Phi(\mathbf{x}), \Phi(\mathbf{y}) \rangle] \leq \frac{\prod_k \|\mathbf{x}_k\|^2 \|\mathbf{y}_k\|^2}{d'}$ for `K` inputs, decaying as `O(1/d′)` for fixed inputs. <br> - **d′ heuristic**: Set $d' \geq \frac{\prod_k \|\mathbf{x}_k\|^2 \|\mathbf{y}_k\|^2}{\varepsilon^2}$ to achieve standard deviation $\leq \varepsilon$ for kernel estimates. <br> - **Practical scaling**: For bounded-norm inputs (e.g., $\|\mathbf{x}_k\| \leq 1$), $d' = \mathcal{O}\left(\frac{1}{\varepsilon^2}\right)$ per group. |
+| **L4**     | **Binary / orthogonal projections + BGN**. Orthogonality reduces collision bias; Backward-Gradient-Normalisation tames large residuals. | For binary $\pm 1$ matrices the collision error’s second moment halves; BGN keeps per-row gradient $\ell_2\text{-norm} \approx \sqrt{d'}$, preventing explosion. |
+| **L5**     | **Greedy or ILP-based bake** - quantise complex weights to 8-bit sign and 16-bit index; per-head storage ≤ 1 KiB. | After bake the forward uses integer `scatter_add`, so memory drops by $\times 32$ and inference latency falls because no dense GEMM is executed. |
 
 
 <details>
 <summary>Mathematical Justifications: 2.3 L3</summary>
 
 **1. Variance Bound for K-Input Fusion**
-For inputs `{𝐱₁, ..., 𝐱ₖ}` and `{𝐲₁, ..., 𝐲ₖ}`, the UCBP kernel estimator is:  
+For inputs $\{\mathbf{x}_1, \dots, \mathbf{x}_k\}$ and $\{\mathbf{y}_1, \dots, \mathbf{y}_k\}$, the UCBP kernel estimator is:  
 ```math
 \langle \Phi(\mathbf{x}), \Phi(\mathbf{y}) \rangle = \left\langle \text{IFFT}\left( \prod_{k=1}^K \text{FFT}(\text{CS}(\mathbf{x}_k)) \right), \text{IFFT}\left( \prod_{k=1}^K \text{FFT}(\text{CS}(\mathbf{y}_k)) \right) \right\rangle
 ```  
@@ -107,15 +107,15 @@ The variance is bounded by:
   ```math
   \mathbb{E}\left[\langle \text{CS}(\mathbf{x}_k), \text{CS}(\mathbf{y}_k) \rangle\right] = \langle \mathbf{x}_k, \mathbf{y}_k \rangle, \quad \text{Var} \leq \frac{\|\mathbf{x}_k\|^2 \|\mathbf{y}_k\|^2}{d'}.
   ```  
-- The Hadamard product `⊙` in Fourier domain preserves independence across `k` via the **tensor sketch convolution theorem** [1, 2].  
+- The Hadamard product $\odot$ in Fourier domain preserves independence across `k` via the **tensor sketch convolution theorem** [1, 2].  
 - Variance of the product kernel scales multiplicatively due to independence:  
   ```math
   \text{Var}\left[\prod_{k=1}^K \langle \phi_k, \psi_k \rangle\right] = \prod_{k=1}^K (\text{Var}[\langle \phi_k, \psi_k \rangle] + \mu_k^2) - \prod_{k=1}^K \mu_k^2, \quad \mu_k = \langle \mathbf{x}_k, \mathbf{y}_k \rangle.
   ```  
-  For small `μₖ` (common in high-dim), this simplifies to `≈ ∏ₖ Var[⟨ϕₖ, ψₖ⟩] ≤ ∏ₖ (‖𝐱ₖ‖²‖𝐲ₖ‖²)/d′`.  
+  For small $\mu_k$ (common in high-dim), this simplifies to $\approx \prod_k \mathrm{Var}[\langle \varphi_k, \psi_k \rangle] \leq \prod_k \frac{\|\mathbf{x}_k\|^2 \|\mathbf{y}_k\|^2}{d'}$.  
 
 **2. d′ Selection Heuristic**  
-To achieve a target **standard deviation `ε`** for the kernel estimate:  
+To achieve a target **standard deviation $\varepsilon$** for the kernel estimate:  
 ```math
 \sqrt{\text{Var}\left[\langle \Phi(\mathbf{x}), \Phi(\mathbf{y}) \rangle\right]} \leq \varepsilon.
 ```  
@@ -123,12 +123,14 @@ Substituting (1):
 ```math
 \sqrt{\frac{\prod_{k=1}^K \|\mathbf{x}_k\|^2 \|\mathbf{y}_k\|^2}{d'}} \leq \varepsilon \implies d' \geq \frac{\prod_{k=1}^K \|\mathbf{x}_k\|^2 \|\mathbf{y}_k\|^2}{\varepsilon^2}. \quad (2)
 ```  
-- **Special case (bilinear, K=2)**: `d′ ≥ (‖𝐱‖²‖𝐲‖²)/ε²`.  
-- **Unit-norm inputs (‖𝐱ₖ‖=1)**: `d′ ≥ 1/ε²` (Johnson-Lindenstrauss style).  
+- **Special case (bilinear, K = 2)**: $d' \geq \frac{\|\mathbf{x}\|^2 \|\mathbf{y}\|^2}{\varepsilon^2}$  
+- **Unit-norm inputs ($\|\mathbf{x}_k\| = 1$)**: $d' \geq \frac{1}{\varepsilon^2}$ (Johnson–Lindenstrauss style).  
 
-**3. Group Routing Advantage**  
-- **Variance isolation**: Routing `G` heads to independent projectors confines variance to per-group `d′` (no cross-head error propagation).  
-- **Adaptive bin sharing**: Sparsity-aware bin allocation minimizes `d′` under `ε`-constraints.  
+**3. Group Routing Advantage**
+
+- **Variance isolation**: Routing \$G\$ heads to independent projectors confines variance to per-group \$d'\$ (no cross-head error propagation).
+- **Adaptive bin sharing**: Sparsity-aware bin allocation minimizes \$d'\$ under \$\varepsilon\$-constraints.
+  
 
 --- 
 
@@ -142,11 +144,11 @@ Substituting (1):
 
 **Practical Implications**  
 
-- **Memory/compute trade-off**: `d′` adjusted per group to meet `ε`-accuracy:  
+- **Memory/compute trade-off**: $d'$ adjusted per group to meet $\varepsilon$-accuracy:  
   ```math
   \text{Memory} \propto G \cdot d', \quad \text{Error} \propto 1/\sqrt{d'}.
   ```  
-- **Edge deployment**: For `ε=0.1`, `K=2`, `‖𝐱‖=‖𝐲‖=1`, `d′=100` suffices (1 KiB/head).  
+- **Edge deployment**: For $\varepsilon = 0.1$, $K = 2$, $\|\mathbf{x}\| = \|\mathbf{y}\| = 1$, $d' = 100$ suffices (1 KiB/head).  
 
 ---
 
@@ -162,12 +164,12 @@ Compact Bilinear Pooling remains a powerful kernel trick, but naïve implementat
 | -- | ---- | ----------------- |
 | **G1 — Arbitrary axis pairing** | Project any user-chosen pair(s) of axes without flattening the whole tensor. | Preserves spatial / modal structure and eliminates costly reshapes; required for vision (H × W), language (T × D) and cross-modal fusion where axes have distinct semantics. |
 | **G2 — Affine equivariance to head / rank permutation** | Results are identical under re-ordering of heads, sub-spaces or ranks. | Enables drop-in replacement for multi-head attention and other grouped operations, and lets weights be shared or shuffled freely at runtime. |
-| **G3 — Massive head / rank scalability** | Support thousands of independent groups (`G = heads × subspaces × ranks`) with no weight duplication. | Modern Transformers, video nets and graph models often push *G ≫ 1 k*; memory must scale **O(G)** only in activations, not in parameters. |
-| **G4 — Adjustable compression knob** | Sketch dimension *d′* sets an explicit accuracy ↔ memory/compute trade-off. | Acts like a Johnson–Lindenstrauss parameter: variance ∝ 1 / *d′*; practitioners can dial quality to fit hardware budgets. |
+| **G3 — Massive head / rank scalability** | Support thousands of independent groups (`G = heads × subspaces × ranks`) with no weight duplication. | Modern Transformers, video nets and graph models often push $G \gg 1\text{k}$; memory must scale **O(G)** only in activations, not in parameters. |
+| **G4 — Adjustable compression knob** | Sketch dimension $d'$ sets an explicit accuracy ↔ memory/compute trade-off. | Acts like a Johnson–Lindenstrauss parameter: variance $\propto \frac{1}{d'}$; practitioners can dial quality to fit hardware budgets. |
 | **G5 — Trainable → Baked switch** | Dense complex projections while training; automatically quantised to `(h:int16, s:int8)` hash tables (≤ 1 KiB per head) for inference. | Yields high accuracy during learning and ultra-compact, scatter-add–only inference kernels for edge deployment. |
 | **G6 — Complex-number correctness** | Native support for complex weights and inputs; keeps Re/Im gradients exact. | Möbius-style and other geometric networks rely on complex algebra; approximations would break equivariance properties. |
 | **G7 — Framework friendliness (FX / TorchScript / ONNX)** | Implementation restricted to pure `aten` ops (`scatter_add`, `fft_rfft/irfft`) so that entire layer traces under Dynamo and exports to ONNX. | Guarantees compatibility with production pipelines, AOT compilers and hardware accelerators. |
-| **G8 — Extensible cascade & N-ary fusion** | API admits sequential CBP passes (cascade) or simultaneous fusion of K ≥ 3 tensors. | Future-proofs the layer for hierarchical pooling (e.g. H×W followed by T×C) and multi-modal joins beyond simple bilinear forms. |
+| **G8 — Extensible cascade & N-ary fusion** | API admits sequential CBP passes (cascade) or simultaneous fusion of K ≥ 3 tensors. | Future-proofs the layer for hierarchical pooling (e.g. $H \times W$ followed by $T \times C$) and multi-modal joins beyond simple bilinear forms. |
 
 **Design philosophy:** these goals collectively pursue a single objective—*a universal, bakeable projector for N-D, multi-head, multi-rank tensors that offers adjustable compression while remaining export-friendly and numerically stable* .
 
@@ -206,8 +208,8 @@ The UCBP layer converts two (or more) high-dimensional tensors into a **compact 
 | Stage | Purpose | Key design choices | Problems it solves |
 | ----- | ------- | ------------------ | ------------------ |
 | **AxisGather** | Permute/reshape tensors so that the chosen axis pairs line up contiguously. | Pure `aten` *view* and `permute` preserve autograd and FX traceability. | Avoids flattening the entire tensor—retains spatial semantics and saves memory. |
-| **SketchProjector** | Map each input to a size-`d′` sketch vector. Training: dense complex matrices **A**, **B**; Inference: hashed `(h:int16, s:int8)` tables. | *Projection type* ∈ {binary, gaussian, orthogonal}; `learnable_sketch` lets the optimiser reduce variance and later *bake* collapses to integer look-ups. | Eliminates O(d\_in × d′) weight tensors; learnability cures the bias of frozen hashes while bake shrinks memory to ≤1 KiB / head. |
-| **FFT ／ Hadamard ／ IFFT** | Turns convolutions in sketch space into element-wise products, realising the bilinear kernel in *O(d′ log d′)*. | Uses `torch.fft.rfft/irfft` in fp32; fallback to dense GEMM for `d′<16`. | Reduces compute vs explicit outer products; unbiased estimator with Var ≤ \|\|x\|\|²\|\|y\|\|²/d′. |
+| **SketchProjector** | Map each input to a size-`d′` sketch vector. Training: dense complex matrices **A**, **B**; Inference: hashed `(h:int16, s:int8)` tables. | *Projection type* ∈ {binary, gaussian, orthogonal}; `learnable_sketch` lets the optimiser reduce variance and later *bake* collapses to integer look-ups. | Eliminates $\mathcal{O}(d_\text{in} \times d')$ weight tensors; learnability cures the bias of frozen hashes while bake shrinks memory to ≤1 KiB / head. |
+| **FFT ／ Hadamard ／ IFFT** | Turns convolutions in sketch space into element-wise products, realising the bilinear kernel in $\mathcal{O}(d' \log d')$. | Uses `torch.fft.rfft/irfft` in fp32; fallback to dense GEMM for $d' < 16$. | Reduces compute vs explicit outer products; unbiased estimator with $\mathrm{Var} \leq \frac{\|\mathbf{x}\|^2 \|\mathbf{y}\|^2}{d'}$. |
 | **PostScale · BGN / LayerNorm** | Learn per-group scale `g`; optionally normalise gradients with **Backward-Gradient Normalisation**. | Place BGN after IFFT by default; can be moved pre-FFT when gradients explode (hyper-parameter table §7). | Stabilises training, especially with large `d′` or sparse inputs, and keeps per-row grad ℓ₂-norm ≈√d′. |
 | **Reshape & Merge** | Restore user-requested tensor layout or merge heads/ranks. | Cheap `view`/`permute`; respects batch broadcasting. | Integrates seamlessly into existing models (e.g. replacing Q · Kᵀ in attention). |
 
@@ -254,9 +256,9 @@ Orthogonal projections enforce $ \mathbf{A}_{\text{real}}^\top \mathbf{A}_{\text
 
 | Phase                 | Parameter form                                                           | Forward cost            | Gradient flow                              |
 | --------------------- | ------------------------------------------------------------------------ | ----------------------- | ------------------------------------------ |
-| **Training**          | Dense complex **A**, **B** (fp16/fp32)                                   | `B·G·d′·log₂ d′` (FFT)  | Full autograd through FFT & projector.     |
+| **Training**          | Dense complex **A**, **B** (fp16/fp32)                                   | $B \cdot G \cdot d' \cdot \log_2 d'$ (FFT)  | Full autograd through FFT & projector.     |
 | **Bake** *(offline)*  | Greedy/ILP quantisation: pick max-mag bin per row → `(h,s)` ‹int16/int8› | –                       | No gradients; one-time step.               |
-| **Inference (baked)** | Only `(h,s)` tables + int16 scatter-add                                  | `O(batch × d_in)` + FFT | Gradients disabled; layer set to `eval()`. |
+| **Inference (baked)** | Only `(h,s)` tables + int16 scatter-add                                  | $\mathcal{O}(\text{batch} \times d_\text{in})$ + FFT | Gradients disabled; layer set to `eval()`. |
 
 After bake the layer contains just *lookup indices and signs*; activations dominate memory, not parameters.
 
@@ -420,14 +422,14 @@ satisfies:
 <details>
 <summary>Resolution of Mathematical Ambiguities: BGN Formulation</summary>
 
-**Issue**: Element-wise clipping `clip(∇ℒ, -τ, τ)` doesn't guarantee per-row gradient norm `≈ √d′`.  
+**Issue**: Element-wise clipping $\mathrm{clip}(\nabla \mathcal{L}, -\tau, \tau)$ doesn't guarantee per-row gradient norm $\approx \sqrt{d'}$.  
 **Resolution**: Replace clipping with **Per-Row Gradient Normalization**:  
 $$
 \nabla_{\mathbf{Z}} \mathcal{L} \leftarrow \nabla_{\mathbf{Z}} \mathcal{L} \cdot \min\left(1, \frac{\tau}{\|\nabla_{\mathbf{Z}} \mathcal{L}\|_2}\right) \quad \text{where} \quad \tau = c \sqrt{d'}
 $$
 **Justification**:  
 - Preserves gradient direction while capping ℓ₂-norm.  
-- Theoretical basis: Expected ℓ₂-norm of a $d'$-dimensional random gradient is $O(\sqrt{d'})$ under Gaussian initialization.  
+- Theoretical basis: Expected $\ell_2$-norm of a $d'$-dimensional random gradient is $\mathcal{O}(\sqrt{d'})$ under Gaussian initialization.  
 - Hyperparameter $c$ defaults to 1.0 (tunable via Table §7).  
 
 </details>
