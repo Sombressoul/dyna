@@ -45,11 +45,7 @@ In short, UCBP brings the expressive strength of bilinear pooling to large-scale
 
 ### 2.1 Historical roots
 
-Compact (a.k.a. **Count-Sketch-based) Bilinear Pooling** was introduced by Fukui et al. for visual-question answering in 2016. The key idea is to replace an explicit outer-product with a **random feature map**  
-![eq](https://latex.codecogs.com/svg.image?\phi(x,y)=\mathop{\text{IFFT}}\bigl(\mathop{\text{FFT}}(\text{CS}(x))\odot\mathop{\text{FFT}}(\text{CS}(y))\bigr),)  
-where **CS** is a Count-Sketch that hashes each input coordinate to one of *d′* bins with a random sign.  This trick yields an **unbiased estimator**  
-![eq](https://latex.codecogs.com/svg.image?\mathbb{E}_{h,s}\!\left[\langle\phi(x),\phi(y)\rangle\right]=\langle&space;x,y\rangle,\quad\mathop{\text{Var}}\le\tfrac{\|x\|^2\|y\|^2}{d},)  
-so the mean-square error decays as **O(1/d′)**.  The same pipeline underlies virtually every CBP variant used in vision, audio and NLP today.
+**Compact** (a.k.a. **Count-Sketch-based**) **Bilinear Pooling** was introduced by Fukui et al. for visual-question answering in 2016. The key idea is to replace an explicit outer-product with a **random feature map** ![eq](https://latex.codecogs.com/svg.image?\phi(x,y)=\mathop{\text{IFFT}}\bigl(\mathop{\text{FFT}}(\text{CS}(x))\odot\mathop{\text{FFT}}(\text{CS}(y))\bigr),) where **CS** is a Count-Sketch that hashes each input coordinate to one of *d′* bins with a random sign. This trick yields an **unbiased estimator** ![eq](https://latex.codecogs.com/svg.image?\mathbb{E}_{h,s}\!\left[\langle\phi(x),\phi(y)\rangle\right]=\langle&space;x,y\rangle,\quad\mathop{\text{Var}}\le\tfrac{\|x\|^2\|y\|^2}{d},) so the mean-square error decays as **O(1/d′)**. The same pipeline underlies virtually every CBP variant used in vision, audio and NLP today.
 
 ---
 
@@ -79,6 +75,8 @@ so the mean-square error decays as **O(1/d′)**.  The same pipeline underlies v
 <details>
 <summary>Mathematical Justifications: 2.3 L3</summary>
 
+--- 
+
 **1. Variance Bound for K-Input Fusion**
 For inputs ![eq](https://latex.codecogs.com/svg.image?\{\mathbf{x}_1,\dots,\mathbf{x}_k\}) and ![eq](https://latex.codecogs.com/svg.image?\{\mathbf{y}_1,\dots,\mathbf{y}_k\}), the UCBP kernel estimator is:  
 
@@ -95,14 +93,10 @@ The variance is bounded by:
 
 *Proof Sketch*:  
 - By the Count-Sketch property, ![eq](https://latex.codecogs.com/svg.image?\mathrm{FFT}(\mathrm{CS}(\mathbf{x}_k))) is a random projection with:  
-
-![eq](https://latex.codecogs.com/svg.image?\mathbb{E}\left[\langle\text{CS}(\mathbf{x}_k),\text{CS}(\mathbf{y}_k)\rangle\right]=\langle\mathbf{x}_k,\mathbf{y}_k\rangle,\quad\text{Var}\leq\frac{\|\mathbf{x}_k\|^2\|\mathbf{y}_k\|^2}{d'}.)
-
+  ![eq](https://latex.codecogs.com/svg.image?\mathbb{E}\left[\langle\text{CS}(\mathbf{x}_k),\text{CS}(\mathbf{y}_k)\rangle\right]=\langle\mathbf{x}_k,\mathbf{y}_k\rangle,\quad\text{Var}\leq\frac{\|\mathbf{x}_k\|^2\|\mathbf{y}_k\|^2}{d'}.)  
 - The Hadamard product ![eq](https://latex.codecogs.com/svg.image?\odot) in Fourier domain preserves independence across ![eq](https://latex.codecogs.com/svg.image?k) via the **tensor sketch convolution theorem** [1, 2].  
 - Variance of the product kernel scales multiplicatively due to independence:  
-
-![eq](https://latex.codecogs.com/svg.image?\text{Var}\left[\prod_{k=1}^K\langle\phi_k,\psi_k\rangle\right]=\prod_{k=1}^K(\text{Var}[\langle\phi_k,\psi_k\rangle]&plus;\mu_k^2)-\prod_{k=1}^K\mu_k^2,\quad\mu_k=\langle\mathbf{x}_k,\mathbf{y}_k\rangle)
-
+  ![eq](https://latex.codecogs.com/svg.image?\text{Var}\left[\prod_{k=1}^K\langle\phi_k,\psi_k\rangle\right]=\prod_{k=1}^K(\text{Var}[\langle\phi_k,\psi_k\rangle]&plus;\mu_k^2)-\prod_{k=1}^K\mu_k^2,\quad\mu_k=\langle\mathbf{x}_k,\mathbf{y}_k\rangle)  
   For small ![eq](https://latex.codecogs.com/svg.image?\mu_k) (common in high-dim), this simplifies to ![eq](https://latex.codecogs.com/svg.image?\approx\prod_k\mathrm{Var}[\langle\varphi_k,\psi_k\rangle]\leq\prod_k\frac{\|\mathbf{x}_k\|^2\|\mathbf{y}_k\|^2}{d'}).  
 
 **2. d′ Selection Heuristic**  
@@ -123,12 +117,12 @@ Substituting (1):
 - **Adaptive bin sharing**: Sparsity-aware bin allocation minimizes ![eq](https://latex.codecogs.com/svg.image?d') under ![eq](https://latex.codecogs.com/svg.image?\varepsilon)-constraints.
   
 
---- 
-
 **References**
 
 [1] Pham, N., Pagh, R. (2013). *Fast and scalable polynomial kernels via explicit feature maps*. KDD.  
 [2] Avron, H., Nguyen, H., Woodruff, D. (2014). *Subspace embeddings for the polynomial kernel*. NeurIPS.
+
+--- 
 
 </details>
 
@@ -136,10 +130,10 @@ Substituting (1):
 **Practical Implications**  
 
 - **Memory/compute trade-off**: ![eq](https://latex.codecogs.com/svg.image?d') adjusted per group to meet ![eq](https://latex.codecogs.com/svg.image?\varepsilon)-accuracy:  
+  ![eq](https://latex.codecogs.com/svg.image?\text{Memory}\propto&space;G\cdot&space;d',\quad\text{Error}\propto&space;1/\sqrt{d'})
 
-![eq](https://latex.codecogs.com/svg.image?\text{Memory}\propto&space;G\cdot&space;d',\quad\text{Error}\propto&space;1/\sqrt{d'})
-
-- **Edge deployment**: For ![eq](https://latex.codecogs.com/svg.image?\varepsilon=0.1,K=2,\|\mathbf{x}\|=\|\mathbf{y}\|=1,d'=100) suffices (1 KiB/head).  
+- **Edge deployment**:  
+  For ![eq](https://latex.codecogs.com/svg.image?\varepsilon=0.1,K=2,\|\mathbf{x}\|=\|\mathbf{y}\|=1,d'=100) suffices (1 KiB/head).  
 
 ---
 
@@ -207,6 +201,8 @@ The UCBP layer converts two (or more) high-dimensional tensors into a **compact 
 <details>
 <summary>Resolution of Implementation Ambiguities: 4.1 - Orthogonal Projections</summary>
 
+--- 
+
 **Ambiguity**: How is orthogonality enforced during training?  
 **Resolution**: Orthogonality is enforced via **spectral normalization with iterative refinement**.  
 
@@ -234,6 +230,9 @@ Orthogonal projections enforce ![eq](https://latex.codecogs.com/svg.image?\mathb
 - **Spectral normalization**: Applied every ![eq](https://latex.codecogs.com/svg.image?N) training steps using SVD-based projection.  
 - **Cayley retraction**: Maintains orthogonality during gradient updates.  
 - **Complex handling**: Real/imaginary components constrained jointly to preserve ![eq](https://latex.codecogs.com/svg.image?\mathbb{C})-linearity.  
+
+--- 
+
 </details>
 
 ---
@@ -250,6 +249,8 @@ After bake the layer contains just *lookup indices and signs*; activations domin
 
 <details>
 <summary>Resolution of Implementation Ambiguities: 4.2 - Bake Process</summary>
+
+--- 
 
 **Ambiguity**: Algorithmic details of "Greedy/ILP quantisation".  
 **Resolution**: Two-phase approach:  
@@ -307,10 +308,14 @@ Bake process converts dense ![eq](https://latex.codecogs.com/svg.image?\mathbf{A
 2. **ILP collision minimization** (optional): Solves bin assignment to minimize row collisions while preserving magnitude.  
 Storage: **6 bytes/row** (e.g., 1020 bytes for 170 rows).  
 
+--- 
+
 </details>
 
 <details>
 <summary>Appendix: ILP Formulation for Bake Process</summary>
+
+--- 
 
 **Integer Linear Programming Setup**:  
 - **Variables**:  
@@ -330,6 +335,8 @@ Storage: **6 bytes/row** (e.g., 1020 bytes for 170 rows).
 
 **Theoretical Justification**:  
 The ILP minimizes the **expected collision rate** ![eq](https://latex.codecogs.com/svg.image?\mathbb{E}[\text{collisions}]\approx&space;1-e^{-d_{\text{in}}/d'}) while maximizing signal preservation, reducing variance by up to **2x** vs. greedy-only quantization.
+
+--- 
 
 </details>
 
@@ -362,6 +369,8 @@ The ILP minimizes the **expected collision rate** ![eq](https://latex.codecogs.c
 <details>
 <summary>Resolution of Mathematical Ambiguities: Variance Scaling for K>=3</summary>
 
+--- 
+
 **Issue**: Ambiguity in variance bound for multi-input fusion.  
 **Resolution**: Unified derivation for ![eq](https://latex.codecogs.com/svg.image?K-input) case:  
 
@@ -380,11 +389,15 @@ satisfies:
 - ![eq](https://latex.codecogs.com/svg.image?\kappa_j) depends on 4th+ moments of ![eq](https://latex.codecogs.com/svg.image?\mathbf{x}_k,\mathbf{y}_k). For unit-norm inputs, ![eq](https://latex.codecogs.com/svg.image?\Delta_K<0.02/d^{\prime&space;2}).  
 - **Practical consequence**: For ![eq](https://latex.codecogs.com/svg.image?d%27&space;\geq&space;64), ![eq](https://latex.codecogs.com/svg.image?\Delta_K) is negligible → variance ![eq](https://latex.codecogs.com/svg.image?\approx\prod_k\|\mathbf{x}_k\|^2\|\mathbf{y}_k\|^2/d').  
 
+--- 
+
 </details>
 
 
 <details>
 <summary>Resolution of Mathematical Ambiguities: BGN Formulation</summary>
+
+--- 
 
 **Issue**: Element-wise clipping ![eq](https://latex.codecogs.com/svg.image?\mathrm{clip}(\nabla\mathcal{L},-\tau,\tau)) doesn't guarantee per-row gradient norm ![eq](https://latex.codecogs.com/svg.image?\approx\sqrt{d'}).  
 **Resolution**: Replace clipping with  
@@ -394,6 +407,8 @@ satisfies:
 - Preserves gradient direction while capping ℓ₂-norm.  
 - Theoretical basis: Expected ![eq](https://latex.codecogs.com/svg.image?\ell_2-norm) of a ![eq](https://latex.codecogs.com/svg.image?d'-dimensional) random gradient is ![eq](https://latex.codecogs.com/svg.image?\mathcal{O}(\sqrt{d'})) under Gaussian initialization.  
 - Hyperparameter ![eq](https://latex.codecogs.com/svg.image?c) defaults to 1.0 (tunable via Table §7).  
+
+--- 
 
 </details>
 
