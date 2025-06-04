@@ -48,7 +48,7 @@ In short, UCBP brings the expressive strength of bilinear pooling to large-scale
 Compact (a.k.a. **Count-Sketch-based) Bilinear Pooling** was introduced by Fukui et al. for visual-question answering in 2016. The key idea is to replace an explicit outer-product with a **random feature map**
 
 $$
-\phi(x,y)\;=\;\operatorname{IFFT}\!\bigl(\operatorname{FFT}(\text{CS}(x))\odot \operatorname{FFT}(\text{CS}(y))\bigr),
+\phi(x,y)\;=\;\mathop{\text{IFFT}}\!\bigl(\mathop{\text{FFT}}(\text{CS}(x))\odot \mathop{\text{FFT}}(\text{CS}(y))\bigr),
 $$
 
 where **CS** is a Count-Sketch that hashes each input coordinate to one of *d′* bins with a random sign.  This trick yields an **unbiased estimator**
@@ -56,7 +56,7 @@ where **CS** is a Count-Sketch that hashes each input coordinate to one of *d′
 $$
 \mathbb{E}_{h,s}\!\left[\langle\phi(x),\phi(y)\rangle\right]=\langle x,y\rangle,
 \quad
-\operatorname{Var}\le \tfrac{\|x\|^2\|y\|^2}{d′},
+\mathop{\text{Var}}\le \tfrac{\|x\|^2\|y\|^2}{d′},
 $$
 
 so the mean-square error decays as **O(1/d′)**.  The same pipeline underlies virtually every CBP variant used in vision, audio and NLP today.
@@ -80,7 +80,7 @@ so the mean-square error decays as **O(1/d′)**.  The same pipeline underlies v
 | Limitation | UCBP fix   | Mathematical / engineering justification |
 | ---------- | ---------- | ---------------------------------------- |
 | **L1**     | **Parametric Count-Sketch** - replace frozen sign & bin with **A,B ∈ ℂ^{d\_in×d′}** that are trainable and later quantised. | Learning lets the optimiser minimise variance on the *actual* data distribution; greedy bake then stores only the maximally-used bin per row, preserving accuracy while collapsing to *(h,s)*. |
-| **L2**     | **Multi-input fusion** via Hadamard product in Fourier domain and generalised AxisGather to any axis pairs. | Bilinearity extends by associativity:  $\prod_{k=1}^{K}\operatorname{FFT}(\text{CS}(x_k))$. <br> Variance scales **multiplicatively** with `∏ₖ‖𝐱ₖ‖²‖𝐲ₖ‖²` (exponential in `K`); clarification: dependence on `d′` is `O(1/d′)` (not linear in `K`). |
+| **L2**     | **Multi-input fusion** via Hadamard product in Fourier domain and generalised AxisGather to any axis pairs. | Bilinearity extends by associativity:  $\prod_{k=1}^{K}\mathop{\text{FFT}}(\text{CS}(x_k))$. <br> Variance scales **multiplicatively** with `∏ₖ‖𝐱ₖ‖²‖𝐲ₖ‖²` (exponential in `K`); clarification: dependence on `d′` is `O(1/d′)` (not linear in `K`). |
 | **L3**     | **Adjustable sketch size `d′` + group routing**. Heads/ranks are routed to independent projectors and can share or prune bins adaptively. | - **Variance bound**: `Var[⟨Φ(𝐱), Φ(𝐲)⟩] ≤ (∏ₖ‖𝐱ₖ‖²‖𝐲ₖ‖²)/d′` for `K` inputs, decaying as `O(1/d′)` for fixed inputs. <br> - **d′ heuristic**: Set `d′ ≥ (∏ₖ‖𝐱ₖ‖²‖𝐲ₖ‖²)/ε²` to achieve standard deviation `≤ ε` for kernel estimates. <br> - **Practical scaling**: For bounded-norm inputs (e.g., `‖𝐱ₖ‖≤1`), `d′ = O(1/ε²)` per group. |
 | **L4**     | **Binary / orthogonal projections + BGN**. Orthogonality reduces collision bias; Backward-Gradient-Normalisation tames large residuals. | For binary ±1 matrices the collision error’s second moment halves; BGN keeps per-row gradient ℓ₂-norm ≈ √d′, preventing explosion. |
 | **L5**     | **Greedy or ILP-based bake** - quantise complex weights to 8-bit sign and 16-bit index; per-head storage ≤ 1 KiB. | After bake the forward uses integer `scatter_add`, so memory drops by ×32 and inference latency falls because no dense GEMM is executed. |
@@ -358,7 +358,7 @@ The ILP minimizes the **expected collision rate** $ \mathbb{E}[\text{collisions}
     The sketch mapping $\Phi$ satisfies:  
     $$
     \mathbb{E}_{h,s}\bigl[\langle \Phi(x), \Phi(y) \rangle\bigr] = \langle x, y \rangle, \qquad
-    \operatorname{Var}\bigl[\langle \Phi(x), \Phi(y) \rangle\bigr] \leq \frac{\prod \|\mathbf{x}_k\|^2 \|\mathbf{y}_k\|^2}{d'} + O(1/d^{\prime 2})
+    \mathop{\text{Var}}\bigl[\langle \Phi(x), \Phi(y) \rangle\bigr] \leq \frac{\prod \|\mathbf{x}_k\|^2 \|\mathbf{y}_k\|^2}{d'} + O(1/d^{\prime 2})
     $$  
     Hence, the approximation error decays as $O(1/d')$. The projection dimension $d'$ is chosen via the Johnson-Lindenstrauss heuristic: $d'\approx 4\sqrt{d_{\text{in}}}$ (for $\epsilon$-distortion with high probability).
 
