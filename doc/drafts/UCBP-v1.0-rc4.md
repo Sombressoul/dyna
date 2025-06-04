@@ -209,14 +209,12 @@ The UCBP layer converts two (or more) high-dimensional tensors into a **compact 
 **Mathematical Formulation**:  
 For a complex projection matrix ![eq](https://latex.codecogs.com/svg.image?\mathbf{A}\in\mathbb{C}^{d_{\text{in}}\times&space;d'}), we:  
 1. Treat as real-valued block matrix:  
-
   ![eq](https://latex.codecogs.com/svg.image?\mathbf{A}_{\text{real}}=\begin{bmatrix}\text{Re}(\mathbf{A})&-\text{Im}(\mathbf{A})\\\text{Im}(\mathbf{A})&\text{Re}(\mathbf{A})\end{bmatrix}\in\mathbb{R}^{2d_{\text{in}}\times&space;2d_{\text{out}}})
 
 2. Apply **orthogonal constraint**:  
-
   ![eq](https://latex.codecogs.com/svg.image?\mathbf{A}_{\text{real}}^\top\mathbf{A}_{\text{real}}=\mathbf{I})
 
-    using iterative refinement every ![eq](https://latex.codecogs.com/svg.image?N) steps:  
+    using iterative refinement every `N` steps:  
     ```python  
     def enforce_orthogonality(A_real, iters=5):  
          U, _, Vt = torch.linalg.svd(A_real, full_matrices=False)  
