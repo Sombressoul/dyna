@@ -33,8 +33,8 @@ Typical use‑cases:
 ## 3 · High‑Level Architecture
 
 ```text
-╭──────────── AxisGather ────────────╮
-│  A_sel  B_sel  (B, G, d_A/B)       │
+╭──────────── AxisGather ─────────────╮
+│  A_sel  B_sel  (B, G, d_A/B)        │
 ╰─────────────────────────────────────╯
                │
         train: (P_x , P_y) ──┐
@@ -206,14 +206,7 @@ out.scatter_add_(1, idx, sgn * X2)
 
 ---
 
-## 13 · Licensing
-
-Released under **MIT** licence (compatible with PyTorch).
-Algorithm credit: *Fukui et al., “Multimodal Compact Bilinear Pooling”, ECCV 2016 (arXiv: ************************[1606.01847](https://arxiv.org/abs/1606.01847)************************)*
-
----
-
-## 14 · Known Limitations
+## 13 · Known Limitations
 
 * No gradients in baked mode – layer must be in `eval()`.
 * FFT on `d' < 16` can be slower than direct dot‑products.
@@ -221,23 +214,9 @@ Algorithm credit: *Fukui et al., “Multimodal Compact Bilinear Pooling”, EC
 
 ---
 
-## 15 · References
+## 14 · Algorithmic Sketches
 
-```
-[1] A. Fukui, D. H. Park, D. Yang, A. Rohrbach, T. Darrell, and M. Rohrbach, “Multimodal Compact Bilinear Pooling for Visual Question Answering and Visual Grounding,” *European Conference on Computer Vision (ECCV)*, 2016, pp. 19–36. (arXiv: [1606.01847](https://arxiv.org/abs/1606.01847))
-
-[2] M. Charikar, K. Chen, and M. Farach‑Colton, “Finding frequent items in data streams,” *Proceedings of the 29th International Colloquium on Automata, Languages and Programming (ICALP)*, 2002, pp. 693–703. (Introduces the Count‑Sketch algorithm.)
-
-[3] N. Pham and R. Pagh, “Fast and Scalable Polynomial Kernels via Explicit Feature Maps,” *Proceedings of the 19th ACM SIGKDD Conference on Knowledge Discovery and Data Mining (KDD)*, 2013, pp. 239–247. (arXiv: [1307.2977](https://arxiv.org/abs/1307.2977))
-
-[4] I. V. Oseledets, “Tensor‑Train Decomposition,” *SIAM Journal on Scientific Computing*, vol. 33, no. 5, 2011, pp. 2295–2317. (arXiv: [0908.0052](https://arxiv.org/abs/0908.0052))
-```
-
----
-
-## 16 · Algorithmic Sketches
-
-### 16.1 Training Pass (single group)
+### 14.1 Training Pass (single group)
 
 ```python
 # X, Y : (B, dA) and (B, dB) after AxisGather
@@ -255,7 +234,7 @@ Z   = torch.fft.ifft(Z_f).real
 out = Z * g                  # (+ LayerNorm if wanted)
 ```
 
-### 16.2 Bake Step (vectorised)
+### 14.2 Bake Step (vectorised)
 
 ```python
 rows, d_out = W.shape
@@ -264,7 +243,7 @@ h   = mag.argmax(dim=1)                       # (rows,)
 s   = W[torch.arange(rows), h].real.sign().to(torch.int8)
 ```
 
-### 16.3 Inference Scatter‑Add
+### 14.3 Inference Scatter‑Add
 
 ```python
 out = torch.zeros(B, d', device=X.device)
@@ -275,9 +254,9 @@ out.scatter_add_(1, idx, sgn * X2)
 
 ---
 
-## 17 · Quick Examples
+## 15 · Quick Examples
 
-### 17.1 Single‑Head, Latent × Channel
+### 15.1 Single‑Head, Latent × Channel
 
 ```python
 layer = UCBP(
@@ -291,7 +270,7 @@ layer = UCBP(
 Z = layer(A, B)               # → (B, 512)
 ```
 
-### 17.2 Replacing Q‑K dot in Transformer
+### 15.2 Replacing Q‑K dot in Transformer
 
 ```python
 cbp = UCBP(
@@ -306,7 +285,7 @@ attn_logits = cbp(Q, K) / math.sqrt(D)
 
 ---
 
-## 18 · Implementation‑Time Use Cases
+## 16 · Implementation‑Time Use Cases
 
 | ID | Scenario                             | Design impact                                      |
 | -- | ------------------------------------ | -------------------------------------------------- |
@@ -317,5 +296,27 @@ attn_logits = cbp(Q, K) / math.sqrt(D)
 | U5 | **Complex‑valued geometric nets**    | Maintain correct Re/Im gradients.                  |
 
 ---
+
+## 17 · Licensing
+
+Released under **MIT** licence (compatible with PyTorch).
+Algorithm credit: *Fukui et al., “Multimodal Compact Bilinear Pooling”, ECCV 2016 (arXiv: ************************[1606.01847](https://arxiv.org/abs/1606.01847)************************)*
+
+---
+
+## 18 · References
+
+```
+[1] A. Fukui, D. H. Park, D. Yang, A. Rohrbach, T. Darrell, and M. Rohrbach, “Multimodal Compact Bilinear Pooling for Visual Question Answering and Visual Grounding,” *European Conference on Computer Vision (ECCV)*, 2016, pp. 19–36. (arXiv: [1606.01847](https://arxiv.org/abs/1606.01847))
+
+[2] M. Charikar, K. Chen, and M. Farach‑Colton, “Finding frequent items in data streams,” *Proceedings of the 29th International Colloquium on Automata, Languages and Programming (ICALP)*, 2002, pp. 693–703. (Introduces the Count‑Sketch algorithm.)
+
+[3] N. Pham and R. Pagh, “Fast and Scalable Polynomial Kernels via Explicit Feature Maps,” *Proceedings of the 19th ACM SIGKDD Conference on Knowledge Discovery and Data Mining (KDD)*, 2013, pp. 239–247. (arXiv: [1307.2977](https://arxiv.org/abs/1307.2977))
+
+[4] I. V. Oseledets, “Tensor‑Train Decomposition,” *SIAM Journal on Scientific Computing*, vol. 33, no. 5, 2011, pp. 2295–2317. (arXiv: [0908.0052](https://arxiv.org/abs/0908.0052))
+```
+
+---
+
 
 *Prepared for integration into* **WeightsLib2DMobius**. *Feedback & PRs welcome!*
