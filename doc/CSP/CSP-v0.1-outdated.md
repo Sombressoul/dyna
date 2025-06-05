@@ -1,4 +1,4 @@
-# Universal Compact Bilinear Projection (UCBP)
+# Compact Spectral Projector (CSP)
 
 *Technical Design Document  ·  Version 0.9a (June 2025)*
 
@@ -6,7 +6,7 @@
 
 ## 1 · Purpose
 
-UCBP is a **drop‑in, parameter‑efficient replacement for explicit bilinear or multi‑linear weight tensors**. It approximates the interaction of two arbitrary tensors via **Count‑Sketch + FFT**, supports complex numbers, multi‑head/multi‑rank groupings, cascade operation, and a *bake* step that collapses large train‑time projectors into hash tables for inference.
+SCP is a **drop‑in, parameter‑efficient replacement for explicit bilinear or multi‑linear weight tensors**. It approximates the interaction of two arbitrary tensors via **Count‑Sketch + FFT**, supports complex numbers, multi‑head/multi‑rank groupings, cascade operation, and a *bake* step that collapses large train‑time projectors into hash tables for inference.
 
 Typical use‑cases:
 
@@ -63,7 +63,7 @@ Typical use‑cases:
 ## 4 · Public API (PyTorch)
 
 ```python
-class UCBP(nn.Module):
+class SCP(nn.Module):
     def __init__(
         self,
         shape_A: tuple[int, ...],
@@ -180,7 +180,7 @@ out.scatter_add_(1, idx, sgn * X2)
 
 1. **Shape fuzzing** – random tensors & axis pairs.
 2. **Grad‑check** – compare autograd with finite diff.
-3. **Equivalence** – UCBP vs explicit bilinear on toy dims.
+3. **Equivalence** – SCP vs explicit bilinear on toy dims.
 4. **Bake regression** – MSE before/after bake ≤ ε.
 5. **FX compile** – ensure `torch.export` & ONNX pass.
 
@@ -259,7 +259,7 @@ out.scatter_add_(1, idx, sgn * X2)
 ### 15.1 Single‑Head, Latent × Channel
 
 ```python
-layer = UCBP(
+layer = SCP(
     shape_A=(B, T, H, W, D),
     shape_B=(B, T, H, W, D),
     axes=[(4, 4)],            # D ↔ D
@@ -273,7 +273,7 @@ Z = layer(A, B)               # → (B, 512)
 ### 15.2 Replacing Q‑K dot in Transformer
 
 ```python
-cbp = UCBP(
+cbp = SCP(
     shape_A=(B, Heads, S, D),
     shape_B=(B, Heads, S, D),
     axes=[(3, 3)],            # channel dim

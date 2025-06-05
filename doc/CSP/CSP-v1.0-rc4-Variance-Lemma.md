@@ -1,4 +1,4 @@
-# Variance Lemma for Universal Compact Bilinear Projection (UCBP) — **v1.0‑rc4**
+# Variance Lemma for Compact Spectral Projector (CSP) — **v1.0‑rc4**
 
 
 ## 1 Notation and Assumptions  

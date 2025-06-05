@@ -1,4 +1,4 @@
-# Universal Compact Bilinear Projection (UCBP)
+# Compact Spectral Projector (CSP)
 
 *Technical Design Document · **Version 1.0‑rc4** (June 2025)*
 
@@ -6,18 +6,18 @@
 
 ## 1 · Purpose
 
-Universal Compact Bilinear Projection (UCBP) is conceived as a **drop-in, parameter-efficient replacement for explicit bilinear or multi-linear weight tensors** in modern neural networks. By compressing high-dimensional interactions into a lower-dimensional sketch, it drastically reduces memory footprint while preserving the expressive power of full bilinear models.
+Compact Spectral Projector (CSP) is conceived as a **drop-in, parameter-efficient replacement for explicit bilinear or multi-linear weight tensors** in modern neural networks. By compressing high-dimensional interactions into a lower-dimensional sketch, it drastically reduces memory footprint while preserving the expressive power of full bilinear models.
 
-### What UCBP does
+### What SCP does
 
 * **Approximation pipeline** – *Count-Sketch → FFT → Hadamard (element-wise) product → IFFT* captures the outer-product information of **two or more** input tensors without constructing dense weight tensors.
-* **Trainable → Baked switch** – During training, UCBP learns dense projection matrices; at inference, these matrices are **quantised into compact hash tables** ![eq](https://latex.codecogs.com/svg.image?(h,s)) so that per-head storage drops to ≤ 1 KiB.
+* **Trainable → Baked switch** – During training, SCP learns dense projection matrices; at inference, these matrices are **quantised into compact hash tables** ![eq](https://latex.codecogs.com/svg.image?(h,s)) so that per-head storage drops to ≤ 1 KiB.
 * **Rich tensor support** – Works on arbitrary axis pairings, supports **multi-head / multi-rank groupings**, and handles **complex-valued features** required by the research models.
 * **Framework-friendly** – Implemented with pure `aten` ops, enabling FX, Torch-Dynamo and ONNX export; interchangeable with explicit bilinear layers in existing PyTorch code-bases.
 
 ### Why it matters
 
-UCBP unifies several desirable properties in a single projector:
+SCP unifies several desirable properties in a single projector:
 
 | Capability | Impact on models |
 | ---------- | ---------------- |
@@ -37,7 +37,7 @@ UCBP unifies several desirable properties in a single projector:
 
 > *Provide a universal, bakeable projector for N-D, multi-head, multi-rank tensors that offers adjustable compression while remaining export-friendly and numerically stable.*
 
-In short, UCBP brings the expressive strength of bilinear pooling to large-scale, resource-constrained deep-learning systems - without the usual cost explosion.
+In short, SCP brings the expressive strength of bilinear pooling to large-scale, resource-constrained deep-learning systems - without the usual cost explosion.
 
 ---
 
@@ -61,9 +61,9 @@ In short, UCBP brings the expressive strength of bilinear pooling to large-scale
 
 ---
 
-### 2.3 UCBP remedies
+### 2.3 SCP remedies
 
-| Limitation | UCBP fix   | Mathematical / engineering justification |
+| Limitation | SCP fix   | Mathematical / engineering justification |
 | ---------- | ---------- | ---------------------------------------- |
 | **L1**     | **Parametric Count-Sketch** - replace frozen sign & bin with **![eq](https://latex.codecogs.com/svg.image?A,B\in\mathbb{C}^{d_\text{in}\times&space;d'})** that are trainable and later quantised. | Learning lets the optimiser minimise variance on the *actual* data distribution; greedy bake then stores only the maximally-used bin per row, preserving accuracy while collapsing to ![eq](https://latex.codecogs.com/svg.image?(h,s)). |
 | **L2**     | **Multi-input fusion** via Hadamard product in Fourier domain and generalised AxisGather to any axis pairs. | Bilinearity extends by associativity: ![eq](https://latex.codecogs.com/svg.image?\prod_{k=1}^{K}\mathop{\text{FFT}}(\text{CS}(x_k))). <br> Variance scales **multiplicatively** with ![eq](https://latex.codecogs.com/svg.image?\prod_k\|\mathbf{x}_k\|^2\|\mathbf{y}_k\|^2) (exponential in ![eq](https://latex.codecogs.com/svg.image?K)); clarification: dependence on ![eq](https://latex.codecogs.com/svg.image?d') is ![eq](https://latex.codecogs.com/svg.image?\mathcal{O}\left(\frac{1}{d'}\right)) (not linear in ![eq](https://latex.codecogs.com/svg.image?K)). |
@@ -78,7 +78,7 @@ In short, UCBP brings the expressive strength of bilinear pooling to large-scale
 --- 
 
 **1. Variance Bound for K-Input Fusion**
-For inputs ![eq](https://latex.codecogs.com/svg.image?\{\mathbf{x}_1,\dots,\mathbf{x}_k\}) and ![eq](https://latex.codecogs.com/svg.image?\{\mathbf{y}_1,\dots,\mathbf{y}_k\}), the UCBP kernel estimator is:  
+For inputs ![eq](https://latex.codecogs.com/svg.image?\{\mathbf{x}_1,\dots,\mathbf{x}_k\}) and ![eq](https://latex.codecogs.com/svg.image?\{\mathbf{y}_1,\dots,\mathbf{y}_k\}), the SCP kernel estimator is:  
 
 ![eq](https://latex.codecogs.com/svg.image?\langle\Phi(\mathbf{x}),\Phi(\mathbf{y})\rangle=\left\langle\text{IFFT}\left(\prod_{k=1}^K\text{FFT}(\text{CS}(\mathbf{x}_k))\right),\text{IFFT}\left(\prod_{k=1}^K\text{FFT}(\text{CS}(\mathbf{y}_k))\right)\right\rangle)
 
@@ -139,7 +139,7 @@ Substituting (1):
 
 ### 2.4 Practical takeaway
 
-Compact Bilinear Pooling remains a powerful kernel trick, but naïve implementations hit accuracy, stability and deployment walls at modern scale.  **UCBP** resolves these pain-points by (1) making the sketch *learnable*, (2) generalising to arbitrary tensor arities and axis pairings, (3) exposing a tunable accuracy–cost knob, (4) adding robust normalisation, and (5) introducing a *bake* path that slashes inference memory without retraining.  These upgrades preserve CBP’s theoretical guarantees while aligning it with today’s multi-head, multi-modal deep-learning workloads.
+Compact Bilinear Pooling remains a powerful kernel trick, but naïve implementations hit accuracy, stability and deployment walls at modern scale.  **SCP** resolves these pain-points by (1) making the sketch *learnable*, (2) generalising to arbitrary tensor arities and axis pairings, (3) exposing a tunable accuracy–cost knob, (4) adding robust normalisation, and (5) introducing a *bake* path that slashes inference memory without retraining.  These upgrades preserve CBP’s theoretical guarantees while aligning it with today’s multi-head, multi-modal deep-learning workloads.
 
 ---
 
@@ -162,7 +162,7 @@ Compact Bilinear Pooling remains a powerful kernel trick, but naïve implementat
 
 ## 4 · High-Level Architecture
 
-The UCBP layer converts two (or more) high-dimensional tensors into a **compact bilinear feature** through a five-stage pipeline that is identical in spirit for training and inference, yet stores radically fewer parameters once *baked*.  The diagram below represents the overall high-level architecture:
+The SCP layer converts two (or more) high-dimensional tensors into a **compact bilinear feature** through a five-stage pipeline that is identical in spirit for training and inference, yet stores radically fewer parameters once *baked*.  The diagram below represents the overall high-level architecture:
 
 ```
             ┏━━━━━━━━━━━━ AxisGather ━━━━━━━━━━━━┓
@@ -425,7 +425,7 @@ satisfies:
 
 ### 4.5 Extensibility hooks
 
-* **Cascade mode**: stack multiple UCBP stages to fuse (H × W) then (T × C).
+* **Cascade mode**: stack multiple SCP stages to fuse (H × W) then (T × C).
 * **N-ary fusion**: pass ≥3 tensors to `forward()`; Hadamard product generalises by associativity.
 * **Adaptive mask λ**: prunes dead output bins post-training to reclaim compute.
 
