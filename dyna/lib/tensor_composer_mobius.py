@@ -7,7 +7,7 @@ from typing import Union, List
 import dyna
 
 
-class WeightsLib2DMobius(nn.Module):
+class TensorComposerMobius(nn.Module):
     def __init__(
         self,
         output_shape: Union[torch.Size, List[int]],     # Output spatial size (e.g. [H, W])

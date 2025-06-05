@@ -1,7 +1,7 @@
 from dyna.lib.tensor_composer_delta import TensorComposerDelta
-from dyna.lib.weights_lib_2d_mobius import WeightsLib2DMobius
+from dyna.lib.tensor_composer_mobius import TensorComposerMobius
 
 __all__ = [
     "TensorComposerDelta",
-    "WeightsLib2DMobius",
+    "TensorComposerMobius",
 ]

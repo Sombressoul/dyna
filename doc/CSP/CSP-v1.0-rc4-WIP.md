@@ -28,7 +28,7 @@ SCP unifies several desirable properties in a single projector:
 
 ### Typical use-cases
 
-* **Dynamic weight generators** (e.g. `WeightsLib2DMobius`) that need thousands of per-step convolution kernels without GPU memory blow-ups.
+* **Dynamic weight generators** (e.g. `TensorComposerMobius`) that need thousands of per-step convolution kernels without GPU memory blow-ups.
 * **Multi-modal attention** spanning vision, text and audio where bilinear fusion improves alignment.
 * **Graph or relational link-prediction** models that score entity–relation pairs.
 * **Parameter-efficient fine-tuning** inside large Transformer / LLM blocks (LoRA-style adapters).

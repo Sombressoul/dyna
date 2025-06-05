@@ -10,7 +10,7 @@ SCP is a **drop‑in, parameter‑efficient replacement for explicit bilinear or
 
 Typical use‑cases:
 
-* Dynamic weight generators (e.g. `WeightsLib2DMobius`)
+* Dynamic weight generators (e.g. `TensorComposerMobius`)
 * Multi‑modal attention (vision × text × audio)
 * Graph/relational scoring
 * Parameter‑efficient fine‑tuning inside LLM blocks
@@ -194,7 +194,7 @@ out.scatter_add_(1, idx, sgn * X2)
 | M2        | Complex support, `group_dim`, cascade          | +2 weeks |
 | M3        | Bake algorithm + state export                  | +3 weeks |
 | M4        | TorchScript / ONNX compliance, docs & examples | +4 weeks |
-| M5        | Integrate into `WeightsLib2DMobius`            | +5 weeks |
+| M5        | Integrate into `TensorComposerMobius`          | +5 weeks |
 
 ---
 
@@ -320,4 +320,4 @@ Algorithm credit: *Fukui et al., “Multimodal Compact Bilinear Pooling”, EC
 ---
 
 
-*Prepared for integration into* **WeightsLib2DMobius**. *Feedback & PRs welcome!*
+*Prepared for integration into* **TensorComposerMobius**. *Feedback & PRs welcome!*

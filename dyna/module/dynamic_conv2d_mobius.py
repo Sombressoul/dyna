@@ -169,7 +169,7 @@ class DynamicConv2DMobius(nn.Module):
                 ),
             )
 
-        self.weights_lib = dyna.lib.WeightsLib2DMobius(
+        self.weights_lib = dyna.lib.TensorComposerMobius(
             output_shape=self.dynamic_weights_shape,
             context_length=self.context_length,
             n_subspaces=self.n_subspaces,
