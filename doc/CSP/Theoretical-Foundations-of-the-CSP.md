@@ -5,49 +5,40 @@ About Unbiasedness, Variance Bounds, and Gradient Reachability for Learnable Cou
 ## 1 Notation and Assumptions  
 
 
-* **Modes.** Let $K \ge 2$ be the number of modes ("heads").
+* **Modes.** Let ![eq.001](./tf-csp/001.svg) be the number of modes ("heads").
 
-* **Dimensions.** For mode $k$ the raw dimension is $d_k$ and the common sketch dimension is $d' \ge 2$.
+* **Dimensions.** For mode ![eq.002](./tf-csp/002.svg) the raw dimension is ![eq.003](./tf-csp/003.svg) and the common sketch dimension is ![eq.004](./tf-csp/004.svg).
 
 * **2‑wise–independent hashes.** Sample
 
-  $$
-    h_k : [d_k] \to [d'], \qquad s_k : [d_k] \to \{ -1, +1 \}.
-  $$
+  ![eq.005](./tf-csp/005.svg)
 
-* **Count–Sketch $\operatorname{CS}$.** For $x_k \in \mathbb R^{d_k}$ let
+* **Count–Sketch ![eq.006](./tf-csp/006.svg).** For ![eq.007](./tf-csp/007.svg) let
 
-  $$
-    \operatorname{CS}(x_k)[j] \;=\; \sum_{t\,:\,h_k(t)=j} s_k(t)\,x_k[t].
-  $$
+  ![eq.008](./tf-csp/008.svg)
 
 * **Frequency feature.**
 
-  $$
-    G(x) \;:=\; \prod_{k=1}^{K} \operatorname{FFT}(\operatorname{CS}(x_k)) \in \mathbb C^{d'}, \quad
-    \Phi(x) \;:=\; \operatorname{IFFT}(G(x)) \in \mathbb C^{d'}.
-  $$
+  ![eq.009](./tf-csp/009.svg)
 
 * **Pairwise sketch products.** Write
 
-  $$
-    Z_k \;:=\; \langle \operatorname{CS}(x_k),\operatorname{CS}(y_k) \rangle.
-  $$
+  ![eq.010](./tf-csp/010.svg)
 
-> **Assumption A (Mode Independence).** Pairs $(h_k,s_k)$ are mutually independent across modes.
+> **Assumption A (Mode Independence).** Pairs ![eq.011](./tf-csp/011.svg) are mutually independent across modes.
 
 *Throughout the sequel we abbreviate*
 
-$$
-  A_k \;:=\; \|x_k\|^{2}\,\|y_k\|^{2}. \tag{1}
-$$
+![eq.012](./tf-csp/012.svg)
 
 ---
 
 ## 2 Unbiasedness
 
 > **Lemma 1 (Unbiased Inner‑Product).**
-> $\mathbb{E}\,\langle \Phi(x),\Phi(y) \rangle \,=\, \prod_{k=1}^{K} \langle x_k, y_k \rangle.$
+>  
+> ![eq.013](./tf-csp/013.svg)
+> 
 
 *Proof.* Tensor‑Sketch (Avron, Kapralov & Musco 2014, Thm 4.1) is an unbiased estimator of the outer product.  Since FFT/IFFT merely converts the circular convolution form, the claim follows. ∎
 
@@ -57,41 +48,25 @@ $$
 
 > **Lemma 2 (First‑Order Bound).** Under Assumption A,
 >
-> $$
->   \operatorname{Var}[\langle \Phi(x),\Phi(y) \rangle] \;\le\; \frac{1}{d'} \prod_{k=1}^{K} A_k.
-> $$
+> ![eq.014](./tf-csp/014.svg)
+> 
 
 *Proof.*
 
-1. **Variance of a single sketch product.** Pham & Pagh (2013, Cor. 2) give
-   $\operatorname{Var}(Z_k) \le A_k/d'.$
-2. **Product expansion.** Independence of the $Z_k$ yields
+1. **Variance of a single sketch product.** Pham & Pagh (2013, Cor. 2) give ![eq.015](./tf-csp/015.svg)
+2. **Product expansion.** Independence of the ![eq.016](./tf-csp/016.svg) yields
 
-   $$
-     \operatorname{Var}\!\Bigl(\prod_{k} Z_k\Bigr)
-     \,=\, \sum_{i=1}^{K} \operatorname{Var}(Z_i)
-            \prod_{j\neq i}\bigl(\mathbb{E}[Z_j]\bigr)^{2}
-            \;\; + \text{(higher‑order sets)}.
-   $$
-3. **Cauchy–Schwarz relaxation.** Because
-   $
-     (\mathbb{E}[Z_j])^{2}
-     \;\le\;
-     A_j$ (Cauchy–Schwarz), we find
+   ![eq.017](./tf-csp/017.svg)  
 
-   $$
-     \prod_{j\neq i}(\mathbb{E}[Z_j])^{2}
-     \;\le\;
-     \prod_{j\neq i} A_j.
-   $$
+3. **Cauchy–Schwarz relaxation.** Because ![eq.018](./tf-csp/018.svg) (Cauchy–Schwarz), we find
+
+   ![eq.019](./tf-csp/019.svg)  
 
    Inserting this and Step 1 gives
 
-   $$
-     \sum_{i=1}^{K} \frac{A_i}{d'}\prod_{j\neq i} A_j
-       \;=\; \frac{1}{d'}\prod_{k=1}^{K} A_k.
-   $$
-4. **Neglecting higher‑order terms.** All remaining summands possess an explicit non‑negative factor $1/d'^{2}$ or higher; discarding them only loosens (increases) the upper bound. ∎
+   ![eq.020](./tf-csp/020.svg)  
+
+4. **Neglecting higher‑order terms.** All remaining summands possess an explicit non‑negative factor ![eq.021](./tf-csp/021.svg) or higher; discarding them only loosens (increases) the upper bound.
 
 ---
 
