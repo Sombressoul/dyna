@@ -1,5 +1,6 @@
-# Variance Lemma for Compact Spectral Projector (CSP) — **v1.0‑rc4**
+# Theoretical Foundations of the Compact Spectral Projector (CSP) — **v1.0‑rc4**
 
+About Unbiasedness, Variance Bounds, and Gradient Reachability for Learnable CountSketch-Based Kernel Projections.
 
 ## 1 Notation and Assumptions  
 
