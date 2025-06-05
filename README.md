@@ -41,7 +41,7 @@ dyna/
 
 ### `dyna.lib`
 
-- **WeightsLib2DDelta** – generates banks of 2‑D weights via rank‑weighted
+- **TensorComposerDelta** – generates banks of 2‑D weights via rank‑weighted
   modulation and diversity penalties.
 - **WeightsLib2DMobius** – constructs spatial filters using Mobius‑like
   complex transformations and learned projections.
@@ -49,7 +49,7 @@ dyna/
 ### `dyna.module`
 
 - **DynamicConv2DDelta** – convolutional layer that draws its kernels from
-  `WeightsLib2DDelta` conditioned on context vectors.
+  `TensorComposerDelta` conditioned on context vectors.
 - **DynamicConv2DMobius** – convolutional layer based on
   `WeightsLib2DMobius` with optional dynamic bias, padding and offsets.
 - **SignalStabilizationCompressor** – non‑linear block combining gating,

@@ -7,9 +7,9 @@ from typing import Union, List
 import dyna
 
 
-class WeightsLib2DDelta(nn.Module):
+class TensorComposerDelta(nn.Module):
     """
-    WeightsLib2DDelta
+    TensorComposerDelta
     -----------------
 
     A 2D dynamic weight generation module with modulation, decorellation, and adaptive weighting.
