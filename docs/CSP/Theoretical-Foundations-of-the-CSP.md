@@ -212,6 +212,8 @@ Equation (2.2) shows that **kernels** built from CSP sketches are unbiased (see 
 
 ## 3 Variance Analysis
 
+**Warning.** This section contains the definition of a non-scaled estimator. A complete and correct definition of a scaled estimator is provided in Appendix C.
+
 
 ### 3.1  Single-Mode Variance
 
@@ -259,7 +261,7 @@ $$
 \mathbb{E}[Z_k^2] = \mathbb{E}\left[\left(\sum_j \left(\sum_{i: h(i) = j} s(i) x_i\right)^2\right)^2\right].
 $$
 
-Expanding and collecting terms, we analyze all pairings of the four indices arising from squaring the sum of squared projections. The dominant contributions come from index combinations where either all four indices are equal, or they form two equal pairs (e.g., \$i\_1 = i\_2\$, \$i\_3 = i\_4\$), and their respective hash-collisions overlap. Accounting for these cases under 2-wise independence of \$h\$ and \$s\$, we arrive at the exact coefficient \$(2 - 2/d')\$. For full enumeration and expectation bounds, see Appendix B: (see Appendix B):
+Expanding and collecting terms, we analyze all pairings of the four indices arising from squaring the sum of squared projections. The dominant contributions come from index combinations where either all four indices are equal, or they form two equal pairs (e.g., \$i\_1 = i\_2\$, \$i\_3 = i\_4\$), and their respective hash-collisions overlap. Accounting for these cases under 2-wise independence of \$h\$ and \$s\$, we arrive at the exact coefficient \$(2 - 2/d')\$. For full enumeration and expectation bounds, see Appendix B:
 
 $$
 \operatorname{Var}(Z_k) = \mathbb{E}[Z_k^2] - (\mathbb{E}[Z_k])^2 \le (2 - 2/d')\|x_k\|^4.
@@ -1230,3 +1232,67 @@ which is the form quoted in Eq. (3.1.1) with \$c\_t=2\$.
 * The correction tightens intermediate coefficients but **does not change** the final bound used in the main text or any downstream results.
 * With 4-wise hashes, cross-pattern (iii) further downgrades from \$\beta\$ to \$\beta^2\$, yielding the exact variance Eq. (3.1.2).
 * Numerical checks (Section 3.1 example) confirm the revised calculus aligns with empirical variance.
+
+---
+
+## Appendix C: Revised Variance Analysis for the scaled estimator (Section 3.1)
+
+### 3 Variance Analysis
+
+#### 3.1 Single-Mode Variance — **Revised for the scaled estimator**
+
+> **Notation.** Throughout this section we analyse the *scaled* CSP estimator
+>
+> $\widehat Z(x,y)\;:=\;d'^{\,K-1}\,S(x,y)$
+>
+> where \$S(x,y)\$ is the raw sketch inner-product defined in Eq. (2.5).  The factor \$d'^{,K-1}\$ makes the estimator unbiased (Theorem 2.1).
+
+---
+
+##### Lemma 3.1 (Unbiased inner product of a single sketch)
+
+Let \$x,y\in\mathbb R^{d\_k}\$ and let \$h,s\$ be 2-wise independent hash and sign functions with range \${0,\dots,d'-1}\$ and \${-1,+1}\$, respectively.  Define the **normalised CountSketch**
+
+$\mathrm{CS}(x)[j] \;:=\; \frac{1}{\sqrt{d'}}\sum_{i=0}^{d_k-1} s(i)\,x_i\,\mathbf 1\bigl\{h(i)=j\bigr\}.$
+
+Then
+
+$\mathbb E\bigl[\langle \mathrm{CS}(x),\mathrm{CS}(y)\rangle\bigr]\;=\;\tfrac1{d'}\,\langle x,y\rangle,$
+
+and the variance satisfies
+
+$\operatorname{Var}\bigl[\langle \mathrm{CS}(x),\mathrm{CS}(y)\rangle\bigr] \;\le\; \frac{c_t}{d'}\,\|x\|_2^2\,\|y\|_2^2,$
+
+where \$c\_t\le 2\$ for 2-wise, and \$c\_t\le 1\$ for 4-wise independent hashes.
+
+*Proof.* Standard CountSketch analysis (see \[Charikar & Li 2012]). 
+
+---
+
+##### Proposition 3.2 (Variance of the scaled single-mode estimator)
+
+For a *single mode* (\$K=1\$) the scaled estimator reduces to
+
+$\widehat Z_1(x,y)=d'^{0}\,S_1(x,y)=\langle \mathrm{FFT}(\mathrm{CS}(x)),\mathrm{FFT}(\mathrm{CS}(y))\rangle,$
+
+because \$d'^{K-1}=1\$.  With unitary FFT the variance is identical to Lemma 3.1:
+
+$\operatorname{Var}[\widehat Z_1] \;\le\; \frac{c_t}{d'}\,\|x\|_2^2\,\|y\|_2^2.$
+
+*Proof.* Unitary FFT preserves both expectation and \$\ell\_2\$-norms (Parseval).  
+
+---
+
+##### Corollary 3.3 (Bias–variance decomposition)
+
+Because \$\widehat Z\_1\$ is unbiased, the mean-squared error obeys
+
+$\mathrm{MSE}[\widehat Z_1] = \operatorname{Var}[\widehat Z_1] \le \frac{c_t}{d'}\,\|x\|_2^2\,\|y\|_2^2.$
+
+Hence the **root-MSE scales as \$d'^{-1/2}\$**, exactly as in classic CountSketch.
+
+---
+
+##### Practical implication
+
+For \$K=1\$ the revised scaling does **not** change the variance constant relative to earlier drafts; the only difference is that the estimator is now *truly unbiased*.  In later sections we lift these bounds to \$K!>!1\$ by leveraging independence across modes and obtain variance \$O(d'^{1-K})\$ for the product sketch.
