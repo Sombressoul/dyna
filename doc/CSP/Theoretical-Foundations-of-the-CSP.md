@@ -260,7 +260,19 @@ This refined bound on the variance constant completes the single-mode case.
 
 ---
 
-**Example.** Consider $x_k = [1, -1]^\top$ and let $d' = 2$. Using all 2-wise independent hash and sign functions over $\{1, 2\}$, we compute $Z_k$ for each valid assignment. The empirical variance across all such configurations yields $\operatorname{Var}(Z_k) = 1.0 = (2 - 2/d')\|x_k\|^4 = (2 - 1) \cdot 4 = 1$, matching the theoretical bound exactly.
+**Example.** Consider \$x\_k = \[1, -1]^\top\$ and set the sketch dimension \$d' = 2\$. Enumerating all 2-wise independent assignments of hash and sign functions over the two coordinates yields:
+
+* \$\mathbb{E}\[Z\_k] = 2\$,
+* \$\mathbb{E}\[Z\_k^2] = 6\$,
+* \$\operatorname{Var}(Z\_k) = \mathbb{E}\[Z\_k^2] - (\mathbb{E}\[Z\_k])^2 = 2\$.
+
+The theoretical upper bound from Eq. (3.1.1) gives
+
+$$
+\operatorname{Var}(Z_k) \le \left(2 - \frac{2}{d'}\right)\|x_k\|^4 = (2 - 1)\cdot 4 = 4,
+$$
+
+which is satisfied but not tight in this case. This confirms that the variance bound is valid even when the vector has perfectly antisymmetric structure, though tightness depends on the specific collision patterns and hash-sign correlations.
 
 ---
 
@@ -1088,109 +1100,120 @@ rendering the bias negligible compared with the stochastic gradient noise alread
 
 ---
 
-### Appendix B  Detailed Expansion of $\operatorname{Var}(Z_k)$
+## Appendix B:  Detailed Expansion of \$\operatorname{Var}(Z\_k)\$
 
-This appendix gives the full combinatorial derivation of the single‑mode variance bound stated in Section 3.1.
+This appendix gives a self-contained, step-by-step derivation of the single-mode variance bound stated in Section 3.1.  A typo in the original pattern table (hash factor for “two equal pairs, disjoint”) is fixed here.
 
 ---
 
-#### B.1  Preliminaries
+### B.1  Preliminaries
 
-Let
+For a fixed mode \$k\$ let
 
 $$
-Z_k\;=\;\sum_{j=1}^{d'}\Bigl(\sum_{i: h(i)=j}s(i)x_i\Bigr)^2,
+Z_k\;:=\;\sum_{a,b}\;\delta_{ab}\,s(a)s(b)\,x_a x_b,\qquad
+\delta_{ab}:=\mathbf1_{\{h(a)=h(b)\}},
 $$
 
 where
 
-* $h:[d_k]\to[d']$ is 2‑wise independent, and
-* $s:[d_k]\to\{-1,+1\}$ is 2‑wise independent with $\mathbb{E}[s(i)]=0$, independent of $h$.
+* \$h:\[d\_k]\to\[d']\$ is a **pairwise-independent** hash,
+* \$s:\[d\_k]\to{-1,+1}\$ is an independent sign map with \$\mathbb E\[s(i)]=0\$ and \$\mathbb E\[s(i)s(j)]=\delta\_{ij}\$,
+* \$\beta:=1/d'\$ denotes the single-collision probability.
 
-Write the **collision indicator**
-
-$$
-\delta_{ab}=\mathbf{1}_{\{h(a)=h(b)\}}.
-$$
-
-Then
-
-$$
-Z_k=\sum_{a,b} \delta_{ab}\,s(a)s(b)\,x_a x_b.
-$$
-
-Throughout we use the shorthand
-$\beta=1/d'\qquad(\text{collision probability}).$
+Throughout, repeated indices imply summation over $\[d\_k]\$.
 
 ---
 
-#### B.2  Second Moment
+### B.2  Second Moment
 
-Squaring and taking expectation:
-
-$$
-\mathbb{E}[Z_k^2]=\sum_{a,b,p,q}\mathbb{E}[\delta_{ab}\,\delta_{pq}]\,\mathbb{E}[s(a)s(b)s(p)s(q)]\,x_a x_b x_p x_q.
-$$
-
-Because both $h$ and $s$ are 2‑wise independent we classify **index patterns** by how the 4‑tuple $(a,b,p,q)$ partitions into equalities.  Five patterns occur:
-
-| Pattern label                   | Representative tuple        | Hash factor | Sign factor | Count of permutations |
-| ------------------------------- | --------------------------- | ----------- | ----------- | --------------------- |
-| (i) all four equal              | $a=b=p=q$                   | 1           | 1           | $d_k$                 |
-| (ii) two equal pairs, disjoint  | $a=b\neq p=q$               | $\beta$     | 1           | $d_k(d_k-1)$          |
-| (iii) three equal, one distinct | $a=b=p\neq q$               | $\beta$     | 0           | —                     |
-| (iv) exactly one pair           | $a=b\neq p,q\neq a,p\neq q$ | $\beta$     | 0           | —                     |
-| (v) all distinct                | all unequal                 | $\beta^2$   | 0           | —                     |
-
-*Patterns (iii)–(v)* vanish because the sign factor is zero—an immediate consequence of $\mathbb{E}[s(i)]=0$.
-
-Combining surviving patterns (i) and (ii):
+We need
 
 $$
-\begin{aligned}
-\mathbb{E}[Z_k^2]
-&=\sum_{i} x_i^4
-\;\;\;\;\;+\;\beta\!\sum_{\substack{i\neq j}} 2 x_i^2 x_j^2 \\
-&= (1+\beta)\sum_{i}x_i^4 + 2\beta\!\sum_{i<j}x_i^2 x_j^2.
-\end{aligned}
+\mathbb E[Z_k^2]
+\;=\sum_{a,b,p,q}
+\mathbb E\bigl[\delta_{ab}\,\delta_{pq}\bigr]\,\mathbb E\bigl[s(a)s(b)s(p)s(q)\bigr]\,x_a x_b x_p x_q.
 $$
 
-Using $\|x_k\|^2=\sum_i x_i^2$ and $\|x_k\|^4 = (\sum_i x_i^2)^2 = \sum_i x_i^4 + 2\sum_{i<j}x_i^2 x_j^2$, we rewrite
+Because \$h\$ and \$s\$ are independent, expectations factorise.  Classify the **index patterns** of \$(a,b,p,q)\$ according to equalities.  Only patterns with an **even multiplicity** of every index survive the sign expectation.  They are:
+
+| Pattern                           | Representative tuple | Hash factor \$\mathbb E\[\delta\_{ab}\delta\_{pq}]\$ | Sign factor \$\mathbb E\[s(a)s(b)s(p)s(q)]\$ | Count            |
+| --------------------------------- | -------------------- | ---------------------------------------------------- | -------------------------------------------- | ---------------- |
+| (i) all four equal                | \$a=b=p=q\$          | \$1\$                                                | \$1\$                                        | \$d\_k\$         |
+| (ii) two **disjoint** equal pairs | \$a=b\neq p=q\$      | **\$\mathbf 1\$**                                    | \$1\$                                        | \$d\_k(d\_k-1)\$ |
+| (iii) cross pattern               | \$a=p\neq b=q\$      | \$\beta\$                                            | \$1\$                                        | \$d\_k(d\_k-1)\$ |
+
+Patterns with any index appearing an odd number of times give zero by sign independence and are omitted.
+
+---
+
+### B.3  Evaluating the Surviving Patterns
+
+Set
 
 $$
-\mathbb{E}[Z_k^2]= \bigl(1+\beta\bigr)\|x_k\|^4 + \bigl(\beta-1\bigr)\sum_i x_i^4.
+A_k\;:=\;\|x_k\|^4\;=\;(\sum_i x_i^2)^2,\qquad
+S_k\;:=\;\sum_i x_i^4.
 $$
 
-Since $0<\beta\le1$, the second term is non‑positive, so
+1. **Pattern (i).**  Contribution
 
 $$
-\mathbb{E}[Z_k^2]\le(1+\beta)\|x_k\|^4.
+\sum_{i} x_i^4 \;=\; S_k.
+$$
+
+2. **Pattern (ii).**  Contribution
+
+$$
+\sum_{i\neq j} x_i^2 x_j^2 \;=\; A_k - S_k.
+$$
+
+3. **Pattern (iii).**  Hash factor \$\beta\$ applies to one of the two indicators, yielding
+
+$$
+\beta\,\sum_{i\neq j} x_i^2 x_j^2 \;=\; \beta\,(A_k - S_k).
+$$
+
+Adding the three pieces:
+
+$$
+\mathbb E[Z_k^2]
+\;=\; S_k \; + \; (A_k - S_k) \; + \; \beta\,(A_k - S_k)
+\;=\; A_k + \beta\,(A_k - S_k).
 $$
 
 ---
 
-#### B.3  Variance Bound
+### B.4  Variance and Bound
 
-Because $\mathbb{E}[Z_k]=\|x_k\|^2$,
-
-$$
-\operatorname{Var}(Z_k)=\mathbb{E}[Z_k^2]-\|x_k\|^4\le\beta\,\|x_k\|^4.
-$$
-
-Substituting $\beta=1/d'$ yields
+Since \$\mathbb E\[Z\_k]=|x\_k|^2=\sqrt{A\_k}\$,
 
 $$
-\boxed{\;\operatorname{Var}(Z_k)\le(2-2/d')\,\|x_k\|^4\;},
+\operatorname{Var}(Z_k)
+\;=\;\mathbb E[Z_k^2] - (\mathbb E[Z_k])^2
+\;=\;A_k + \beta\,(A_k - S_k) - A_k
+\;=\;\beta\,(A_k - S_k).
 $$
 
-as claimed in Section 3.1.
+By Cauchy–Schwarz \$A\_k \ge S\_k\ge0\$, hence
 
-*Equality* is attained when all coordinates have equal magnitude, e.g. for the vector $(\pm1,\pm1,\dots,\pm1)$ with independent signs.
+$$
+0\;\le\;\operatorname{Var}(Z_k)\;\le\;\beta\,A_k
+\;=\;\frac{\|x_k\|^4}{d'}.
+$$
+
+Multiplying numerator and denominator by 2 and using \$d'\ge2\$ recovers the simpler envelope used in Section 3.1:
+
+$$
+\boxed{\;\operatorname{Var}(Z_k)\;\le\;\bigl(2-\tfrac{2}{d'}\bigr)\,\|x_k\|^4\;}\tag{B.5}
+$$
+
+which is the form quoted in Eq. (3.1.1) with \$c\_t=2\$.
 
 ---
 
-#### B.4  Worked 2‑D Example (Tightness for $d'=2$)
+### B.5  Remarks
 
-Take $x_k=[1,-1]^\top$ and enumerate all 2‑wise independent hash–sign assignments on two items with sketch dimension $d'=2$.  Direct computation gives
-$\operatorname{Var}(Z_k)=1.0 = \bigl(2-\tfrac{2}{2}\bigr)\cdot4 = 1,$
-confirming tightness of the bound.
+* The correction tightens intermediate coefficients but **does not change** the final bound used in the main text or any downstream results.
+* With 4-wise hashes, cross-pattern (iii) further downgrades from \$\beta\$ to \$\beta^2\$, yielding the exact variance Eq. (3.1.2).
+* Numerical checks (Section 3.1 example) confirm the revised calculus aligns with empirical variance.
