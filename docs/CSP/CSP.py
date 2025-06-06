@@ -11,22 +11,27 @@ from scipy.stats import pearsonr
 #   d_k = 32
 #   d_prime = 2048
 #   n_trials = 10000
+#   xy_correlation = 0.5
 #   torch.manual_seed(42)
 #
 # Should give the following result:
 #   CSP (K=4) — Canonical
-#   RMSE=229175.88265508565, Bias=246.0090829265084, Pearson=0.9487576102286971
-#   NRMSE=0.21759386185273363, Avg. bias=1.0002335763509873
+#   RMSE=14323.492584319598, Bias=15.375518473648606, Pearson=0.9487576105841762
+#   NRMSE=0.21759386061901784, Avg. bias=1.0002335756034362
+#
+# Note: canonical CSP produces high-variance estimates when inputs are weakly correlated,
+#       due to multiplicative amplification of unaligned spectral noise.
 #
 
 K = 4
 d_k = 32
 d_prime = 2048
 n_trials = 10000
+xy_correlation = 0.5
 torch.manual_seed(42)
 
 xs = [torch.randn(n_trials, d_k) for _ in range(K)]
-ys = [x + torch.randn_like(x) for x in xs]
+ys = [torch.lerp(torch.randn_like(x), x, xy_correlation) for x in xs]
 
 def generate_hash_and_sign(d_k, d_prime):
     h = torch.randint(0, d_prime, (d_k,))
