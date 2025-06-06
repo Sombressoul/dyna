@@ -1,4 +1,4 @@
-# Theoretical Foundations of the Compact Spectral Projector (CSP) — **v1.8c**
+# Theoretical Foundations of the Compact Spectral Projector (CSP) — **v1.9**
 
 
 ## 1 Notation, Problem Setting & Fundamental Assumptions
@@ -58,6 +58,10 @@ $F_k\;:=\;\operatorname{FFT}\bigl(\operatorname{CS}(x_k)\bigr)\in\mathbb C^{d'},
 
 The *frequency‑domain product* and its inverse transform give the **compact spectral projector (CSP) feature**
 $G(x)\;:=\;\bigodot_{k=0}^{K-1}F_k,\qquad \Phi(x)\;:=\;\operatorname{FFT}^{-1}\bigl(G(x)\bigr)\in\mathbb C^{d'}.\tag{4}$
+
+> **Remark.** The raw inner product $S(x,y) := \langle \Phi(x), \Phi(y) \rangle$ is not generally unbiased for the kernel $Z(x,y) = \prod_k \langle x_k, y_k \rangle$ unless rescaled.  
+> A correction factor $d'^{K-1}$ is introduced in Section 2 to produce the final unbiased estimator $\widehat Z := d'^{K-1} S(x,y)$.
+
 
 #### 1.4.1 Real‑Expectation Lemma
 
@@ -124,6 +128,10 @@ $$
 $$
 
 *Only 2-wise independence is required for (2.2); 4-wise independence becomes relevant **solely** for the variance bounds of Section 3.*
+
+> **Explanation.** The scaling factor $d'^{K-1}$ compensates for the normalization introduced by $K$ independent CountSketches and the unitary FFT.  
+> Without this factor, the raw estimator $S(x,y)$ underestimates the kernel expectation by a factor of $d'^{1-K}$.  
+> This rescaling ensures that $\widehat Z = d'^{K-1} S(x,y)$ is an unbiased estimator of $Z(x,y)$ for any $K \ge 1$.
 
 ---
 
@@ -210,7 +218,7 @@ Equation (2.2) shows that **kernels** built from CSP sketches are unbiased (see 
 
 ---
 
-## 3 Variance Analysis
+## 3 Variance Analysis (Raw and Scaled Estimators)
 
 **Warning.** This section contains the definition of a non-scaled estimator. A complete and correct definition of a scaled estimator is provided in Appendix C.
 
@@ -218,6 +226,9 @@ Equation (2.2) shows that **kernels** built from CSP sketches are unbiased (see 
 ### 3.1  Single-Mode Variance
 
 We begin by analyzing the second moment of the CSP sketch for a single mode \$k\$, focusing on the expected squared norm:
+
+> **Remark.** The estimator studied here is *not* the scaled inner product $\widehat Z = d'^{K-1} S(x,y)$ but the raw sketch energy for a single mode.  
+> The complete variance analysis for the scaled estimator appears in **Appendix C**.
 
 $$
 Z_k = \|\Phi_k(x_k)\|^2.
