@@ -4,6 +4,45 @@ import os
 import sys
 
 # ========================================================= #
+#
+# Benchmark: TensorComposerMobius – Capacity under Random Inputs
+#
+# This experiment evaluates the *internal representational capacity*
+# of the TensorComposerMobius (TCM) module using purely randomized data.
+#
+# Each input x_i ∈ ℝ^256 and corresponding target y_i ∈ ℝ^{512×512}
+# are independently sampled from a standard normal distribution 𝒩(0, 1).
+#
+# No structure or correlation exists between x_i and y_i or across samples.
+# The model must learn to reconstruct unique high-dimensional noise
+# via complex-phase parameter modulation and subspace projection.
+#
+# The goal is *not* generalization, but to measure:
+# - how much noise can be reconstructed
+# - how expressive and decorrelated the generated tensors are
+#
+# Key metrics:
+# - Final MSE (loss): lower = better reconstruction
+# - Cosine similarity between outputs: lower = higher diversity
+# - Output rank: higher = better space coverage
+# - Std: amplitude richness of generated tensors
+# - Max grad: training dynamics stability
+#
+# ========================================================= #
+#
+# Baseline results in provided experimental conditions:
+#   Step #000990 loss: 0.2959265, max grad: 137.7931366
+#   Similarity between w[0] and w[1]: 0.0027
+#   Step #000990 rank: 256, std: 0.8384
+#
+# Final stats (step #990):
+#   Loss (MSE):     0.2959265   ->  70.4% signal captured
+#   Max grad:       137.7931    ->  stable optimization
+#   Sim(w₀, w₁):    0.0027      ->  high orthogonality
+#   Rank:           256 / 256   ->  full output diversity
+#   Std:            0.8384      ->  saturated phase variance
+#
+# ========================================================= #
 
 # Experiment params
 seed = 1337
