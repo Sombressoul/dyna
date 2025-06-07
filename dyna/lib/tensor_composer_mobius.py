@@ -83,39 +83,18 @@ class TensorComposerMobius(nn.Module):
         )
 
         # -------------------------------------------------------------
-        # Transformation decoder (factorised bilinear-form, low rank K)  
+        # Transformation decoder
+        # Direct Tucker G kernel (identity-based, no projection)
         # -------------------------------------------------------------
-        #   A-factor : [T, C, L, K, R,  2]   – projects latent component Li
-        #   B-factor : [T, C, K, L, R,  2]   – projects back to latent Lj
-        #
-        #   where
-        #       T = 2 + 2 * rank_transformations        # shifts + z-controls
-        #       C = n_subspaces                         # independent weight subspaces
-        #       L = latent_dim                          # width of latent modulation
-        #       R = rank_subspace                       # independent ranks within subspaces
-        #       K = int(math.sqrt(L))                   # chosen low-rank dimension
-        #
-        #   Both factors keep the complex channel (Re/Im) in the last axis.
         T = 2 + 2 * self.rank_transformations
-        K = int(math.sqrt(self.latent_dim))
-        self.spaces_transformations_factor_A = nn.Parameter(
-            data=torch.nn.init.xavier_uniform_(
-                torch.empty(
-                    [T, self.n_subspaces, self.latent_dim, K, self.rank_subspace, 2],
-                    dtype=self.dtype_weights,
-                )
-            ),
+        self.direct_G_Re = nn.Parameter(
+            torch.empty([T, self.n_subspaces, self.latent_dim, self.rank_subspace], dtype=self.dtype_weights)
         )
-        self.spaces_transformations_factor_B = nn.Parameter(
-            data=torch.nn.init.xavier_uniform_(
-                torch.empty(
-                    [T, self.n_subspaces, K, self.latent_dim, self.rank_subspace, 2],
-                    dtype=self.dtype_weights,
-                )
-            ),
+        self.direct_G_Im = nn.Parameter(
+            torch.empty([T, self.n_subspaces, self.latent_dim, self.rank_subspace], dtype=self.dtype_weights)
         )
-        # Prepare precomputed transformation kernel through its invalidation
-        self._invalidate_kernel()
+        torch.nn.init.xavier_uniform_(self.direct_G_Re)
+        torch.nn.init.xavier_uniform_(self.direct_G_Im)
 
         # Trainable weights for resulting weights ranking
         self.w_mix = nn.Parameter(
@@ -149,70 +128,6 @@ class TensorComposerMobius(nn.Module):
             projection_planes = projection_planes.to(dtype=self.dtype_weights)
 
         self.projections = nn.Parameter(data=projection_planes)
-
-        # Register weights update hooks.
-        self._register_weight_hooks()
-
-        # Params for low rank Tucker decomposition
-        self.n_directions = T # 2 + 2 * self.rank_transformations # Equals T
-        self.tucker_dim = K # 32 # Could be equal K
-        self.tucker_U = nn.Parameter(
-            data=torch.empty(
-                [self.latent_dim, self.tucker_dim],
-                dtype=self.dtype_weights,
-            ),
-        )
-        self.tucker_G_Re = nn.Parameter(
-            data=torch.empty(
-                [self.n_directions, self.n_subspaces, self.tucker_dim, self.rank_subspace],
-                dtype=self.dtype_weights,
-            ),
-        )
-        self.tucker_G_Im = nn.Parameter(
-            data=torch.empty(
-                [self.n_directions, self.n_subspaces, self.tucker_dim, self.rank_subspace],
-                dtype=self.dtype_weights,
-            ),
-        )
-        self.tucker_decoder_L = nn.Parameter(
-            data=torch.empty(
-                [self.latent_dim, self.tucker_dim],
-                dtype=self.dtype_weights,
-            ),
-        )
-        torch.nn.init.xavier_uniform_(self.tucker_decoder_L)        
-        torch.nn.init.xavier_uniform_(self.tucker_U)
-        torch.nn.init.xavier_uniform_(self.tucker_G_Re)
-        torch.nn.init.xavier_uniform_(self.tucker_G_Im)
-
-        # Direct G kernel (identity-based, no projection)
-        self.direct_G_Re = nn.Parameter(
-            torch.empty([self.n_directions, self.n_subspaces, self.latent_dim, self.rank_subspace], dtype=self.dtype_weights)
-        )
-        self.direct_G_Im = nn.Parameter(
-            torch.empty([self.n_directions, self.n_subspaces, self.latent_dim, self.rank_subspace], dtype=self.dtype_weights)
-        )
-        torch.nn.init.xavier_uniform_(self.direct_G_Re)
-        torch.nn.init.xavier_uniform_(self.direct_G_Im)        
-
-
-    def __setattr__(self, name, value):
-        if name in ['spaces_transformations_factor_A', 'spaces_transformations_factor_B']:
-            self._invalidate_kernel()
-        super().__setattr__(name, value)
-
-
-    def load_state_dict(self, state_dict, strict=True, assign=False):
-        super().load_state_dict(state_dict, strict, assign)
-        self._invalidate_kernel()
-
-
-    def _register_weight_hooks(self) -> None:
-        def _hook_fn_t_factor(*args):
-            self._invalidate_kernel()
-
-        self.spaces_transformations_factor_A.register_hook(_hook_fn_t_factor)
-        self.spaces_transformations_factor_B.register_hook(_hook_fn_t_factor)
 
 
     def dirichlet_init_(
@@ -291,25 +206,6 @@ class TensorComposerMobius(nn.Module):
         return space
 
 
-    def _invalidate_kernel(self):
-        self.transformation_kernel = None
-
-
-    def _precompute_kernel(self) -> None:
-        A_tensor = dyna.functional.backward_gradient_normalization(self.spaces_transformations_factor_A)
-        B_tensor = dyna.functional.backward_gradient_normalization(self.spaces_transformations_factor_B)
-
-        A_perm = A_tensor.permute(0, 1, 2, 4, 3, 5)
-        B_perm = B_tensor.permute(0, 1, 3, 4, 2, 5)
-        A_Re, A_Im = A_perm[..., 0], A_perm[..., 1]
-        B_Re, B_Im = B_perm[..., 0], B_perm[..., 1]
-
-        C_Re = (A_Re * B_Re - A_Im * B_Im).sum(dim=-1)
-        C_Im = (A_Re * B_Im + A_Im * B_Re).sum(dim=-1)
-
-        self.transformation_kernel = torch.stack([C_Re, C_Im], dim=-1)
-
-
     def forward(
         self,
         x: torch.Tensor,
@@ -328,148 +224,26 @@ class TensorComposerMobius(nn.Module):
         x_modulated = x_transformed[::, :slice_subspaces:] * dyna.functional.siglog(x_transformed[::, slice_subspaces::])
         x_modulated = x_modulated.reshape([x_modulated.shape[0], self.latent_dim, 2]) # [B, latent_dim, complex[2]]
 
-        # Tests (for torch.bfloat16):
-        # opt_0: 229.16s/7.4gb; loss: 0.0363770; grad ~= 50...+/-5
-        # opt_1: 148.13s/1.5gb; loss: 0.0358887; grad ~= 50...+/-5
-        # opt_2: 148.68s/1.5gb; loss: 0.0358887; grad ~= 50...+/-5
-        # opt_3: 143.84s/1.6gb; loss: 0.2343750; grad ~= 3000...+/-500
-        # opt_4: 141.74s/1.4gb; loss: 0.0303955; grad ~= 60...+/-10
-        #
-        # Optimisation modes:
-        #   0 - direct
-        #   1 - same operation reimagined
-        #   2 - 1+precomputed core
-        #   3 - Tucker
-        #   4 - direct complex bilinear projection (full-rank uncompressed)
-        monstrous_optimization = 4
-        if monstrous_optimization == 0:
-            # TODO: custom kernel for the following monstrous operation:
-            # ===> MONSTROUS OPERATION (START)
-            # Complex bilinear projection: apply latent representation to transformation kernels
-            # Contraction over latent Li
-            spaces_transformations_factor_A = self.spaces_transformations_factor_A
-            spaces_transformations_factor_A = dyna.functional.backward_gradient_normalization(spaces_transformations_factor_A)
-            i_Re = torch.einsum("bl,tclki->btclki", x_modulated[..., 0], spaces_transformations_factor_A[..., 0]).sub_(
-                torch.einsum("bl,tclki->btclki", x_modulated[..., 1], spaces_transformations_factor_A[..., 1])
-            ).contiguous()
-            i_Im = torch.einsum("bl,tclki->btclki", x_modulated[..., 0], spaces_transformations_factor_A[..., 1]).add_(
-                torch.einsum("bl,tclki->btclki", x_modulated[..., 1], spaces_transformations_factor_A[..., 0])
-            ).contiguous()
+        # Bilinear projection: apply latent representation to transformation kernels
+        # Backward-normalize weights
+        G_Re = dyna.functional.backward_gradient_normalization(self.direct_G_Re)  # [T, C, L, R]
+        G_Im = dyna.functional.backward_gradient_normalization(self.direct_G_Im)
 
-            # Contraction over latent Lj
-            spaces_transformations_factor_B = self.spaces_transformations_factor_B
-            spaces_transformations_factor_B = dyna.functional.backward_gradient_normalization(spaces_transformations_factor_B)
-            j_Re = torch.einsum("bl,tcklj->btclkj", x_modulated[..., 0], spaces_transformations_factor_B[..., 0]).sub_(
-                torch.einsum("bl,tcklj->btclkj", x_modulated[..., 1], spaces_transformations_factor_B[..., 1])
-            ).contiguous()
-            j_Im = torch.einsum("bl,tcklj->btclkj", x_modulated[..., 0], spaces_transformations_factor_B[..., 1]).add_(
-                torch.einsum("bl,tcklj->btclkj", x_modulated[..., 1], spaces_transformations_factor_B[..., 0])
-            ).contiguous()
+        # Complex latetn vector
+        x_Re, x_Im = x_modulated[..., 0], x_modulated[..., 1]  # [B, L]
 
-            # Complex product, collapse K
-            Re = (i_Re * j_Re - i_Im * j_Im).sum(dim=4)  # [B, T, C, L, R]
-            Im = (i_Re * j_Im + i_Im * j_Re).sum(dim=4)  # [B, T, C, L, R]
-            Re = dyna.functional.backward_gradient_normalization(Re)
-            Im = dyna.functional.backward_gradient_normalization(Im)
-            # <=== MONSTROUS OPERATION (END)
-        elif monstrous_optimization == 1:
-            B, L = x_modulated.shape[0], self.latent_dim
+        # Einsum bilinear projection: [B, L] x [T, C, L, R] -> [B, T, C, R]
+        Re = torch.einsum("bl,tclr->btcr", x_Re, G_Re) - torch.einsum("bl,tclr->btcr", x_Im, G_Im)
+        Im = torch.einsum("bl,tclr->btcr", x_Re, G_Im) + torch.einsum("bl,tclr->btcr", x_Im, G_Re)
 
-            # First normalization
-            A_tensor = dyna.functional.backward_gradient_normalization(self.spaces_transformations_factor_A)
-            B_tensor = dyna.functional.backward_gradient_normalization(self.spaces_transformations_factor_B)
+        # Expand L axis (copy x over L positions)
+        Re = Re.unsqueeze(3).expand(-1, -1, -1, self.latent_dim, -1)  # [B, T, C, L, R]
+        Im = Im.unsqueeze(3).expand(-1, -1, -1, self.latent_dim, -1)
+        # TODO: Above is the point for further performance gains. Simply copying over L is dumb.
 
-            # Core
-            A_perm = A_tensor.permute(0, 1, 2, 4, 3, 5)
-            B_perm = B_tensor.permute(0, 1, 3, 4, 2, 5)
-            A_Re, A_Im = A_perm[..., 0], A_perm[..., 1]
-            B_Re, B_Im = B_perm[..., 0], B_perm[..., 1]
-
-            C_Re = (A_Re * B_Re - A_Im * B_Im).sum(dim=-1)
-            C_Im = (A_Re * B_Im + A_Im * B_Re).sum(dim=-1)
-
-            # x^2
-            x_Re, x_Im = x_modulated[..., 0], x_modulated[..., 1]
-            sq_x_Re = x_Re**2 - x_Im**2
-            sq_x_Im = 2 * x_Re * x_Im
-
-            # Broadcast
-            sq_x_Re = sq_x_Re.view(B, 1, 1, L, 1)
-            sq_x_Im = sq_x_Im.view(B, 1, 1, L, 1)
-            C_Re, C_Im = C_Re.unsqueeze(0), C_Im.unsqueeze(0)
-
-            Re = sq_x_Re * C_Re - sq_x_Im * C_Im
-            Im = sq_x_Re * C_Im + sq_x_Im * C_Re
-
-            # Second normalization
-            Re = dyna.functional.backward_gradient_normalization(Re)
-            Im = dyna.functional.backward_gradient_normalization(Im)
-        elif monstrous_optimization == 2:
-            if self.transformation_kernel is None:
-                self._precompute_kernel()
-            
-            C_Re, C_Im = self.transformation_kernel[..., 0], self.transformation_kernel[..., 1]
-            B = x_modulated.shape[0]
-
-            # x^2
-            x_Re, x_Im = x_modulated[..., 0], x_modulated[..., 1]
-            sq_x_Re = x_Re**2 - x_Im**2
-            sq_x_Im = 2 * x_Re * x_Im
-
-            # Broadcast
-            sq_x_Re = sq_x_Re.view(B, 1, 1, self.latent_dim, 1)
-            sq_x_Im = sq_x_Im.view(B, 1, 1, self.latent_dim, 1)
-            C_Re, C_Im = C_Re.unsqueeze(0), C_Im.unsqueeze(0)
-
-            Re = sq_x_Re * C_Re - sq_x_Im * C_Im
-            Im = sq_x_Re * C_Im + sq_x_Im * C_Re
-
-            # Second normalization
-            Re = dyna.functional.backward_gradient_normalization(Re)
-            Im = dyna.functional.backward_gradient_normalization(Im)
-        elif monstrous_optimization == 3:
-            # Backward-normalize weights
-            tucker_G_Re = dyna.functional.backward_gradient_normalization(self.tucker_G_Re) # [T, C, P, R]
-            tucker_G_Im = dyna.functional.backward_gradient_normalization(self.tucker_G_Im)
-            tucker_decoder_L = dyna.functional.backward_gradient_normalization(self.tucker_decoder_L) # [L, P]
-
-            # Complex latetn vector
-            x_Re, x_Im = x_modulated[..., 0], x_modulated[..., 1]  # [B, L]
-
-            # Project into Tucker latent space
-            xU_Re = torch.matmul(x_Re, self.tucker_U)  # [B, P]
-            xU_Im = torch.matmul(x_Im, self.tucker_U)  # [B, P]
-
-            # Complex bilinear operation with kernel G
-            Re_core = torch.einsum('bp,tcpr->btcr', xU_Re, tucker_G_Re) - torch.einsum('bp,tcpr->btcr', xU_Im, tucker_G_Im)
-            Im_core = torch.einsum('bp,tcpr->btcr', xU_Re, tucker_G_Im) + torch.einsum('bp,tcpr->btcr', xU_Im, tucker_G_Re)
-
-            # Project back into L space (self.tucker_decoder_L: [L, P])
-            Re_decoded = torch.einsum("btcr,lp->btclr", Re_core, tucker_decoder_L)
-            Im_decoded = torch.einsum("btcr,lp->btclr", Im_core, tucker_decoder_L)
-
-            # Gradient norm
-            Re = dyna.functional.backward_gradient_normalization(Re_decoded)
-            Im = dyna.functional.backward_gradient_normalization(Im_decoded)
-        elif monstrous_optimization == 4:
-            # Backward-normalize weights
-            G_Re = dyna.functional.backward_gradient_normalization(self.direct_G_Re)  # [T, C, L, R]
-            G_Im = dyna.functional.backward_gradient_normalization(self.direct_G_Im)
-
-            # Complex latetn vector
-            x_Re, x_Im = x_modulated[..., 0], x_modulated[..., 1]  # [B, L]
-
-            # Einsum bilinear projection: [B, L] × [T, C, L, R] → [B, T, C, R]
-            Re = torch.einsum("bl,tclr->btcr", x_Re, G_Re) - torch.einsum("bl,tclr->btcr", x_Im, G_Im)
-            Im = torch.einsum("bl,tclr->btcr", x_Re, G_Im) + torch.einsum("bl,tclr->btcr", x_Im, G_Re)
-
-            # Expand L axis (copy x over L positions)
-            Re = Re.unsqueeze(3).expand(-1, -1, -1, self.latent_dim, -1)  # [B, T, C, L, R]
-            Im = Im.unsqueeze(3).expand(-1, -1, -1, self.latent_dim, -1)
-
-            Re = dyna.functional.backward_gradient_normalization(Re)
-            Im = dyna.functional.backward_gradient_normalization(Im)
-
+        # Normalize grads on backward pass
+        Re = dyna.functional.backward_gradient_normalization(Re)
+        Im = dyna.functional.backward_gradient_normalization(Im)
 
         # Normalize to unit circle direction
         cos_theta = Re / (Re**2 + Im**2 + self.eps).sqrt()
