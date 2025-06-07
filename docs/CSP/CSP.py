@@ -77,7 +77,7 @@ for n in range(n_trials):
         truth *= torch.dot(xs[k][n], ys[k][n]).item()
     ground_truths.append(truth)
 
-# Анализ
+# Stats
 dot_estimates = np.array(dot_estimates)
 ground_truths = np.array(ground_truths)
 rmse = np.sqrt(np.mean((dot_estimates - ground_truths)**2))
@@ -88,7 +88,7 @@ true_avg = np.mean(ground_truths)
 avg_bias = avg / true_avg
 nrmse = rmse / np.mean(np.abs(ground_truths))
 
-# График
+# Graph
 plt.scatter(ground_truths, dot_estimates, alpha=0.5, s=10)
 plt.xlabel("True ∏⟨xₖ, yₖ⟩")
 plt.ylabel("CSP Estimate (complex)")
