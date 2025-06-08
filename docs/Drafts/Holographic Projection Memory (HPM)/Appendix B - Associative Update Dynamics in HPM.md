@@ -43,7 +43,7 @@ $$
 This defines a new operator:
 
 $$
-\mathcal{T}^*[\delta](x) := \int \delta(u) K(x, \ell_u) \, du
+\mathcal{T}^*{[\delta]}(x) := \int \delta(u) K(x, \ell_u) \, du
 $$
 
 which is the **adjoint** (transpose) of the forward projection operator $\mathcal{T}$. This operator effectively **back-projects** the projection-level error into the memory field — but does so in a **smooth, spatially correlated way**.
