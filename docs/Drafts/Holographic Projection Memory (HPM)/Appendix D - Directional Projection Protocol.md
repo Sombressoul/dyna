@@ -1,4 +1,4 @@
-# HPM — Directional Projection Protocol
+# Appendix D - HPM - Directional Projection Protocol
 
 > *Mathematical formulation and implementation guidelines for coherent directional projection in Holographic Projection Memory (HPM) systems.*
 
@@ -26,7 +26,7 @@ Where:
 * $R^{N-1}$ is the resolution of the projection surface in $(N-1)$ dimensions
 * $M$ is the number of angular directions (e.g., $M = 16\dots 64$)
 
-This implies that **the effective degrees of freedom grow multiplicatively** with projection density and angular coverage — even when $N$ is fixed (e.g., $N = 3$).
+This implies that **the effective degrees of freedom grow multiplicatively** with projection density and angular coverage - even when $N$ is fixed (e.g., $N = 3$).
 
 ### Practical Implications
 
@@ -46,7 +46,7 @@ This implies that **the effective degrees of freedom grow multiplicatively** wit
 
 Although growth in $N$ is unnecessary for scaling, it remains **fully supported**. For multimodal memory (e.g., spatial-temporal or semantic-visual embeddings), higher $N$ allows native disentanglement. However, even in these cases, directional projection remains the core retrieval and modulation strategy.
 
-> **Conclusion:** HPM decouples memory capacity from spatial dimensionality. By scaling projection resolution and directionality, the system enables efficient access to distributed memory with fixed physical dimensionality — allowing for stable, interpretable, and tractable memory operations.
+> **Conclusion:** HPM decouples memory capacity from spatial dimensionality. By scaling projection resolution and directionality, the system enables efficient access to distributed memory with fixed physical dimensionality - allowing for stable, interpretable, and tractable memory operations.
 
 ---
 
@@ -122,7 +122,7 @@ Angular selectivity also underpins advanced routing and disentanglement mechanis
 
 ## D.2 Attenuation Model Along the Ray
 
-In directional projection, each ray $\ell_u(t) = \Phi(u) + t \cdot \mathbf{v}$ extends from a point on the projection surface $\mathcal{P}(u) \subset \mathbb{R}^N$ into the memory field $W(x)$. As information is gathered along this ray, its contribution must account not only for spatial proximity, but also for **attenuation over distance** — modeling the diminishing influence of deeper memory regions.
+In directional projection, each ray $\ell_u(t) = \Phi(u) + t \cdot \mathbf{v}$ extends from a point on the projection surface $\mathcal{P}(u) \subset \mathbb{R}^N$ into the memory field $W(x)$. As information is gathered along this ray, its contribution must account not only for spatial proximity, but also for **attenuation over distance** - modeling the diminishing influence of deeper memory regions.
 
 We define the **longitudinal attenuation** function as:
 
@@ -198,7 +198,7 @@ Where:
 
 This kernel determines both the forward projection (Section D.3) and gradient updates (Section D.4).
 
-> By interpreting $\tau$ as a geometric control over contextual range, the attenuation model endows HPM with selective depth-awareness — enabling the system to adjust its semantic field of view while preserving full differentiability.
+> By interpreting $\tau$ as a geometric control over contextual range, the attenuation model endows HPM with selective depth-awareness - enabling the system to adjust its semantic field of view while preserving full differentiability.
 
 ---
 
@@ -314,7 +314,7 @@ $$
 \frac{\partial T(u)}{\partial W(x)} = K(x, \ell_u)
 $$
 
-This establishes a direct correspondence between projection and contribution kernel — facilitating sparse, localized gradient propagation.
+This establishes a direct correspondence between projection and contribution kernel - facilitating sparse, localized gradient propagation.
 
 ---
 
@@ -425,7 +425,7 @@ Where:
 * $K(x, \ell_u)$ is the projection kernel defined in Section D.3,
 * The update is applied locally and additively.
 
-This rule requires only the projection error $\delta(u)$ and kernel values — no global loss or gradient computation is needed.
+This rule requires only the projection error $\delta(u)$ and kernel values - no global loss or gradient computation is needed.
 
 ---
 
@@ -480,13 +480,13 @@ The directional local update mechanism can be interpreted as an **introspective 
 
 This opens the door to biologically plausible memory dynamics, as discussed in Section D.6.
 
-> The local update rule operationalizes fast, semantically aligned memory adaptation — bridging inference, learning, and memory within a unified geometric framework.
+> The local update rule operationalizes fast, semantically aligned memory adaptation - bridging inference, learning, and memory within a unified geometric framework.
 
 ---
 
 ## D.6 Cognitive and Physical Interpretation
 
-Beyond its mathematical formulation, the directional projection mechanism in HPM carries deep analogies with both biological cognition and physical sensing. This section highlights two key perspectives — one grounded in **neuroscience**, the other in **optical physics** — that provide intuitive grounding and motivation for the system's design.
+Beyond its mathematical formulation, the directional projection mechanism in HPM carries deep analogies with both biological cognition and physical sensing. This section highlights two key perspectives - one grounded in **neuroscience**, the other in **optical physics** - that provide intuitive grounding and motivation for the system's design.
 
 ---
 
@@ -505,7 +505,7 @@ $$
 acts as a **tuning curve**, analogous to neural selectivity profiles observed in biological systems.
 
 * Directionally structured updates and projections emulate **receptive fields** shaped by task and stimulus context.
-* Learning dynamics (e.g., Section D.5) resemble **experience-dependent plasticity** — selectively reinforcing responses along frequently used directions.
+* Learning dynamics (e.g., Section D.5) resemble **experience-dependent plasticity** - selectively reinforcing responses along frequently used directions.
 
 > Directional projection thus encodes not just spatial but **orientational context**, enabling biologically plausible semantic routing through geometry.
 
@@ -519,15 +519,15 @@ $$
 A(t) = \exp\left(-\frac{t}{\tau}\right)
 $$
 
-models light propagation through an absorbing medium — a principle well-understood in optics and radiative transfer. In this view:
+models light propagation through an absorbing medium - a principle well-understood in optics and radiative transfer. In this view:
 
-* $\tau$ corresponds to the **absorption length** — how far a beam can penetrate before decaying.
+* $\tau$ corresponds to the **absorption length** - how far a beam can penetrate before decaying.
 * The beam $\ell_u(t)$ becomes a **probe** that samples the medium with gradually vanishing influence.
-* The memory field $W(x)$ is analogous to a **semi-transparent volume** — a "fog of meaning" through which information must be recovered.
+* The memory field $W(x)$ is analogous to a **semi-transparent volume** - a "fog of meaning" through which information must be recovered.
 
 This analogy justifies the use of exponential decay as both **physically motivated** and **computationally tractable**, linking directional depth sensitivity to perception.
 
-> The system performs metaphorical tomography — sweeping through representational space to reconstruct latent structure.
+> The system performs metaphorical tomography - sweeping through representational space to reconstruct latent structure.
 
 ---
 
@@ -539,9 +539,9 @@ In both metaphors:
 * Depth $t$ and decay $\tau$ regulate context span
 * Angular selectivity $S(\theta)$ implements filtering and prioritization
 
-Together, these components make directional HPM more than a projection mechanism — they render it an **active perception operator** over distributed memory, capable of structured introspection and adaptively routed generalization.
+Together, these components make directional HPM more than a projection mechanism - they render it an **active perception operator** over distributed memory, capable of structured introspection and adaptively routed generalization.
 
-> HPM directional projection mirrors vision not only in geometry, but in function: it sees, filters, adapts, and remembers — with structure.
+> HPM directional projection mirrors vision not only in geometry, but in function: it sees, filters, adapts, and remembers - with structure.
 
 ---
 
@@ -561,8 +561,8 @@ $$
 
 Let $\mathbf{v}_1, \mathbf{v}_2$ be the projection directions associated with updates to $\rho_1$ and $\rho_2$, respectively. Denote:
 
-* $\theta = \angle(\mathbf{v}_1, \mathbf{v}_2) \in [0, \pi]$ — angular mismatch
-* $F_{ij}(\theta)$ — effective repulsive force between clusters
+* $\theta = \angle(\mathbf{v}_1, \mathbf{v}_2) \in [0, \pi]$ - angular mismatch
+* $F_{ij}(\theta)$ - effective repulsive force between clusters
 
 We propose that angular misalignment increases semantic divergence. Specifically:
 
@@ -625,13 +625,13 @@ Angular divergence supports memory disentanglement along multiple dimensions:
 
 This structure can be exploited to construct **multi-angle projection ensembles** with soft or learnable angular basis sets $\{\mathbf{v}_m\}_{m=1}^M$, enabling modular specialization.
 
-> These results extend the stability theorems of Appendix C to directional scenarios — showing that geometric and angular information jointly shape the evolution of distributed memory structures.
+> These results extend the stability theorems of Appendix C to directional scenarios - showing that geometric and angular information jointly shape the evolution of distributed memory structures.
 
 ---
 
 ## D.8 Practical Implementation Notes
 
-This section provides engineering-level guidance for implementing the directional projection protocol in practice. While the preceding sections formalize the mathematical and cognitive foundations of HPM, deployment on real systems — especially GPU-based neural backends — demands specific optimization strategies.
+This section provides engineering-level guidance for implementing the directional projection protocol in practice. While the preceding sections formalize the mathematical and cognitive foundations of HPM, deployment on real systems - especially GPU-based neural backends - demands specific optimization strategies.
 
 ---
 
@@ -719,4 +719,4 @@ This ensures graceful adaptation and compatibility with continual learning.
 
 ---
 
-> These implementation notes transform directional HPM from theory to practice — ensuring it remains computationally tractable, stable under learning dynamics, and deployable in large-scale memory-augmented architectures.
+> These implementation notes transform directional HPM from theory to practice - ensuring it remains computationally tractable, stable under learning dynamics, and deployable in large-scale memory-augmented architectures.
