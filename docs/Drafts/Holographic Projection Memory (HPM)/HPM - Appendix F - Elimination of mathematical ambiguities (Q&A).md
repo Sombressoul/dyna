@@ -1,7 +1,7 @@
 # Appendix F - Elimination of mathematical ambiguities (Q&A)
 
 
-## **Q1. Do we compute the response from all memory points for each projection ray?**  
+## Q1. Do we compute the response from all memory points for each projection ray?  
 
 **In theory:** Yes — the projection integral $T(u) = \int W(x) \cdot K(x, \ell_u) \, dx$ spans the entire memory field.
 
@@ -21,7 +21,7 @@ This reduces complexity from $O(N_{\text{voxels}})$ to a small constant per ray 
 
 ---
 
-## **Q2. If the projection surface is positioned far outside the memory field, do the rays still produce valid responses?**
+## Q2. If the projection surface is positioned far outside the memory field, do the rays still produce valid responses?  
 
 **Yes — by design.**  
 Practical implementations of HPM could use a **bidirectional probing convention**, where each projection coordinate $u$ on the surface emits **two symmetric rays**: one in the direction $\mathbf{v}$, and another in the opposite direction $-\mathbf{v}$.
@@ -38,7 +38,7 @@ This ensures that even if the surface is outside or parallel to the memory volum
 
 ---
 
-## **Q3. Can each projection ray in HPM have its own direction vector, or must all rays share the same direction?**
+## Q3. Can each projection ray in HPM have its own direction vector, or must all rays share the same direction?  
 
 **Yes, each ray can have its own direction vector.**  
 While most theoretical implementations define a global direction $\mathbf{v}$ shared across the entire projection surface for simplicity and efficiency, the mathematical formulation of HPM imposes no such restriction. Each ray $\ell_u(t) = \Phi(u) + t \cdot \mathbf{v}_u$ may independently define its own orientation $\mathbf{v}_u \in \mathbb{R}^N$, as long as the direction is differentiable with respect to system parameters and satisfies norm constraints (e.g., $\|\mathbf{v}_u\| \varepsilon$).
@@ -65,7 +65,7 @@ Using per-ray directions may increase computational complexity and buffer size, 
 
 ---
 
-## **Q4. Can each projection ray have its own attenuation parameter $\tau$, or must all rays share the same value? Does this break the projection model?**
+## Q4. Can each projection ray have its own attenuation parameter $\tau$, or must all rays share the same value? Does this break the projection model?  
 
 **Yes, each ray can have its own attenuation constant $\tau_u$, and no, it does not break the model.**  
 In the HPM projection kernel:
@@ -98,13 +98,13 @@ The only affected term is the longitudinal attenuation $e^{-t_x / \tau_u}$, whic
 
 ---
 
-## **Q5. What is the dimensional relationship between the memory field, the projection hypersurface, and the ambient space in which they coexist?**
+## Q5. What is the dimensional relationship between the memory field, the projection hypersurface, and the ambient space in which they coexist?  
 
 The dimensional structure of Holographic Projection Memory (HPM) is fully internal to a single ambient Euclidean space — denoted $\mathbb{R}^N$ — and all components of the system, including memory, projection rays, and projection surfaces, are defined within it. This dimensional alignment is both mathematically grounded and practically essential for differentiable implementation.
 
 ---
 
-### **5.1 Memory Field**
+### 5.1 Memory Field
 
 The memory is defined as a differentiable field:
 
@@ -122,7 +122,7 @@ This space $\mathbb{R}^N$ serves as the ambient coordinate system for all geomet
 
 ---
 
-### **5.2 Projection Hypersurface**
+### 5.2 Projection Hypersurface
 
 The projection surface (also called the "probe manifold") is defined via a mapping:
 
@@ -142,7 +142,7 @@ The dimensional reduction — from $N$ to $N - 1$ — is deliberate and grounded
 
 ---
 
-### **5.3 Projection Rays**
+### 5.3 Projection Rays
 
 Each coordinate $u \in \mathbb{R}^{N-1}$ defines a ray:
 
@@ -158,7 +158,7 @@ Thus, **the rays, memory field, and projection surface all coexist in the same s
 
 ---
 
-### **5.4 Dimensional Summary Table**
+### 5.4 Dimensional Summary Table
 
 | Component                             | Domain                     | Dimension   | Contained In                    |
 | ------------------------------------- | -------------------------- | ----------- | ------------------------------- |
@@ -169,7 +169,7 @@ Thus, **the rays, memory field, and projection surface all coexist in the same s
 
 ---
 
-### **5.5 Practical Confirmation**
+### 5.5 Practical Confirmation
 
 This design is consistently used throughout the formal documentation:
 
@@ -186,7 +186,7 @@ This design is consistently used throughout the formal documentation:
 
 ---
 
-### **Conclusion:**
+### Conclusion:
 
 The projection surface in HPM is **always an $(N - 1)$-dimensional hypersurface** embedded in the **same ambient space $\mathbb{R}^N$ as the memory field**. This is a direct instantiation of the holographic principle and ensures that projection, gradient flow, and update dynamics all remain fully differentiable and geometrically coherent.
 
@@ -200,7 +200,7 @@ The Holographic Projection Memory (HPM) is formulated in terms of continuous geo
 
 ---
 
-### **6.1 Continuous Memory Field — Theoretical Foundation**
+### 6.1 Continuous Memory Field — Theoretical Foundation
 
 The memory is defined as a continuous field:
 
@@ -233,7 +233,7 @@ $$
 
 ---
 
-### **6.2 Discrete Tensor Field — Practical Realization**
+### 6.2 Discrete Tensor Field — Practical Realization
 
 In practical machine learning systems, the memory field is implemented as a discretized tensor:
 
@@ -262,7 +262,7 @@ This discretization is exact in the limit where voxel spacing $\delta \to 0$ and
 
 ---
 
-### **6.3 Interpretation: Continuum as Limit of Discretization**
+### 6.3 Interpretation: Continuum as Limit of Discretization
 
 The continuous model serves as a conceptual and mathematical foundation. The discrete implementation is an approximation of this ideal, where the integral becomes a Riemann sum:
 
@@ -280,7 +280,7 @@ In this light, the discrete implementation is not a compromise but a **numerical
 
 ---
 
-### **6.4 Implications for Differentiability and Learning**
+### 6.4 Implications for Differentiability and Learning
 
 Despite discretization, the projection operator $T(u)$ remains differentiable in all learnable parameters:
 
@@ -294,8 +294,175 @@ Therefore, the continuous formulation is preserved in spirit and function — en
 
 ---
 
-### **Conclusion:**
+### Conclusion:
 
 The continuous memory field $W(x)$ defines the **idealized geometric behavior** of HPM, while the discrete tensor $W[x]$ realizes this behavior in practice. The integral projection becomes a finite sum over spatially indexed voxels, and all learning dynamics remain fully compatible. This dual perspective — continuous for theory, discrete for implementation — is foundational to HPM's design.
 
 > *In HPM, discreteness is not a limitation, but a lens through which continuous geometry becomes computable.*
+
+---
+
+## Q7. Does precomputing ray paths conflict with learnable direction vectors or attenuation?  
+  
+**Yes — when direction vectors $\mathbf{v}_u$ or attenuation parameters $\tau_u$ are learnable or dynamic, precomputing ray paths becomes partially incompatible with some assumptions of HPM’s rasterization-based optimization strategy. However, this is not a contradiction in the model itself, but a trade-off between runtime flexibility and implementation efficiency.**  
+
+---
+
+### 7.1 Rasterized Projection as Optimization Strategy
+
+In Appendix E, a high-performance implementation strategy is proposed based on rasterizing projection rays over a fixed grid:
+
+* Rays $\ell_u(t) = \Phi(u) + t \cdot \mathbf{v}$ are assumed to be **aligned** with fixed directions (e.g., constant $\mathbf{v}$)
+* Discrete voxel paths are precomputed using line traversal algorithms (e.g., Amanatides–Woo)
+* This permits efficient, GPU-parallel evaluation of contributions
+
+Such optimization assumes **static geometry** of rays — direction and attenuation are fixed during traversal and do not change across iterations or training steps.
+
+---
+
+### 7.2 Learnable Direction Vectors $\mathbf{v}_u$
+
+In more expressive models, the direction of each ray may depend on learnable parameters:
+
+$$
+\ell_u(t) = \Phi(u) + t \cdot \mathbf{v}_u
+$$
+
+Here, $\mathbf{v}_u$ may be:
+
+* Learned as a differentiable function of $u$
+* Sampled from a directional codebook
+* Conditioned on external context or latent states
+
+Since the direction is no longer fixed, the voxel path traversed by $\ell_u$ cannot be computed ahead of time. It must be computed **at runtime**, as part of the forward pass.
+
+---
+
+### 7.3 Learnable or Spatially Varying Attenuation $\tau_u$
+
+Similarly, if attenuation is spatially varying or learned:
+
+$$
+K(x, \ell_u) = \exp\left( -\frac{d_\perp^2}{2\sigma^2} \right) \cdot \exp\left( -\frac{t_x}{\tau_u} \right)
+$$
+
+Then contributions along the ray depend on $\tau_u$, which may differ per projection point $u$. Precomputed paths do not account for this variation, and kernel weights must be recomputed online.
+
+---
+
+### 7.4 Implementation Implications
+
+**Precomputed ray paths are valid only if:**
+
+* $\mathbf{v}$ is shared globally across all $u$
+* $\tau$ is constant or piecewise static
+
+**If either parameter is dynamic or learned:**
+
+* Paths must be traced at runtime
+* Kernel weights must be recomputed online
+* Data structures (buffers, masks) must be constructed dynamically
+
+This does not invalidate the projection model — it simply increases computational complexity and necessitates dynamic batching and traversal.
+
+---
+
+### 7.5 Hybrid and Modular Strategies
+
+To reconcile performance and flexibility, HPM supports hybrid schemes:
+
+* **Fixed directions + learnable attention**:
+
+  * Use a fixed set of $M$ precomputed directions ${\mathbf{v}_m}$
+  * Each ray $u$ selects or interpolates among them
+
+* **Blockwise precomputation**:
+
+  * Group rays into local blocks where $\mathbf{v}_u$ is approximately constant
+  * Use cached paths for each block
+
+* **Low-resolution probing + refinement**:
+
+  * Use precomputed coarse ray bundles to estimate regions of interest
+  * Trace fine-resolution rays dynamically within selected subregions
+
+These approaches preserve efficiency while enabling expressive, differentiable geometry.
+
+---
+
+### Conclusion:
+
+Precomputed ray paths are an effective optimization for static directional projection in HPM, but they are fundamentally incompatible with learnable per-ray direction vectors $\mathbf{v}_u$ or attenuation parameters $\tau_u$. When dynamic control is needed, ray traversal and kernel evaluation must occur at runtime. This trade-off reflects the broader design philosophy of HPM: optimization strategies are modular — the geometric foundation remains intact.
+
+> *When rays can learn where to look, they must also learn how to travel.*
+
+---
+
+## Q8. Bidirectional emission adds an extra channel — what to do with it?
+
+In the bidirectional probing convention, each projection point $u \in \mathbb{R}^{N-1}$ emits two rays:
+
+$$
+\ell_u^{(+)}(t) = \Phi(u) + t \cdot \mathbf{v}_u, \quad
+\ell_u^{(-)}(t) = \Phi(u) - t \cdot \mathbf{v}_u, \quad t \ge 0
+$$
+
+Each ray yields an independent projection value:
+
+$$
+T^{(+)}(u) = \int W(x) \cdot K(x, \ell_u^{(+)}) \, dx, \quad
+T^{(-)}(u) = \int W(x) \cdot K(x, \ell_u^{(-)}) \, dx
+$$
+
+This results in two projected values per location $u$, effectively doubling the channel dimension of $T(u)$.
+
+---
+
+### Interpretation Options
+
+1. **Sum / Average:**
+
+$$
+T(u) = T^{(+)}(u) + T^{(-)}(u) \quad \text{or} \quad \frac{1}{2}(T^{(+)} + T^{(-)})
+$$
+
+* Suitable when symmetry is assumed
+* Ensures invariance to direction sign
+
+2. **Concatenation:**
+
+$$
+T(u) = [T^{(+)}(u),\ T^{(-)}(u)] \in \mathbb{R}^{2C}
+$$
+
+* Preserves directional separation
+* Enables downstream models to learn asymmetries
+
+3. **Selective use:**
+
+* Use only one ray based on prior, learned gate, or task.  
+
+---
+
+### Conclusion:
+
+Bidirectional emission yields two responses per projection point. Whether to sum, concatenate, or select them depends on the symmetry assumptions of the task and architecture. All choices are mathematically valid and implementation-compatible.
+
+> *Bidirectional rays illuminate both sides of meaning — how to interpret them is up to the observer.*
+
+---
+
+## Q9. Should the projection be kernel-normalized?
+
+**Answer:**  
+Normalization is optional and depends on the intended semantics:
+
+* **Unnormalized projection:**
+  $T(u) = \sum_x W[x] \cdot K(x, \ell_u)$
+  — sensitive to local sampling density and ray depth.
+
+* **Normalized projection:**
+  $T(u) = \frac{\sum_x W[x] \cdot K(x, \ell_u)}{\sum_x K(x, \ell_u)}$
+  — invariant to sampling artifacts; interpretable as a local weighted average.
+
+Both forms are valid. The choice can be exposed as a configurable switch (e.g., `normalize=True`), depending on whether absolute mass or relative structure is more important in the application.
