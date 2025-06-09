@@ -1,4 +1,4 @@
-# Chapter B — Associative Update Dynamics in Holographic Memory
+# Chapter B - Associative Update Dynamics in Holographic Memory
 
 > *A mathematical and conceptual clarification of nonlocal updates in holographically structured memory.*
 
@@ -46,15 +46,15 @@ $$
 \mathcal{T}^*{[\delta]}(x) := \int \delta(u) K(x, \ell_u) \, du
 $$
 
-which is the **adjoint** (transpose) of the forward projection operator $\mathcal{T}$. This operator effectively **back-projects** the projection-level error into the memory field — but does so in a **smooth, spatially correlated way**.
+which is the **adjoint** (transpose) of the forward projection operator $\mathcal{T}$. This operator effectively **back-projects** the projection-level error into the memory field - but does so in a **smooth, spatially correlated way**.
 
 ---
 
-## B.4 Not Noise — But Generalization
+## B.4 Not Noise - But Generalization
 
 This nonlocal behavior is **not a source of contamination or noise**, because:
 
-1. The projection kernel $K$ defines a **semantic locality** — regions in $W$ that contribute similarly to a given projected shadow.
+1. The projection kernel $K$ defines a **semantic locality** - regions in $W$ that contribute similarly to a given projected shadow.
 2. The update is weighted: distant or irrelevant components in $W$ are naturally suppressed.
 3. It functions analogously to **Hopfield-style associative memory**, where stored states are not fixed points but **distributed attractors**.
 
@@ -92,10 +92,10 @@ Thus, the system exhibits:
 
 The distributed nature of updates in HPM is not a flaw but an intentional mechanism of **semantic generalization** and **associative adaptation**.
 
-By encoding similarity through the geometry of projection kernels, memory corrections propagate to semantically relevant regions — resulting in behavior that is:
+By encoding similarity through the geometry of projection kernels, memory corrections propagate to semantically relevant regions - resulting in behavior that is:
 
 * Consistently modifiable
 * Contextually aware
 * Aligned with human-like generalization
 
-> *In this architecture, generalization is not learned — it is built into the memory’s very geometry.*
+> *In this architecture, generalization is not learned - it is built into the memory’s very geometry.*

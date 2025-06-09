@@ -1,12 +1,12 @@
-# Chapter E — Memory Field and Probing
+# Chapter E - Memory Field and Probing
 
 > *This chapter introduces the internal structure of the Holographic Projection Memory (HPM) field and presents a rasterized formulation of projection that is both mathematically principled and computationally tractable. It enables high-throughput memory access via parallelizable, discrete geometric traversal, generalizing naturally to arbitrary memory dimensionality.*
 
 ---
 
-Artificial memory systems often rely on discrete keys, flat embeddings, or address-based retrieval. HPM, in contrast, is based on a geometric principle: information is stored across a continuous spatial field, and accessed via directional integration along semantically meaningful rays. In this formulation, memory becomes not an indexable container, but a **reflective medium** — one in which meaning is encountered through structured probing.
+Artificial memory systems often rely on discrete keys, flat embeddings, or address-based retrieval. HPM, in contrast, is based on a geometric principle: information is stored across a continuous spatial field, and accessed via directional integration along semantically meaningful rays. In this formulation, memory becomes not an indexable container, but a **reflective medium** - one in which meaning is encountered through structured probing.
 
-Formally, the HPM memory field is defined as a differentiable function $W : \mathbb{R}^N \to \mathbb{R}^C$, mapping coordinates in continuous space to semantic vectors. Each point $x \in \mathbb{R}^N$ encodes latent content — a high-dimensional vector $W(x) \in \mathbb{R}^C$ — that contributes to a projected response when intersected by an external probe. These probes take the form of directed rays $\ell_u(t) = \Phi(u) + t \cdot \mathbf{v}$, where $\Phi(u) \in \mathbb{R}^N$ is the origin of the ray (sampled from a projection surface), and $\mathbf{v} \in \mathbb{R}^N$ is a unit direction vector.
+Formally, the HPM memory field is defined as a differentiable function $W : \mathbb{R}^N \to \mathbb{R}^C$, mapping coordinates in continuous space to semantic vectors. Each point $x \in \mathbb{R}^N$ encodes latent content - a high-dimensional vector $W(x) \in \mathbb{R}^C$ - that contributes to a projected response when intersected by an external probe. These probes take the form of directed rays $\ell_u(t) = \Phi(u) + t \cdot \mathbf{v}$, where $\Phi(u) \in \mathbb{R}^N$ is the origin of the ray (sampled from a projection surface), and $\mathbf{v} \in \mathbb{R}^N$ is a unit direction vector.
 
 The projected signal at point $u \in \mathbb{R}^{N-1}$ is computed by integrating contributions from the field along the ray $\ell_u$, typically via a Gaussian kernel centered on the ray trajectory. This defines a directional projection operator:
 
@@ -18,7 +18,7 @@ where $K(x, \ell_u)$ is a continuous, localized kernel that weights memory point
 
 While this integral formulation is elegant and differentiable, its direct implementation is computationally expensive: evaluating $K(x, \ell_u)$ for all $x \in \mathbb{R}^N$ is infeasible on real hardware, particularly when $W$ is represented as a large, discrete tensor. Therefore, an efficient approximation strategy is required.
 
-This chapter develops a **rasterized projection framework**, in which rays are discretized, clipped to the memory volume, and traversed using voxel-efficient line-drawing algorithms (e.g., N-dimensional Bresenham). The resulting discrete paths allow projection values to be computed from a sparse neighborhood of relevant memory points. Furthermore, lateral influence — required to simulate beam width — is implemented either via local convolution in memory space or by smoothing over adjacent rays in the projection domain.
+This chapter develops a **rasterized projection framework**, in which rays are discretized, clipped to the memory volume, and traversed using voxel-efficient line-drawing algorithms (e.g., N-dimensional Bresenham). The resulting discrete paths allow projection values to be computed from a sparse neighborhood of relevant memory points. Furthermore, lateral influence - required to simulate beam width - is implemented either via local convolution in memory space or by smoothing over adjacent rays in the projection domain.
 
 This rasterized strategy offers multiple benefits:
 
@@ -109,13 +109,13 @@ Because $W$ is defined over a spatial lattice with fixed indexing and structured
 * Understanding the structure of projection shadows $T(u)$
 * Supporting modular and compositional learning paradigms
 
-In summary, the memory field $W(x)$ in HPM acts as a structured, high-capacity, differentiable medium — enabling coherent interaction between spatial geometry and latent semantics. Its design supports both stability under projection and adaptability under learning, forming the backbone of the HPM architecture.
+In summary, the memory field $W(x)$ in HPM acts as a structured, high-capacity, differentiable medium - enabling coherent interaction between spatial geometry and latent semantics. Its design supports both stability under projection and adaptability under learning, forming the backbone of the HPM architecture.
 
 ---
 
 ### E.2 Projection Rays and Probing Protocol
 
-Information stored in the HPM memory field is not accessed through discrete indexing or content-based similarity, but rather via structured geometric **probing** — the process of integrating semantic contributions along **directed rays** that traverse the memory volume. These rays originate from a projection surface embedded in the ambient space and are parameterized by coordinates $u \in \mathbb{R}^{N-1}$.
+Information stored in the HPM memory field is not accessed through discrete indexing or content-based similarity, but rather via structured geometric **probing** - the process of integrating semantic contributions along **directed rays** that traverse the memory volume. These rays originate from a projection surface embedded in the ambient space and are parameterized by coordinates $u \in \mathbb{R}^{N-1}$.
 
 Each such coordinate defines a **ray** $\ell_u(t) \in \mathbb{R}^N$, constructed from a surface mapping $\Phi(u)$ and a direction vector $\mathbf{v}_u$, forming the basis of directional memory access. The response of the memory field to probing is given by the integral of local content $W(x)$ modulated by a kernel $K(x, \ell_u)$ that localizes interaction both **laterally** (via distance to the ray path) and **longitudinally** (via depth attenuation).
 
@@ -231,10 +231,10 @@ In this configuration, the projection acts as a symmetric bidirectional probe th
 This results in:
 
 * **Smooth gradient flow** during backpropagation, as there are no abrupt edges or truncation in the integration path.
-* **Compact and centered projections** that highlight a local region of the memory field — ideal for introspective decoding or context-dependent memory focusing.
+* **Compact and centered projections** that highlight a local region of the memory field - ideal for introspective decoding or context-dependent memory focusing.
 * A geometrically coherent way to implement **soft attention over a spatial neighborhood**, without requiring explicit masks or sampling windows.
 
-This approach is especially powerful when the projection surface is narrow or spatially compressed — it effectively “resonates” within a bounded volume, providing a **focused semantic snapshot** of a localized memory region.
+This approach is especially powerful when the projection surface is narrow or spatially compressed - it effectively “resonates” within a bounded volume, providing a **focused semantic snapshot** of a localized memory region.
 
 
 ---
@@ -289,7 +289,7 @@ In practice, hybrid schemes are most likely to be used, where:
 * Attenuation $\tau_u$ is predicted from the projection surface $\Phi(u)$
 * Only a subset of rays are fully dynamic, while others remain fixed
 
-This modular design ensures that HPM can operate across a spectrum of regimes — from static geometric probing to fully adaptive perceptual routing.
+This modular design ensures that HPM can operate across a spectrum of regimes - from static geometric probing to fully adaptive perceptual routing.
 
 ---
 
@@ -462,7 +462,7 @@ In summary, discrete rasterization of rays enables practical and efficient trave
 
 ### E.5 Beam Width Strategies (Unified Section)
 
-The effective spatial influence of each projection ray in HPM is governed not only by its direction and attenuation, but also by its **beam width** — the extent to which nearby memory voxels contribute to the projection. This section outlines alternative strategies for controlling beam width, addressing both lateral and longitudinal integration behavior.
+The effective spatial influence of each projection ray in HPM is governed not only by its direction and attenuation, but also by its **beam width** - the extent to which nearby memory voxels contribute to the projection. This section outlines alternative strategies for controlling beam width, addressing both lateral and longitudinal integration behavior.
 
 Two primary approaches are considered:
 
@@ -536,7 +536,7 @@ In summary, projection-surface-based convolution provides an efficient and diffe
 
 #### E.5.2 Memory-Volume-Based Sampling (Alternative)
 
-In settings where rays exhibit heterogeneous geometry — such as varying direction vectors $\mathbf{v}_u$ or adaptive emission across the projection surface — projection-surface-based convolution becomes inadequate due to misalignment between neighboring rays. In such cases, beam widening may instead be achieved via **direct convolution over memory voxels** in the vicinity of each ray path. This approach trades computational efficiency for geometric precision and is recommended only when lateral coherence across rays cannot be assumed.
+In settings where rays exhibit heterogeneous geometry - such as varying direction vectors $\mathbf{v}_u$ or adaptive emission across the projection surface - projection-surface-based convolution becomes inadequate due to misalignment between neighboring rays. In such cases, beam widening may instead be achieved via **direct convolution over memory voxels** in the vicinity of each ray path. This approach trades computational efficiency for geometric precision and is recommended only when lateral coherence across rays cannot be assumed.
 
 ---
 

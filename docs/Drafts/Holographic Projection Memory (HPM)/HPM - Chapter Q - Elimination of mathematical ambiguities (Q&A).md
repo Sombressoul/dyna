@@ -3,10 +3,10 @@
 
 ## Q1. Do we compute the response from all memory points for each projection ray?  
 
-**In theory:** Yes — the projection integral $T(u) = \int W(x) \cdot K(x, \ell_u) \, dx$ spans the entire memory field.
+**In theory:** Yes - the projection integral $T(u) = \int W(x) \cdot K(x, \ell_u) \, dx$ spans the entire memory field.
 
 **In practice:** Absolutely not.
-The kernel $K(x, \ell_u)$ decays rapidly with distance from the ray. Therefore, we compute contributions **only from a local neighborhood** around the ray — typically within a few multiples of the kernel width $\sigma$, e.g., $d_\perp < 3\sigma$.
+The kernel $K(x, \ell_u)$ decays rapidly with distance from the ray. Therefore, we compute contributions **only from a local neighborhood** around the ray - typically within a few multiples of the kernel width $\sigma$, e.g., $d_\perp < 3\sigma$.
 
 **Implementation Strategy:**
 
@@ -14,16 +14,16 @@ The kernel $K(x, \ell_u)$ decays rapidly with distance from the ray. Therefore, 
 * Select only memory points $x$ whose centers fall within this region.
 * Compute $K(x, \ell_u)$ and sum the weighted contributions.
 
-This reduces complexity from $O(N_{\text{voxels}})$ to a small constant per ray (e.g., 300–600 points), with negligible loss of accuracy — since distant points contribute almost nothing.
+This reduces complexity from $O(N_{\text{voxels}})$ to a small constant per ray (e.g., 300–600 points), with negligible loss of accuracy - since distant points contribute almost nothing.
 
 > **Conclusion:**  
-> The locality of the projection kernel is not a trick — it's a **core design principle**. It ensures efficient, differentiable, and semantically focused memory access.
+> The locality of the projection kernel is not a trick - it's a **core design principle**. It ensures efficient, differentiable, and semantically focused memory access.
 
 ---
 
 ## Q2. If the projection surface is positioned far outside the memory field, do the rays still produce valid responses?  
 
-**Yes — by design.**  
+**Yes - by design.**  
 Practical implementations of HPM could use a **bidirectional probing convention**, where each projection coordinate $u$ on the surface emits **two symmetric rays**: one in the direction $\mathbf{v}$, and another in the opposite direction $-\mathbf{v}$.
 These rays are evaluated independently and identically, using the same attenuation kernel:
 
@@ -31,7 +31,7 @@ $$
 K(x, \ell_u) = \exp\left( -\frac{d_\perp^2}{2\sigma^2} \right) \cdot \exp\left( -\frac{t}{\tau} \right), \quad t \ge 0
 $$
 
-This ensures that even if the surface is outside or parallel to the memory volume, one of the two rays will typically intersect the field — preserving projection fidelity without requiring special handling or directional flipping.
+This ensures that even if the surface is outside or parallel to the memory volume, one of the two rays will typically intersect the field - preserving projection fidelity without requiring special handling or directional flipping.
 
 > **Conclusion:**  
 > The projection operator is geometrically symmetric but computationally one-sided. Bidirectional emission allows consistent probing from any surface placement while maintaining simple forward-only integration logic.
@@ -74,7 +74,7 @@ $$
 K(x, \ell_u) = \exp\left( -\frac{d_\perp^2(x, \ell_u)}{2\sigma^2} \right) \cdot \exp\left( -\frac{t_x}{\tau_u} \right)
 $$
 
-the parameter $\tau$ controls **longitudinal attenuation** — i.e., how quickly information fades along the direction of the ray. By default, $\tau$ is assumed to be shared across all rays in a bundle. However, Chapter D.2 explicitly permits this parameter to vary:
+the parameter $\tau$ controls **longitudinal attenuation** - i.e., how quickly information fades along the direction of the ray. By default, $\tau$ is assumed to be shared across all rays in a bundle. However, Chapter D.2 explicitly permits this parameter to vary:
 
 “To enable adaptive focus, the attenuation parameter can vary across the projection surface:
 $\tau = \tau(u)$”
@@ -100,7 +100,7 @@ The only affected term is the longitudinal attenuation $e^{-t_x / \tau_u}$, whic
 
 ## Q5. What is the dimensional relationship between the memory field, the projection hypersurface, and the ambient space in which they coexist?  
 
-The dimensional structure of Holographic Projection Memory (HPM) is fully internal to a single ambient Euclidean space — denoted $\mathbb{R}^N$ — and all components of the system, including memory, projection rays, and projection surfaces, are defined within it. This dimensional alignment is both mathematically grounded and practically essential for differentiable implementation.
+The dimensional structure of Holographic Projection Memory (HPM) is fully internal to a single ambient Euclidean space - denoted $\mathbb{R}^N$ - and all components of the system, including memory, projection rays, and projection surfaces, are defined within it. This dimensional alignment is both mathematically grounded and practically essential for differentiable implementation.
 
 ---
 
@@ -138,7 +138,7 @@ $$
 
 This surface emits projection rays into the memory volume.
 
-The dimensional reduction — from $N$ to $N - 1$ — is deliberate and grounded in the **holographic principle**, where information in a volume is represented on a lower-dimensional surface.
+The dimensional reduction - from $N$ to $N - 1$ - is deliberate and grounded in the **holographic principle**, where information in a volume is represented on a lower-dimensional surface.
 
 ---
 
@@ -154,7 +154,7 @@ $$
 * $\mathbf{v}_u \in \mathbb{R}^N$ is a unit direction vector (which may vary per ray).
 * The full ray $\ell_u$ is entirely contained in $\mathbb{R}^N$.
 
-Thus, **the rays, memory field, and projection surface all coexist in the same space** — $\mathbb{R}^N$.
+Thus, **the rays, memory field, and projection surface all coexist in the same space** - $\mathbb{R}^N$.
 
 ---
 
@@ -190,7 +190,7 @@ This design is consistently used throughout the formal documentation:
 
 The projection surface in HPM is **always an $(N - 1)$-dimensional hypersurface** embedded in the **same ambient space $\mathbb{R}^N$ as the memory field**. This is a direct instantiation of the holographic principle and ensures that projection, gradient flow, and update dynamics all remain fully differentiable and geometrically coherent.
 
-> *In HPM, the memory and its shadows live side-by-side — in the same space, at different scales of meaning.*
+> *In HPM, the memory and its shadows live side-by-side - in the same space, at different scales of meaning.*
 
 ---
 
@@ -200,7 +200,7 @@ The Holographic Projection Memory (HPM) is formulated in terms of continuous geo
 
 ---
 
-### 6.1 Continuous Memory Field — Theoretical Foundation
+### 6.1 Continuous Memory Field - Theoretical Foundation
 
 The memory is defined as a continuous field:
 
@@ -233,7 +233,7 @@ $$
 
 ---
 
-### 6.2 Discrete Tensor Field — Practical Realization
+### 6.2 Discrete Tensor Field - Practical Realization
 
 In practical machine learning systems, the memory field is implemented as a discretized tensor:
 
@@ -290,13 +290,13 @@ Despite discretization, the projection operator $T(u)$ remains differentiable in
 
 The kernel $K(x, \ell_u)$ is computed analytically and differentiably w\.r.t. all these quantities, and the resulting weighted sum retains gradient flow.
 
-Therefore, the continuous formulation is preserved in spirit and function — enabling backpropagation, active updates, and integration with gradient-based optimization frameworks.
+Therefore, the continuous formulation is preserved in spirit and function - enabling backpropagation, active updates, and integration with gradient-based optimization frameworks.
 
 ---
 
 ### Conclusion:
 
-The continuous memory field $W(x)$ defines the **idealized geometric behavior** of HPM, while the discrete tensor $W[x]$ realizes this behavior in practice. The integral projection becomes a finite sum over spatially indexed voxels, and all learning dynamics remain fully compatible. This dual perspective — continuous for theory, discrete for implementation — is foundational to HPM's design.
+The continuous memory field $W(x)$ defines the **idealized geometric behavior** of HPM, while the discrete tensor $W[x]$ realizes this behavior in practice. The integral projection becomes a finite sum over spatially indexed voxels, and all learning dynamics remain fully compatible. This dual perspective - continuous for theory, discrete for implementation - is foundational to HPM's design.
 
 > *In HPM, discreteness is not a limitation, but a lens through which continuous geometry becomes computable.*
 
@@ -304,7 +304,7 @@ The continuous memory field $W(x)$ defines the **idealized geometric behavior** 
 
 ## Q7. Does precomputing ray paths conflict with learnable direction vectors or attenuation?  
   
-**Yes — when direction vectors $\mathbf{v}_u$ or attenuation parameters $\tau_u$ are learnable or dynamic, precomputing ray paths becomes partially incompatible with some assumptions of HPM’s rasterization-based optimization strategy. However, this is not a contradiction in the model itself, but a trade-off between runtime flexibility and implementation efficiency.**  
+**Yes - when direction vectors $\mathbf{v}_u$ or attenuation parameters $\tau_u$ are learnable or dynamic, precomputing ray paths becomes partially incompatible with some assumptions of HPM’s rasterization-based optimization strategy. However, this is not a contradiction in the model itself, but a trade-off between runtime flexibility and implementation efficiency.**  
 
 ---
 
@@ -316,7 +316,7 @@ In Chapter E, a high-performance implementation strategy is proposed based on ra
 * Discrete voxel paths are precomputed using line traversal algorithms (e.g., Amanatides–Woo)
 * This permits efficient, GPU-parallel evaluation of contributions
 
-Such optimization assumes **static geometry** of rays — direction and attenuation are fixed during traversal and do not change across iterations or training steps.
+Such optimization assumes **static geometry** of rays - direction and attenuation are fixed during traversal and do not change across iterations or training steps.
 
 ---
 
@@ -363,7 +363,7 @@ Then contributions along the ray depend on $\tau_u$, which may differ per projec
 * Kernel weights must be recomputed online
 * Data structures (buffers, masks) must be constructed dynamically
 
-This does not invalidate the projection model — it simply increases computational complexity and necessitates dynamic batching and traversal.
+This does not invalidate the projection model - it simply increases computational complexity and necessitates dynamic batching and traversal.
 
 ---
 
@@ -392,13 +392,13 @@ These approaches preserve efficiency while enabling expressive, differentiable g
 
 ### Conclusion:
 
-Precomputed ray paths are an effective optimization for static directional projection in HPM, but they are fundamentally incompatible with learnable per-ray direction vectors $\mathbf{v}_u$ or attenuation parameters $\tau_u$. When dynamic control is needed, ray traversal and kernel evaluation must occur at runtime. This trade-off reflects the broader design philosophy of HPM: optimization strategies are modular — the geometric foundation remains intact.
+Precomputed ray paths are an effective optimization for static directional projection in HPM, but they are fundamentally incompatible with learnable per-ray direction vectors $\mathbf{v}_u$ or attenuation parameters $\tau_u$. When dynamic control is needed, ray traversal and kernel evaluation must occur at runtime. This trade-off reflects the broader design philosophy of HPM: optimization strategies are modular - the geometric foundation remains intact.
 
 > *When rays can learn where to look, they must also learn how to travel.*
 
 ---
 
-## Q8. Bidirectional emission adds an extra channel — what to do with it?
+## Q8. Bidirectional emission adds an extra channel - what to do with it?
 
 In the bidirectional probing convention, each projection point $u \in \mathbb{R}^{N-1}$ emits two rays:
 
@@ -448,7 +448,7 @@ $$
 
 Bidirectional emission yields two responses per projection point. Whether to sum, concatenate, or select them depends on the symmetry assumptions of the task and architecture. All choices are mathematically valid and implementation-compatible.
 
-> *Bidirectional rays illuminate both sides of meaning — how to interpret them is up to the observer.*
+> *Bidirectional rays illuminate both sides of meaning - how to interpret them is up to the observer.*
 
 ---
 
@@ -459,11 +459,11 @@ Normalization is optional and depends on the intended semantics:
 
 * **Unnormalized projection:**
   $T(u) = \sum_x W[x] \cdot K(x, \ell_u)$
-  — sensitive to local sampling density and ray depth.
+  - sensitive to local sampling density and ray depth.
 
 * **Normalized projection:**
   $T(u) = \frac{\sum_x W[x] \cdot K(x, \ell_u)}{\sum_x K(x, \ell_u)}$
-  — invariant to sampling artifacts; interpretable as a local weighted average.
+  - invariant to sampling artifacts; interpretable as a local weighted average.
 
 Both forms are valid. The choice can be exposed as a configurable switch (e.g., `normalize=True`), depending on whether absolute mass or relative structure is more important in the application.
 
@@ -471,7 +471,7 @@ Both forms are valid. The choice can be exposed as a configurable switch (e.g., 
 
 ## Q10. Is the attenuation function $A(t)$ defined for $t < 0$?
 
-**No — in the current formulation of HPM, attenuation is explicitly defined only for $t \ge 0$.** This is a design convention adopted for simplicity, efficiency, and consistency across bidirectional ray processing. However, the mathematical model itself does not prohibit extension to $t < 0$; such generalizations remain theoretically valid and could be implemented if needed.
+**No - in the current formulation of HPM, attenuation is explicitly defined only for $t \ge 0$.** This is a design convention adopted for simplicity, efficiency, and consistency across bidirectional ray processing. However, the mathematical model itself does not prohibit extension to $t < 0$; such generalizations remain theoretically valid and could be implemented if needed.
 
 ---
 
@@ -545,7 +545,7 @@ These alternatives allow bidirectional integration along a single ray, or gradie
 
 The attenuation function $A(t)$ is currently defined only for $t \ge 0$, consistent with HPM’s unidirectional ray traversal design. Bidirectional probing is handled via two independent forward-only rays. Extensions to $t < 0$ are mathematically possible, but not included in the default formulation.
 
-> *Attenuation in HPM is a directional lens — defined forward by default, but extendable in theory.*
+> *Attenuation in HPM is a directional lens - defined forward by default, but extendable in theory.*
 
 
 ---
@@ -670,7 +670,7 @@ Recoverable solution:
 
 Discrete rasterization breaks differentiability in the forward trace, but if sufficient geometric metadata is retained (entry/exit points, continuous time indices, direction IDs), then gradients can be reconstructed with high fidelity. This enables efficient, high-performance projection with full backward compatibility.
 
-> *A ray need not be smooth to carry a gradient — only transparent enough to let it pass through.*
+> *A ray need not be smooth to carry a gradient - only transparent enough to let it pass through.*
 
 ---
 
@@ -767,28 +767,28 @@ This results in a wide-beam effect while preserving coherence across parallel ra
 
 ### 12.6 Conclusion
 
-In rasterized projection with exact geometric metadata (entry/exit points, voxel sequence, longitudinal distances), longitudinal attenuation contributes a precisely quantifiable and analytically differentiable term to the projection. Even under coarse voxel stepping, attenuation remains smooth and fully trainable — provided that tracing information is retained and leveraged.
+In rasterized projection with exact geometric metadata (entry/exit points, voxel sequence, longitudinal distances), longitudinal attenuation contributes a precisely quantifiable and analytically differentiable term to the projection. Even under coarse voxel stepping, attenuation remains smooth and fully trainable - provided that tracing information is retained and leveraged.
 
-> *Even if the path is discrete, the decay along it need not be — and its gradient flows precisely, if we let it.*
+> *Even if the path is discrete, the decay along it need not be - and its gradient flows precisely, if we let it.*
 
 ---
 
 ## Q13. Which gradients are lost under aggressive rasterization, and which can be recovered?
 
-**Answer:** Under extreme projection optimizations—such as Bresenham-based voxel stepping, fixed ray dictionaries, discrete-only forward computation, and no float-level tracing—it is possible to lose several gradients essential for training. However, most can be recovered analytically or through surrogate pathways if the right geometric metadata is retained.
+**Answer:** Under extreme projection optimizations-such as Bresenham-based voxel stepping, fixed ray dictionaries, discrete-only forward computation, and no float-level tracing-it is possible to lose several gradients essential for training. However, most can be recovered analytically or through surrogate pathways if the right geometric metadata is retained.
 
 ---
 
 ### 13.1 Always Retained Gradients
 
-1. **Memory Content $W[x]$** — Used directly in projection sum; gradients always preserved.
-2. **Transverse Kernel Parameters (e.g., $\sigma$)** — If Gaussian or similar kernel is applied across voxels, its gradients are preserved, assuming $\text{dist}_\perp(x)$ is computed in float.
+1. **Memory Content $W[x]$** - Used directly in projection sum; gradients always preserved.
+2. **Transverse Kernel Parameters (e.g., $\sigma$)** - If Gaussian or similar kernel is applied across voxels, its gradients are preserved, assuming $\text{dist}_\perp(x)$ is computed in float.
 
 ---
 
 ### 13.2 Lost by Default but Recoverable
 
-3. **Longitudinal Attenuation $\tau_u$** — If $t_i$ values are stored, then:
+3. **Longitudinal Attenuation $\tau_u$** - If $t_i$ values are stored, then:
 
 $$
 \frac{\partial T(u)}{\partial \tau} = -\frac{1}{\tau^2} \sum_i t_i \cdot W[x_i] \cdot e^{-t_i/\tau}
@@ -796,7 +796,7 @@ $$
 
 This provides a fully analytical surrogate gradient.
 
-4. **Ray Direction $\mathbf{v}_u$** — Can be recovered through entry/exit points $A, B$:
+4. **Ray Direction $\mathbf{v}_u$** - Can be recovered through entry/exit points $A, B$:
 
 $$
 \mathbf{v}_{\text{eff}} = \frac{B - A}{\|B - A\|}
@@ -804,25 +804,25 @@ $$
 
 Backpropagation can proceed via surrogate Jacobians.
 
-5. **Projection Origin $\Phi(u)$** — If the ray start point $A$ is retained and not hard-snapped, its contribution to the path can be reintroduced.
+5. **Projection Origin $\Phi(u)$** - If the ray start point $A$ is retained and not hard-snapped, its contribution to the path can be reintroduced.
 
 ---
 
 ### 13.3 Recoverable If Architecture Permits
 
-6. **Direction Codebook Index $k$** — Gradients can flow through soft-attention or Gumbel-Softmax layers if the direction is selected from a dictionary.
+6. **Direction Codebook Index $k$** - Gradients can flow through soft-attention or Gumbel-Softmax layers if the direction is selected from a dictionary.
 
-7. **Kernel Normalization Terms** — If $T(u)$ uses normalization by $\sum K(x)$, gradient still flows but becomes more coupled; if unnormalized, it remains purely linear.
+7. **Kernel Normalization Terms** - If $T(u)$ uses normalization by $\sum K(x)$, gradient still flows but becomes more coupled; if unnormalized, it remains purely linear.
 
 ---
 
 ### 13.4 Fully Lost Without Special Measures
 
-8. **Time Step $t_i$ Recovery** — If not stored during rasterization (e.g., steps are implicit integers), the attenuation gradient is unrecoverable.
+8. **Time Step $t_i$ Recovery** - If not stored during rasterization (e.g., steps are implicit integers), the attenuation gradient is unrecoverable.
 
-9. **$\Phi(u)$ Influence** — If the ray entry point is hard-snapped to voxel grid and float offset is discarded, the gradient through $\Phi(u)$ is permanently lost.
+9. **$\Phi(u)$ Influence** - If the ray entry point is hard-snapped to voxel grid and float offset is discarded, the gradient through $\Phi(u)$ is permanently lost.
 
-10. **Dynamic $\mathbf{v}_u$ without Trace** — If rays are not traced at all and a precomputed path is reused for a "nearby" direction, the gradient with respect to the actual $\mathbf{v}_u$ is lost.
+10. **Dynamic $\mathbf{v}_u$ without Trace** - If rays are not traced at all and a precomputed path is reused for a "nearby" direction, the gradient with respect to the actual $\mathbf{v}_u$ is lost.
 
 ---
 
@@ -834,7 +834,7 @@ Gradient flow under rasterization depends not only on which operations are used 
 * Longitudinal distances $t_i$
 * Voxel visitation list ${x_i}$
 
-> *Rasterization doesn't destroy gradients — but lack of memory does.*
+> *Rasterization doesn't destroy gradients - but lack of memory does.*
 
 By caching just a few geometric variables, full training signal can be preserved even under highly optimized projection traversal.
 
@@ -852,9 +852,9 @@ This insight eliminates the need to explicitly accumulate or cache $t_i$ values 
 
 Assume the following:
 
-* $\Phi(u) \in \mathbb{R}^N$ — the origin of the ray for projection coordinate $u$
-* $\mathbf{v}_u \in \mathbb{R}^N$ — the (normalized) direction of the ray
-* $x_i \in \mathbb{R}^N$ — the center of the $i$-th visited voxel along the ray
+* $\Phi(u) \in \mathbb{R}^N$ - the origin of the ray for projection coordinate $u$
+* $\mathbf{v}_u \in \mathbb{R}^N$ - the (normalized) direction of the ray
+* $x_i \in \mathbb{R}^N$ - the center of the $i$-th visited voxel along the ray
 
 Then the longitudinal distance from the ray origin to voxel $x_i$ is given by **scalar projection**:
 
@@ -911,10 +911,10 @@ This operation is differentiable, efficient, and does not depend on traversal lo
 
 ### 14.4 Benefits
 
-* **No accumulation needed** — works even with fixed-step voxel traversal
-* **Fully differentiable** — all components are float-valued and autograd-compatible
-* **Compatible with optimization** — $t_i$ is reconstructed only when needed
-* **Eliminates numerical drift** — avoids accumulation errors from raster indices
+* **No accumulation needed** - works even with fixed-step voxel traversal
+* **Fully differentiable** - all components are float-valued and autograd-compatible
+* **Compatible with optimization** - $t_i$ is reconstructed only when needed
+* **Eliminates numerical drift** - avoids accumulation errors from raster indices
 
 ---
 
@@ -933,7 +933,7 @@ In HPM, both conditions are avoided by design. Memory is a regular N-dimensional
 
 $\boxed{\text{There is no need to store } t_i.}$
 
-It can always be reconstructed analytically and differentiably from the geometry of the projection surface and memory grid. Even under discrete rasterization, the underlying geometry remains smooth — and so do the gradients.
+It can always be reconstructed analytically and differentiably from the geometry of the projection surface and memory grid. Even under discrete rasterization, the underlying geometry remains smooth - and so do the gradients.
 
 > *The voxel knows where it lies. The ray knows where it began. The rest is simple geometry.*
 
@@ -971,7 +971,7 @@ Here:
 * $K(x, \ell_u)$ is a smooth projection kernel (e.g., Gaussian), which is **nonzero across all of** $\mathbb{R}^N$
 * Therefore, $\Delta W(x) \neq 0$ potentially **everywhere**, even for a localized projection error $\delta(u)$
 
-This defines a **nonlocal response**: modifying a single projection influences an extended region of memory — consistent with **associative memory dynamics**.
+This defines a **nonlocal response**: modifying a single projection influences an extended region of memory - consistent with **associative memory dynamics**.
 
 ---
 
@@ -1009,8 +1009,8 @@ The nonlocal nature is encoded in the **shape of the projection kernel**, while 
 
 HPM supports both local and nonlocal updates:
 
-* **Nonlocality** is a feature of its continuous, differentiable architecture — enabling semantic generalization
-* **Locality** is a feature of its discrete, tractable implementation — ensuring efficient and focused updates
+* **Nonlocality** is a feature of its continuous, differentiable architecture - enabling semantic generalization
+* **Locality** is a feature of its discrete, tractable implementation - ensuring efficient and focused updates
 
 > *Continuum says "everything touches everything." Machines say "only what fits in cache." Both are correct, at their own scales.*
 
@@ -1103,7 +1103,7 @@ The Gaussian kernel is the **default** in HPM due to its smoothness, locality, a
 
 **Answer:**
 
-Not necessarily. The active memory update rule in HPM — where the memory field $W(x)$ is modified during inference via local projection error — is designed for *plasticity*, not guaranteed convergence. While each update is bounded and differentiable, there is currently **no formal convergence proof** for the general case. Instead, the behavior depends on multiple architectural and dynamic factors.
+Not necessarily. The active memory update rule in HPM - where the memory field $W(x)$ is modified during inference via local projection error - is designed for *plasticity*, not guaranteed convergence. While each update is bounded and differentiable, there is currently **no formal convergence proof** for the general case. Instead, the behavior depends on multiple architectural and dynamic factors.
 
 ---
 
@@ -1136,7 +1136,7 @@ Several factors preclude convergence guarantees in the current formulation:
 
 3. **Non-convex geometry**. The space of memory configurations and projections is highly non-linear and may contain many attractors or unstable fixed points.
 
-4. **External dependencies.** If $T^*(u)$ is not fixed or itself a function of $W(x)$ or downstream computation, the target shifts dynamically — rendering convergence ill-posed.
+4. **External dependencies.** If $T^*(u)$ is not fixed or itself a function of $W(x)$ or downstream computation, the target shifts dynamically - rendering convergence ill-posed.
 
 ---
 
@@ -1165,11 +1165,11 @@ These conditions would align the update rule with classical stochastic approxima
 
 ### 17.5 Conclusion
 
-> *The active memory update rule in HPM is intentionally unconstrained. It supports rapid semantic plasticity, but does not promise convergence. Its long-term behavior is governed by projection geometry, kernel structure, and error signal dynamics — not by energy minimization.*
+> *The active memory update rule in HPM is intentionally unconstrained. It supports rapid semantic plasticity, but does not promise convergence. Its long-term behavior is governed by projection geometry, kernel structure, and error signal dynamics - not by energy minimization.*
 
 A full analysis of convergence conditions and divergence modes is proposed as a topic for future theoretical research. Until then, updates in HPM should be understood as **context-sensitive deformations** of memory, not as steps toward a fixed attractor.
 
-> *In HPM, error does not vanish — it reshapes the space.*
+> *In HPM, error does not vanish - it reshapes the space.*
 
 ---
 
@@ -1177,7 +1177,7 @@ A full analysis of convergence conditions and divergence modes is proposed as a 
 
 **Answer:**
 
-The projection surface $\Phi(u)$ is not a passive indexing construct — it is a **semantically active, context-sensitive coordinate system**. Mathematically, it defines a differentiable mapping:
+The projection surface $\Phi(u)$ is not a passive indexing construct - it is a **semantically active, context-sensitive coordinate system**. Mathematically, it defines a differentiable mapping:
 
 $$
 \Phi : \mathbb{R}^{N-1} \to \mathbb{R}^N
@@ -1193,7 +1193,7 @@ This surface determines both the **origin and orientation context** of all direc
 
 #### Semantic Role:
 
-$\Phi(u)$ can be understood as an analog of a **viewpoint, attention focus, or internal perspective**. A deformed or rotated projection surface will extract a different cross-section of the memory field — one that emphasizes, suppresses, or recontextualizes latent semantic patterns.
+$\Phi(u)$ can be understood as an analog of a **viewpoint, attention focus, or internal perspective**. A deformed or rotated projection surface will extract a different cross-section of the memory field - one that emphasizes, suppresses, or recontextualizes latent semantic patterns.
 
 Thus, a **flexible $\Phi(u)$ acts as a semantic lens**: by modulating its geometry, the system can adaptively extract meaning-aligned slices of distributed memory content.
 
@@ -1203,7 +1203,7 @@ Thus, a **flexible $\Phi(u)$ acts as a semantic lens**: by modulating its geomet
 
 **Answer:**
 
-Overlapping projection rays are not problematic — in fact, they are a fundamental mechanism by which **semantic richness** emerges in HPM.
+Overlapping projection rays are not problematic - in fact, they are a fundamental mechanism by which **semantic richness** emerges in HPM.
 
 Consider multiple rays $\ell_{u_1}, \ell_{u_2}, \dots$ that intersect or traverse nearby regions in $W(x)$. Because each ray integrates contributions using a localized kernel $K(x, \ell_u)$, even small angular or positional deviations lead to **non-identical semantic footprints**:
 
@@ -1220,7 +1220,7 @@ $$
 K(x, \ell_{u_1}) \neq K(x, \ell_{u_2}) \quad \text{if } \mathbf{v}_{u_1} \neq \mathbf{v}_{u_2} \text{ or } \Phi(u_1) \neq \Phi(u_2)
 $$
 
-Thus, even in overlapping volumes, projections sample **slightly different local submanifolds** of memory — enabling fine-grained modulation and semantic nuance.
+Thus, even in overlapping volumes, projections sample **slightly different local submanifolds** of memory - enabling fine-grained modulation and semantic nuance.
 
 Overlap does not cause conflict unless projection errors with **opposite signs** are applied to the same region (see Chapter C). Even then, repulsive dynamics cause **divergent adaptation**, not destructive interference.
 
@@ -1255,7 +1255,7 @@ This is structurally analogous to biological vision:
 * The full field ${T(u)}$ constitutes a **semantic rendering** of memory content
 * Lateral convolution on $T(u)$ (as in beam widening) emulates **cortical pooling** or **topographic integration**
 
-Thus, HPM's projection mechanism is not just mathematically grounded — it is **cognitively interpretable** as a perceptual interface over distributed latent geometry.
+Thus, HPM's projection mechanism is not just mathematically grounded - it is **cognitively interpretable** as a perceptual interface over distributed latent geometry.
 
 ---
 
@@ -1281,8 +1281,8 @@ $$
 
 Here:
 
-* No softmax is needed — **locality is enforced by kernel decay**, not normalization
-* No attention weights are learned — **focus emerges from geometry** ($\Phi$, $\mathbf{v}_u$, $\tau$)
+* No softmax is needed - **locality is enforced by kernel decay**, not normalization
+* No attention weights are learned - **focus emerges from geometry** ($\Phi$, $\mathbf{v}_u$, $\tau$)
 * Multiple $T(u)$ values can coexist without competing for a shared sum
 
 This leads to:
@@ -1291,9 +1291,9 @@ This leads to:
 * **Modularity**: projections can be added, removed, or composed
 * **Extensibility**: directional probing generalizes across continuous fields, not fixed tokens
 
-While HPM *can emulate* attention (e.g., by normalizing $T(u)$ or gating updates), it does not require softmax — and in fact gains **flexibility and robustness** by avoiding it.
+While HPM *can emulate* attention (e.g., by normalizing $T(u)$ or gating updates), it does not require softmax - and in fact gains **flexibility and robustness** by avoiding it.
 
-> *In HPM, meaning is focused by geometry — not by competition.*
+> *In HPM, meaning is focused by geometry - not by competition.*
 
 ---
 
@@ -1321,10 +1321,10 @@ $$
 
 with:
 
-* $d_\perp(x)$ — perpendicular distance to the ray $\ell_u$
-* $t(x)$ — longitudinal distance along the ray
-* $K_\perp$ — lateral (transverse) weighting (e.g., Gaussian)
-* $A(t)$ — longitudinal attenuation (e.g., exponential decay)
+* $d_\perp(x)$ - perpendicular distance to the ray $\ell_u$
+* $t(x)$ - longitudinal distance along the ray
+* $K_\perp$ - lateral (transverse) weighting (e.g., Gaussian)
+* $A(t)$ - longitudinal attenuation (e.g., exponential decay)
 
 ---
 
@@ -1339,8 +1339,8 @@ The **form and width** of the kernel influence interpretability along several ax
 
 #### 2. **Directionality and Anisotropy**
 
-* **Isotropic kernels** (e.g., standard Gaussians): treat all directions equally — good for general-purpose probing.
-* **Anisotropic kernels** (different $\sigma_\perp$, $\sigma_\parallel$): create elongated receptive profiles — emulating motion sensitivity or directional gradients.
+* **Isotropic kernels** (e.g., standard Gaussians): treat all directions equally - good for general-purpose probing.
+* **Anisotropic kernels** (different $\sigma_\perp$, $\sigma_\parallel$): create elongated receptive profiles - emulating motion sensitivity or directional gradients.
 
 #### 3. **Tail Behavior and Semantic Reach**
 
@@ -1354,13 +1354,13 @@ The tail behavior directly impacts whether $T(u)$ is interpretable as a **local 
 * **Shallow $\tau$**: emphasizes near-surface content ("shallow memory read")
 * **Deep $\tau$**: integrates deeper into the field ("contextual semantic aggregation")
 
-The attenuation determines how temporal or structural depth is encoded in the projection — akin to near vs. far attention.
+The attenuation determines how temporal or structural depth is encoded in the projection - akin to near vs. far attention.
 
 ---
 
 ### 22.3 Kernel Shape as Cognitive Prior
 
-The kernel in HPM is not merely a smoothing function — it is a **structural prior** that defines *what it means to look*. Its shape encodes assumptions about:
+The kernel in HPM is not merely a smoothing function - it is a **structural prior** that defines *what it means to look*. Its shape encodes assumptions about:
 
 * What is considered close or relevant
 * How far influence propagates
@@ -1376,4 +1376,4 @@ Thus, tuning the kernel is akin to configuring **the perceptual strategy** of th
 >
 > Its shape determines whether $T(u)$ behaves like a pinpoint detector, a semantic scanner, or a context aggregator.
 >
-> Adjusting the kernel tail, width, and anisotropy allows precise control over **what is extracted**, **from where**, and **in what structure** — making kernel design central to the interpretability and cognitive behavior of HPM.
+> Adjusting the kernel tail, width, and anisotropy allows precise control over **what is extracted**, **from where**, and **in what structure** - making kernel design central to the interpretability and cognitive behavior of HPM.

@@ -1,4 +1,4 @@
-# Chapter A — Active Inference Memory (Theoretical Perspective)
+# Chapter A - Active Inference Memory (Theoretical Perspective)
 
 > *A speculative extension of the Holographic Projection Memory mechanism within the DyNA framework.*
 
@@ -6,15 +6,15 @@
 
 ## A.1 Conceptual Overview
 
-While the base formulation of Holographic Projection Memory (HPM) assumes passively sampled memory projections, the differentiable structure of the system allows — at least in theory — an **active memory model**, in which inference-time signals may directly modify or reinforce the memory field $W$ based on contextual outcomes.
+While the base formulation of Holographic Projection Memory (HPM) assumes passively sampled memory projections, the differentiable structure of the system allows - at least in theory - an **active memory model**, in which inference-time signals may directly modify or reinforce the memory field $W$ based on contextual outcomes.
 
-This section explores the notion of **active inference memory** — a self-adjusting differentiable memory surface whose internal structure can be updated during inference in response to the observed error or reinforcement signal.
+This section explores the notion of **active inference memory** - a self-adjusting differentiable memory surface whose internal structure can be updated during inference in response to the observed error or reinforcement signal.
 
 ---
 
 ## A.2 Motivation
 
-In many cognitive systems — biological or artificial — learning is not confined to distinct training epochs. Instead, memory representations adapt during interaction. The proposed HPM model, owing to its local and interpretable gradient flow, enables a form of runtime plasticity.
+In many cognitive systems - biological or artificial - learning is not confined to distinct training epochs. Instead, memory representations adapt during interaction. The proposed HPM model, owing to its local and interpretable gradient flow, enables a form of runtime plasticity.
 
 ---
 
