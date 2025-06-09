@@ -1,4 +1,4 @@
-# Appendix B — Associative Update Dynamics in Holographic Memory
+# Chapter B — Associative Update Dynamics in Holographic Memory
 
 > *A mathematical and conceptual clarification of nonlocal updates in holographically structured memory.*
 
@@ -14,7 +14,7 @@ $$
 \Delta W(x) = \alpha \cdot \delta(u) \cdot K(x, \ell_u)
 $$
 
-is well-defined due to the explicit differentiability of the projection kernel $K(x, \ell_u)$. However, the kernel introduces **nonlocal effects**: the update is not applied at a single point but across a region defined by $K$. This appendix explains why such behavior is not an artifact or instability, but rather a **feature of associative memory dynamics**.
+is well-defined due to the explicit differentiability of the projection kernel $K(x, \ell_u)$. However, the kernel introduces **nonlocal effects**: the update is not applied at a single point but across a region defined by $K$. This chapter explains why such behavior is not an artifact or instability, but rather a **feature of associative memory dynamics**.
 
 ---
 

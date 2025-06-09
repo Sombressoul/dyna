@@ -1,4 +1,4 @@
-# Appendix F - Elimination of mathematical ambiguities (Q&A)
+# Chapter Q - Elimination of mathematical ambiguities (Q&A)
 
 
 ## Q1. Do we compute the response from all memory points for each projection ray?  
@@ -74,7 +74,7 @@ $$
 K(x, \ell_u) = \exp\left( -\frac{d_\perp^2(x, \ell_u)}{2\sigma^2} \right) \cdot \exp\left( -\frac{t_x}{\tau_u} \right)
 $$
 
-the parameter $\tau$ controls **longitudinal attenuation** — i.e., how quickly information fades along the direction of the ray. By default, $\tau$ is assumed to be shared across all rays in a bundle. However, Appendix D.2 explicitly permits this parameter to vary:
+the parameter $\tau$ controls **longitudinal attenuation** — i.e., how quickly information fades along the direction of the ray. By default, $\tau$ is assumed to be shared across all rays in a bundle. However, Chapter D.2 explicitly permits this parameter to vary:
 
 “To enable adaptive focus, the attenuation parameter can vary across the projection surface:
 $\tau = \tau(u)$”
@@ -173,15 +173,15 @@ Thus, **the rays, memory field, and projection surface all coexist in the same s
 
 This design is consistently used throughout the formal documentation:
 
-* **Appendix D.1:**
+* **Chapter D.1:**
 
   “Each projection is defined by a ray emitted from a point on a projection hypersurface $\mathcal{P}(u) \subset \mathbb{R}^N$, parameterized by $u \in \mathbb{R}^{N-1}$.”
 
-* **Appendix E:**
+* **Chapter E:**
 
   “The projected signal at point $u \in \mathbb{R}^{N-1}$ is computed by integrating contributions from the field along the ray $\ell_u(t) = \Phi(u) + t \cdot \mathbf{v}$, where $\Phi(u) \in \mathbb{R}^N$.”
 
-* **Appendix F (Q3 & Q4):**
+* **Chapter Q (Q3 & Q4):**
   Confirm that both $\Phi(u)$ and $\mathbf{v}_u$ live in $\mathbb{R}^N$, without requiring higher-dimensional embedding.
 
 ---
@@ -310,7 +310,7 @@ The continuous memory field $W(x)$ defines the **idealized geometric behavior** 
 
 ### 7.1 Rasterized Projection as Optimization Strategy
 
-In Appendix E, a high-performance implementation strategy is proposed based on rasterizing projection rays over a fixed grid:
+In Chapter E, a high-performance implementation strategy is proposed based on rasterizing projection rays over a fixed grid:
 
 * Rays $\ell_u(t) = \Phi(u) + t \cdot \mathbf{v}$ are assumed to be **aligned** with fixed directions (e.g., constant $\mathbf{v}$)
 * Discrete voxel paths are precomputed using line traversal algorithms (e.g., Amanatides–Woo)
@@ -477,7 +477,7 @@ Both forms are valid. The choice can be exposed as a configurable switch (e.g., 
 
 ### 10.1 Current Definition
 
-In Appendix D.2, the longitudinal attenuation function is defined as:
+In Chapter D.2, the longitudinal attenuation function is defined as:
 
 $$
 A(t) = \exp\left( -\frac{t}{\tau} \right), \quad t \ge 0
@@ -502,7 +502,7 @@ This one-sided attenuation has several practical advantages:
 * Aligns with ray-box clipping and rasterized integration schemes
 * Simplifies bidirectional projection by treating each direction independently
 
-In Appendix F (Q2), bidirectional probing is implemented by evaluating two rays separately:
+In Chapter Q (Q2), bidirectional probing is implemented by evaluating two rays separately:
 
 $$
 \ell_u^{(+)}(t), \quad \ell_u^{(-)}(t), \quad \text{with } t \ge 0 \text{ in both cases}
@@ -617,7 +617,7 @@ This approximation is valid if $A$ and $B$ are computed analytically (not snappe
 
 ### 11.4 Fixed Codebook Directions
 
-In codebook-based ray projection (Appendix E.8):
+In codebook-based ray projection (Chapter E.8):
 
 * The direction $\mathbf{v}_u$ is chosen from a fixed set ${\mathbf{v}_k}$
 * Index $k(u)$ is selected either by soft-attention or hard routing

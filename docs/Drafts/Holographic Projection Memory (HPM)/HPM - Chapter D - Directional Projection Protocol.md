@@ -1,4 +1,4 @@
-# Appendix D - HPM - Directional Projection Protocol
+# Chapter D - HPM - Directional Projection Protocol
 
 > *Mathematical formulation and implementation guidelines for coherent directional projection in Holographic Projection Memory (HPM) systems.*
 
@@ -431,9 +431,9 @@ This rule requires only the projection error $\delta(u)$ and kernel values - no 
 
 ---
 
-### Relation to Appendix A: Active Inference
+### Relation to Chapter A: Active Inference
 
-This mechanism directly instantiates the concept of **inference-time plasticity** described in Appendix A.3. There, a projection error modifies the memory field through its localized footprint. In the directional case:
+This mechanism directly instantiates the concept of **inference-time plasticity** described in Chapter A.3. There, a projection error modifies the memory field through its localized footprint. In the directional case:
 
 * The projection kernel $K(x, \ell_u)$ is no longer isotropic.
 * The beam direction $\mathbf{v}$ introduces **contextual selectivity**.
@@ -442,9 +442,9 @@ Thus, the update becomes **spatially and directionally aware**, enabling **modul
 
 ---
 
-### Relation to Appendix B: Associative Update Dynamics
+### Relation to Chapter B: Associative Update Dynamics
 
-Appendix B formalizes associative memory updates via smooth back-projection:
+Chapter B formalizes associative memory updates via smooth back-projection:
 
 $$
 \Delta W(x) = \int \delta(u) \cdot K(x, \ell_u) \, du
@@ -549,7 +549,7 @@ Together, these components make directional HPM more than a projection mechanism
 
 ## D.7 Theoretical Extensions
 
-This section explores formal consequences and extensions of the directional projection model introduced in HPM, focusing on how angular orientation affects cluster dynamics, memory separability, and semantic plasticity. These results complement the conflict-resolution mechanisms described in Appendix C.
+This section explores formal consequences and extensions of the directional projection model introduced in HPM, focusing on how angular orientation affects cluster dynamics, memory separability, and semantic plasticity. These results complement the conflict-resolution mechanisms described in Chapter C.
 
 ---
 
@@ -582,7 +582,7 @@ We propose that angular misalignment increases semantic divergence. Specifically
 * Overlapping updates $K_1(x), K_2(x)$ produce interference terms decaying with $\cos(\theta)$.
 * For $\theta > \theta_{\text{crit}}$, the overlap between kernels becomes negligible, maximizing net gradient difference and hence separation rate.
 
-This effect enhances **topological divergence** (Appendix C.10) by introducing angular disentanglement.
+This effect enhances **topological divergence** (Chapter C.10) by introducing angular disentanglement.
 
 ---
 
@@ -627,7 +627,7 @@ Angular divergence supports memory disentanglement along multiple dimensions:
 
 This structure can be exploited to construct **multi-angle projection ensembles** with soft or learnable angular basis sets $\{\mathbf{v}_m\}_{m=1}^M$, enabling modular specialization.
 
-> These results extend the stability theorems of Appendix C to directional scenarios - showing that geometric and angular information jointly shape the evolution of distributed memory structures.
+> These results extend the stability theorems of Chapter C to directional scenarios - showing that geometric and angular information jointly shape the evolution of distributed memory structures.
 
 ---
 

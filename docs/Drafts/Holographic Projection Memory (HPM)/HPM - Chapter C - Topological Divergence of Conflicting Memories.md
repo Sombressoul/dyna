@@ -1,4 +1,4 @@
-# Appendix C — Topological Divergence of Conflicting Memories
+# Chapter C — Topological Divergence of Conflicting Memories
 
 > *A comprehensive and reconciled exposition of conflict resolution, associative dynamics, and semantic topological restructuring in Holographic Projection Memory (HPM).*
 
@@ -10,7 +10,7 @@ In contrast, the Holographic Projection Memory (HPM) model introduces a **spatia
 
 This emergent behavior, which we call **topological divergence**, transforms the memory system into a **self-organizing, geometry-preserving substrate**, where each memory adapts, interacts, and resolves semantic conflicts via spatial separation.
 
-This appendix integrates intuitive insight, mathematical formulation, and biological analogy to characterize this process as a physically plausible and cognitively interpretable mechanism of **non-destructive memory evolution**.
+This chapter integrates intuitive insight, mathematical formulation, and biological analogy to characterize this process as a physically plausible and cognitively interpretable mechanism of **non-destructive memory evolution**.
 
 ---
 

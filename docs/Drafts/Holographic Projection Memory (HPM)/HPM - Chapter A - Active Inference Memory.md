@@ -1,4 +1,4 @@
-# Appendix A — Active Inference Memory (Theoretical Perspective)
+# Chapter A — Active Inference Memory (Theoretical Perspective)
 
 > *A speculative extension of the Holographic Projection Memory mechanism within the DyNA framework.*
 
