@@ -66,6 +66,8 @@ where:
 
 This formulation defines a **coherent, parallel beam** architecture, where all rays are aligned and maintain fixed directional geometry.
 
+> **Note:** While most practical implementations use a shared direction vector $\mathbf{v}$ for the entire projection bundle, the model fully supports the general case where each ray may have its own direction $\mathbf{v}_u$. All projection formulas and kernels remain valid under this extension, provided $\mathbf{v}_u$ is differentiable with respect to $u$ or externally defined.
+
 ---
 
 ### Norm Regularization of $\mathbf{v}$
