@@ -191,3 +191,111 @@ This design is consistently used throughout the formal documentation:
 The projection surface in HPM is **always an $(N - 1)$-dimensional hypersurface** embedded in the **same ambient space $\mathbb{R}^N$ as the memory field**. This is a direct instantiation of the holographic principle and ensures that projection, gradient flow, and update dynamics all remain fully differentiable and geometrically coherent.
 
 > *In HPM, the memory and its shadows live side-by-side — in the same space, at different scales of meaning.*
+
+---
+
+## Q6. What is the relationship between the continuous memory field $W(x)$ and the discrete implementation $W[x]$?
+
+The Holographic Projection Memory (HPM) is formulated in terms of continuous geometric structures to ensure mathematical elegance, differentiability, and physical interpretability. However, practical implementations necessarily operate over discretized domains, such as tensors stored in GPU memory. This question addresses the relationship between the theoretical continuous memory field $W(x)$ and its discrete counterpart $W[x]$ used in computation.
+
+---
+
+### **6.1 Continuous Memory Field — Theoretical Foundation**
+
+The memory is defined as a continuous field:
+
+$$
+W : \mathbb{R}^N \to \mathbb{R}^C
+$$
+
+Here:
+
+* $N$ is the spatial dimension of the memory domain.
+* $C$ is the number of semantic channels (e.g., feature dimensions).
+
+The field $W(x)$ is treated as a differentiable function over $\mathbb{R}^N$, supporting:
+
+* Integration along continuous paths (e.g., rays $\ell_u(t)$)
+* Continuous optimization with respect to spatial derivatives $\nabla_x W(x)$
+* Formal reasoning via calculus and variational principles
+
+This perspective allows HPM to be defined in terms of smooth projection operators:
+
+$$
+T(u) = \int_{\mathbb{R}^N} W(x) \cdot K(x, \ell_u) \, dx
+$$
+
+and its corresponding gradient flow:
+
+$$
+\frac{\partial T(u)}{\partial W(x)} = K(x, \ell_u)
+$$
+
+---
+
+### **6.2 Discrete Tensor Field — Practical Realization**
+
+In practical machine learning systems, the memory field is implemented as a discretized tensor:
+
+$$
+W[x] \in \mathbb{R}^{D_1 \times D_2 \times \dots \times D_N \times C}
+$$
+
+Here:
+
+* $x \in \mathbb{Z}^N$ indexes voxel locations in a uniform grid.
+* Each voxel $W[x]$ stores a feature vector of dimension $C$.
+* The field is typically stored in GPU memory as a high-dimensional array.
+
+The continuous projection integral is approximated by a weighted sum over voxels:
+
+$$
+T(u) \approx \sum_{x \in \Omega_u} W[x] \cdot K(x, \ell_u)
+$$
+
+where:
+
+* $\Omega_u$ is a small neighborhood of voxels near the ray $\ell_u$ (as determined by kernel support)
+* $K(x, \ell_u)$ is computed based on geometric distance from voxel center $x$ to ray $\ell_u$
+
+This discretization is exact in the limit where voxel spacing $\delta \to 0$ and the kernel is sufficiently smooth.
+
+---
+
+### **6.3 Interpretation: Continuum as Limit of Discretization**
+
+The continuous model serves as a conceptual and mathematical foundation. The discrete implementation is an approximation of this ideal, where the integral becomes a Riemann sum:
+
+$$
+\int_{\mathbb{R}^N} f(x) \, dx \quad \longrightarrow \quad \delta^N \sum_{x \in \mathbb{Z}^N} f(x)
+$$
+
+This approximation is valid under standard assumptions:
+
+* $f(x)$ (here, $W(x) \cdot K(x, \ell_u)$) is smooth
+* The voxel size $\delta$ is small relative to the kernel width $\sigma$
+* The kernel has compact support or decays rapidly outside a bounded region
+
+In this light, the discrete implementation is not a compromise but a **numerical realization** of a continuous model.
+
+---
+
+### **6.4 Implications for Differentiability and Learning**
+
+Despite discretization, the projection operator $T(u)$ remains differentiable in all learnable parameters:
+
+* $W[x]$ (memory content)
+* $\Phi(u)$ (projection surface)
+* $\mathbf{v}_u$, $\tau_u$ (direction, attenuation)
+
+The kernel $K(x, \ell_u)$ is computed analytically and differentiably w\.r.t. all these quantities, and the resulting weighted sum retains gradient flow.
+
+Therefore, the continuous formulation is preserved in spirit and function — enabling backpropagation, active updates, and integration with gradient-based optimization frameworks.
+
+---
+
+### **Conclusion:**
+
+The continuous memory field $W(x)$ defines the **idealized geometric behavior** of HPM, while the discrete tensor $W[x]$ realizes this behavior in practice. The integral projection becomes a finite sum over spatially indexed voxels, and all learning dynamics remain fully compatible. This dual perspective — continuous for theory, discrete for implementation — is foundational to HPM's design.
+
+> *In HPM, discreteness is not a limitation, but a lens through which continuous geometry becomes computable.*
