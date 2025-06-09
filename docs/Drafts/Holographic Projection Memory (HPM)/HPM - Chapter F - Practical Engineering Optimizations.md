@@ -2,7 +2,7 @@
 
 ---
 
-### G.1 Overview
+### F.1 Overview
 
 * Purpose of engineering optimizations in HPM
 * Balancing efficiency with full differentiability
@@ -10,7 +10,7 @@
 
 ---
 
-### G.2 Geometric Inference Instead of Storage
+### F.2 Geometric Inference Instead of Storage
 
 **G.2.1 Reconstructing $t_i$ via Scalar Projection**
 
@@ -31,7 +31,7 @@
 
 ---
 
-### G.3 Discrete Rasterization-Compatible Backpropagation
+### F.3 Discrete Rasterization-Compatible Backpropagation
 
 **G.3.1 Recovering Gradients for $\tau$ Analytically**
 
@@ -50,7 +50,7 @@
 
 ---
 
-### G.4 Kernel Design and Width Handling
+### F.4 Kernel Design and Width Handling
 
 **G.4.1 Surface-Based Beam Width via Convolution**
 
@@ -70,7 +70,7 @@
 
 ---
 
-### G.5 Forward-Pass Memory and Performance Optimizations
+### F.5 Forward-Pass Memory and Performance Optimizations
 
 **G.5.1 Stateless Ray Traversal**
 
@@ -89,7 +89,7 @@
 
 ---
 
-### G.6 Gradient Survivability Map (Ref: Chapter Q Q13)
+### F.6 Gradient Survivability Map (Ref: Chapter Q Q13)
 
 * Summarizes which gradients are:
 
@@ -100,7 +100,7 @@
 
 ---
 
-### G.7 Implementation Guidelines and Tradeoffs
+### F.7 Implementation Guidelines and Tradeoffs
 
 * When to use codebooks vs. dynamic rays
 * When to sacrifice exactness for runtime performance
@@ -108,7 +108,7 @@
 
 ---
 
-### G.8 Summary of Key Strategies
+### F.8 Summary of Key Strategies
 
 * Tabular or bulleted review of all optimization levers
 * Highlight high-impact choices for real-world deployments
