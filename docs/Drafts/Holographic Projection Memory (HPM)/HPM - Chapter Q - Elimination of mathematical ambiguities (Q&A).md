@@ -617,7 +617,7 @@ This approximation is valid if $A$ and $B$ are computed analytically (not snappe
 
 ### 11.4 Fixed Codebook Directions
 
-In codebook-based ray projection (Chapter E.8):
+In codebook-based ray projection:
 
 * The direction $\mathbf{v}_u$ is chosen from a fixed set ${\mathbf{v}_k}$
 * Index $k(u)$ is selected either by soft-attention or hard routing
