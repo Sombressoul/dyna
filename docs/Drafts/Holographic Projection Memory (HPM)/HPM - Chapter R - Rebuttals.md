@@ -148,7 +148,7 @@ It is a tool for cognitive machines - not benchmark chasers.
 
 **Response:**
 
-These terms are used deliberately — not metaphorically, but **structurally**. Each maps directly to a specific operational mechanism in HPM, grounded in mathematical formulation and, where applicable, biological analogy. We use cognitive terms not as embellishments, but because the system *behaves cognitively*.
+These terms are used deliberately - not metaphorically, but **structurally**. Each maps directly to a specific operational mechanism in HPM, grounded in mathematical formulation and, where applicable, biological analogy. We use cognitive terms not as embellishments, but because the system *behaves cognitively*.
 
 Cognitive Terminology Mapping:  
 
@@ -162,7 +162,7 @@ In HPM:
 
 * The **"viewpoint"** is not metaphor. It is the **surface $\Phi(u)$**, which determines *where* and *how* we look into the memory volume. It is a parametrized geometric interface to internal knowledge.
 * **"Perception"** is implemented by the directional integral $T(u)$, which returns the content encountered along a projection ray. It is not a symbol lookup, but a structured, differentiable sensing process.
-* **"Semantics"** emerges through the **interaction of projection geometry and memory gradients**. The structure of $W(x)$ — and its deformation under learning — defines meaning via topological configuration, not symbol-level assignment.
+* **"Semantics"** emerges through the **interaction of projection geometry and memory gradients**. The structure of $W(x)$ - and its deformation under learning - defines meaning via topological configuration, not symbol-level assignment.
 
 This is not linguistic flair. It is a shift from discrete computation to structured cognition via geometry.
 
@@ -222,10 +222,125 @@ We make no claims of biological realism. However, **structural analogies** exist
 
 All analogies are backed by structural correspondence:
 
-* Projections $\ell_u(t) = \Phi(u) + t \cdot \mathbf{v}_u$ define receptive fields aligned to a surface — matching retinotopic maps.
+* Projections $\ell_u(t) = \Phi(u) + t \cdot \mathbf{v}_u$ define receptive fields aligned to a surface - matching retinotopic maps.
 * Update dynamics via $\delta(u) \cdot K(x, \ell_u)$ mirror Hebbian modulation over directionally organized inputs.
 * Divergence under conflicting projections parallels homeostatic separation of sensory maps.
 
-We do not simulate biology. But HPM mechanisms reflect **structurally constrained design choices** that resonate with observed cortical organization. These serve as interpretive anchors — not empirical claims.
+We do not simulate biology. But HPM mechanisms reflect **structurally constrained design choices** that resonate with observed cortical organization. These serve as interpretive anchors - not empirical claims.
 
-The term "biological plausibility" is used **architecturally, not anatomically**. In that sense, HPM is as plausible as convolutional receptive fields or grid-cell-like embeddings — functional, constrained, and interpretable.
+The term "biological plausibility" is used **architecturally, not anatomically**. In that sense, HPM is as plausible as convolutional receptive fields or grid-cell-like embeddings - functional, constrained, and interpretable.
+
+---
+
+## R15. *You describe all updates as local, bounded, and differentiable. Where are the guarantees of safety under repeated updates?*
+
+**Response:**
+
+No formal safety guarantee is provided in the current formulation - and intentionally so.
+
+As stated in **Chapter Q17**, the local update rule in HPM:
+
+$$
+W(x) \leftarrow W(x) + \alpha \cdot \delta(u) \cdot K(x, \ell_u)
+$$
+
+is designed for **semantic plasticity**, not energy minimization. The system performs update-by-projection rather than update-by-descent. While each individual step is:
+
+* bounded (via the kernel $K$),
+* localized (support of $K$),
+* and differentiable,
+
+the accumulation of updates over time depends on:
+
+* the projection distribution $u \sim p(u)$,
+* the variability and structure of $\delta(u)$,
+* and the consistency of directional context $\mathbf{v}_u$.
+
+As such, **repeated updates may induce divergence, drift, or stable reconfiguration**, depending on context.
+
+> Theoretical guarantees of convergence or bounded drift are possible but require assumptions over projection sampling and error structure. This remains an open area for formal study, as noted in Chapter Q.
+
+---
+
+## R16. *Why is geometry superior to learned similarity? Isn’t softmax attention strictly more expressive?*
+
+**Response:**
+
+This question assumes a false equivalence between **expressivity** and **structure**.
+
+Softmax attention is expressive in the space of discrete similarity-weighted mixtures. HPM is not designed to compete on expressivity per se, but to offer:
+
+* **Geometric interpretability**: projections are spatial, directional, and contextual
+* **Locality by construction**: no need for normalization or competition
+* **Gradient-aligned updates**: memory responds in coherent geometric zones
+
+Learned similarity yields high-dimensional mixtures; HPM yields **structured perceptual fields**.
+
+Furthermore, softmax attention:
+
+* requires pairwise score matrices (O($n^2$))
+* lacks directional semantics
+* collapses all keys into a flat latent space
+
+In contrast, HPM:
+
+* defines access via rays and kernels
+* preserves **semantic geometry**
+* enables **directionally disentangled modulation**
+
+> **Conclusion:** HPM is not a subset or superset of attention. It is a topological alternative. Where softmax flattens, HPM localizes. Where attention selects, HPM projects.
+
+---
+
+## R17. *How does HPM deal with aliasing or redundancy across overlapping projections? Is there any information-theoretic justification?*
+
+**Response:**
+
+Overlapping projections are **not a flaw**. They are the primary mechanism by which HPM enables **semantic synthesis**.
+
+When rays $\ell_{u_1}, \ell_{u_2}, \dots$ traverse intersecting regions of $W(x)$, their weighted projections $T(u_i)$ form **entangled perceptual channels**. This overlap allows:
+
+* **disambiguation** through angular integration
+* **context enhancement** from multiple passes
+* **novel concept emergence** via interference patterns
+
+This is not aliasing - it is **geometric superposition**.
+
+From an information-theoretic view:
+
+* Each $T(u)$ acts as a lossy projection of latent content
+* Overlaps introduce **redundant coverage**, which supports denoising and robustness
+* The spatial diversity of $\Phi(u)$ and $\mathbf{v}_u$ yields **multi-angle sampling**, akin to compressive sensing
+
+> **Conclusion:** Redundancy across projections is **not noise**. It is constructive semantic recombination. HPM favors coherence over sparsity, and geometry over orthogonality.
+
+---
+
+## R18. *Is HPM invertible? Can we reconstruct $W(x)$ from $T(u)$ in any principled way?*
+
+**Response:**
+
+In general, **no exact inversion** of $T(u)$ is possible. The projection operator
+
+$$
+T(u) = \int W(x) \cdot K(x, \ell_u) \, dx
+$$
+
+is **smoothing, lossy, and non-injective**. It reduces dimensionality (from $\mathbb{R}^N$ to $\mathbb{R}^{N-1}$) and integrates over local fields.
+
+However, the problem of reconstructing $W(x)$ from $T(u)$ is **formally related to inverse problems in tomographic reconstruction**, including:
+
+* Inverse Radon transforms
+* Volumetric CT scan inversion
+* Optical deconvolution with directional kernels
+
+These are well-studied but ill-posed.
+
+We make **no claim** of invertibility. HPM is designed for forward perception, not backward decoding. That said:
+
+* Learning an approximate inverse is possible (e.g., via neural deprojectors)
+* Theoretical study of invertibility is an open direction
+
+> Finally, the connection to holographic duality and the AdS/CFT correspondence suggests deeper theoretical analogies - but we treat these as interpretive metaphors, not operational tools.
+
+HPM is not a reversible memory. It is a **semantic interface** grounded in projection.
