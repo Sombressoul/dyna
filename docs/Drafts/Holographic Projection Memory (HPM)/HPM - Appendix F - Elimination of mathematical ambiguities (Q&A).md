@@ -466,3 +466,83 @@ Normalization is optional and depends on the intended semantics:
   — invariant to sampling artifacts; interpretable as a local weighted average.
 
 Both forms are valid. The choice can be exposed as a configurable switch (e.g., `normalize=True`), depending on whether absolute mass or relative structure is more important in the application.
+
+---
+
+## Q10. Is the attenuation function $A(t)$ defined for $t < 0$?
+
+**No — in the current formulation of HPM, attenuation is explicitly defined only for $t \ge 0$.** This is a design convention adopted for simplicity, efficiency, and consistency across bidirectional ray processing. However, the mathematical model itself does not prohibit extension to $t < 0$; such generalizations remain theoretically valid and could be implemented if needed.
+
+---
+
+### 10.1 Current Definition
+
+In Appendix D.2, the longitudinal attenuation function is defined as:
+
+$$
+A(t) = \exp\left( -\frac{t}{\tau} \right), \quad t \ge 0
+$$
+
+The kernel used in projection is:
+
+$$
+K(x, \ell_u) = \exp\left( -\frac{d_\perp^2}{2\sigma^2} \right) \cdot \exp\left( -\frac{t_x}{\tau} \right), \quad t_x \ge 0
+$$
+
+This definition ensures that only points *in the forward direction* along the ray contribute to the projection.
+
+---
+
+### 10.2 Justification
+
+This one-sided attenuation has several practical advantages:
+
+* Eliminates ambiguity near $t = 0$
+* Enables efficient, unidirectional traversal
+* Aligns with ray-box clipping and rasterized integration schemes
+* Simplifies bidirectional projection by treating each direction independently
+
+In Appendix F (Q2), bidirectional probing is implemented by evaluating two rays separately:
+
+$$
+\ell_u^{(+)}(t), \quad \ell_u^{(-)}(t), \quad \text{with } t \ge 0 \text{ in both cases}
+$$
+
+Each direction has its own kernel, evaluated from $t = 0$ forward. No integration is performed over negative $t$.
+
+---
+
+### 10.3 Theoretical Extensions (Optional)
+
+While the current kernel omits $t < 0$, several plausible extensions are theoretically valid:
+
+1. **Symmetric attenuation**:
+
+$$
+A(t) = \exp\left( -\frac{|t|}{\tau} \right)
+$$
+
+2. **Asymmetric attenuation**:
+
+$$
+A(t) = \begin{cases}
+\exp(-t/\tau_+) & t \ge 0 \\
+\exp(t/\tau_-) & t < 0
+\end{cases}
+$$
+
+3. **Soft gating**:
+
+$$
+A(t) = \sigma(\beta t) \cdot \exp\left( -\frac{|t|}{\tau} \right)
+$$
+
+These alternatives allow bidirectional integration along a single ray, or gradient-based learning of asymmetric focus. However, they require kernel and traversal logic changes.
+
+---
+
+### Conclusion:
+
+The attenuation function $A(t)$ is currently defined only for $t \ge 0$, consistent with HPM’s unidirectional ray traversal design. Bidirectional probing is handled via two independent forward-only rays. Extensions to $t < 0$ are mathematically possible, but not included in the default formulation.
+
+> *Attenuation in HPM is a directional lens — defined forward by default, but extendable in theory.*
