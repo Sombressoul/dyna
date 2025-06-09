@@ -1294,3 +1294,86 @@ This leads to:
 While HPM *can emulate* attention (e.g., by normalizing $T(u)$ or gating updates), it does not require softmax — and in fact gains **flexibility and robustness** by avoiding it.
 
 > *In HPM, meaning is focused by geometry — not by competition.*
+
+---
+
+## Q22. How does the shape of the kernel $K(x, \ell_u)$ affect the interpretability of projections $T(u)$?
+
+**Answer:**
+
+The shape of the kernel $K(x, \ell_u)$ fundamentally determines the **spatial semantics and interpretive resolution** of the projection $T(u)$. It governs **which memory locations contribute**, **how strongly**, and **in what spatial pattern**, thereby shaping the *meaning* that the projection operator extracts from the memory field $W(x)$.
+
+---
+
+### 22.1 Projection Mechanism Recap
+
+Each projection $T(u)$ is computed as:
+
+$$
+T(u) = \int W(x) \cdot K(x, \ell_u) \, dx
+$$
+
+where the kernel typically factorizes as:
+
+$$
+K(x, \ell_u) = K_\perp(d_\perp(x)) \cdot A(t(x))
+$$
+
+with:
+
+* $d_\perp(x)$ — perpendicular distance to the ray $\ell_u$
+* $t(x)$ — longitudinal distance along the ray
+* $K_\perp$ — lateral (transverse) weighting (e.g., Gaussian)
+* $A(t)$ — longitudinal attenuation (e.g., exponential decay)
+
+---
+
+### 22.2 Interpretive Effects of Kernel Shape
+
+The **form and width** of the kernel influence interpretability along several axes:
+
+#### 1. **Spatial Precision vs. Generalization**
+
+* **Narrow kernels** ($\sigma \ll 1$): yield highly localized projections, akin to edge detectors or pointwise feature readers. Useful for fine-grained decoding, but sensitive to noise.
+* **Wide kernels** ($\sigma \gg 1$): aggregate over broader semantic regions. Useful for capturing high-level structure or resolving ambiguity, but may blur detail.
+
+#### 2. **Directionality and Anisotropy**
+
+* **Isotropic kernels** (e.g., standard Gaussians): treat all directions equally — good for general-purpose probing.
+* **Anisotropic kernels** (different $\sigma_\perp$, $\sigma_\parallel$): create elongated receptive profiles — emulating motion sensitivity or directional gradients.
+
+#### 3. **Tail Behavior and Semantic Reach**
+
+* **Gaussian tails**: decay rapidly ($\sim e^{-r^2}$), confining contribution to near-ray vicinity.
+* **Laplacian or heavy-tailed kernels**: retain influence at greater distances, enabling long-range semantic associations (see Q16).
+
+The tail behavior directly impacts whether $T(u)$ is interpretable as a **local feature** or a **global semantic context**.
+
+#### 4. **Attenuation Profile $A(t)$**
+
+* **Shallow $\tau$**: emphasizes near-surface content ("shallow memory read")
+* **Deep $\tau$**: integrates deeper into the field ("contextual semantic aggregation")
+
+The attenuation determines how temporal or structural depth is encoded in the projection — akin to near vs. far attention.
+
+---
+
+### 22.3 Kernel Shape as Cognitive Prior
+
+The kernel in HPM is not merely a smoothing function — it is a **structural prior** that defines *what it means to look*. Its shape encodes assumptions about:
+
+* What is considered close or relevant
+* How far influence propagates
+* What kinds of structure are expected (e.g., localized vs. extended)
+
+Thus, tuning the kernel is akin to configuring **the perceptual strategy** of the memory system.
+
+---
+
+### 22.4 Summary
+
+> The kernel $K(x, \ell_u)$ in HPM acts as the semantic lens through which memory is perceived.
+>
+> Its shape determines whether $T(u)$ behaves like a pinpoint detector, a semantic scanner, or a context aggregator.
+>
+> Adjusting the kernel tail, width, and anisotropy allows precise control over **what is extracted**, **from where**, and **in what structure** — making kernel design central to the interpretability and cognitive behavior of HPM.
