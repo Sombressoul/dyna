@@ -74,7 +74,7 @@ $$
 **Lemma (Product Variance):**
 
 $$
-\operatorname{Var}[\widehat{Z}] = Z^2 \left( \prod_{k=0}^{K-1}(1 + \xi_k) - 1 \right).
+\text{Var}[\widehat{Z}] = Z^2 \left( \prod_{k=0}^{K-1}(1 + \xi_k) - 1 \right).
 $$
 
 **NRMSE Bound:**
