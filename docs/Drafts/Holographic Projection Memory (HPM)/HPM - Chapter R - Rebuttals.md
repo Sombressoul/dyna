@@ -148,13 +148,23 @@ It is a tool for cognitive machines - not benchmark chasers.
 
 **Response:**
 
-These terms are used with care - not metaphorically, but **structurally**. Each has a concrete operational counterpart:
+These terms are used deliberately — not metaphorically, but **structurally**. Each maps directly to a specific operational mechanism in HPM, grounded in mathematical formulation and, where applicable, biological analogy. We use cognitive terms not as embellishments, but because the system *behaves cognitively*.
 
-* "Viewpoint" corresponds to the surface $\Phi(u)$ - which controls where and how we probe memory. $\Phi(u)$ *does* behave as a viewpoint.
-* "Perception" refers to the directional integral $T(u)$ - the field of projected structure. $T(u)$ *is* what the system "perceives" when probing memory. 
-* "Semantics" refers to how spatially distributed memory content contributes meaningfully to that projection. The memory is not symbolic - so semantic structure *must* arise from geometry. 
+Cognitive Terminology Mapping:  
 
-We use cognitive terms because **the system behaves cognitively** - not symbolically. Geometry *is* semantics here.
+| Term         | Mathematical Construct                                                 | Biological Analogy               |
+| ------------ | ---------------------------------------------------------------------- | -------------------------------- |
+| *Viewpoint*  | Projection surface: $\Phi(u) \in \mathbb{R}^N$                         | Retinotopic mapping (V1)         |
+| *Perception* | Directional projection: $T(u) = \int W(x) \cdot K(x, \ell_u) , dx$     | V1 activation / receptive fields |
+| *Semantics*  | Gradient field: $\nabla_x W$, cluster dynamics                         | Cortical column tuning / drift   |
+
+In HPM:
+
+* The **"viewpoint"** is not metaphor. It is the **surface $\Phi(u)$**, which determines *where* and *how* we look into the memory volume. It is a parametrized geometric interface to internal knowledge.
+* **"Perception"** is implemented by the directional integral $T(u)$, which returns the content encountered along a projection ray. It is not a symbol lookup, but a structured, differentiable sensing process.
+* **"Semantics"** emerges through the **interaction of projection geometry and memory gradients**. The structure of $W(x)$ — and its deformation under learning — defines meaning via topological configuration, not symbol-level assignment.
+
+This is not linguistic flair. It is a shift from discrete computation to structured cognition via geometry.
 
 ---
 
@@ -179,3 +189,43 @@ which supports **active inference**, **adaptive reconstruction**, and **topologi
 HPM is not a static probe - it is a geometrically coherent loop of perception and modulation.
 
 ---
+
+## R13. *Why didn’t you compare HPM to Memorizing Transformers or other neural memory models?*
+
+**Response:**
+
+Because such comparisons are structurally invalid. HPM and models like Memorizing Transformers operate under **incompatible assumptions**:
+
+| Aspect            | HPM                                       | Memorizing Transformers                  |
+| ----------------- | ----------------------------------------- | ---------------------------------------- |
+| Memory Structure  | Continuous, geometric field $W(x)$        | Discrete key-value cache                 |
+| Access Mechanism  | Directional projection via $\ell_u(t)$    | Similarity-based softmax over embeddings |
+| Spatial Semantics | Emerges from geometry                     | Absent; slot identity is arbitrary       |
+| Projection Model  | Integrals over rays with kernel decay     | Dot-product similarity + softmax         |
+
+HPM is a **geometric projective memory**, not a sequence-aligned, token-indexed memory store. Comparing the two is like comparing **a tomographic scanner to an indexed photo archive**.
+
+---
+
+## R14. *What evidence supports the claim that HPM is biologically plausible?*
+
+**Response:**
+
+We make no claims of biological realism. However, **structural analogies** exist between HPM mechanisms and known cortical phenomena. These analogies are not assertions of equivalence.
+
+| HPM Mechanism          | Biological Parallel                                   |
+| ---------------------- | ----------------------------------------------------- |
+| Directional projection | Orientation columns in V1                             |
+| Bidirectional rays     | Reciprocal thalamocortical connectivity               |
+| Topological divergence | Cortical map plasticity, e.g. ocular dominance shifts |
+| Adaptive kernel width  | Receptive field sharpening under attention            |
+
+All analogies are backed by structural correspondence:
+
+* Projections $\ell_u(t) = \Phi(u) + t \cdot \mathbf{v}_u$ define receptive fields aligned to a surface — matching retinotopic maps.
+* Update dynamics via $\delta(u) \cdot K(x, \ell_u)$ mirror Hebbian modulation over directionally organized inputs.
+* Divergence under conflicting projections parallels homeostatic separation of sensory maps.
+
+We do not simulate biology. But HPM mechanisms reflect **structurally constrained design choices** that resonate with observed cortical organization. These serve as interpretive anchors — not empirical claims.
+
+The term "biological plausibility" is used **architecturally, not anatomically**. In that sense, HPM is as plausible as convolutional receptive fields or grid-cell-like embeddings — functional, constrained, and interpretable.
