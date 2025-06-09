@@ -770,3 +770,169 @@ This results in a wide-beam effect while preserving coherence across parallel ra
 In rasterized projection with exact geometric metadata (entry/exit points, voxel sequence, longitudinal distances), longitudinal attenuation contributes a precisely quantifiable and analytically differentiable term to the projection. Even under coarse voxel stepping, attenuation remains smooth and fully trainable — provided that tracing information is retained and leveraged.
 
 > *Even if the path is discrete, the decay along it need not be — and its gradient flows precisely, if we let it.*
+
+---
+
+## Q13. Which gradients are lost under aggressive rasterization, and which can be recovered?
+
+**Answer:** Under extreme projection optimizations—such as Bresenham-based voxel stepping, fixed ray dictionaries, discrete-only forward computation, and no float-level tracing—it is possible to lose several gradients essential for training. However, most can be recovered analytically or through surrogate pathways if the right geometric metadata is retained.
+
+---
+
+### 13.1 Always Retained Gradients
+
+1. **Memory Content $W[x]$** — Used directly in projection sum; gradients always preserved.
+2. **Transverse Kernel Parameters (e.g., $\sigma$)** — If Gaussian or similar kernel is applied across voxels, its gradients are preserved, assuming $\text{dist}_\perp(x)$ is computed in float.
+
+---
+
+### 13.2 Lost by Default but Recoverable
+
+3. **Longitudinal Attenuation $\tau_u$** — If $t_i$ values are stored, then:
+
+$$
+\frac{\partial T(u)}{\partial \tau} = -\frac{1}{\tau^2} \sum_i t_i \cdot W[x_i] \cdot e^{-t_i/\tau}
+$$
+
+This provides a fully analytical surrogate gradient.
+
+4. **Ray Direction $\mathbf{v}_u$** — Can be recovered through entry/exit points $A, B$:
+
+$$
+\mathbf{v}_{\text{eff}} = \frac{B - A}{\|B - A\|}
+$$
+
+Backpropagation can proceed via surrogate Jacobians.
+
+5. **Projection Origin $\Phi(u)$** — If the ray start point $A$ is retained and not hard-snapped, its contribution to the path can be reintroduced.
+
+---
+
+### 13.3 Recoverable If Architecture Permits
+
+6. **Direction Codebook Index $k$** — Gradients can flow through soft-attention or Gumbel-Softmax layers if the direction is selected from a dictionary.
+
+7. **Kernel Normalization Terms** — If $T(u)$ uses normalization by $\sum K(x)$, gradient still flows but becomes more coupled; if unnormalized, it remains purely linear.
+
+---
+
+### 13.4 Fully Lost Without Special Measures
+
+8. **Time Step $t_i$ Recovery** — If not stored during rasterization (e.g., steps are implicit integers), the attenuation gradient is unrecoverable.
+
+9. **$\Phi(u)$ Influence** — If the ray entry point is hard-snapped to voxel grid and float offset is discarded, the gradient through $\Phi(u)$ is permanently lost.
+
+10. **Dynamic $\mathbf{v}_u$ without Trace** — If rays are not traced at all and a precomputed path is reused for a "nearby" direction, the gradient with respect to the actual $\mathbf{v}_u$ is lost.
+
+---
+
+### 13.5 Summary
+
+Gradient flow under rasterization depends not only on which operations are used in the forward pass, but **what geometric information is preserved and made available to backpropagation**. The key quantities enabling recovery are:
+
+* Entry/exit points ($A$, $B$)
+* Longitudinal distances $t_i$
+* Voxel visitation list ${x_i}$
+
+> *Rasterization doesn't destroy gradients — but lack of memory does.*
+
+By caching just a few geometric variables, full training signal can be preserved even under highly optimized projection traversal.
+
+---
+
+## Q14. Do we need to store $t_i$ at all? Or can it be reconstructed analytically?
+
+**Answer:** No, we do not need to store $t_i$ during ray traversal. The longitudinal position $t_i$ of each voxel relative to the origin of the ray can be reconstructed geometrically with full precision using only the known spatial coordinates of voxel centers and the origin/direction of the ray.
+
+This insight eliminates the need to explicitly accumulate or cache $t_i$ values during traversal, even in discrete rasterized settings such as Bresenham's algorithm. All that is needed is the geometric configuration of the projection surface, the ray direction, and the memory grid.
+
+---
+
+### 14.1 Geometric Framework
+
+Assume the following:
+
+* $\Phi(u) \in \mathbb{R}^N$ — the origin of the ray for projection coordinate $u$
+* $\mathbf{v}_u \in \mathbb{R}^N$ — the (normalized) direction of the ray
+* $x_i \in \mathbb{R}^N$ — the center of the $i$-th visited voxel along the ray
+
+Then the longitudinal distance from the ray origin to voxel $x_i$ is given by **scalar projection**:
+
+$$
+t_i = \langle x_i - \Phi(u), \, \mathbf{v}_u \rangle
+\tag{1}
+$$
+
+This is the orthogonal projection of $x_i$ onto the line defined by the ray.
+
+---
+
+### 14.2 Derivation and Justification
+
+Recall that the ray is defined parametrically as:
+
+$$
+\ell_u(t) = \Phi(u) + t \cdot \mathbf{v}_u
+$$
+
+For any point $x_i$, the projection onto this line is obtained by solving:
+
+$$
+x_i = \Phi(u) + t_i \cdot \mathbf{v}_u + r_i
+$$
+
+where $r_i$ is the residual vector orthogonal to $\mathbf{v}_u$. Taking the dot product with $\mathbf{v}_u$ eliminates $r_i$:
+
+$$
+\langle x_i - \Phi(u), \, \mathbf{v}_u \rangle = t_i \cdot \langle \mathbf{v}_u, \mathbf{v}_u \rangle = t_i
+$$
+
+because $|\mathbf{v}_u| = 1$. Hence Equation (1) is exact.
+
+---
+
+### 14.3 Practical Implementation
+
+In practice, voxel centers $x_i$ are known (or recoverable) from their integer indices and the grid's transform-to-world matrix. Projection origin $\Phi(u)$ is constructed from the surface grid. Thus:
+
+```python
+# Given:
+# x_i: center of voxel i (float vector in R^N)
+# phi_u: origin of ray for projection point u
+# v: normalized direction vector
+
+# Reconstruct t_i
+t_i = (x_i - phi_u).dot(v)
+```
+
+This operation is differentiable, efficient, and does not depend on traversal logic.
+
+---
+
+### 14.4 Benefits
+
+* **No accumulation needed** — works even with fixed-step voxel traversal
+* **Fully differentiable** — all components are float-valued and autograd-compatible
+* **Compatible with optimization** — $t_i$ is reconstructed only when needed
+* **Eliminates numerical drift** — avoids accumulation errors from raster indices
+
+---
+
+### 14.5 When Does This Fail?
+
+This method assumes that the voxel center $x_i$ is accessible. Therefore, it fails only if:
+
+* The traversal does not retain the voxel index
+* The voxel layout is irregular or non-grid
+
+In HPM, both conditions are avoided by design. Memory is a regular N-dimensional grid, and voxel IDs are always known.
+
+---
+
+### Conclusion
+
+$\boxed{\text{There is no need to store } t_i.}$
+
+It can always be reconstructed analytically and differentiably from the geometry of the projection surface and memory grid. Even under discrete rasterization, the underlying geometry remains smooth — and so do the gradients.
+
+> *The voxel knows where it lies. The ray knows where it began. The rest is simple geometry.*
