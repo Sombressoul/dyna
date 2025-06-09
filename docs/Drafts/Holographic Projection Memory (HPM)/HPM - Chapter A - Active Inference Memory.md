@@ -55,6 +55,11 @@ However, it is important to note:
 * Without additional constraints, memory drift may occur over time.
 * The approach assumes interpretability of the projection-target $T^*(u)$, which may not always be explicitly known.
 
+> **Note on Convergence.**  
+> The active memory update rule described above does **not guarantee convergence** in the classical optimization sense. The process is driven by local projection errors and applied without a global loss function or energy minimization.  
+> While each update is bounded and spatially localized via the kernel $K(x, \ell_u)$, the aggregate effect of repeated, possibly conflicting updates may lead to stable adaptation, semantic drift, or divergence depending on system configuration.  
+> A formal characterization of convergence behavior is **beyond the scope of this chapter** and is designated as a topic for future investigation.  
+
 ---
 
 ## A.5 Use Case Scenarios (Hypothetical)
