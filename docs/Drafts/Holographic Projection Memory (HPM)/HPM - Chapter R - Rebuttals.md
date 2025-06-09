@@ -258,7 +258,7 @@ the accumulation of updates over time depends on:
 
 As such, **repeated updates may induce divergence, drift, or stable reconfiguration**, depending on context.
 
-> Theoretical guarantees of convergence or bounded drift are possible but require assumptions over projection sampling and error structure. This remains an open area for formal study, as noted in Chapter Q.
+> Theoretical guarantees of convergence or bounded drift are possible, but require assumptions over projection sampling and error structure. As noted in Chapter Q, this remains an open area of formal study and is scheduled for future theoretical development.
 
 ---
 
@@ -343,4 +343,4 @@ We make **no claim** of invertibility. HPM is designed for forward perception, n
 
 > Finally, the connection to holographic duality and the AdS/CFT correspondence suggests deeper theoretical analogies - but we treat these as interpretive metaphors, not operational tools.
 
-HPM is not a reversible memory. It is a **semantic interface** grounded in projection.
+HPM is not a reversible memory. It is a semantic interface grounded in projection. While it is not designed to reconstruct $W(x)$ from $T(u)$, the degree of recoverability can be empirically evaluated via auxiliary invertible models trained for this purpose.
