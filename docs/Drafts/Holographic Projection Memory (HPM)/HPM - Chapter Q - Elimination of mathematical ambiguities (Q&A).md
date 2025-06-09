@@ -936,3 +936,361 @@ $\boxed{\text{There is no need to store } t_i.}$
 It can always be reconstructed analytically and differentiably from the geometry of the projection surface and memory grid. Even under discrete rasterization, the underlying geometry remains smooth — and so do the gradients.
 
 > *The voxel knows where it lies. The ray knows where it began. The rest is simple geometry.*
+
+---
+
+## Q15. Why does the HPM documentation sometimes describe memory updates as local, and other times as nonlocal?
+
+### Short Answer:
+
+Because **Holographic Projection Memory (HPM)** supports **both levels of description**:
+
+* **Nonlocal updates** arise in the **continuous formulation**, where memory is defined as a smooth field $W : \mathbb{R}^N \to \mathbb{R}^C$
+* **Local updates** arise in the **discrete implementation**, where memory is stored as a finite tensor $W[x] \in \mathbb{R}^{D_1 \times \cdots \times D_N \times C}$
+
+This is **not a contradiction**, but a result of the **distinction between mathematical abstraction and numerical realization**. Projection-based updates are theoretically continuous and spatially extended, but in practice affect only a small neighborhood around each probing ray.
+
+---
+
+### 15.1 Theoretical Nonlocality
+
+In the continuous formulation (see Chapters A and B), a memory update is defined as:
+
+$$
+\Delta W(x) = \alpha \cdot \delta(u) \cdot K(x, \ell_u)
+$$
+
+or, in aggregate form:
+
+$$
+\Delta W(x) = \int_{\mathcal{U}} \delta(u) \cdot K(x, \ell_u) \, du
+$$
+
+Here:
+
+* $K(x, \ell_u)$ is a smooth projection kernel (e.g., Gaussian), which is **nonzero across all of** $\mathbb{R}^N$
+* Therefore, $\Delta W(x) \neq 0$ potentially **everywhere**, even for a localized projection error $\delta(u)$
+
+This defines a **nonlocal response**: modifying a single projection influences an extended region of memory — consistent with **associative memory dynamics**.
+
+---
+
+### 15.2 Practical Locality
+
+In the discrete implementation, the memory field is a tensor $W[x]$, and the kernel $K(x, \ell_u)$ is approximated over a sparse set of points:
+
+* Typically: $K(x, \ell_u) \approx 0$ when $d_\perp(x) > 3\sigma$
+* Updates are computed **only for a small voxel neighborhood** $\Omega_u \subset \mathbb{Z}^N$
+
+Example of a discrete update:
+
+$$
+W[x] \leftarrow W[x] + \alpha \cdot \delta(u) \cdot K(x, \ell_u), \quad \text{for } x \in \Omega_u
+$$
+
+This makes the operation strictly **local** in practice, affecting only a few hundred memory points per ray.
+
+---
+
+### 15.3 Why This Is Not a Contradiction
+
+These are simply two descriptions of the **same mechanism**, applied at different levels of resolution:
+
+| Level       | Kernel                 | Update Scope | Interpretation                      |
+| ----------- | ---------------------- | ------------ | ----------------------------------- |
+| Theoretical | $K(x, \ell_u)$, smooth | Nonlocal     | Semantic field influence            |
+| Numerical   | $K[x]$, discretized    | Local        | Computation-efficient approximation |
+
+The nonlocal nature is encoded in the **shape of the projection kernel**, while locality emerges from **truncation and numerical support bounds**.
+
+---
+
+### 15.4 Conclusion
+
+HPM supports both local and nonlocal updates:
+
+* **Nonlocality** is a feature of its continuous, differentiable architecture — enabling semantic generalization
+* **Locality** is a feature of its discrete, tractable implementation — ensuring efficient and focused updates
+
+> *Continuum says "everything touches everything." Machines say "only what fits in cache." Both are correct, at their own scales.*
+
+---
+
+## Q16. Why does the HPM documentation primarily use the Gaussian kernel? Are other kernels, such as Laplacian or heavy-tailed alternatives, appropriate?
+
+### Short Answer:
+
+Because the **Gaussian kernel** offers an ideal balance of:
+
+* **Smoothness** and differentiability
+* **Localized support** for efficient computation
+* **Analytical convenience** for gradient-based learning
+
+However, in **high-dimensional spaces** $N \gg 1$, Gaussian kernels can become too narrow, causing projection interactions to vanish. In such cases, **heavier-tailed kernels** like the **Laplacian** or **generalized exponentials** are more appropriate.
+
+---
+
+### 16.1 Why Gaussian is the Default
+
+The standard projection kernel used in HPM is:
+
+$$
+K(x, \ell_u) = \exp\left( -\frac{d_\perp^2}{2\sigma^2} \right)
+$$
+
+This Gaussian form is preferred due to:
+
+1. **Smoothness:** infinitely differentiable across $\mathbb{R}^N$
+2. **Isotropy:** equal decay in all spatial directions
+3. **Analytical gradients:** simple closed-form derivatives w\.r.t. geometry
+4. **Localized response:** effective support within $2\text{--}3\sigma$ neighborhood
+
+These traits make it highly suitable for **low- and mid-dimensional** projection fields (e.g., $N = 2, 3$).
+
+---
+
+### 16.2 The Problem in High Dimensions
+
+In high-dimensional memory fields ($N \gg 1$), Gaussian kernels:
+
+* **Decay too quickly**: kernel values become negligible for all but the closest points
+* **Fail to overlap**: projection rays and memory clusters become effectively disjoint
+* **Suppress generalization**: nonlocal memory association vanishes
+
+This is discussed in **Chapter C.7** as the "vanishing interaction strength" problem.
+
+---
+
+### 16.3 Laplacian and Generalized Kernels
+
+**Laplacian kernel:**
+
+$$
+K(x, \ell_u) = \exp\left( -\frac{d(x, \ell_u)}{\sigma} \right)
+$$
+
+* Decays linearly in the exponent ($\sim e^{-r}$)
+* Has **heavier tails** than the Gaussian ($\sim e^{-r^2}$)
+* Maintains differentiability almost everywhere
+
+**Generalized kernel (hybrid form):**
+
+$$
+K(x, \ell_u) = \exp\left( -\left( \frac{d(x, \ell_u)}{\sigma} \right)^\alpha \right), \quad \alpha \in (1, 2]
+$$
+
+* $\alpha = 2$: Gaussian
+* $\alpha = 1$: Laplacian
+* $\alpha \in (1, 2)$: interpolated heavy-tailed kernel
+
+This allows flexible tuning of spatial decay behavior based on memory density, semantic range, or task requirements.
+
+---
+
+### 16.4 Conclusion
+
+The Gaussian kernel is the **default** in HPM due to its smoothness, locality, and gradient simplicity. However:
+
+* In **high-dimensional memory fields**, interaction strength may vanish
+* **Heavier-tailed kernels** (Laplacian, generalized) are effective alternatives
+* These support **long-range semantic interactions** without sacrificing differentiability
+
+> *The Gaussian kernel is a microscope. The Laplacian is a radar. The choice depends on how far you need to see.*
+
+---
+
+## Q17. Does the active memory update rule in HPM converge over time?
+
+**Answer:**
+
+Not necessarily. The active memory update rule in HPM — where the memory field $W(x)$ is modified during inference via local projection error — is designed for *plasticity*, not guaranteed convergence. While each update is bounded and differentiable, there is currently **no formal convergence proof** for the general case. Instead, the behavior depends on multiple architectural and dynamic factors.
+
+---
+
+### 17.1 Update Rule Recap
+
+In Chapter A, the memory update rule is introduced as:
+
+$$
+W(x) \leftarrow W(x) + \alpha \cdot \delta(u) \cdot K(x, \ell_u)
+$$
+
+Where:
+
+* $\alpha > 0$ is the memory learning rate,
+* $\delta(u) = T^*(u) - T(u)$ is the projection-level error,
+* $K(x, \ell_u)$ is the projection kernel,
+* $\ell_u(t) = \Phi(u) + t \cdot \mathbf{v}_u$ defines the probing ray.
+
+Each update is spatially bounded (via the kernel $K$) and directionally modulated (via $\mathbf{v}_u$), but the system performs no global energy minimization.
+
+---
+
+### 17.2 Why Convergence Is Not Guaranteed
+
+Several factors preclude convergence guarantees in the current formulation:
+
+1. **No global loss functional** is minimized. Updates occur locally in response to projection mismatches without an objective scalar functional $\mathcal{L}(W)$.
+
+2. **Sequential updates may interfere**. Projection points $u_1, u_2, \dots$ may activate overlapping regions in $W$, causing updates to conflict or oscillate.
+
+3. **Non-convex geometry**. The space of memory configurations and projections is highly non-linear and may contain many attractors or unstable fixed points.
+
+4. **External dependencies.** If $T^*(u)$ is not fixed or itself a function of $W(x)$ or downstream computation, the target shifts dynamically — rendering convergence ill-posed.
+
+---
+
+### 17.3 Local Stability vs. Global Convergence
+
+In practice, small $\alpha$ values and smooth kernels may lead to **local stabilization** in regions of memory activated consistently by similar $u$. However, this is not the same as convergence to a fixed point $W^*$. Instead, memory may exhibit:
+
+* **Convergent behavior in low-noise regimes** (e.g., consistent $T^*(u)$, redundant projections)
+* **Semantic drift** in conflicting update regimes (see Chapter C)
+* **Oscillatory or divergent trajectories** under adversarial or cyclic supervision
+
+---
+
+### 17.4 Possible Conditions for Convergence (Future Work)
+
+Convergence might be provable under additional constraints, such as:
+
+* A fixed projection distribution $u \sim p(u)$ with sufficient coverage
+* A bounded error target $\delta(u)$ with decay schedule
+* Smoothness and monotonicity conditions on $K(x, \ell_u)$
+* A decreasing step size $\alpha_t \to 0$ (as in Robbins–Monro schemes)
+
+These conditions would align the update rule with classical stochastic approximation methods. However, such formalization is not yet established in HPM.
+
+---
+
+### 17.5 Conclusion
+
+> *The active memory update rule in HPM is intentionally unconstrained. It supports rapid semantic plasticity, but does not promise convergence. Its long-term behavior is governed by projection geometry, kernel structure, and error signal dynamics — not by energy minimization.*
+
+A full analysis of convergence conditions and divergence modes is proposed as a topic for future theoretical research. Until then, updates in HPM should be understood as **context-sensitive deformations** of memory, not as steps toward a fixed attractor.
+
+> *In HPM, error does not vanish — it reshapes the space.*
+
+---
+
+## Q18. What is the physical or mathematical significance of the projection surface $\Phi(u)$? Is it merely an interface or does it influence memory?
+
+**Answer:**
+
+The projection surface $\Phi(u)$ is not a passive indexing construct — it is a **semantically active, context-sensitive coordinate system**. Mathematically, it defines a differentiable mapping:
+
+$$
+\Phi : \mathbb{R}^{N-1} \to \mathbb{R}^N
+$$
+
+which embeds an $(N{-}1)$-dimensional manifold into the ambient memory space $\mathbb{R}^N$. Each coordinate $u \in \mathbb{R}^{N-1}$ gives rise to a projection ray:
+
+$$
+\ell_u(t) = \Phi(u) + t \cdot \mathbf{v}_u
+$$
+
+This surface determines both the **origin and orientation context** of all directional access mechanisms. Its geometric properties (position, orientation, curvature) influence how the memory field $W(x)$ is perceived, integrated, and ultimately interpreted.
+
+#### Semantic Role:
+
+$\Phi(u)$ can be understood as an analog of a **viewpoint, attention focus, or internal perspective**. A deformed or rotated projection surface will extract a different cross-section of the memory field — one that emphasizes, suppresses, or recontextualizes latent semantic patterns.
+
+Thus, a **flexible $\Phi(u)$ acts as a semantic lens**: by modulating its geometry, the system can adaptively extract meaning-aligned slices of distributed memory content.
+
+---
+
+## Q19. What happens when projection rays overlap? Does it cause interference or conflict?
+
+**Answer:**
+
+Overlapping projection rays are not problematic — in fact, they are a fundamental mechanism by which **semantic richness** emerges in HPM.
+
+Consider multiple rays $\ell_{u_1}, \ell_{u_2}, \dots$ that intersect or traverse nearby regions in $W(x)$. Because each ray integrates contributions using a localized kernel $K(x, \ell_u)$, even small angular or positional deviations lead to **non-identical semantic footprints**:
+
+* One ray may extract a general concept: "cat"
+* Another, slightly offset, may capture "fat cat"
+
+The combination yields richer meaning. Instead of creating conflict, **overlap enhances context**.
+
+### Mathematical View:
+
+Let $T(u)$ denote the projection for a given ray. Then the **semantic variation** across nearby rays arises from the directional and spatial sensitivity of $K(x, \ell_u)$:
+
+$$
+K(x, \ell_{u_1}) \neq K(x, \ell_{u_2}) \quad \text{if } \mathbf{v}_{u_1} \neq \mathbf{v}_{u_2} \text{ or } \Phi(u_1) \neq \Phi(u_2)
+$$
+
+Thus, even in overlapping volumes, projections sample **slightly different local submanifolds** of memory — enabling fine-grained modulation and semantic nuance.
+
+Overlap does not cause conflict unless projection errors with **opposite signs** are applied to the same region (see Chapter C). Even then, repulsive dynamics cause **divergent adaptation**, not destructive interference.
+
+---
+
+## Q20. Can the projections $T(u)$ be interpreted as perceptual images or receptive fields?
+
+**Answer:**
+
+Yes. The projection operator $T(u)$ in HPM closely parallels biological concepts such as **receptive fields**, **perceptual filters**, and **retinotopic responses**.
+
+Each $T(u)$ results from an integral over a directed kernel:
+
+$$
+T(u) = \int W(x) \cdot K(x, \ell_u) \, dx
+$$
+
+Here:
+
+* $W(x)$ is the distributed latent content
+* $K(x, \ell_u)$ defines a spatially localized, directionally selective receptive window
+
+This is structurally analogous to biological vision:
+
+* **Retinal projection:** $u$ indexes a 2D surface of perceptual samples
+* **Receptive field:** $K(x, \ell_u)$ selects the spatial window
+* **Output activation:** $T(u)$ captures the neural response at that location
+
+### Functional Interpretation:
+
+* $T(u)$ can be interpreted as **what the system sees** when looking along ray $\ell_u$
+* The full field ${T(u)}$ constitutes a **semantic rendering** of memory content
+* Lateral convolution on $T(u)$ (as in beam widening) emulates **cortical pooling** or **topographic integration**
+
+Thus, HPM's projection mechanism is not just mathematically grounded — it is **cognitively interpretable** as a perceptual interface over distributed latent geometry.
+
+---
+
+## Q21. Why is there no softmax or attention normalization in HPM, like in transformer architectures?
+
+**Answer:**
+
+Because HPM is a topological projective memory, not "yet another attention", and fundamentally **geometric**, not competitive.
+
+In transformer models, attention is computed via normalized similarity weights:
+
+$$
+\alpha_i = \frac{\exp(q \cdot k_i)}{\sum_j \exp(q \cdot k_j)}
+$$
+
+This creates **competition among discrete slots** (tokens, positions, keys).
+
+In contrast, HPM does not assign discrete scores. It integrates over a continuous space using a smooth kernel:
+
+$$
+T(u) = \int W(x) \cdot K(x, \ell_u) \, dx
+$$
+
+Here:
+
+* No softmax is needed — **locality is enforced by kernel decay**, not normalization
+* No attention weights are learned — **focus emerges from geometry** ($\Phi$, $\mathbf{v}_u$, $\tau$)
+* Multiple $T(u)$ values can coexist without competing for a shared sum
+
+This leads to:
+
+* **Interpretability**: each projection ray $\ell_u$ defines an independent semantic probe
+* **Modularity**: projections can be added, removed, or composed
+* **Extensibility**: directional probing generalizes across continuous fields, not fixed tokens
+
+While HPM *can emulate* attention (e.g., by normalizing $T(u)$ or gating updates), it does not require softmax — and in fact gains **flexibility and robustness** by avoiding it.
+
+> *In HPM, meaning is focused by geometry — not by competition.*
