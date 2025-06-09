@@ -546,3 +546,227 @@ These alternatives allow bidirectional integration along a single ray, or gradie
 The attenuation function $A(t)$ is currently defined only for $t \ge 0$, consistent with HPM’s unidirectional ray traversal design. Bidirectional probing is handled via two independent forward-only rays. Extensions to $t < 0$ are mathematically possible, but not included in the default formulation.
 
 > *Attenuation in HPM is a directional lens — defined forward by default, but extendable in theory.*
+
+
+---
+
+## Q11. What happens to gradients when using rasterized ray traversal? Can they be recovered?
+
+**Answer:** Rasterized ray traversal, such as Bresenham-style grid stepping, introduces discontinuities in ray paths and thus breaks the standard differentiability with respect to geometric parameters like direction vectors and projection origins. However, if intermediate geometric information (e.g., ray entry and exit points) is retained, then surrogate gradients can be reconstructed. This makes the use of discrete ray casting compatible with gradient-based learning.
+
+---
+
+### 11.1 Theoretical Background
+
+In the ideal continuous formulation, the projection is defined by:
+
+$$
+T(u) = \int W(x) \cdot K(x, \ell_u) \, dx
+$$
+
+where:
+
+* $\ell_u(t) = \Phi(u) + t \cdot \mathbf{v}_u$ is the ray emitted from point $\Phi(u)$ in direction $\mathbf{v}_u$.
+* $K(x, \ell_u)$ is a smooth kernel centered along the ray.
+
+In practice, this is replaced by a sum over rasterized voxel indices:
+
+$$
+T(u) \approx \sum_{x \in \text{Ray}(u)} W[x] \cdot K(x, \ell_u)
+$$
+
+Here, `Ray(u)` is computed discretely using Bresenham’s or other grid-based algorithms.
+
+---
+
+### 11.2 Parameters Affected by Rasterization
+
+| Parameter                   | Gradient Loss (Default) | Recoverable? | Notes                                                                                     |
+| --------------------------- | ----------------------- | ------------ | ----------------------------------------------------------------------------------------- |
+| Memory content $W[x]$    | No loss                 | Yes          | Directly used in sum. Gradients fully preserved.                                          |
+| Kernel width $\sigma$     | No loss                 | Yes          | Appears in smooth kernel function.                                                        |
+| Attenuation $\tau_u$     | Possibly lost           | Yes          | If $t$ is discretized, gradients may vanish. Recoverable via surrogate time encoding.   |
+| Origin $\Phi(u)$          | Lost                    | Partial      | Discrete voxel routing is insensitive to small shifts. Recoverable via entry point $A$. |
+| Direction $\mathbf{v}_u$ | Lost                    | Yes          | Recoverable via entry/exit point analysis.                                                |
+
+---
+
+### 11.3 Recovery via Geometric Surrogates
+
+Let $A$ and $B$ be the entry and exit points of the ray inside the memory field:
+
+$$
+A = \Phi(u) + t_\text{entry} \cdot \mathbf{v}_u, \quad B = \Phi(u) + t_\text{exit} \cdot \mathbf{v}_u
+$$
+
+Then the **effective direction vector** can be reconstructed as:
+
+$$
+\vec{v}_{\text{eff}} = \frac{B - A}{\|B - A\|}
+$$
+
+This allows a surrogate gradient with respect to $\mathbf{v}_u$ to be computed:
+
+$$
+\frac{\partial T(u)}{\partial \mathbf{v}_u} \approx \left( \frac{\partial T(u)}{\partial B} - \frac{\partial T(u)}{\partial A} \right) \cdot \frac{\partial B, A}{\partial \mathbf{v}_u}
+$$
+
+This approximation is valid if $A$ and $B$ are computed analytically (not snapped to grid).
+
+---
+
+### 11.4 Fixed Codebook Directions
+
+In codebook-based ray projection (Appendix E.8):
+
+* The direction $\mathbf{v}_u$ is chosen from a fixed set ${\mathbf{v}_k}$
+* Index $k(u)$ is selected either by soft-attention or hard routing
+
+In this case:
+
+* Gradients do not propagate through the discrete voxel path
+* But they do propagate through:
+
+  * Codebook vectors $\mathbf{v}_k$
+  * Selection weights $a_k(u)$ if attention-based
+
+This makes routing differentiable via meta-parameters:
+
+$$
+\mathbf{v}_u = \sum_k a_k(u) \cdot \mathbf{v}_k
+$$
+
+---
+
+### 11.5 Time-Attenuation Gradients
+
+If kernel attenuation depends on the longitudinal distance $t$:
+
+$$
+K(x, \ell_u) = \exp\left( -\frac{\text{dist}^2_\perp(x)}{2\sigma^2} \right) \cdot \exp\left( -\frac{t(x)}{\tau_u} \right)
+$$
+
+Then discretization affects gradients if:
+
+* $t(x)$ is approximated via discrete index (e.g., step number)
+
+Recoverable solution:
+
+* Store continuous $t_x$ values per voxel during traversal
+* Compute gradients of $K$ w\.r.t. $\tau_u$ analytically
+
+---
+
+### 11.6 Practical Recommendations
+
+1. **Always cache entry ($A$) and exit ($B$) points per ray.**
+2. **Treat direction vectors as meta-parameters and pass gradients through $A, B$ or $k(u)$**.
+3. **If using dynamic directions, maintain float-precision during traversal.**
+4. **Use differentiable interpolation instead of hard voxel assignment if needed (e.g., via trilinear weights).**
+
+---
+
+### Conclusion
+
+Discrete rasterization breaks differentiability in the forward trace, but if sufficient geometric metadata is retained (entry/exit points, continuous time indices, direction IDs), then gradients can be reconstructed with high fidelity. This enables efficient, high-performance projection with full backward compatibility.
+
+> *A ray need not be smooth to carry a gradient — only transparent enough to let it pass through.*
+
+---
+
+## Q12. Can longitudinal attenuation gradients be recovered analytically under rasterized ray traversal?
+
+**Yes.** When ray traversal is rasterized (e.g., using N-dimensional Bresenham) and attenuation along the ray is defined as an exponential decay with respect to distance, it is possible to recover both the exact contribution and the gradient of the attenuation term. This is feasible under the condition that we retain access to the full voxel trace, ray entry/exit points, and per-step longitudinal positions $t_i$ during forward traversal.
+
+---
+
+### 12.1 Geometric Setup and Assumptions
+
+We consider a coherent, parallel bundle of rays. Each ray is defined by:
+
+* A fixed direction vector $\mathbf{v} \in \mathbb{R}^N$, normalized such that $|\mathbf{v}| = 1$
+* An origin point on the projection hyperplane $\Phi(u)$, where $u \in \mathbb{Z}^{N-1}$ is a discrete projection coordinate
+
+The ray enters the memory volume (assumed to be an axis-aligned hypercube) at point $A$ and exits at point $B$, both computed using exact **Ray–AABB intersection**. The physical length of the ray inside the volume is:
+
+$$
+L = \|B - A\| = t_{\text{exit}} - t_{\text{entry}}
+$$
+
+The ray is rasterized using an N-dimensional Bresenham algorithm, producing a discrete sequence of visited voxels $\{x_i\}_{i=1}^N$, along with corresponding longitudinal positions $\{t_i\} \subset [t_{\text{entry}}, t_{\text{exit}}]$.
+
+---
+
+### 12.2 Projection and Attenuation Definitions
+
+We define the longitudinal attenuation kernel as:
+
+$$
+K_\parallel(t_i; \, \tau) = \exp\left( - \frac{t_i}{\tau} \right)
+$$
+
+The total projected signal for ray $u$ is:
+
+$$
+T(u) = \sum_{i=1}^{N} W[x_i] \cdot K_\parallel(t_i; \, \tau)
+\tag{1}
+$$
+
+For comparison, we define the "unattenuated" projection (i.e., assuming infinite $\tau$) as:
+
+$$
+T_{\text{flat}}(u) = \sum_{i=1}^{N} W[x_i]
+\tag{2}
+$$
+
+The difference between them reflects the cumulative suppression caused by attenuation:
+
+$$
+\Delta T(u) = T_{\text{flat}}(u) - T(u) = \sum_{i=1}^N W[x_i] \cdot \left(1 - \exp\left( -\frac{t_i}{\tau} \right)\right)
+\tag{3}
+$$
+
+All quantities in this equation are known during forward traversal. Thus, the attenuation contribution can be exactly separated.
+
+---
+
+### 12.3 Gradient with Respect to $\tau$
+
+The projection $T(u)$ is differentiable with respect to $\tau$:
+
+$$
+\frac{\partial T(u)}{\partial \tau} = \sum_{i=1}^N W[x_i] \cdot \frac{\partial}{\partial \tau} \exp\left( -\frac{t_i}{\tau} \right) = -\frac{1}{\tau^2} \sum_{i=1}^N t_i \cdot W[x_i] \cdot \exp\left( -\frac{t_i}{\tau} \right)
+\tag{4}
+$$
+
+This gradient can be computed analytically and efficiently using the cached trace $\{x_i, t_i\}$.
+
+---
+
+### 12.4 Modeling Beam Width via Surface Convolution
+
+Instead of expanding the ray path laterally within the volume (e.g., using a cylinder or Gaussian shell), we implement beam width through **convolution across neighboring projection rays** at the surface level. After computing $T(u)$ via Equation (1), we apply an N-1-dimensional Gaussian convolution over neighboring projection points $u$:
+
+$$
+\widetilde{T}(u) = \sum_{s \in \mathcal{N}(0)} \omega_s \cdot T(u + s), \quad \text{where } \omega_s = \exp\left( - \frac{\|s\|^2}{2\sigma_\perp^2} \right)
+\tag{5}
+$$
+
+This results in a wide-beam effect while preserving coherence across parallel rays. The width parameter $\sigma_\perp$ controls lateral spread and can be optimized.
+
+---
+
+### 12.5 Recovery Scenarios
+
+1. If the direction $\mathbf{v}$ is fixed and $\tau$ is learnable, then Equation (4) gives exact gradients.
+2. If $\mathbf{v}$ is dynamically generated, then entry and exit points $A$ and $B$ allow us to recover $\mathbf{v}_{\text{eff}} = (B - A)/|B - A|$ for surrogate differentiation.
+3. If $\mathbf{v}$ is selected from a codebook, gradients flow through the selection weights and vector basis.
+4. If both $\tau$ and $\mathbf{v}$ are learnable, we combine (2) and (4) via a custom backward rule.
+
+---
+
+### 12.6 Conclusion
+
+In rasterized projection with exact geometric metadata (entry/exit points, voxel sequence, longitudinal distances), longitudinal attenuation contributes a precisely quantifiable and analytically differentiable term to the projection. Even under coarse voxel stepping, attenuation remains smooth and fully trainable — provided that tracing information is retained and leveraged.
+
+> *Even if the path is discrete, the decay along it need not be — and its gradient flows precisely, if we let it.*
