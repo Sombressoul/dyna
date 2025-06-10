@@ -71,7 +71,7 @@ dyna/
 
 |            | Theory   | Implementation  | Verified  | Test code |
 | ---------- | -------- | --------------- | --------- | --------- |
-| **Status** | Ongoing  | TBD             | NO        | NO        |
+| **Status** | Ongoing  | TODO            | NO        | NO        |
 
 ---
 
@@ -81,7 +81,7 @@ dyna/
 
 |            | Theory   | Implementation  | Verified  | Test code |
 | ---------- | -------- | --------------- | --------- | --------- |
-| **Status** | TBD      | COMPLETE        | YES       | YES       |
+| **Status** | TODO     | COMPLETE        | YES       | YES       |
 
 ---
 
