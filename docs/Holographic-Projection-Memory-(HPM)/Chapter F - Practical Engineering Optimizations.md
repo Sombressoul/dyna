@@ -517,10 +517,142 @@ In rasterized or stateful scenarios, **there is no fundamental barrier to passin
 
 ---
 
+## F.8 Implementation Guidelines and Tradeoffs
 
+Engineering an efficient and trainable HPM system requires balancing multiple constraints: memory access patterns, gradient propagation, execution throughput, and architectural flexibility. This section summarizes practical recommendations and design tradeoffs that arise when implementing projection and update mechanisms.
 
 ---
 
-TODO:
-F.8 Implementation Guidelines and Tradeoffs  
-F.9 Summary of Key Strategies  
+### F.8.1 Preferred Data Contract
+
+The minimal, fully differentiable interface for projection consists of:
+
+* $\Phi(u) \in \mathbb{R}^N$: ray origin (viewpoint surface)
+* $\mathbf{v}_u \in \mathbb{R}^N$: ray direction (unit or normalized)
+* $W(x)$: memory field (discretized)
+* Kernel parameters ($\tau$, $\sigma$, etc.)
+
+This stateless contract ensures that all geometric quantities ($t_i$, $x_i$, direction vectors) can be computed on-the-fly, preserving gradient flow and enabling pure-function ray evaluation.
+
+Tradeoff: passing full geometric data per ray slightly increases memory bandwidth (e.g., 24 bytes/ray in FP32), but eliminates the need for reconstruction and surrogate gradients.
+
+---
+
+### F.8.2 Codebook Direction Handling
+
+If $\mathbf{v}_u$ is selected from a discrete codebook ${\mathbf{v}_k}$:
+
+* Use soft routing: $\mathbf{v}_u = \sum_k a_k(u) \cdot \mathbf{v}_k$
+* Gradients flow through weights $a_k(u)$ (learnable, e.g., via softmax or Gumbel-Softmax)
+* Optional: cache precomputed ray traces for each $\mathbf{v}_k$
+
+Tradeoff: increases flexibility and learnability, but introduces soft interpolation error and runtime mixture cost.
+
+---
+
+### F.8.3 Tracing Backend Selection
+
+| Mode                | Characteristics                                     | Gradient Support          |
+| ------------------- | --------------------------------------------------- | ------------------------- |
+| Stateless           | Requires $\Phi(u)$ and $\mathbf{v}_u$ per ray       | Full                      |
+| Stateful + $A,B$    | Entry/exit points cached                            | With surrogate recovery   |
+| Stateful only       | Voxel list only, no geometry                        | Limited or blocked        |
+
+Recommendation: Prefer stateless tracing with geometry passed explicitly. Only use pure stateful tracing when hardware constraints dominate.
+
+---
+
+### F.8.4 Memory and Batch Efficiency
+
+* Group rays by shared $\mathbf{v}_k$ to exploit memory coherence
+* Use precomputed offset lists for codebook directions
+* Cache projection kernels in LUTs for repeated decay profiles
+* Evaluate $K(t_i)$ in-place to avoid memory allocation per ray
+
+Tradeoff: these optimizations improve runtime speed and batching, but may reduce flexibility in learnable direction scenarios.
+
+---
+
+### F.8.5 Update Modes and Streaming Writes
+
+In update mode (e.g., Delta-Learning):
+
+* Streaming writes to $W(x)$ can be performed incrementally
+* Each ray contributes $\delta(u) \cdot K(x_i, \ell_u)$ at its visited voxels
+* Use atomic operations or scatter-add to merge contributions
+
+Tradeoff: atomicity ensures correctness, but may slow down parallelism; buffer-based accumulation may improve throughput but requires more memory.
+
+---
+
+### Summary
+
+Efficient HPM implementation depends on carefully managing projection interface, memory access, and execution context. Stateless geometry contracts and modular direction selection maximize differentiability and compatibility. Tradeoffs between flexibility, performance, and learnability should be evaluated based on task and deployment environment.
+
+> *Optimization is not about removing complexity. It is about placing it where it belongs.*
+
+---
+
+## F.9 Summary of Key Strategies
+
+This section consolidates the core engineering strategies for implementing Holographic Projection Memory (HPM) systems in a way that is efficient, scalable, and fully differentiable. Each method below is grounded in the geometry of projection and aligned with the analytical formulation of HPM.
+
+---
+
+### F.9.1 Projection Interface Design
+
+| Component         | Recommendation                                      | Rationale                                   |
+| ----------------- | --------------------------------------------------- | ------------------------------------------- |
+| $\Phi(u)$         | Pass explicitly per ray                             | Enables stateless execution, full gradients |
+| $\mathbf{v}_u$    | Pass explicitly or as a codebook mixture            | Differentiable direction control            |
+| $t_i$             | Recompute from geometry                             | Avoids state accumulation                   |
+| $x_i$             | Generate via $\Phi(u) + t_i \cdot \mathbf{v}_u$     | Stateless ray evaluation                    |
+
+---
+
+### F.9.2 Gradient Preservation
+
+| Scenario                        | Strategy                                          | Gradient Status |
+| ------------------------------- | ------------------------------------------------- | --------------- |
+| Stateless execution             | Pass $\Phi(u)$ and $\mathbf{v}_u$                 | Full            |
+| Stateful + entry/exit ($A,B$)   | Recover $\mathbf{v}_{\text{eff}}$ from $A,B$      | Surrogate       |
+| Rasterized only (no $A,B$)      | Avoid or approximate                              | Blocked         |
+
+---
+
+### F.9.3 Kernel Handling
+
+| Design Choice | Strategy                                | Benefit              |
+| ------------- | --------------------------------------- | -------------------- |
+| Beam widening | Surface-level convolution               | Fast, differentiable |
+| Shape control | Separable longitudinal/transverse decay | Tunable locality     |
+| Normalization | Avoid in-kernel; apply post-projection  | Preserves linearity  |
+
+---
+
+### F.9.4 Performance Optimization
+
+| Technique                     | Application Context                 | Effect                                |
+| ----------------------------- | ----------------------------------- | ------------------------------------- |
+| Directional batching          | Codebook-based rays                 | Improves cache coherence              |
+| Ray trace caching             | Shared $\mathbf{v}_k$ directions    | Eliminates redundant tracing          |
+| LUT kernel evaluation         | Repeated decay profiles             | Accelerates kernel application        |
+| Scatter-add with accumulation | Update phase                        | Ensures correctness under parallelism |
+
+---
+
+### F.9.5 Execution Mode Selection
+
+| Mode              | Preferred When                          | Limitations             |
+| ----------------- | --------------------------------------- | ----------------------- |
+| Stateless         | Training, learnable geometry            | Slight memory overhead  |
+| Hybrid ($A,B$)    | Low-level GPU kernels with ray clipping | Requires extra caching  |
+| Fully rasterized  | Inference-only with fixed geometry      | No direction gradients  |
+
+---
+
+### Final Observation
+
+The core insight of this chapter is that **efficiency and differentiability are not at odds** - provided that geometric structure is made explicit and preserved throughout execution. Stateless ray contracts, analytical reconstruction, and modular control over projection dynamics allow HPM systems to scale without sacrificing precision or gradient reach.
+
+> *Every projection carries structure. Optimization is the art of preserving it.*
