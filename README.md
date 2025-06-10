@@ -24,7 +24,7 @@ gradient control techniques.
 docs/             # Various documentation about DyNA project
 dyna/
 ├── functional/   # Stand‑alone differentiable functions
-├── lib/          # Low‑level dynamic weight builders
+├── lib/          # Low‑level building blocks
 └── module/       # High‑level neural network layers
 ```
 
