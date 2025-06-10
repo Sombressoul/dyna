@@ -361,7 +361,7 @@ The execution model of Holographic Projection Memory (HPM) determines how rays $
 
 This section formalizes both paradigms and establishes a clear interface contract for projection operations.
 
-**Note:** In rasterized or low-level tracing scenarios, there is no fundamental barrier to forwarding the original ray parameters — namely $\Phi(u)$ and $\mathbf{v}_u$ — into the projection kernel. Doing so eliminates the need for surrogate reconstruction and preserves full gradient coverage. The omission of these quantities is a matter of engineering convenience, not theoretical necessity.
+**Note:** In rasterized or low-level tracing scenarios, there is no fundamental barrier to forwarding the original ray parameters - namely $\Phi(u)$ and $\mathbf{v}_u$ - into the projection kernel. Doing so eliminates the need for surrogate reconstruction and preserves full gradient coverage. The omission of these quantities is a matter of engineering convenience, not theoretical necessity.
 
 ---
 
@@ -462,9 +462,9 @@ $$
 
 can be computed:
 
-* **Always preserved** — gradient flows naturally via autodiff
-* **Recoverable** — requires geometric reconstruction or surrogate computation
-* **Unavailable** — cannot be computed without explicit input or auxiliary state
+* **Always preserved** - gradient flows naturally via autodiff
+* **Recoverable** - requires geometric reconstruction or surrogate computation
+* **Unavailable** - cannot be computed without explicit input or auxiliary state
 
 ---
 
@@ -496,7 +496,7 @@ When tracing is handled via discrete rasterization without explicit $\Phi(u)$ or
 | $\mathbf{v}_u$        | Blocked       | Yes               | Surrogate: $\mathbf{v}_{\text{eff}} = \frac{B-A}{\|B-A\|}$    |
 | $t_i$                 | Blocked       | Yes               | $t_i = (x_i - A) \cdot \mathbf{v}_{\text{eff}}$               |
 
-Survivability depends on whether entry/exit points $A$, $B$ are cached. Without them, gradients through geometry cannot be recovered (at least from the point of view of the considered methods).
+Gradient survivability in stateful execution depends not on the tracing method itself, but on whether the entry and exit points $A$, $B$ of the ray are retained. Without access to this geometric context, gradients with respect to direction or position cannot be recovered - at least within the scope of the reconstruction techniques considered here.
 
 ---
 
@@ -513,13 +513,14 @@ Survivability depends on whether entry/exit points $A$, $B$ are cached. Without 
 
 Gradient flow in HPM is guaranteed under stateless execution, where all projection-defining variables are explicit.  
 
-In rasterized or stateful scenarios, **there is no fundamental barrier to passing $\Phi(u)$ and $\mathbf{v}_u$ directly into the projection kernel**. If this information is retained or reconstructed, all required gradients can propagate without approximation. The choice to omit such data is a performance heuristic — not a theoretical necessity.
+In rasterized or stateful scenarios, **there is no fundamental barrier to passing $\Phi(u)$ and $\mathbf{v}_u$ directly into the projection kernel**. If this information is retained or reconstructed, all required gradients can propagate without approximation. The choice to omit such data is a performance heuristic - not a theoretical necessity.
 
-> *Gradients do not vanish. They wait behind geometry.*
+---
+
 
 
 ---
 
-TODO: F5-F8  
+TODO:
 F.8 Implementation Guidelines and Tradeoffs  
 F.9 Summary of Key Strategies  
