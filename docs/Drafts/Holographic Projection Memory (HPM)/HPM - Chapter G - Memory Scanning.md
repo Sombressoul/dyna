@@ -21,7 +21,7 @@ Instead of performing full-resolution projection across the entire field, the sc
 * Starts from a coarse representation of the memory (e.g., $8^3$ voxels),
 * Applies directional projection probes to identify promising regions,
 * Recursively refines the search through progressively higher LOD levels,
-* Concludes with a full-resolution, context-aware HPM projection at LOD$_0$.
+* Concludes with a full-resolution, context-aware HPM projection at $\text{LOD}_0$.
 
 This approach minimizes computational overhead and aligns with HPM's geometric nature.
 
@@ -71,7 +71,7 @@ with long-range kernel support $\tau^{(k)}$ appropriate for coarse levels.
 
 ## G.5 Recursive Localization
 
-Once candidate regions are identified at level LOD$_{k}$, the scanning procedure:
+Once candidate regions are identified at level $\text{LOD}_{k}$, the scanning procedure:
 
 1. **Selects subregions** of interest in memory $W^{(k)}(x)$.
 2. **Transitions to finer resolution** level $W^{(k-1)}(x)$.
@@ -79,13 +79,13 @@ Once candidate regions are identified at level LOD$_{k}$, the scanning procedure
 
 At each level, projection parameters (direction $\mathbf{v}_u$, attenuation $\tau_u$, beam density) can be adapted based on context from the coarser level.
 
-This recursive narrowing continues until reaching the finest level LOD$_0$.
+This recursive narrowing continues until reaching the finest level $\text{LOD}_0$.
 
 ---
 
-## G.6 Canonical Projection at LOD$_0$
+## G.6 Canonical Projection at $\text{LOD}_0$
 
-Upon reaching LOD$_0$, the scanning mechanism transitions from probing to full semantic interpretation:
+Upon reaching $\text{LOD}_0$, the scanning mechanism transitions from probing to full semantic interpretation:
 
 * A **complete HPM projection** is performed over the refined region.
 * The projection surface $\Phi(u)$ may now be **nonlinear or adaptive**, informed by previous scanning layers.
