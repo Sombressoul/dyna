@@ -20,7 +20,7 @@ $$
 \text{Instead of } W(x) \rightarrow T(u), \text{ we prescribe } T^*(u) \text{ and solve for } W(x).
 $$
 
-This inversion is achieved via **projection error backpropagation** — a geometrically consistent update rule that modifies memory content along projection rays.
+This inversion is achieved via **projection error backpropagation** - a geometrically consistent update rule that modifies memory content along projection rays.
 
 ---
 
@@ -32,7 +32,7 @@ $$
 T(u) = \int W(x) \cdot K(x, \ell_u) \, dx
 $$
 
-Let $T^*(u)$ be the desired outcome — a known target projection.
+Let $T^*(u)$ be the desired outcome - a known target projection.
 
 We define the **projection error**:
 
@@ -102,7 +102,7 @@ $$
 ### H.5.3 Compatibility with Fixed Interpretation
 
 * The interpretive mechanism (i.e., $\Phi(u)$, $\mathbf{v}_u$, decoder layers) can remain **fixed and pre-trained**.
-* Only $W(x)$ changes — enabling modular behavior.
+* Only $W(x)$ changes - enabling modular behavior.
 
 ---
 
@@ -146,6 +146,6 @@ Delta-Learning complements traditional learning by enabling **targeted injection
 
 Delta-Learning transforms HPM from a static memory probe into a **programmable semantic substrate**. By updating $W(x)$ to produce desired projections $T^*(u)$, the system gains the ability to implant, revise, and transfer knowledge efficiently.
 
-Coupled with Memory Scanning, this mechanism enables flexible cognitive behaviors such as self-guided imprinting, modular memory switching, and symbolic-to-perceptual grounding — all within a geometrically structured and mathematically coherent framework.
+Coupled with Memory Scanning, this mechanism enables flexible cognitive behaviors such as self-guided imprinting, modular memory switching, and symbolic-to-perceptual grounding - all within a geometrically structured and mathematically coherent framework.
 
-> *In HPM, learning is not optimization — it is projection-aligned semantic sculpting.*
+> *In HPM, learning is not optimization - it is projection-aligned semantic sculpting.*

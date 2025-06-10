@@ -8,7 +8,7 @@
 
 The Holographic Projection Memory (HPM) mechanism provides a continuous, differentiable framework for semantic memory access via geometric projection. However, in high-resolution volumetric memory fields $W(x)$, direct projection from arbitrary viewpoints can be computationally expensive and inefficient when the region of semantic interest is sparse or unknown.
 
-This chapter introduces a structured **Memory Scanning** procedure based on a hierarchy of **Levels of Detail (LOD)**. The method enables scalable, efficient, and interpretable localization of memory content through a recursive projection process—from coarse-to-fine spatial resolution—culminating in a canonical high-resolution HPM projection.
+This chapter introduces a structured **Memory Scanning** procedure based on a hierarchy of **Levels of Detail (LOD)**. The method enables scalable, efficient, and interpretable localization of memory content through a recursive projection process-from coarse-to-fine spatial resolution-culminating in a canonical high-resolution HPM projection.
 
 ---
 
@@ -111,6 +111,6 @@ The mechanism is compatible with gradient-based optimization and can be implemen
 
 ## G.8 Summary
 
-Memory Scanning with LOD introduces a principled, efficient, and modular approach to memory localization in HPM. By leveraging multi-resolution geometry, orthogonal probing, and canonical projection, the system gains a capacity for structured attention, perceptual adaptation, and selective interpretation — all within a mathematically coherent framework.
+Memory Scanning with LOD introduces a principled, efficient, and modular approach to memory localization in HPM. By leveraging multi-resolution geometry, orthogonal probing, and canonical projection, the system gains a capacity for structured attention, perceptual adaptation, and selective interpretation - all within a mathematically coherent framework.
 
-> *Scanning is not an afterthought — it is the perceptual front-end of semantic memory.*
+> *Scanning is not an afterthought - it is the perceptual front-end of semantic memory.*
