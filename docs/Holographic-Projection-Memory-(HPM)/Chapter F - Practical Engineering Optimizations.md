@@ -278,8 +278,248 @@ Proper kernel handling in HPM balances precision, efficiency, and flexibility. K
 
 ---
 
-TODO: F5-F8
-F.5 Forward-Pass Performance Optimizations
-F.6 Gradient Survivability Map
-F.7 Implementation Guidelines and Tradeoffs
-F.8 Summary of Key Strategies
+## F.5 Forward-Pass Memory and Performance Optimizations
+
+HPM projection relies on volumetric traversal and kernel accumulation over a spatial memory field $W(x)$. In large-scale or high-resolution systems, naive implementation of these operations can lead to memory bottlenecks, redundant computation, and excessive branching.
+
+This section presents engineering strategies to accelerate the forward pass without compromising the geometric semantics of HPM.
+
+---
+
+### F.5.1 Stateless Ray Traversal
+
+Traditional ray marching accumulates state at each step: step index $i$, depth $t_i$, current position $x_i$, and accumulated output. To reduce memory pressure and branching, we eliminate explicit ray state.
+
+Using scalar projection (see F.2.1), the relative depth $t_i$ for each voxel $x_i$ is computed on-the-fly:
+
+$$
+t_i = (x_i - \Phi(u)) \cdot \mathbf{v}_u
+$$
+
+Thus, projection accumulation is implemented as a pure map-reduce over voxels:
+
+$$
+T(u) = \sum_{x_i \in \ell_u} W[x_i] \cdot K(t_i)
+$$
+
+No additional per-ray metadata is required. This enables batched, SIMD-compatible evaluation.
+
+---
+
+### F.5.2 Hybrid Tracing: Analytical Boundaries + Discrete Marching
+
+To identify the voxel segment of a ray efficiently:
+
+1. Use **analytical ray-box intersection** to compute entry and exit points $A$, $B$ of the ray within the memory volume.
+2. Perform **discrete traversal** (e.g., 3D Bresenham) between $A$ and $B$ to enumerate $x_i$.
+
+This hybrid strategy reduces traversal overhead and ensures rays are clipped precisely to the bounds of $W(x)$, improving locality and reducing unnecessary kernel evaluations.
+
+It also enables surrogate gradient flow through $\mathbf{v}_u$ via $A$, $B$ (see F.3.2).
+
+---
+
+### F.5.3 Direction Caching and Lookup
+
+When projection directions $\mathbf{v}_u$ are drawn from a finite codebook ${\mathbf{v}_k}$, it is beneficial to **cache traversal patterns per direction**:
+
+* For each $\mathbf{v}_k$, precompute voxel offsets ${\Delta x_i}$ within a support window.
+* At runtime, instantiate ray $\ell_u$ using center point $\Phi(u)$ and offset list indexed by $k$.
+
+This avoids redundant DDA computation and allows high-throughput batching for all $u$ sharing the same $\mathbf{v}_k$.
+
+For dynamic routing (F.3.3), interpolation over multiple cached rays can approximate smooth mixtures.
+
+---
+
+### F.5.4 Direction-Based Batching
+
+When memory projection is applied over a grid of $u$ values (e.g., during scanning or canonical readout), performance can be improved by **sorting or grouping** queries by their associated $\mathbf{v}_k$.
+
+* Within each batch, use the same cached offset trace.
+* Kernel evaluations and memory fetches become contiguous.
+
+This exploits memory coherence and reduces GPU thread divergence. On modern hardware, such batching can yield significant speedups.
+
+---
+
+### Summary
+
+Efficient forward execution of HPM is possible through stateless traversal, hybrid tracing, and directional reuse. These methods:
+
+* Eliminate redundant ray-state storage
+* Support high-performance batching and SIMD computation
+* Maintain full geometric interpretability and projection semantics
+
+---
+
+## F.6 Stateless vs. Stateful Execution
+
+The execution model of Holographic Projection Memory (HPM) determines how rays $\ell_u(t) = \Phi(u) + t \cdot \mathbf{v}_u$ are represented, traversed, and consumed during projection. In practical implementations, this leads to a fundamental design question:
+
+> Should the projection engine operate in a **stateless** or **stateful** mode?
+
+This section formalizes both paradigms and establishes a clear interface contract for projection operations.
+
+**Note:** In rasterized or low-level tracing scenarios, there is no fundamental barrier to forwarding the original ray parameters — namely $\Phi(u)$ and $\mathbf{v}_u$ — into the projection kernel. Doing so eliminates the need for surrogate reconstruction and preserves full gradient coverage. The omission of these quantities is a matter of engineering convenience, not theoretical necessity.
+
+---
+
+### F.6.1 Stateless Execution
+
+In **stateless mode**, the projection system receives explicit, fully specified inputs:
+
+* Viewpoint $\Phi(u) \in \mathbb{R}^N$ (starting point of the ray)
+* Direction vector $\mathbf{v}_u \in \mathbb{R}^N$ (unit or normalized)
+* Projection kernel parameters (e.g., $\tau$, $\sigma$)
+
+Given these inputs, all derived quantities can be computed analytically:
+
+* Scalar depth: $t_i = (x_i - \Phi(u)) \cdot \mathbf{v}_u$
+* Kernel decay: $K(t_i) = e^{-t_i / \tau}$ or Gaussian
+* Voxel center: $x_i = \Phi(u) + t_i \cdot \mathbf{v}_u$
+
+Stateless execution is functionally pure:
+
+* No internal state or traversal history is required
+* Supports vectorized, batched processing
+* Enables gradient flow through all inputs
+
+This is the preferred mode when $\Phi(u)$ and $\mathbf{v}_u$ are readily available, either from surface parameterization, codebooks, or neural generators.
+
+---
+
+### F.6.2 Stateful Execution
+
+In **stateful mode**, the projection system manages internal ray traversal and records auxiliary geometric quantities:
+
+* Voxel sequence ${x_i}$ produced via rasterized tracing (e.g., 3D Bresenham)
+* Step index $i$, scalar depths $t_i$ (if computed)
+* Entry and exit points $A$, $B$ of the ray through the memory volume
+
+In this mode, $\Phi(u)$ and $\mathbf{v}_u$ may be unknown or unavailable during backward pass. Reconstruction techniques (see F.2, F.3) become necessary to recover differentiability:
+
+* $\mathbf{v}_{\text{eff}} = \frac{B - A}{|B - A|}$
+* $t_i$ via geometry: $t_i = (x_i - A) \cdot \mathbf{v}_{\text{eff}}$
+
+Stateful mode is often used when tracing is handled by low-level GPU kernels that output only rasterized voxel lists.
+
+---
+
+### F.6.3 Interface Contract for Projection Kernels
+
+To support modular, interchangeable projection backends, we define a minimal interface:
+
+**Required inputs (stateless):**
+
+* $\Phi(u)$: origin point
+* $\mathbf{v}_u$: direction
+* Kernel hyperparameters ($\tau$, $\sigma$)
+* Memory field $W(x)$ (discretized over a lattice)
+
+**Optional internal state (stateful):**
+
+* Rasterized voxel indices ${x_i}$
+* Scalar steps $t_i$
+* Entry/exit points $A$, $B$
+
+If $\Phi(u)$ and $\mathbf{v}_u$ are provided, no reconstruction is needed. If not, the kernel must either:
+
+* Reconstruct missing quantities from geometric data, or
+* Signal inability to propagate gradients (e.g., freeze directional learning)
+
+---
+
+### F.6.4 Recommendations
+
+* Use stateless execution whenever possible. The overhead is minimal (e.g., 24 bytes per ray in FP32) and fully justified by analytical clarity and gradient support.
+* When interfacing with rasterized or hardware-accelerated tracing, retain $A$, $B$ to enable surrogate direction recovery.
+* Always expose $\Phi(u)$ and $\mathbf{v}_u$ to the projection kernel in training modes that require learning of surface geometry or view adaptation.
+
+---
+
+### Summary
+
+Stateless projection is geometrically explicit, differentiable, and efficient. Stateful projection is occasionally necessary for low-level traversal, but requires careful management of ray metadata. With clear interface boundaries, both modes can coexist within a unified, modular HPM system.
+
+---
+
+## F.7 Gradient Survivability Map
+
+A core requirement of HPM as a differentiable memory system is the ability to propagate gradients through all projection parameters: position, direction, decay, and structure. However, depending on the execution mode (stateless vs. stateful), not all quantities are equally accessible during backpropagation.
+
+This section defines the **gradient survivability** of key parameters and enumerates recovery strategies when native gradients are blocked or unavailable.
+
+---
+
+### F.7.1 Definition: Gradient Survivability
+
+Let $\theta$ be a projection parameter. Its **gradient survivability** is defined as the condition under which
+
+$$
+\frac{\partial T(u)}{\partial \theta} \in \mathbb{R}
+$$
+
+can be computed:
+
+* **Always preserved** — gradient flows naturally via autodiff
+* **Recoverable** — requires geometric reconstruction or surrogate computation
+* **Unavailable** — cannot be computed without explicit input or auxiliary state
+
+---
+
+### F.7.2 Survivability Table (Stateless Mode)
+
+In stateless execution (see F.6), all required quantities are explicitly passed. Gradient coverage is thus maximal:
+
+| Parameter             | Survivability | Recovery Needed?  | Notes                                                   |
+| --------------------- | ------------- | ----------------- | ------------------------------------------------------- |
+| $W[x]$                | Always        | No                | Linear in projection                                    |
+| $\tau$, $\sigma$      | Always        | No                | Appears in kernel, fully differentiable                 |
+| $\Phi(u)$             | Always        | No                | Passed directly, affects $t_i$                          |
+| $\mathbf{v}_u$        | Always        | No                | Passed directly, affects $t_i$                          |
+| $t_i$                 | Implicit      | Derived           | Computed from $\Phi(u)$, $\mathbf{v}_u$, $x_i$          |
+
+All projection components are differentiable by design. No reconstruction is needed.
+
+---
+
+### F.7.3 Survivability Table (Stateful Mode)
+
+When tracing is handled via discrete rasterization without explicit $\Phi(u)$ or $\mathbf{v}_u$, gradient access becomes limited:
+
+| Parameter             | Survivability | Recovery Required | Recovery Strategy                                             |
+| --------------------- | ------------- | ----------------- | ------------------------------------------------------------- |
+| $W[x]$                | Always        | No                | Linear in projection                                          |
+| $\tau$, $\sigma$      | Always        | No                | Analytic gradient via $t_i$ (see F.3.1)                       |
+| $\Phi(u)$             | Blocked       | Partially         | Reconstruct via $t_i$ and $x_i$                               |
+| $\mathbf{v}_u$        | Blocked       | Yes               | Surrogate: $\mathbf{v}_{\text{eff}} = \frac{B-A}{\|B-A\|}$    |
+| $t_i$                 | Blocked       | Yes               | $t_i = (x_i - A) \cdot \mathbf{v}_{\text{eff}}$               |
+
+Survivability depends on whether entry/exit points $A$, $B$ are cached. Without them, gradients through geometry cannot be recovered (at least from the point of view of the considered methods).
+
+---
+
+### F.7.4 Recommendations
+
+* **Use stateless execution** when training or when $\Phi(u)$ and $\mathbf{v}_u$ are learnable.
+* **In stateful mode**, retain $A$ and $B$ per ray to enable surrogate gradients.
+* **Avoid hard index selection** (e.g., for codebook directions) without soft routing (see F.3.3).
+* **Cache $t_i$** only if $\Phi(u)$ and $\mathbf{v}_u$ are unavailable; otherwise compute on-the-fly.
+
+---
+
+### Summary
+
+Gradient flow in HPM is guaranteed under stateless execution, where all projection-defining variables are explicit.  
+
+In rasterized or stateful scenarios, **there is no fundamental barrier to passing $\Phi(u)$ and $\mathbf{v}_u$ directly into the projection kernel**. If this information is retained or reconstructed, all required gradients can propagate without approximation. The choice to omit such data is a performance heuristic — not a theoretical necessity.
+
+> *Gradients do not vanish. They wait behind geometry.*
+
+
+---
+
+TODO: F5-F8  
+F.8 Implementation Guidelines and Tradeoffs  
+F.9 Summary of Key Strategies  
