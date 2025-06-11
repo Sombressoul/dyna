@@ -1,6 +1,6 @@
-# Theoretical Foundations of the Compact Spectral Projector (CSP)
+# Theoretical Foundations of the Compact Spectral Multiplier (CSM)
 
-The Compact Spectral Projector (CSP) is a randomized feature map that approximates high-dimensional multilinear kernels via CountSketch and FFT, enabling efficient inner-product estimation with bounded variance. It is designed to replace expensive outer products in bilinear or polynomial mechanisms while preserving kernel expectations in case of highly correlated data.
+The Compact Spectral Multiplier (CSM) is a randomized feature map that approximates high-dimensional multilinear kernels via CountSketch and FFT, enabling efficient inner-product estimation with bounded variance. It is designed to replace expensive outer products in bilinear or polynomial mechanisms while preserving kernel expectations in case of highly correlated data.
 
 ---
 
@@ -31,7 +31,7 @@ $$
 \text{FFT}(u)[j] := \frac{1}{\sqrt{d'}} \sum_{t=0}^{d'-1} u[t] e^{-2\pi i jt / d'}.
 $$
 
-Define the **CSP feature map**:
+Define the **CSM feature map**:
 
 $$
 \Phi(x) := \text{IFFT} \left( \bigodot_{k=0}^{K-1} \text{FFT}(\text{CS}(x_k)) \right) \in \mathbb{C}^{d'}.
@@ -53,7 +53,7 @@ $$
 \mathbb{E}[\widehat{Z}(x, y)] = \prod_{k=0}^{K-1} \langle x_k, y_k \rangle =: Z(x, y).
 $$
 
-*Interpretation:* The CSP estimator is unbiased for the multilinear kernel formed by dot-products across modes, despite using low-dimensional projections.
+*Interpretation:* The CSM estimator is unbiased for the multilinear kernel formed by dot-products across modes, despite using low-dimensional projections.
 
 ---
 
@@ -89,12 +89,12 @@ This explains the **variance explosion** when input modes have moderate or low s
 
 ## 4. Summary
 
-The Compact Spectral Projector:
+The Compact Spectral Multiplier:
 
 * Combines CountSketch + FFT across $K$ modes.
 * Produces an unbiased kernel estimate via rescaled inner product: $\widehat{Z} = d'^{K-1} \langle \Phi(x), \Phi(y) \rangle$.
 * Accumulates variance multiplicatively across modes, with magnitude governed by $\rho_k$ and $d'$.
 
-CSP is most effective when the input mode similarities $\rho_k$ are moderately high. In low-similarity regimes ($\rho_k \ll 1$), the relative variance $\xi_k$ becomes large and may dominate the estimation error. In such cases, increasing $d'$ or falling back to exact dot-product computation may be necessary.
+CSM is most effective when the input mode similarities $\rho_k$ are moderately high. In low-similarity regimes ($\rho_k \ll 1$), the relative variance $\xi_k$ becomes large and may dominate the estimation error. In such cases, increasing $d'$ or falling back to exact dot-product computation may be necessary.
 
 ---

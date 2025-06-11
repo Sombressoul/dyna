@@ -85,9 +85,9 @@ dyna/
 
 ---
 
-### Compact Spectral Projector (CSP)
+### Compact Spectral Multiplier (CSM)
 
-**[Compact Spectral Projector (CSP)](/docs/CSP/)** is a randomized kernel estimator that approximates high-dimensional multilinear interactions via CountSketch and FFT. It enables fast, low-memory inner product estimation between structured tensors while preserving unbiasedness. CSP is particularly effective in highly correlated regimes.
+**[Compact Spectral Multiplier (CSM)](/docs/Compact-Spectral-Multiplier-(CSM)/)** is a randomized kernel estimator that approximates high-dimensional multilinear interactions via CountSketch and FFT. It enables fast, low-memory inner product estimation between structured tensors while preserving unbiasedness. CSM is particularly effective in highly correlated regimes.
 
 |            | Theory     | Implementation  | Verified  | Test code |
 | ---------- | ---------- | --------------- | --------- | --------- |

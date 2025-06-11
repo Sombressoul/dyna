@@ -14,11 +14,11 @@ from scipy.stats import pearsonr
 #   torch.manual_seed(42)
 #
 # Should give the following result:
-#   CSP (K=4) — Canonical
+#   CSM (K=4) — Canonical
 #   RMSE=14323.492584319598, Bias=15.375518473648606, Pearson=0.9487576105841762
 #   NRMSE=0.21759386061901784, Avg. bias=1.0002335756034362
 #
-# Note: canonical CSP produces high-variance estimates when inputs are weakly correlated,
+# Note: canonical CSM produces high-variance estimates when inputs are weakly correlated,
 #       due to multiplicative amplification of unaligned spectral noise.
 #
 
@@ -91,10 +91,10 @@ nrmse = rmse / np.mean(np.abs(ground_truths))
 # Graph
 plt.scatter(ground_truths, dot_estimates, alpha=0.5, s=10)
 plt.xlabel("True ∏⟨xₖ, yₖ⟩")
-plt.ylabel("CSP Estimate (complex)")
-plt.title(f"CSP (K={K}) — Canonical\nRMSE={rmse:.4f}, Bias={bias:.4f}, Pearson={pearson:.4f}\nNRMSE={nrmse:.12f}, Avg. bias={avg_bias:.12f}")
+plt.ylabel("CSM Estimate (complex)")
+plt.title(f"CSM (K={K}) — Canonical\nRMSE={rmse:.4f}, Bias={bias:.4f}, Pearson={pearson:.4f}\nNRMSE={nrmse:.12f}, Avg. bias={avg_bias:.12f}")
 plt.grid(True)
 plt.tight_layout()
 plt.show()
 
-print(f"CSP (K={K}) — Canonical\nRMSE={rmse}, Bias={bias}, Pearson={pearson}\nNRMSE={nrmse}, Avg. bias={avg_bias}")
+print(f"CSM (K={K}) — Canonical\nRMSE={rmse}, Bias={bias}, Pearson={pearson}\nNRMSE={nrmse}, Avg. bias={avg_bias}")
