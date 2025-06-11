@@ -1,6 +1,12 @@
-# Chapter G - Memory Scanning: Hierarchical Localization via Projection Bundles
+# Chapter G - Memory Scanning
 
-*A coarse-to-fine procedure for localizing meaningful memory regions using directional projections across levels of abstraction.*
+This chapter defines the geometric and algorithmic mechanisms by which Holographic Projection Memory (HPM) selectively interrogates its high-dimensional memory field $W(x)$. The scanning process converts continuous volumetric structure into localized, structured, and semantically traceable projections $T(u)$.
+
+We formalize multiscale recursive refinement of projection surfaces $\Phi(u)$ and direction fields $\mathbf{v}_u$, establish kernel scaling protocols, and define termination criteria for adaptive focusing. The chapter also analyzes failure modes and clarifies the division of responsibilities between the HPM model, its implementation, and downstream interpretation logic.
+
+Memory scanning is presented not as a static data-access routine, but as a dynamic semantic localization interface — enabling modular attention, sparse interaction, and context-driven memory construction.
+
+This chapter completes the definition of HPM’s read interface, preparing the system for imprinting, feedback, and architectural composability in subsequent stages.
 
 ---
 
