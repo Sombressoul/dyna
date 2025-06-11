@@ -471,21 +471,21 @@ $$
 T(u) = \int W(x) \cdot K(x, \ell_u) \, dx
 $$
 
-exhibits fluctuations that are **not uniform**, but spatially correlated due to the convolution with $K$. These fluctuations form localized peaks in $T(u)$ — even in noise.
+exhibits fluctuations that are **not uniform**, but spatially correlated due to the convolution with $K$. These fluctuations form localized peaks in $T(u)$ - even in noise.
 
-Such peaks are not necessarily meaningful — but they are **candidates for meaning**.
+Such peaks are not necessarily meaningful - but they are **candidates for meaning**.
 
 ### Two Interpretations of Projection Peaks:
 
 1. **Imprinting targets**: High responses may serve as natural anchoring points for semantic imprinting. Delta-Learning modifies $W(x)$ along the ray to align with a target $T^*(u)$, guided by the geometry already present.
 
-2. **Semantic rejection**: Peaks may be rejected by downstream logic (decoders, classifiers) if they do not align with task objectives — yet their existence shapes the attentional landscape.
+2. **Semantic rejection**: Peaks may be rejected by downstream logic (decoders, classifiers) if they do not align with task objectives - yet their existence shapes the attentional landscape.
 
 ### Key Insight:
 
 > *Every projection is a question; imprinting is an answer.*
 
-HPM is thus not a neutral memory — it is an active substrate of possibility. The projection geometry always reveals something. It is up to the surrounding system to decide what to reinforce, what to ignore, and what to transform.
+HPM is thus not a neutral memory - it is an active substrate of possibility. The projection geometry always reveals something. It is up to the surrounding system to decide what to reinforce, what to ignore, and what to transform.
 
 Even in absence of data, **structure emerges**. And this structure is already usable.
 
@@ -519,19 +519,19 @@ Each failure mode is analyzed below.
 
 ## G.6.2 Responsibility Table
 
-| #  | Failure Mode                                                                | Responsibility   | Commentary                                                                                             |
-| -- | --------------------------------------------------------------------------- | ---------------- | ------------------------------------------------------------------------------------------------------ |
-| 1  | Region collapses to zero volume during recursive refinement                 | Implementation   | Requires a minimum region size constraint or early stopping; not a theoretical failure of HPM geometry |
-| 2  | Peak disappears between LOD levels                                          | Implementation   | Typically caused by inconsistent kernel scaling or misaligned ray geometry                             |
-| 3  | Kernel decay parameters $\tau$, $\sigma$ not scaled to voxel resolution | Implementation   | Breaks projection consistency across LODs; must reflect voxel size changes                             |
-| 4  | Direction fields $\mathbf{v}_u$ change between LODs                      | Implementation   | Violates continuity; introduces instability in projection targeting                                    |
-| 5  | Projection surfaces $\Phi^{(n)}$ misaligned across LODs                   | Implementation   | Disrupts semantic continuity; surface interpolation must preserve geometric coherence                  |
-| 6  | Overfocus on early minor peak (greedy top-1)                                | Implementation   | Myopic search policy; model permits top-k, beam search, or diversity-aware routing                     |
-| 7  | Conflicting projections from overlapping regions                            | Not a failure    | Legitimate in topologically divergent memory fields; handled by downstream interpretation              |
-| 8  | Activation of $S(u)$ due to structure in noise or untrained memory        | Not a failure    | Projection geometry always induces fluctuation; significance is determined externally                  |
-| 9  | Misinterpretation of $T(u)$ by downstream modules                         | Downstream logic | HPM provides structure; it is up to interpreters to validate, reject, or act on it                     |
-| 10 | Insufficient beam diversity or sampling width                               | Implementation   | Causes brittleness in recursion; broader sampling strategies are implementation choices                |
-| 11 | Projected feature disagrees with target label                               | Downstream logic | Discrepancy arises in decoding or learning, not in projection geometry                                 |
+| #  | Failure Mode                                                                 | Responsibility   | Commentary                                                                                             |
+| -- | ---------------------------------------------------------------------------- | ---------------- | ------------------------------------------------------------------------------------------------------ |
+| 1  | Region collapses to zero volume during recursive refinement                  | Implementation   | Requires a minimum region size constraint or early stopping; not a theoretical failure of HPM geometry |
+| 2  | Peak disappears between LOD levels                                           | Implementation   | Typically caused by inconsistent kernel scaling or misaligned ray geometry                             |
+| 3  | Kernel decay parameters $\tau$, $\sigma$ not scaled to voxel resolution      | Implementation   | Breaks projection consistency across LODs; must reflect voxel size changes                             |
+| 4  | Direction fields $\mathbf{v}_u$ change between LODs                          | Implementation   | Violates continuity; introduces instability in projection targeting                                    |
+| 5  | Projection surfaces $\Phi^{(n)}$ misaligned across LODs                      | Implementation   | Disrupts semantic continuity; surface interpolation must preserve geometric coherence                  |
+| 6  | Overfocus on early minor peak (greedy top-1)                                 | Implementation   | Myopic search policy; model permits top-k, beam search, or diversity-aware routing                     |
+| 7  | Conflicting projections from overlapping regions                             | Not a failure    | Legitimate in topologically divergent memory fields; handled by downstream interpretation              |
+| 8  | Activation of $S(u)$ due to structure in noise or untrained memory           | Not a failure    | Projection geometry always induces fluctuation; significance is determined externally                  |
+| 9  | Misinterpretation of $T(u)$ by downstream modules                            | Downstream logic | HPM provides structure; it is up to interpreters to validate, reject, or act on it                     |
+| 10 | Insufficient beam diversity or sampling width                                | Implementation   | Causes brittleness in recursion; broader sampling strategies are implementation choices                |
+| 11 | Projected feature disagrees with target label                                | Downstream logic | Discrepancy arises in decoding or learning, not in projection geometry                                 |
 
 ---
 
@@ -545,4 +545,123 @@ This division ensures clarity:
 * **Implementation**: must preserve multiscale geometry, correct scaling, and structural consistency,
 * **Downstream systems**: are responsible for decoding, validation, and semantic decision-making.
 
-Projection is never absent — but its use can fail. The scanning interface illuminates what may be meaningful. The rest belongs to the system that follows.
+Projection is never absent - but its use can fail. The scanning interface illuminates what may be meaningful. The rest belongs to the system that follows.
+
+---
+
+# G.7 Implementation Notes for Scanning
+
+This section provides engineering guidance for implementing the multistage scanning protocol in HPM systems. All recommendations assume compliance with the theoretical structure described in Sections G.1–G.6.
+
+---
+
+**Ray Geometry and Surfaces**
+
+* Projection surface $\Phi^{(n)}$ should be initialized as a regular grid in local memory coordinates.
+* Direction fields $\mathbf{v}_u$ must remain fixed or coherently scaled across LOD levels.
+* Avoid discontinuous changes in $\mathbf{v}_u$ between recursive passes.
+
+**Kernel Scaling**
+
+* Kernel decay parameters $\tau_n$ and $\sigma_n$ must scale with voxel size: $\tau_n \propto \text{voxel size}_n$.
+* Avoid using fixed-size kernels across different LODs.
+* Use kernels with compact support in both axial and lateral dimensions.
+
+**Recursive Refinement Strategy**
+
+* Scoring function $S(u)$ should be smooth and consistent across LOD levels.
+* Use top-$k$ beam selection, not greedy top-1.
+* Implement early stopping based on $\operatorname{diam}(\mathcal{R}_i^{(n)})$ or convergence of $S(u)$.
+* Avoid myopic narrowing that suppresses alternative candidates.
+
+**Projection and Integration**
+
+* Decompose kernel as $K(x, \ell_u) = K_{\parallel}(t) \cdot K_{\perp}(r)$ where $t$ is longitudinal distance and $r$ is transverse offset.
+* Ensure numerical stability of projection at deep regions; limit ray length or normalize contributions.
+* Use efficient sampling or convolution methods for long-range integration.
+
+**Region Construction and Propagation**
+
+* Define region $\mathcal{R}_i$ around top-$k$ peaks in $S(u)$.
+* Regions must be geometrically coherent and consistent across levels.
+* Impose a minimum spatial extent constraint on each $\mathcal{R}_i^{(n)}$ to avoid collapse.
+
+**Output Protocols**
+
+* For each active region, provide: $\Phi_i$, $\mathbf{v}_u$, $T_i(u)$, and region bounds $\mathcal{R}_i$.
+* Projection outputs may be reused or cached if geometry is static.
+* Output format must support parallel decoding or downstream processing.
+
+**Debugging and Stability Checks**
+
+* Visualize $S(u)$ as heatmaps at each level.
+* Track $\cos(T^{(n)}(u), T^{(n-1)}(u))$ to evaluate semantic consistency.
+* Detect irregularities in $S(u)$ dynamics to identify kernel or sampling issues.
+
+**Common Pitfalls**
+
+* Using fixed kernels across LODs without rescaling.
+* Ignoring beam width; greedy selection leads to instability.
+* Changing $\mathbf{v}_u$ or $\Phi$ without preserving alignment.
+* Allowing $\mathcal{R}_i$ to degenerate into single-point regions.
+* Using $T(u)$ directly without semantic validation or rejection logic.
+
+*These guidelines support robust implementation of HPM scanning across multiple levels of spatial detail, while preserving projection integrity and semantic traceability.*
+
+---
+
+# G.8 Summary
+
+The scanning procedure formalized in Chapter G provides the mechanism by which Holographic Projection Memory (HPM) transforms a dense, distributed memory field $W(x)$ into localized, structured, and semantically relevant perceptual outputs $T(u)$. This transformation is not flat or uniform - it is hierarchical, targeted, and geometrically constrained.
+
+---
+
+## G.8.1 Structural Role of Scanning
+
+HPM scanning is not a secondary optimization layer; it is an essential structural mechanism that:
+
+* Restricts computational access to semantically promising subregions.
+* Enables multiscale localization of meaning via recursive geometric refinement.
+* Reduces global ambiguity by grounding projection in directionally constrained bundles.
+
+It achieves this by defining projection rays $\ell_u(t) = \Phi(u) + t \cdot \mathbf{v}_u$ and their integrals:
+
+$$
+T(u) = \int W(x) \cdot K(x, \ell_u) \, dx,
+$$
+
+with hierarchical refinement of surface $\Phi$ and vector field $\mathbf{v}_u$ across levels of detail.
+
+---
+
+## G.8.2 Key Contributions of the Mechanism
+
+The scanning framework introduced in this chapter delivers several essential capabilities:
+
+1. **Hierarchical inference**: Projection is no longer global and indiscriminate, but directed through a multistage refinement protocol.
+2. **Topological filtering**: Projection rays serve as filters for geometric-semantic relevance, even in untrained or noise-initialized memory.
+3. **Semantic zoom**: Recursive candidate selection ensures increasing focus and decreasing entropy in the information retrieved.
+4. **Modularity and parallelism**: Independent projection cubes allow for parallelized attention over disjoint memory sectors.
+5. **Interpretability and sparsity**: Projection outputs $T(u)$ reflect spatially local structure, directly attributable to subregions of $W(x)$.
+
+---
+
+## G.8.3 Interface Boundaries and Responsibilities
+
+Chapter G also delineates clear separation of roles:
+
+* **Scanning theory**: guarantees structured geometric access to $W(x)$.
+* **Implementation**: responsible for stable, consistent realization of surfaces, rays, and scoring.
+* **Downstream interpretation**: responsible for judging or rejecting $T(u)$ outputs.
+
+Failures, when they occur, are attributable not to the model itself but to violation of these boundaries - misaligned directions, degenerate regions, or misinterpretation.
+
+---
+
+## G.8.4 Closing Statement
+
+Scanning in HPM is not passive observation - it is active localization. The system does not merely retrieve memory; it constructs a geometrically constrained perceptual interface to interrogate and imprint upon that memory.
+
+It is this structure that enables HPM to operate under partial information, support modular reuse of weights, and allow downstream modules to act only on semantically meaningful subspaces.
+
+The chapter thus completes the definition of the HPM access protocol, preparing the system for subsequent stages of learning and interaction (Chapter H and beyond).
