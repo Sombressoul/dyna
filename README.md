@@ -69,9 +69,9 @@ dyna/
 
 **[Holographic Projection Memory (HPM)](/docs/Holographic-Projection-Memory-(HPM)/)** is a geometrically structured, differentiable memory system where information is accessed and modified through directional projections. By treating memory as a continuous spatial field and using localized projection-aligned updates, HPM enables inference-time learning, resolves conflicting updates via topological divergence, and naturally avoids catastrophic forgetting - making it well-suited for lifelong and adaptive cognitive systems.
 
-|            | Theory   | Implementation  | Verified  | Test code |
-| ---------- | -------- | --------------- | --------- | --------- |
-| **Status** | Ongoing  | TODO            | NO        | NO        |
+|            | Theory     | Implementation  | Verified  | Test code |
+| ---------- | ---------- | --------------- | --------- | --------- |
+| **Status** | Ongoing    | TODO            | NO        | NO        |
 
 ---
 
@@ -79,9 +79,9 @@ dyna/
 
 **[TensorComposerMobius (TCM)](/docs/TCM/)** is a dynamic composition module that generates high-dimensional tensor structures through complex-phase transformations over learnable subspaces. By leveraging Möbius-like modulation, spectral routing, and adaptive rank mixing, TCM supports self-modifying representations and nonlinear composition - enabling compositional generalization, runtime reconfiguration, and modular control in DyNA-style cognitive architectures.
 
-|            | Theory   | Implementation  | Verified  | Test code |
-| ---------- | -------- | --------------- | --------- | --------- |
-| **Status** | TODO     | COMPLETE        | YES       | YES       |
+|            | Theory     | Implementation  | Verified  | Test code |
+| ---------- | ---------- | --------------- | --------- | --------- |
+| **Status** | TODO       | COMPLETED       | YES       | YES       |
 
 ---
 
@@ -89,6 +89,6 @@ dyna/
 
 **[Compact Spectral Projector (CSP)](/docs/CSP/)** is a randomized kernel estimator that approximates high-dimensional multilinear interactions via CountSketch and FFT. It enables fast, low-memory inner product estimation between structured tensors while preserving unbiasedness. CSP is particularly effective in highly correlated regimes.
 
-|            | Theory   | Implementation  | Verified  | Test code |
-| ---------- | -------- | --------------- | --------- | --------- |
-| **Status** | YES      | COMPLETE        | YES       | YES       |
+|            | Theory     | Implementation  | Verified  | Test code |
+| ---------- | ---------- | --------------- | --------- | --------- |
+| **Status** | COMPLETED  | COMPLETED       | YES       | YES       |
