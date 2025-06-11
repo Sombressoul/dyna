@@ -31,6 +31,8 @@ $$
 
 This integral can be interpreted as the system's "perception" at viewpoint $u$ - a structured summary of what the ray encounters within the memory field.
 
+*Note: The specific forms of the kernel $K$ and update strategies are discussed in later chapters.*
+
 ---
 
 ## 0.3 Key Properties
