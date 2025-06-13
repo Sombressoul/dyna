@@ -1,7 +1,6 @@
 import torch
-
 from memory_field import MemoryField
-
+from typing import Union
 
 class MemoryProjector:
     def __init__(self, memory: MemoryField, max_steps: int = 128, min_tau_u: float = 1e-4, min_sigma_u: float = 1e-4):
@@ -14,11 +13,13 @@ class MemoryProjector:
         self,
         phi_u: torch.Tensor,
         v_u: torch.Tensor,
-        tau_u: float,
-        sigma_u: float,
+        tau_u: Union[float, torch.Tensor],
+        sigma_u: Union[float, torch.Tensor],
         normalize_v_u: bool,
         normalized_coords: bool,
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, float, float, torch.Tensor]:
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        assert tau_u.shape == (phi_u.shape[0],), "tau_u must be of shape [B]"
+        assert sigma_u.shape == (phi_u.shape[0],), "sigma_u must be of shape [B]"
         B, D = phi_u.shape
         assert D == self.memory.n_dim and v_u.shape == (B, D)
 
@@ -30,7 +31,7 @@ class MemoryProjector:
             phi_u = phi_u * shape_tensor
             v_u = v_u * shape_tensor
         else:
-            if (phi_u < 0).any() or (phi_u > shape_tensor).any():
+            if (phi_u < 0).any() or (phi_u >= shape_tensor).any():
                 raise ValueError("phi_u coordinates out of memory bounds")
 
         if normalize_v_u:
@@ -42,8 +43,8 @@ class MemoryProjector:
             v_u_norm = torch.ones((B, 1), device=v_u.device)
             v_u_unit = v_u
 
-        tau_u = max(tau_u, self.min_tau_u)
-        sigma_u = max(sigma_u, self.min_sigma_u)
+        tau_u = torch.clamp(tau_u, min=self.min_tau_u)
+        sigma_u = torch.clamp(sigma_u, min=self.min_sigma_u)
 
         return phi_u, v_u_unit, v_u_norm, tau_u, sigma_u, shape_tensor
 
@@ -52,8 +53,8 @@ class MemoryProjector:
         phi_u: torch.Tensor,
         v_u_unit: torch.Tensor,
         v_u_norm: torch.Tensor,
-        tau_u: float,
-        sigma_u: float,
+        tau_u: torch.Tensor,
+        sigma_u: torch.Tensor,
         shape_tensor: torch.Tensor,
         delta_t: float,
         bidirectional: bool
@@ -86,22 +87,24 @@ class MemoryProjector:
         t = torch.abs(t_shift) if bidirectional else t_shift
         t_real = t * v_u_norm * voxel_size
         delta_t_i = delta_t * v_u_norm * voxel_size
-        atten_long = torch.exp(-t_real / tau_u).unsqueeze(-1)
+        t_real = torch.nan_to_num(t_real, nan=1e6, posinf=1e6, neginf=0.0)
+        d_perp_sq = torch.nan_to_num(d_perp_sq, nan=1e6, posinf=1e6, neginf=0.0)
+        atten_long = torch.exp(-t_real / tau_u[:, None]).unsqueeze(-1)
 
         points_vec = l_u - phi_u[:, None, :]
         proj_len = (points_vec * v_u_unit[:, None, :]).sum(dim=-1, keepdim=True)
         proj = proj_len * v_u_unit[:, None, :]
         d_perp_sq = ((points_vec - proj) ** 2).sum(dim=-1, keepdim=True) * (voxel_size ** 2)
 
-        weights = torch.exp(-d_perp_sq / (2.0 * sigma_u ** 2)) * atten_long * valid_mask * delta_t_i.unsqueeze(-1)
+        weights = torch.exp(-d_perp_sq / (2.0 * sigma_u[:, None, None] ** 2)) * atten_long * valid_mask * delta_t_i.unsqueeze(-1)
         return values, indices, weights.view(B, -1)
 
     def project(
         self,
         phi_u: torch.Tensor,
         v_u: torch.Tensor,
-        tau_u: float = 1.0,
-        sigma_u: float = 1.0,
+        tau_u: torch.Tensor,
+        sigma_u: torch.Tensor,
         delta_t: float = 1.0,
         normalize_output: bool = True,
         normalize_v_u: bool = False,
