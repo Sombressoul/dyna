@@ -146,7 +146,7 @@ t_{\max} = \min_{i}\!
         \Bigr)
 $$
 
-> *The ray is **active** iff $t_{\max} > \max(0,,t_{\min})$.*
+> The ray is **active** if $t_{\max} > \max(0,t_{\min})$
 
 ---
 
