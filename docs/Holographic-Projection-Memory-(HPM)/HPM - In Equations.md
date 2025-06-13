@@ -297,12 +297,14 @@ $$
 \nabla_{\Phi(u)} T(u) = \int W(x) \cdot \nabla_{\Phi} K(x, \ell_u) \, dx
 $$
 
-**Gradient w.r.t. direction vector $\mathbf{v}_u$:**
+**Gradient w.r.t. direction vector $\mathbf{v}_u$:**  
+
 $$
 \nabla_{\mathbf{v}_u} T(u) = \int W(x) \cdot \nabla_{\mathbf{v}} K(x, \ell_u) \, dx
 $$
 
-**Surrogate direction approximation (if $\mathbf{v}_u$ non-differentiable):**
+**Surrogate direction approximation (if $\mathbf{v}_u$ non-differentiable):**  
+
 $$
 \mathbf{v}_u \approx \frac{B - A}{\|B - A\|}, \quad A, B = \text{entry/exit points}
 $$
@@ -313,7 +315,8 @@ $$
 \frac{\partial T(u)}{\partial \tau} = \int W(x) \cdot K(x, \ell_u) \cdot \frac{t(x)}{\tau^2} \, dx
 $$
 
-**Gradient w.r.t. transverse width $\sigma$ (for Gaussian kernel):**
+**Gradient w.r.t. transverse width $\sigma$ (for Gaussian kernel):**  
+
 $$
 \frac{\partial T(u)}{\partial \sigma} = \int W(x) \cdot K(x, \ell_u) \cdot \frac{d_\perp(x)^2}{\sigma^3} \, dx
 $$
