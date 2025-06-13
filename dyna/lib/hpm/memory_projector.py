@@ -137,5 +137,9 @@ class MemoryProjector:
         projection = projection.view(*original_shape, -1)
         indices = indices.view(*original_shape, -1)
         weights = weights.view(*original_shape, -1)
+        phi_u = phi_u.view(*original_shape, -1)
+        v_u_unit = v_u_unit.view(*original_shape, -1)
+        tau_u = tau_u.view(*original_shape, -1)
+        sigma_u = sigma_u.view(*original_shape, -1)
 
-        return projection, indices.masked_fill(~mask, -1), weights
+        return projection, indices.masked_fill(~mask, -1), weights, phi_u, v_u_unit, tau_u, sigma_u
