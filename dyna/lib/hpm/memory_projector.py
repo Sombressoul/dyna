@@ -1,6 +1,7 @@
 import torch
-from memory_field import MemoryField
-from typing import Union
+
+
+from dyna.lib.hpm.memory_field import MemoryField
 
 class MemoryProjector:
     def __init__(self, memory: MemoryField, max_steps: int = 128, min_tau_u: float = 1e-4, min_sigma_u: float = 1e-4):
