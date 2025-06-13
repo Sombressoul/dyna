@@ -382,12 +382,14 @@ $$
 
 ### 8. Delta-Learning (Integrated Form)
 
-**Continuous update across projection domain:**
+**Continuous update across projection domain:**  
+
 $$
 \Delta W(x) = \int \alpha(u) \cdot \delta(u) \cdot K(x, \ell_u) \, du
 $$
 
-**Discrete approximation:**
+**Discrete approximation:**  
+
 $$
 \Delta W(x) \approx \sum_j \alpha_j \cdot \delta_j \cdot K(x, \ell_{u_j})
 $$
@@ -405,12 +407,14 @@ $$
 
 ### 9. Associative Backprojection Operator
 
-**Adjoint projection operator:**
+**Adjoint projection operator:**  
+
 $$
 \mathcal{T}^*[\delta](x) := \int \delta(u) \cdot K(x, \ell_u) \, du
 $$
 
-**Linearity and superposition:**
+**Linearity and superposition:**  
+
 $$
 \Delta W(x) = \sum_{i=1}^n \Delta W_i(x) = \sum_{i=1}^n \alpha_i \cdot \delta_i \cdot K(x, \ell_{u_i})
 $$
@@ -419,22 +423,26 @@ $$
 
 ### 10. Topological Divergence & Repulsion
 
-**Gradient interference field:**
+**Gradient interference field:**  
+
 $$
 \vec{F}(x) = -\nabla_x \Delta W(x)
 $$
 
-**Overlap energy between memory modes:**
+**Overlap energy between memory modes:**  
+
 $$
 U_{ij} = \int \rho_i(x) \cdot \rho_j(x) \, dx
 $$
 
-**Repulsive interaction force:**
+**Repulsive interaction force:**  
+
 $$
 F_{ij} = \frac{x_i - x_j}{\sigma_i^2 + \sigma_j^2} \cdot U_{ij}
 $$
 
-**Cluster center dynamics:**
+**Cluster center dynamics:**  
+
 $$
 \frac{dx_i}{dt} = \sum_{j \ne i} F_{ij} - \gamma \cdot \dot{x}_i + \sqrt{2T} \cdot \xi(t)
 $$
@@ -453,12 +461,14 @@ $$
 
 ### 11. Adaptive Kernel Width
 
-**Local semantic density estimate:**
+**Local semantic density estimate:**  
+
 $$
 \rho_{\text{loc}}(x_i) = \sum_{j \ne i} U_{ij}
 $$
 
-**Density-modulated kernel width:**
+**Density-modulated kernel width:**  
+
 $$
 \sigma_i = \sigma_0 \cdot \exp(-\beta \cdot \rho_{\text{loc}}(x_i))
 $$
@@ -467,14 +477,14 @@ $$
 
 ### 12. Kernel Variants
 
-**Laplacian kernel:**
+**Laplacian kernel:**  
+
 $$
 K_{\text{Lap}}(x, \ell) = \exp\left( -\frac{d(x, \ell)}{\sigma} \right)
 $$
 
-**Hybrid kernel (generalized decay):**
+**Hybrid kernel (generalized decay):**  
+
 $$
 K_{\text{hybrid}}(x, \ell) = \exp\left( -\left( \frac{d(x, \ell)}{\sigma} \right)^\alpha \right), \quad \alpha \in (1, 2]
 $$
-
----
