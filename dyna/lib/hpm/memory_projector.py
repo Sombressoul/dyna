@@ -88,14 +88,14 @@ class MemoryProjector:
         t_real = t * v_u_norm * voxel_size
         delta_t_i = delta_t * v_u_norm * voxel_size
         t_real = torch.nan_to_num(t_real, nan=1e6, posinf=1e6, neginf=0.0)
-        d_perp_sq = torch.nan_to_num(d_perp_sq, nan=1e6, posinf=1e6, neginf=0.0)
-        atten_long = torch.exp(-t_real / tau_u[:, None]).unsqueeze(-1)
 
         points_vec = l_u - phi_u[:, None, :]
         proj_len = (points_vec * v_u_unit[:, None, :]).sum(dim=-1, keepdim=True)
         proj = proj_len * v_u_unit[:, None, :]
         d_perp_sq = ((points_vec - proj) ** 2).sum(dim=-1, keepdim=True) * (voxel_size ** 2)
+        d_perp_sq = torch.nan_to_num(d_perp_sq, nan=1e6, posinf=1e6, neginf=0.0)
 
+        atten_long = torch.exp(-t_real / tau_u[:, None]).unsqueeze(-1)
         weights = torch.exp(-d_perp_sq / (2.0 * sigma_u[:, None, None] ** 2)) * atten_long * valid_mask * delta_t_i.unsqueeze(-1)
         return values, indices, weights.view(B, -1)
 
