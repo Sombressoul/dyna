@@ -13,15 +13,23 @@ class MemoryProjector:
         self,
         phi_u: torch.Tensor,
         v_u: torch.Tensor,
-        tau_u: Union[float, torch.Tensor],
-        sigma_u: Union[float, torch.Tensor],
+        tau_u: torch.Tensor,
+        sigma_u: torch.Tensor,
         normalize_v_u: bool,
         normalized_coords: bool,
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-        assert tau_u.shape == (phi_u.shape[0],), "tau_u must be of shape [B]"
-        assert sigma_u.shape == (phi_u.shape[0],), "sigma_u must be of shape [B]"
-        B, D = phi_u.shape
-        assert D == self.memory.n_dim and v_u.shape == (B, D)
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, tuple]:
+        assert phi_u.shape[-1] == self.memory.n_dim
+        assert v_u.shape == phi_u.shape
+        assert tau_u.shape == phi_u.shape[:-1], "tau_u shape mismatch"
+        assert sigma_u.shape == phi_u.shape[:-1], "sigma_u shape mismatch"
+
+        original_shape = phi_u.shape[:-1]
+        D = self.memory.n_dim
+
+        phi_u = phi_u.reshape(-1, D)
+        v_u = v_u.reshape(-1, D)
+        tau_u = tau_u.reshape(-1)
+        sigma_u = sigma_u.reshape(-1)
 
         shape_tensor = torch.tensor(self.memory.shape, device=phi_u.device, dtype=torch.float32)
 
@@ -40,13 +48,13 @@ class MemoryProjector:
                 raise ValueError("v_u norm too small: likely degenerate direction vector")
             v_u_unit = v_u / v_u_norm
         else:
-            v_u_norm = torch.ones((B, 1), device=v_u.device)
+            v_u_norm = torch.ones((phi_u.shape[0], 1), device=v_u.device)
             v_u_unit = v_u
 
         tau_u = torch.clamp(tau_u, min=self.min_tau_u)
         sigma_u = torch.clamp(sigma_u, min=self.min_sigma_u)
 
-        return phi_u, v_u_unit, v_u_norm, tau_u, sigma_u, shape_tensor
+        return phi_u, v_u_unit, v_u_norm, tau_u, sigma_u, shape_tensor, original_shape
 
     def _trace(
         self,
@@ -111,8 +119,7 @@ class MemoryProjector:
         normalized_coords: bool = False,
         bidirectional: bool = False,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        B, D = phi_u.shape
-        phi_u, v_u_unit, v_u_norm, tau_u, sigma_u, shape_tensor = self._preprocess_inputs(
+        phi_u, v_u_unit, v_u_norm, tau_u, sigma_u, shape_tensor, original_shape = self._preprocess_inputs(
             phi_u, v_u, tau_u, sigma_u, normalize_v_u, normalized_coords
         )
 
@@ -120,10 +127,15 @@ class MemoryProjector:
             phi_u, v_u_unit, v_u_norm, tau_u, sigma_u, shape_tensor, delta_t, bidirectional
         )
         mask = weights > 0
+        mask = mask.view(*original_shape, -1)
 
         weighted = values * weights.unsqueeze(-1) * mask.unsqueeze(-1)
         projection = weighted.sum(dim=1)
         if normalize_output:
             projection = projection / (weights.sum(dim=1, keepdim=True) + 1e-8)
+
+        projection = projection.view(*original_shape, -1)
+        indices = indices.view(*original_shape, -1)
+        weights = weights.view(*original_shape, -1)
 
         return projection, indices.masked_fill(~mask, -1), weights
