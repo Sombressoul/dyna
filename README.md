@@ -69,9 +69,9 @@ dyna/
 
 **[Holographic Projection Memory (HPM)](/docs/Holographic-Projection-Memory-(HPM)/)** is a geometrically structured, differentiable memory system where information is accessed and modified through directional projections. By treating memory as a continuous spatial field and using localized projection-aligned updates, HPM enables inference-time learning, resolves conflicting updates via topological divergence, and naturally avoids catastrophic forgetting - making it well-suited for lifelong and adaptive cognitive systems.
 
-|            | Theory     | Implementation  | Verified  | Test code |
-| ---------- | ---------- | --------------- | --------- | --------- |
-| **Status** | Ongoing    | TODO            | NO        | NO        |
+|            | Theory                 | Implementation  | Verified  | Test code |
+| ---------- | ---------------------- | --------------- | --------- | --------- |
+| **Status** | Close to completion    | POC             | POC       | POC       |
 
 ---
 
