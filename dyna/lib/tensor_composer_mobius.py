@@ -121,7 +121,7 @@ class TensorComposerMobius(nn.Module):
         with torch.no_grad():
             projection_planes = torch.empty(
                 [1, self.n_subspaces, *self.output_shape, 2],
-                dtype=torch.float32,
+                dtype=torch.float32, # precision compatibility for Dirichlet init
             )
             self.dirichlet_init_(projection_planes[..., 0], 0.5)
             projection_planes[..., 1].normal_(0.0, 0.001)
