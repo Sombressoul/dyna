@@ -67,7 +67,7 @@ dyna/
 
 ### Holographic Projection Memory (HPM)
 
-All documentation and theoretical content related to Holographic Projection Memory (HPM) has been moved to the dedicated repository: [CogniRay](https://github.com/sombressoul/CogniRay)  
+All documentation and theoretical content related to Holographic Projection Memory (HPM) has been moved to the dedicated repository: [CogniRay](https://github.com/MnemoWare/CogniRay)  
 
 Please refer to that project for up-to-date material, licensing, and development.  
 
