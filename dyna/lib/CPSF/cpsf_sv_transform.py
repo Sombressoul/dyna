@@ -45,8 +45,9 @@ def test(
     K: int,
     L: int,
     batch_size: int = 1,
-    max_MSE_spectra: float = 0.01,
-    max_MSE_restoration: float = 0.01,
+    window_shift: float = 1.0e-3,
+    max_MSE_spectra: float = 1.0e-2,
+    max_MSE_vector: float = 1.0e-2,
     device: torch.device = "cuda" if torch.cuda.is_available() else "cpu",
 ) -> bool:
     """
@@ -87,7 +88,7 @@ def test(
     Passing this test constitutes the formal definition of correctness.
     """
     max_MSE_spectra = max_MSE_spectra
-    max_MSE_restoration = max_MSE_restoration
+    max_MSE_vector = max_MSE_vector
 
     samples_len = K
     num_modes = L
@@ -112,44 +113,74 @@ def test(
 
     samples_a_restored = spectrum_to_vector(spectra_a, samples_a_scales, samples_a_shifts, samples_len)
     samples_b_restored = spectrum_to_vector(spectra_b, samples_b_scales, samples_b_shifts, samples_len)
+    samples_a_restored_shifted = spectrum_to_vector(spectra_a, samples_a_scales, samples_a_shifts + window_shift, samples_len)
+    samples_b_restored_shifted = spectrum_to_vector(spectra_b, samples_b_scales, samples_b_shifts + window_shift, samples_len)
 
     mse_S_a = torch.mean((spectra_source - spectra_a)**2).abs()
     mse_S_b = torch.mean((spectra_source - spectra_b)**2).abs()
     mse_a_b = torch.mean((spectra_a - spectra_b)**2).abs()
     mse_SamplesA_SamplesARestored = torch.mean((samples_a - samples_a_restored)**2).abs()
     mse_SamplesB_SamplesBRestored = torch.mean((samples_b - samples_b_restored)**2).abs()
+    mse_A_restored_shifted = torch.mean((samples_a_restored - samples_a_restored_shifted)**2).abs()
+    mse_B_restored_shifted = torch.mean((samples_b_restored - samples_b_restored_shifted)**2).abs()
     cossim_a_b = torch.nn.functional.cosine_similarity(samples_a.abs(), samples_b.abs(), dim=-1).mean()
 
     print(f"For K {'>' if K > L else '<='} L: {K=}, {L=}")
     print(f"For {batch_size=}")
+    print(f"For {window_shift=}")
     print(f"MSE between original spectra and spectra_a: {mse_S_a.item()}")
     print(f"MSE between original spectra and spectra_b: {mse_S_b.item()}")
     print(f"MSE between recovered spectra: {mse_a_b.item()}")
     print(f"MSE between samples A (source spectra) and samples A (restored spectra): {mse_SamplesA_SamplesARestored.item()}")
     print(f"MSE between samples B (source spectra) and samples B (restored spectra): {mse_SamplesB_SamplesBRestored.item()}")
+    print(f"MSE between samples A (restored spectra) and samples A (restored spectra + shifted window): {mse_A_restored_shifted.item()}")
+    print(f"MSE between samples B (restored spectra) and samples B (restored spectra + shifted window): {mse_B_restored_shifted.item()}")
     print(f"Cosine similarity between samples A and samples B: {cossim_a_b.item()}")
 
     if all([
             mse_S_a < max_MSE_spectra,
             mse_S_b < max_MSE_spectra,
             mse_a_b < max_MSE_spectra,
-            mse_SamplesA_SamplesARestored < max_MSE_restoration,
-            mse_SamplesB_SamplesBRestored < max_MSE_restoration,
+            mse_SamplesA_SamplesARestored < max_MSE_vector,
+            mse_SamplesB_SamplesBRestored < max_MSE_vector,
         ]):
         return True
     else:
         return False
 
 if __name__ == "__main__":
-    torch.manual_seed(1337)
+    import argparse
+    
+    parser = argparse.ArgumentParser(description="CPSF: spectra-vector transformations.")
+    parser.add_argument("-k", "--vector-length", help="Length of vector representation", required=False, default=1024, type=int)
+    parser.add_argument("-l", "--spectral-mods", help="Number of spectral mods", required=False, default=128, type=int)
+    parser.add_argument("-w", "--window-shift", help="Window shift", required=False, default=1.0e-3, type=float)
+    parser.add_argument("-b", "--batch-size", help="Batch size", required=False, default=512, type=int)
+    parser.add_argument("-s", "--seed", help="Random seed (default=1337, random=-1)", required=False, default=None, type=int)
+    parser.add_argument("--mse-spectra", help="Restored spectra MSE criterion", required=False, default=1.0e-2, type=float)
+    parser.add_argument("--mse-vector", help="Restored vector MSE criterion", required=False, default=1.0e-2, type=float)
+    args = parser.parse_args()
 
-    K_gt_L = test(1024, 64, 512, 1.0e-2, 1.0e-2)
-    K_lt_L = test(64, 1024, 512, 1.0e-2, 1.0e-2)
+    if args.seed is None:
+        torch.manual_seed(1337)
+    elif args.seed != -1:
+            torch.manual_seed(args.seed)
+    
+    K = args.vector_length
+    L = args.spectral_mods
+    B = args.batch_size
+    W = args.window_shift
 
-    print(f"For K > L: {K_gt_L}")
-    print(f"For K < L: {K_lt_L}")
+    with torch.no_grad():
+        K_to_L = test(K, L, B, W, args.mse_spectra, args.mse_vector)
+        print("\n")
+        L_to_K = test(L, K, B, W, args.mse_spectra, args.mse_vector)
+        print("\n")
 
-    if K_gt_L and K_lt_L:
+    print(f"For K({K}) to L({L}) at B={B}, MSE criteria S/V = {args.mse_spectra}/{args.mse_vector}: {K_to_L}")
+    print(f"For L({L}) to K({K}) at B={B}, MSE criteria S/V = {args.mse_spectra}/{args.mse_vector}: {L_to_K}")
+
+    if K_to_L and L_to_K:
         print("SUCCESS")
     else:
         print("FAIL")
