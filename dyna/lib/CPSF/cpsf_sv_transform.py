@@ -1,7 +1,5 @@
 import torch
 
-torch.manual_seed(1337)
-
 # Global spectrum -> Local vector
 def spectrum_to_vector(
     spectra: torch.Tensor,
@@ -143,8 +141,11 @@ def test(
         return False
 
 if __name__ == "__main__":
+    torch.manual_seed(1337)
+
     K_gt_L = test(1024, 64, 512, 1.0e-2, 1.0e-2)
     K_lt_L = test(64, 1024, 512, 1.0e-2, 1.0e-2)
+
     print(f"For K > L: {K_gt_L}")
     print(f"For K < L: {K_lt_L}")
 
