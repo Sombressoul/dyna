@@ -125,6 +125,13 @@ def test(
     mse_B_restored_shifted = torch.mean((samples_b_restored - samples_b_restored_shifted)**2).abs()
     cossim_a_b = torch.nn.functional.cosine_similarity(samples_a.abs(), samples_b.abs(), dim=-1).mean()
 
+    mse_shifted_random = torch.mean(
+        (
+            torch.randn_like(samples_a_restored).mul(samples_a_restored.std(dim=-1, keepdim=True)).add(samples_a_restored.mean(dim=-1, keepdim=True)) - 
+            torch.randn_like(samples_b_restored).mul(samples_b_restored.std(dim=-1, keepdim=True)).add(samples_b_restored.mean(dim=-1, keepdim=True))
+        ) ** 2
+    ).abs()
+
     print(f"For K {'>' if K > L else '<='} L: {K=}, {L=}")
     print(f"For {batch_size=}")
     print(f"For {window_shift=}")
@@ -135,6 +142,7 @@ def test(
     print(f"MSE between samples B (source spectra) and samples B (restored spectra): {mse_SamplesB_SamplesBRestored.item()}")
     print(f"MSE between samples A (restored spectra) and samples A (restored spectra + shifted window): {mse_A_restored_shifted.item()}")
     print(f"MSE between samples B (restored spectra) and samples B (restored spectra + shifted window): {mse_B_restored_shifted.item()}")
+    print(f"MSE between similar to restored, but random samples (reference): {mse_shifted_random.item()}")
     print(f"Cosine similarity between samples A and samples B: {cossim_a_b.item()}")
 
     if all([
@@ -154,8 +162,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="CPSF: spectra-vector transformations.")
     parser.add_argument("-k", "--vector-length", help="Length of vector representation", required=False, default=1024, type=int)
     parser.add_argument("-l", "--spectral-mods", help="Number of spectral mods", required=False, default=128, type=int)
-    parser.add_argument("-w", "--window-shift", help="Window shift", required=False, default=1.0e-3, type=float)
     parser.add_argument("-b", "--batch-size", help="Batch size", required=False, default=512, type=int)
+    parser.add_argument("-w", "--window-shift", help="Window shift", required=False, default=1.0e-4, type=float)
     parser.add_argument("-s", "--seed", help="Random seed (default=1337, random=-1)", required=False, default=None, type=int)
     parser.add_argument("--mse-spectra", help="Restored spectra MSE criterion", required=False, default=1.0e-2, type=float)
     parser.add_argument("--mse-vector", help="Restored vector MSE criterion", required=False, default=1.0e-2, type=float)
