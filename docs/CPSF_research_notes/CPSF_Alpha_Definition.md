@@ -49,7 +49,7 @@ $$
 5. $ \alpha_j $ modifies the shape of the projection kernel:
    $$
    \Sigma_j := \Sigma_j(\alpha_j), \quad \Gamma_j := \Gamma_j(\alpha_j),
-   \quad \psi_j^{\mathbb{T}}(\ell, k; \alpha_j) := \psi_{j,\mathrm{geo}}(\ell; \Sigma_j(\alpha_j)) \cdot \psi_{j,\mathrm{spec}}(k; \Gamma_j(\alpha_j))
+   \quad \psi_j^{\mathbb{T}}(\ell, k; \alpha_j) := \psi_{j,\mathrm{geo}}^{\mathbb{T}}(\ell; \Sigma_j(\alpha_j)) \cdot \psi_{j,\mathrm{spec}}^{\mathbb{T}}(k; \Gamma_j(\alpha_j))
    $$
 6. $ \alpha_j \to 0 \Leftrightarrow \|\hat{T}_j\| \to 0 $ or $ \Lambda_j \to \infty $.
 7. $ \alpha_j $ admits full Wirtinger-differentiability with respect to $ \hat{T}_j, \Lambda_j $; its influence on $ \psi_j^{\mathbb{T}} $ propagates via the chain rule.
