@@ -4,7 +4,7 @@ Let $ D, N \in \mathbb{N} $, $ \mathbb{T}^{2D} := (\mathbb{C} / \mathbb{Z})^{2D}
 
 ---
 
-## Projection Kernel $ \psi_j^{\mathbb{T}}(\ell, k; \alpha_j) $
+### Projection Kernel $ \psi_j^{\mathbb{T}}(\ell, k; \alpha_j) $
 
 Let:
 - $ \ell \in \mathbb{T}^{2D} \subset \mathbb{C}^{2D} $, $ \ell_j := (\vec{o}_j, \vec{d}_j) \in \mathbb{T}^{2D} $, $ \|\vec{d}_j\| = 1 $
@@ -29,7 +29,7 @@ $$
 
 ---
 
-## Properties
+### Properties
 
 1. $ \psi_j^{\mathbb{T}} \in \mathcal{C}^{\infty}(\mathbb{T}^{2D} \times \mathbb{Z}^N; \mathbb{C}) $
 2. $ \forall m \in \mathbb{Z}^{2D},\ \psi_j^{\mathbb{T}}(\ell + m, k) = \psi_j^{\mathbb{T}}(\ell, k) $
@@ -39,7 +39,7 @@ $$
 
 ---
 
-## Requirements
+### Requirements
 
 - $ \psi_j^{\mathbb{T}} : \mathbb{T}^{2D} \times \mathbb{Z}^N \to \mathbb{C} $ must be:
   1. Periodic in $ \ell $, toroidally localized
@@ -51,7 +51,7 @@ $$
 
 ---
 
-## Use
+### Use
 
 - Enters the projected spectral response:
   $$

@@ -4,7 +4,7 @@ Let $ D, N, C \in \mathbb{N} $, $ \mathbb{T}^{2D} := (\mathbb{C} / \mathbb{Z})^{
 
 ---
 
-## Definition: Emergent Contribution Coefficient $ \alpha_j $
+### Definition: Emergent Contribution Coefficient $ \alpha_j $
 
 Let a memory contribution be defined as:
 $$
@@ -35,7 +35,7 @@ $$
 
 ---
 
-## Properties
+### Properties
 
 1. $ \alpha_j \in \mathbb{R}_{\ge 0} $.
 2. $ \alpha_j = \mathcal{A}(C_j) $ is a deterministic, differentiable functional of $ C_j $.
@@ -60,31 +60,31 @@ $$
 
 ---
 
-## Role in Operations
+### Role in Operations
 
-### Projection (READ):
+#### Projection (READ):
 $$
 T(\ell) = \sum_k \hat{w}_k \cdot \psi_k(\ell)
 \quad \text{with} \quad
 \psi_k(\ell) := \sum_j \alpha_j T_j \cdot \psi_j^{\mathbb{T}}(\ell, k; \alpha_j) \cdot \hat{h}_{j,k}
 $$
 
-### Spectrum (Fourier Expansion):
+#### Spectrum (Fourier Expansion):
 $$
 \hat{w}_k = \sum_j \alpha_j T_j \cdot \hat{h}_{j,k}
 $$
 
-### Update (WRITE):
+#### Update (WRITE):
 $$
 \partial_{\hat{T}_j} \alpha_j \ne 0, \quad \text{thus } \alpha_j \text{ can be modified via } \hat{T}_j
 $$
 
-### Forget (DELETE):
+#### Forget (DELETE):
 $$
 \alpha_j \downarrow \Leftrightarrow \|\hat{T}_j\| \to 0 \text{ or } \Lambda_j \to \infty
 $$
 
-### Find:
+#### Find:
 $$
 \ell^* = \operatorname{mod}_1\left(\sum_j \ell_j \cdot \frac{\alpha_j \cdot \exp(-\|T_j - T^*\|^2 / 2\tau^2)}{\sum_k \alpha_k \cdot \exp(-\|T_k - T^*\|^2 / 2\tau^2)}\right)
 $$
@@ -96,7 +96,7 @@ $$
 
 ---
 
-## Interpretation
+### Interpretation
 
 - $ \alpha_j $ is the emergent scalar energy of contribution $ C_j $, reflecting total localized excitation.
 - It induces curvature of the geometric and spectral projection kernels: $ \Sigma_j(\alpha_j), \Gamma_j(\alpha_j) $.
@@ -105,7 +105,7 @@ $$
 
 ---
 
-## Summary
+### Summary
 
 $$
 \boxed{\alpha_j := \|\hat{T}_j\|^2 \cdot \int h_j(x)^2 dx \quad \text{(emergent semantic energy of } C_j)}
