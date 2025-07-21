@@ -112,4 +112,3 @@ $$
 $$
 
 $ \alpha_j $ is a semantically induced, geometrically active, differentiable operator of local field curvature and projection mass in CPSF.
-

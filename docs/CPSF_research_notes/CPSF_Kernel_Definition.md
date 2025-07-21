@@ -27,7 +27,6 @@ $$
 \exp\left( - \tfrac{1}{2} (k - k_j)^\top \Gamma_j(\alpha_j)^{-1} (k - k_j) \right)
 $$
 
-
 ---
 
 ## Properties
