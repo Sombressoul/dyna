@@ -2,35 +2,45 @@
 
 ---
 
+### Complex Torus
+
+**$\mathbb{T}_\mathbb{C}^N := \mathbb{C}^N / \Lambda$** — *compact complex torus*, formed by quotienting complex space $\mathbb{C}^N$ by a full-rank lattice $\Lambda \subset \mathbb{C}^N$, typically $\Lambda = \mathbb{Z}^N + i \mathbb{Z}^N$. This generalizes the real torus and supports a global Fourier basis indexed by the dual lattice $\Lambda^* \subset \mathbb{C}^N$.
+
+---
+
 ### Toroidal Spectral Coordinates
 
-**$\mathbb{T}^N := (\mathbb{R} / \mathbb{Z})^N$** — *N-dimensional torus*, serving as the toroidal spatial domain for harmonic projection; a compact, orientable, boundaryless manifold.
+**$\mathbb{T}_\mathbb{C}^N := \mathbb{C}^N / \Lambda$** — *N-dimensional complex torus*, serving as the toroidal spatial domain for harmonic projection; a compact, orientable, boundaryless complex manifold.
 
-All coordinates $x \in \mathbb{T}^N$ are real positions modulo 1 on the unit torus. Arithmetic is periodic over $\mathbb{R}^N$ modulo $\mathbb{Z}^N$, enabling toroidal continuity and Fourier projection.
+All coordinates $z \in \mathbb{T}_\mathbb{C}^N$ are complex positions modulo the lattice $\Lambda \subset \mathbb{C}^N$. Arithmetic is periodic over $\mathbb{C}^N$ modulo $\Lambda$, enabling toroidal continuity and Fourier projection.
 
 **Spectral Basis** — Global toroidal harmonics
 
 $$
-\phi_k(x) := e^{2\pi i \langle k, x \rangle}, \quad k \in \mathbb{Z}^N
+\phi_m(z) := e^{2\pi i \langle m, z \rangle}, \quad m \in \Lambda^*
 $$
 
-form a complete orthonormal basis in $L^2(\mathbb{T}^N)$. They satisfy $\phi_k(x + a) = \phi_k(x) \cdot e^{2\pi i \langle k, a \rangle}$ and are covariant under toroidal shifts.
+form a complete orthonormal basis in $L^2(\mathbb{T}_\mathbb{C}^N)$. They satisfy $\phi_m(z + \lambda) = \phi_m(z) \cdot e^{2\pi i \langle m, \lambda \rangle}$ and are covariant under toroidal shifts.
 
-The phase factor $e^{2\pi i \langle k, a \rangle}$ encodes the shift symmetry of the basis under toroidal translations, ensuring covariance of the harmonic structure with respect to spatial shifts in $x$.
+The phase factor $e^{2\pi i \langle m, \lambda \rangle}$ encodes the shift symmetry of the basis under toroidal translations, ensuring covariance of the harmonic structure with respect to spatial shifts in $z$.
 
-The index $k \in \mathbb{Z}^N$ is a discrete spectral vector defining the frequency mode of the harmonic. Each component $k_j$ determines the integer frequency along the $j$-th toroidal dimension.
+The index $m \in \Lambda^*$ is a discrete spectral vector defining the frequency mode of the harmonic. Each component determines the dual frequency along a corresponding complex lattice direction.
 
 ---
 
 ### Projection Coordinates
 
-**$\ell := (\vec{o}, \vec{d}) \in \mathbb{T}^N \times \mathbb{C}^N$** — *projection coordinate (ray)*.
+**$\ell := (z, \vec{d}) \in \mathbb{T}_\mathbb{C}^N \times \mathbb{C}^N$** — *projection coordinate (ray)*.
 
 Defines the geometric configuration of directional observation or interaction within CPSF.
 
-* **Origin**: $\vec{o} \in \mathbb{T}^N$ — base point on the real torus;
+* **Origin**: $z \in \mathbb{T}_\mathbb{C}^N$ — base point on the complex torus;
 * **Direction**: $\vec{d} \in \mathbb{C}^N, \|\vec{d}\| = 1$ — unit complex direction vector;
-* The pair $(\vec{o}, \vec{d})$ defines a unique ray in the extended projection space.
+* The pair $(z, \vec{d})$ defines a unique complex ray in the extended projection space:
+
+$$
+z(t) = z + t \cdot \vec{d} \mod \Lambda
+$$
 
 ---
 
@@ -74,7 +84,7 @@ It defines a unitary frame in $\mathbb{C}^{2N}$, aligned with the projection dir
 
 ### Geometric Covariance Matrix
 
-**$\Sigma_j \in \mathbb{C}^{2N \times 2N}$** — *anisotropic localization matrix* associated with the projection coordinate $\ell_j = (\vec{o}_j, \vec{d}_j)$ and attenuation parameters $\sigma_j^{\parallel}, \sigma_j^{\perp} \in \mathbb{R}_{>0}$.
+**$\Sigma_j \in \mathbb{C}^{2N \times 2N}$** — *anisotropic localization matrix* associated with the projection coordinate $\ell_j = (z_j, \vec{d}_j)$ and attenuation parameters $\sigma_j^{\parallel}, \sigma_j^{\perp} \in \mathbb{R}_{>0}$.
 
 Defined as:
 
@@ -87,7 +97,7 @@ where:
 * $\mathcal{R}(\vec{d}_j) \in \mathrm{U}(2N)$ is the extended orthonormal frame aligned with direction $\vec{d}_j$,
 * the diagonal encodes longitudinal scaling along $\vec{d}_j$ and isotropic transverse scaling in the orthogonal complement.
 
-This matrix defines a local Gaussian envelope aligned with the projection ray, and determines the spatial footprint of the contribution in the toroidal projection domain $\mathbb{T}^N \times \mathbb{C}^N$.
+This matrix defines a local Gaussian envelope aligned with the projection ray, and determines the spatial footprint of the contribution in the complex toroidal domain $\mathbb{T}_\mathbb{C}^N \times \mathbb{C}^N$.
 
 ---
 
@@ -99,13 +109,15 @@ The dimensionality $S$ is arbitrary and model-defined, representing the number o
 
 $\hat{T}_j$ encodes localized semantic content directly in the spectral domain. It is not computed from other values, but defined as an intrinsic, stored parameter of the contribution. While not fixed in the sense of being immutable, it is persistent and modifiable through field operations.
 
+> The vector $\hat{T}_j \in \mathbb{C}^S$ resides outside the toroidal spectral domain and belongs to a higher semantic layer. It does not depend on the toroidal coordinates $z \in \mathbb{T}_\mathbb{C}^N$, but is coupled to it through localized geometric weighting.
+
 ---
 
 ### Field Contribution
 
 **$C_j := (\ell_j, \hat{T}_j, \sigma_j^{\parallel}, \sigma_j^{\perp}, \alpha_j)$** — *elementary localized excitation in the field*, specified by:
 
-* projection coordinate $\ell_j = (\vec{o}_j, \vec{d}_j) \in \mathbb{T}^N \times \mathbb{C}^N$,
+* projection coordinate $\ell_j = (z_j, \vec{d}_j) \in \mathbb{T}_\mathbb{C}^N \times \mathbb{C}^N$,
 * spectral content vector $\hat{T}_j \in \mathbb{C}^S$,
 * attenuation scalars $\sigma_j^{\parallel}, \sigma_j^{\perp} \in \mathbb{R}_{>0}$,
 * scalar weight $\alpha_j \in \mathbb{R}_{\ge 0}$.
