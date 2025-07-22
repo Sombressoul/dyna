@@ -68,10 +68,11 @@ $\hat{T}_j$ encodes localized semantic content directly in the spectral domain. 
 
 ### Field Contribution
 
-**$C_j := (\ell_j, \hat{T}_j, \sigma_j^{\parallel}, \sigma_j^{\perp})$** — *elementary localized excitation in the field*, specified by:
+**$C_j := (\ell_j, \hat{T}_j, \sigma_j^{\parallel}, \sigma_j^{\perp}, \alpha_j)$** — *elementary localized excitation in the field*, specified by:
 
 * projection coordinate $\ell_j = (\vec{o}_j, \vec{d}_j) \in \mathbb{T}^{2N}$,
 * spectral content vector $\hat{T}_j \in \mathbb{C}^S$,
-* attenuation scalars $\sigma_j^{\parallel}, \sigma_j^{\perp} \in \mathbb{R}_{>0}$.
+* attenuation scalars $\sigma_j^{\parallel}, \sigma_j^{\perp} \in \mathbb{R}_{>0}$,
+* scalar weight $\alpha_j \in \mathbb{R}_{\ge 0}$.
 
 This tuple defines a directionally localized generator of field structure. All field-level kernels, envelopes, and spectral components are derived from it.
