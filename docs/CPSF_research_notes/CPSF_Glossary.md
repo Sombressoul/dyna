@@ -46,15 +46,14 @@ A single positive real value controlling isotropic decay **in all directions ort
 
 ### Orthonormal Frame
 
-**$R(\vec{d}) \in \mathrm{U}(N)$** — *unitary rotation matrix* unitaryly associated with the direction vector $\vec{d} \in \mathbb{C}^N, \| \vec{d} \| = 1$.
+**$R(\vec{d}) \in \mathrm{U}(N)$** — *unitary rotation matrix* associated with the direction vector $\vec{d} \in \mathbb{C}^N, \| \vec{d} \| = 1$.
 
-It satisfies:
-
-* $R e_1 = \vec{d}$ — the first column aligns with the projection direction (notation $R[:,1] := \vec{d}$ in Python-style indexing);
-* $R^\dagger R = I_N$ — the matrix is unitary (orthonormal in complex space);
+When it exists, it satisfies:
+* $R e_1 = \vec{d}$ — the first column aligns with the projection direction;
+* $R^\dagger R = I_N$ — the matrix is unitary;
 * The remaining $N - 1$ columns span the orthogonal complement of $\vec{d}$.
 
-This matrix defines a unitary local frame in $\mathbb{C}^N$ and is used to construct anisotropic Gaussian envelopes aligned with $\vec{d}$.
+The construction of $R(\vec{d})$ is defined separately (see [**TODO**]).
 
 ---
 
