@@ -46,7 +46,7 @@ A single positive real value controlling isotropic decay **in all directions ort
 
 ### Orthonormal Frame
 
-**$R(\vec{d}) \in \mathrm{U}(N)$** — *unitary rotation matrix* canonically associated with the direction vector $\vec{d} \in \mathbb{C}^N, \| \vec{d} \| = 1$.
+**$R(\vec{d}) \in \mathrm{U}(N)$** — *unitary rotation matrix* unitaryly associated with the direction vector $\vec{d} \in \mathbb{C}^N, \| \vec{d} \| = 1$.
 
 It satisfies:
 
@@ -54,7 +54,7 @@ It satisfies:
 * $R^\dagger R = I_N$ — the matrix is unitary (orthonormal in complex space);
 * The remaining $N - 1$ columns span the orthogonal complement of $\vec{d}$.
 
-This matrix defines a canonical local frame in $\mathbb{C}^N$ and is used to construct anisotropic Gaussian envelopes aligned with $\vec{d}$.
+This matrix defines a unitary local frame in $\mathbb{C}^N$ and is used to construct anisotropic Gaussian envelopes aligned with $\vec{d}$.
 
 ---
 
@@ -66,7 +66,7 @@ $$
 \mathcal{R}(\vec{d}) := \mathrm{diag}(R(\vec{d}), R(\vec{d}))
 $$
 
-It defines a canonical frame in $\mathbb{C}^{2N}$, aligned with the projection direction $\vec{d} \in \mathbb{C}^N$. Used in the construction of directionally aligned anisotropic structures, such as the geometric covariance matrix $\Sigma_j$.
+It defines a unitary frame in $\mathbb{C}^{2N}$, aligned with the projection direction $\vec{d} \in \mathbb{C}^N$. Used in the construction of directionally aligned anisotropic structures, such as the geometric covariance matrix $\Sigma_j$.
 
 ---
 
