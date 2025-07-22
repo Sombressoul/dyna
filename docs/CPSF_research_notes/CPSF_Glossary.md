@@ -11,7 +11,7 @@ All coordinates $x \in \mathbb{T}^N$ are real positions modulo 1 on the unit tor
 **Spectral Basis** — Global toroidal harmonics
 
 $$
-\phi_k(x) := e^{2\pi i \langle k, x \rangle}, \quad k \in \mathbb{Z}^N
+\phi_k(x) := e^{2\pi i \langle k, x \rangle}, \quad k \in \mathbb{Z}^N 
 $$
 
 form a complete orthonormal basis in $L^2(\mathbb{T}^N)$. They satisfy $\phi_k(x + a) = \phi_k(x) \cdot e^{2\pi i \langle k, a \rangle}$ and are covariant under toroidal shifts.
@@ -49,11 +49,12 @@ A single positive real value controlling isotropic decay **in all directions ort
 **$R(\vec{d}) \in \mathrm{U}(N)$** — *unitary rotation matrix* associated with the direction vector $\vec{d} \in \mathbb{C}^N, \| \vec{d} \| = 1$.
 
 When it exists, it satisfies:
+
 * $R e_1 = \vec{d}$ — the first column aligns with the projection direction;
 * $R^\dagger R = I_N$ — the matrix is unitary;
 * The remaining $N - 1$ columns span the orthogonal complement of $\vec{d}$.
 
-The construction of $R(\vec{d})$ is defined separately (see [**TODO**]).
+The construction of $R(\vec{d})$ is defined separately (see \[**TODO**]).
 
 ---
 
@@ -62,7 +63,7 @@ The construction of $R(\vec{d})$ is defined separately (see [**TODO**]).
 **$\mathcal{R}(\vec{d}) \in \mathrm{U}(2N)$** — *block-diagonal unitary matrix* defined as:
 
 $$
-\mathcal{R}(\vec{d}) := \mathrm{diag}(R(\vec{d}), R(\vec{d}))
+\mathcal{R}(\vec{d}) := \mathrm{diag}(R(\vec{d}), R(\vec{d})) 
 $$
 
 It defines a unitary frame in $\mathbb{C}^{2N}$, aligned with the projection direction $\vec{d} \in \mathbb{C}^N$. Used in the construction of directionally aligned anisotropic structures, such as the geometric covariance matrix $\Sigma_j$.
@@ -81,7 +82,7 @@ $$
 \mathrm{diag}(\sigma_j^{\parallel}, \sigma_j^{\perp} I_{N-1}),
 \mathrm{diag}(\sigma_j^{\parallel}, \sigma_j^{\perp} I_{N-1})
 \right) 
-\cdot \mathcal{R}(\vec{d}_j)
+\cdot \mathcal{R}(\vec{d}_j) 
 $$
 
 where:
