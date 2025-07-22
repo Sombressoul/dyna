@@ -58,13 +58,19 @@ A single positive real value controlling isotropic decay **in all directions ort
 
 ### Orthonormal Frame
 
-**$R(\vec{d}) \in \mathrm{U}(N)$** — *unitary rotation matrix* associated with the direction vector $\vec{d} \in \mathbb{C}^N, \| \vec{d} \| = 1$.
+**$R(\vec{d}) \in \mathrm{U}(N)$** — *unitary matrix* associated with the direction vector $\vec{d} \in \mathbb{C}^N, \| \vec{d} \| = 1$.
 
 When it exists, it satisfies:
 
 * $R e_1 = \vec{d}$ — the first column aligns with the projection direction;
 * $R^\dagger R = I_N$ — the matrix is unitary;
-* The remaining $N - 1$ columns span the orthogonal complement of $\vec{d}$.
+* The remaining $N - 1$ columns span the orthogonal complement of $\vec{d}$ **with respect to the standard Hermitian inner product**.
+
+> **All orthogonality statements are defined with respect to the standard Hermitian inner product in $\mathbb{C}^N$:**
+> $$
+> \langle u, v \rangle := \sum_{j=1}^N \overline{u_j} v_j
+> $$
+> This form of orthogonality is preserved by unitary transformations and defines the geometry of $\mathrm{U}(N)$.
 
 The construction of $R(\vec{d})$ is defined separately (see **TODO**).
 
