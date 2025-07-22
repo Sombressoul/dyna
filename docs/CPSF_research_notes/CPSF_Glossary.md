@@ -4,9 +4,9 @@
 
 ### Toroidal Spectral Coordinates
 
-**$\mathbb{T}^N := (\mathbb{C} / \mathbb{Z})^N$** — *N-dimensional complex torus*, defining the spectral coordinate domain as a compact, orientable, boundaryless manifold.
+**$\mathbb{T}^N := (\mathbb{R} / \mathbb{Z})^N$** — *N-dimensional torus*, serving as the toroidal spatial domain for harmonic projection; a compact, orientable, boundaryless manifold.
 
-All coordinates $x \in \mathbb{T}^N$ are phase-aligned complex positions modulo 1. Arithmetic is spectral over $\mathbb{C}^N$, enabling toroidal continuity and Fourier projection.
+All coordinates $x \in \mathbb{T}^N$ are real positions modulo 1 on the unit torus. Arithmetic is periodic over $\mathbb{R}^N$ modulo $\mathbb{Z}^N$, enabling toroidal continuity and Fourier projection.
 
 **Spectral Basis** — Global toroidal harmonics
 
@@ -22,13 +22,13 @@ The index $k \in \mathbb{Z}^N$ is a discrete spectral vector defining the freque
 
 ### Projection Coordinates
 
-**$\ell := (\vec{o}, \vec{d}) \in \mathbb{T}^{2N} \subset \mathbb{C}^{2N}$** — *projection coordinate (ray)*.
+**$\ell := (\vec{o}, \vec{d}) \in \mathbb{T}^N \times \mathbb{C}^N$** — *projection coordinate (ray)*.
 
 Defines the geometric configuration of directional observation or interaction within CPSF.
 
-* **Origin**: $\vec{o} \in \mathbb{T}^N$ — complex-valued base point on the torus;
-* **Direction**: $\vec{d} \in \mathbb{C}^N$, $\|\vec{d}\| = 1$ — unit complex direction vector;
-* The pair $(\vec{o}, \vec{d})$ defines a unique ray on the toroidal manifold, modulo 1 componentwise.
+* **Origin**: $\vec{o} \in \mathbb{T}^N$ — base point on the real torus;
+* **Direction**: $\vec{d} \in \mathbb{C}^N, \|\vec{d}\| = 1$ — unit complex direction vector;
+* The pair $(\vec{o}, \vec{d})$ defines a unique ray in the extended projection space.
 
 ---
 
@@ -44,7 +44,7 @@ A single positive real value controlling isotropic decay **in all directions ort
 
 ### Orthonormal Frame
 
-**$R(\vec{d}) \in \mathrm{U}(N)$** — *unitary rotation matrix* canonically associated with the direction vector $\vec{d} \in \mathbb{C}^N$, $\| \vec{d} \| = 1$.
+**$R(\vec{d}) \in \mathrm{U}(N)$** — *unitary rotation matrix* canonically associated with the direction vector $\vec{d} \in \mathbb{C}^N, \| \vec{d} \| = 1$.
 
 It satisfies:
 
@@ -87,7 +87,7 @@ where:
 * $\sigma_j^{\parallel}, \sigma_j^{\perp} \in \mathbb{R}_{>0}$ are longitudinal and transverse attenuation scalars,
 * $\mathcal{R}(\vec{d}_j) \in \mathrm{U}(2N)$ is the extended orthonormal frame aligned with the direction $\vec{d}_j$.
 
-This matrix defines the local anisotropic Gaussian envelope centered at $\ell_j$ and determines the spatial footprint in the toroidal projection coordinate space $\mathbb{T}^{2N}$.
+This matrix defines the local anisotropic Gaussian envelope centered at $\ell_j$ and determines the spatial footprint in the toroidal projection coordinate space $\mathbb{T}^N \times \mathbb{C}^N$.
 
 ---
 
@@ -105,9 +105,9 @@ $\hat{T}_j$ encodes localized semantic content directly in the spectral domain. 
 
 **$C_j := (\ell_j, \hat{T}_j, \sigma_j^{\parallel}, \sigma_j^{\perp}, \alpha_j)$** — *elementary localized excitation in the field*, specified by:
 
-* projection coordinate $\ell_j = (\vec{o}_j, \vec{d}_j) \in \mathbb{T}^{2N}$,
+* projection coordinate $\ell_j = (\vec{o}_j, \vec{d}_j) \in \mathbb{T}^N \times \mathbb{C}^N$,
 * spectral content vector $\hat{T}_j \in \mathbb{C}^S$,
 * attenuation scalars $\sigma_j^{\parallel}, \sigma_j^{\perp} \in \mathbb{R}_{>0}$,
 * scalar weight $\alpha_j \in \mathbb{R}_{\ge 0}$.
 
-This tuple defines a directionally localized generator of field structure. All field-level kernels, envelopes, and spectral components are derived from it.
+This tuple defines a directionally localized generator of field structure.
