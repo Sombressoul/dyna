@@ -103,6 +103,17 @@ where:
 * $\mathcal{R}(\vec{d}_j) \in \mathrm{U}(2N)$ is the extended orthonormal frame aligned with direction $\vec{d}_j$,
 * the diagonal encodes longitudinal scaling along $\vec{d}_j$ and isotropic transverse scaling in the orthogonal complement.
 
+> **Clarification of the diagonal structure**:
+>
+> The diagonal matrix in the definition of $\Sigma_j$ contains exactly $2N$ entries, organized as two consecutive $N$-dimensional blocks. Each block begins with a longitudinal attenuation scalar $\sigma_j^{\parallel}$ followed by $N - 1$ transverse scalars $\sigma_j^{\perp}$. Explicitly, the diagonal is:
+>
+> $$
+> \mathrm{diag}(\sigma_j^{\parallel}, \underbrace{\sigma_j^{\perp}, \dotsc, \sigma_j^{\perp}}_{N-1}, \sigma_j^{\parallel}, \underbrace{\sigma_j^{\perp}, \dotsc, \sigma_j^{\perp}}_{N-1})
+> $$
+>
+> This ensures full dimensional consistency with $\mathcal{R}(\vec{d}_j) \in \mathrm{U}(2N)$ and preserves the anisotropic structure of the Gaussian envelope in both position and frequency domains.
+> The dimension $2N$ arises from the fact that each field contribution $C_j$ is defined over the product space $\mathbb{T}_\mathbb{C}^N \times \mathbb{C}^N \cong \mathbb{C}^{2N}$, and thus its associated Gaussian envelope must be defined on $\mathbb{C}^{2N}$. This justifies the use of an extended orthonormal frame $\mathcal{R}(\vec{d}_j) \in \mathrm{U}(2N)$ and a $2N \times 2N$ covariance matrix.
+
 This matrix defines a local Gaussian envelope aligned with the projection ray, and determines the spatial footprint of the contribution in the complex toroidal domain $\mathbb{T}_\mathbb{C}^N \times \mathbb{C}^N$.
 
 It also defines a geometric coupling between the spatial domain and the higher semantic layer, acting as a weighting function for the influence of semantic content over the toroidal base.
