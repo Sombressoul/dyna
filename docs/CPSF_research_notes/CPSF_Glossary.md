@@ -133,3 +133,17 @@ $\hat{T}_j$ encodes localized semantic content directly in the spectral domain. 
 * scalar weight $\alpha_j \in \mathbb{R}_{\ge 0}$.
 
 This tuple defines a directionally localized generator of field structure. The geometric part defines a region of influence on the toroidal base, while the semantic part modulates the content delivered into that region. Through their collective interference, such contributions define the emergent semantic field on the second level of CPSF.
+
+---
+
+### Dual Field Structure
+
+**Dual Field Structure** — the foundational architecture of CPSF, consisting of two interdependent levels:
+
+* **Geometric Level (Toroidal)**:
+  Defined by the complex torus $\mathbb{T}_\mathbb{C}^N$, which provides a continuous coordinate system equipped with a global spectral basis $\phi_m(z)$. The localization of each field contribution $C_j$ is determined by a Gaussian envelope shaped by the covariance matrix $\Sigma_j$ and attenuation parameters $\sigma^{\parallel}, \sigma^{\perp}$.
+
+* **Semantic Level (Off-Torus)**:
+  Represented by spectral content vectors $\hat{T}_j \in \mathbb{C}^S$, which do not reside in the toroidal domain. Their influence is made spatially manifest through the geometry of their corresponding localization envelope in the torus, acting as a weight function.
+
+> The semantic field emerges from the interference of these contributions $C_j$, each coupling its semantic content to a region of the toroidal domain. In this way, the geometry of the torus defines *where* influence occurs, while the spectral vector defines *what* is conveyed — and together, they construct the dual-layer field of CPSF.
