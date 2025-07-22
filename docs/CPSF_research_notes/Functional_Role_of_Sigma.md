@@ -41,7 +41,6 @@ $D_j := \mathrm{diag}(\sigma_j^{\parallel}, \underbrace{\sigma_j^{\perp}, \dotsc
 
 Assume that both attenuation scalars $\sigma_j^{\parallel}, \sigma_j^{\perp} \in \mathbb{R}_{>0}$ are strictly positive real numbers. Consequently, the diagonal matrix $D_j$ is positive definite, and the similarity transformation $\Sigma_j = \mathcal{R}(\vec{d}_j)^\dagger D_j \mathcal{R}(\vec{d}_j)$ implies that $\Sigma_j$ is Hermitian and strictly positive definite. Therefore, $\Sigma_j^{-1}$ exists and is also Hermitian positive definite.
 
-
 Then the covariance matrix $\Sigma_j$ is defined by:
 
 $\Sigma_j := \mathcal{R}(\vec{d}_j)^\dagger \cdot D_j \cdot \mathcal{R}(\vec{d}_j)$
@@ -59,6 +58,8 @@ $\langle u, v \rangle := \sum_{k=1}^{2N} \overline{u_k} v_k$
 To restore toroidal periodicity, define the periodized envelope via lattice summation:
 
 $\psi_j^{\mathbb{T}}(z, \vec{d}) := \sum_{n \in \Lambda} \rho_j\left( \iota(\tilde{z} - \tilde{z}_j + n, \vec{d} - \vec{d}_j) \right)$
+
+Although the lifted coordinates $\tilde{z}, \tilde{z}_j \in \mathbb{C}^N$ are not uniquely defined modulo $\Lambda$, the periodized envelope $\psi_j^{\mathbb{T}}(z, \vec{d})$ is invariant under these choices. This follows from the fact that the summation over $n \in \Lambda$ effectively integrates over all toroidal shifts, rendering the final value independent of the specific representatives $\tilde{z}, \tilde{z}_j$.
 
 This function is smooth, $\Lambda$-periodic in $z$, and rapidly decaying in $\vec{d}$, assuming $\Re(\Sigma_j^{-1}) > 0$.
 
