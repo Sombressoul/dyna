@@ -1,3 +1,11 @@
+## CPSF: Orthonormal Frame Construction
+
+--
+
+## CPSF: Functional Role of $\Sigma_j$
+
+---
+
 ## CPSF: Glossary of Core Terms
 
 ---
