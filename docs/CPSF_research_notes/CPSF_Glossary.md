@@ -11,7 +11,7 @@ All coordinates $x \in \mathbb{T}^N$ are real positions modulo 1 on the unit tor
 **Spectral Basis** — Global toroidal harmonics
 
 $$
-\phi_k(x) := e^{2\pi i \langle k, x \rangle}, \quad k \in \mathbb{Z}^N 
+\phi_k(x) := e^{2\pi i \langle k, x \rangle}, \quad k \in \mathbb{Z}^N
 $$
 
 form a complete orthonormal basis in $L^2(\mathbb{T}^N)$. They satisfy $\phi_k(x + a) = \phi_k(x) \cdot e^{2\pi i \langle k, a \rangle}$ and are covariant under toroidal shifts.
@@ -63,7 +63,7 @@ The construction of $R(\vec{d})$ is defined separately (see \[**TODO**]).
 **$\mathcal{R}(\vec{d}) \in \mathrm{U}(2N)$** — *block-diagonal unitary matrix* defined as:
 
 $$
-\mathcal{R}(\vec{d}) := \mathrm{diag}(R(\vec{d}), R(\vec{d})) 
+\mathcal{R}(\vec{d}) := \mathrm{diag}(R(\vec{d}), R(\vec{d}))
 $$
 
 It defines a unitary frame in $\mathbb{C}^{2N}$, aligned with the projection direction $\vec{d} \in \mathbb{C}^N$. Used in the construction of directionally aligned anisotropic structures, such as the geometric covariance matrix $\Sigma_j$.
@@ -72,25 +72,20 @@ It defines a unitary frame in $\mathbb{C}^{2N}$, aligned with the projection dir
 
 ### Geometric Covariance Matrix
 
-**$\Sigma_j \in \mathbb{C}^{2N \times 2N}$** — *anisotropic localization matrix* associated with the projection coordinate $\ell_j = (\vec{o}_j, \vec{d}_j)$.
+**$\Sigma_j \in \mathbb{C}^{2N \times 2N}$** — *anisotropic localization matrix* associated with the projection coordinate $\ell_j = (\vec{o}_j, \vec{d}_j)$ and attenuation parameters $\sigma_j^{\parallel}, \sigma_j^{\perp} \in \mathbb{R}_{>0}$.
 
-Constructed as:
+Defined as:
 
 $$
-\Sigma_j := \mathcal{R}(\vec{d}_j)^\dagger \cdot
-\mathrm{diag}\left( 
-\mathrm{diag}(\sigma_j^{\parallel}, \sigma_j^{\perp} I_{N-1}),
-\mathrm{diag}(\sigma_j^{\parallel}, \sigma_j^{\perp} I_{N-1})
-\right) 
-\cdot \mathcal{R}(\vec{d}_j) 
+\Sigma_j := \mathcal{R}(\vec{d}_j)^\dagger \cdot \mathrm{diag}(\sigma_j^{\parallel}, \underbrace{\sigma_j^{\perp}, \dotsc, \sigma_j^{\perp}}_{N-1}, \sigma_j^{\parallel}, \underbrace{\sigma_j^{\perp}, \dotsc, \sigma_j^{\perp}}_{N-1}) \cdot \mathcal{R}(\vec{d}_j)
 $$
 
 where:
 
-* $\sigma_j^{\parallel}, \sigma_j^{\perp} \in \mathbb{R}_{>0}$ are longitudinal and transverse attenuation scalars,
-* $\mathcal{R}(\vec{d}_j) \in \mathrm{U}(2N)$ is the extended orthonormal frame aligned with the direction $\vec{d}_j$.
+* $\mathcal{R}(\vec{d}_j) \in \mathrm{U}(2N)$ is the extended orthonormal frame aligned with direction $\vec{d}_j$,
+* the diagonal encodes longitudinal scaling along $\vec{d}_j$ and isotropic transverse scaling in the orthogonal complement.
 
-This matrix defines the local anisotropic Gaussian envelope centered at $\ell_j$ and determines the spatial footprint in the toroidal projection coordinate space $\mathbb{T}^N \times \mathbb{C}^N$.
+This matrix defines a local Gaussian envelope aligned with the projection ray, and determines the spatial footprint of the contribution in the toroidal projection domain $\mathbb{T}^N \times \mathbb{C}^N$.
 
 ---
 
