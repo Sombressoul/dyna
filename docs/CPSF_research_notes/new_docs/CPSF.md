@@ -174,3 +174,6 @@ This tuple defines a directionally localized generator of field structure. The g
   Represented by spectral content vectors $\hat{T}_j \in \mathbb{C}^S$, which do not reside in the toroidal domain. Their influence is made spatially manifest through the geometry of their corresponding localization envelope in the torus, acting as a weight function.
 
 > The semantic field emerges from the interference of these contributions $C_j$, each coupling its semantic content to a region of the toroidal domain. In this way, the geometry of the torus defines *where* influence occurs, while the spectral vector defines *what* is conveyed — and together, they construct the dual-layer field of CPSF.
+
+---
+
