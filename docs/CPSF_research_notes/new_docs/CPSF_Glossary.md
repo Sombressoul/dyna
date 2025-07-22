@@ -92,7 +92,8 @@ $$
 
 > **Rationale for block-diagonal structure**:
 >
-> The space $\mathbb{C}^{2N}$ is canonically interpreted as a product of position and frequency spaces: $\mathbb{C}^N_{\text{pos}} \oplus \mathbb{C}^N_{\text{freq}}$. The block-diagonal form of $\mathcal{R}(\vec{d})$ reflects this decomposition, applying the same rotation $R(\vec{d}) \in \mathrm{U}(N)$ to both the spatial and spectral components. This ensures directional alignment and anisotropic scaling are consistent across both domains when constructing the covariance matrix $\Sigma_j$.
+> The space $\mathbb{C}^{2N}$ arises as the product of toroidal positions and complex directions, reflecting the structure $\mathbb{T}_\mathbb{C}^N \times \mathbb{C}^N \cong \mathbb{C}^{2N}$. The block-diagonal form of the extended orthonormal frame $\mathcal{R}(\vec{d}) := \mathrm{diag}(R(\vec{d}), R(\vec{d})) \in \mathrm{U}(2N)$ mirrors this decomposition, applying the same unitary transformation $R(\vec{d})$ to both the position and direction components. This ensures that anisotropic scaling and directional alignment with respect to $\vec{d}$ are preserved uniformly when constructing the covariance matrix $\Sigma_j$.
+
 
 It defines a unitary frame in $\mathbb{C}^{2N}$, aligned with the projection direction $\vec{d} \in \mathbb{C}^N$. Used in the construction of directionally aligned anisotropic structures, such as the geometric covariance matrix $\Sigma_j$.
 
