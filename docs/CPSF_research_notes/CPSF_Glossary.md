@@ -48,7 +48,7 @@ A single positive real value controlling isotropic decay **in all directions ort
 
 It satisfies:
 
-* $R[:,1] := \vec{d}$ — the first column aligns with the projection direction;
+* $R e_1 = \vec{d}$ — the first column aligns with the projection direction (notation $R[:,1] := \vec{d}$ in Python-style indexing);
 * $R^\dagger R = I_N$ — the matrix is unitary (orthonormal in complex space);
 * The remaining $N - 1$ columns span the orthogonal complement of $\vec{d}$.
 
