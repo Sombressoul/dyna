@@ -78,10 +78,11 @@ Constructed as:
 
 $$
 \Sigma_j := \mathcal{R}(\vec{d}_j)^\dagger \cdot
-\mathrm{diag}( 
-\sigma_j^{\parallel}, \sigma_j^{\perp} I_{N-1},
-\sigma_j^{\parallel}, \sigma_j^{\perp} I_{N-1} 
-) \cdot \mathcal{R}(\vec{d}_j)
+\mathrm{diag}\left( 
+\mathrm{diag}(\sigma_j^{\parallel}, \sigma_j^{\perp} I_{N-1}),
+\mathrm{diag}(\sigma_j^{\parallel}, \sigma_j^{\perp} I_{N-1})
+\right) 
+\cdot \mathcal{R}(\vec{d}_j)
 $$
 
 where:
