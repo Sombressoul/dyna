@@ -34,6 +34,17 @@ The index $m \in \Lambda^*$ is a discrete spectral vector defining the frequency
 
 ---
 
+### Lifted Coordinates
+
+**$\tilde{z}, \tilde{z}_j \in \mathbb{C}^N$** — *lifted coordinates* corresponding to toroidal positions $z, z_j \in \mathbb{T}_\mathbb{C}^N$.
+
+These are representatives in $\mathbb{C}^N$ satisfying:
+$\tilde{z} \equiv z \mod \Lambda, \quad \tilde{z}_j \equiv z_j \mod \Lambda$
+
+They allow computations in Euclidean space before restoring toroidal periodicity.
+
+---
+
 ### Projection Coordinates
 
 **$\ell := (z, \vec{d}) \in \mathbb{T}_\mathbb{C}^N \times \mathbb{C}^N$** — *projection coordinate (ray)*.
@@ -47,6 +58,18 @@ Defines the geometric configuration of directional observation or interaction wi
 $$
 z(t) = z + t \cdot \vec{d} \mod \Lambda
 $$
+
+---
+
+### Projection Space
+
+**$\mathbb{T}_\mathbb{C}^N \times \mathbb{C}^N$** — *projection space*, the extended coordinate domain of the CPSF field.
+
+In the geometric layer of CPSF, this space represents the set of all possible ray configurations. While in many geometric constructions $\vec{d} \in \mathbb{C}^N$ is treated as a fixed parameter of a ray, analytic formulations (e.g., field integration or error projection) promote $\vec{d}$ to a variable of integration.
+
+Thus, the projection space unifies spatial and directional components as a domain for functions $T(z, \vec{d}) \in \mathbb{C}^S$.
+
+> **Note**: This analytic treatment does not override the geometric interpretation of $\vec{d}$ as a fixed direction per ray in core CPSF definitions. Rather, it generalizes the domain to support functional and variational constructions.
 
 ---
 
@@ -99,6 +122,15 @@ It defines a unitary frame in $\mathbb{C}^{2N}$, aligned with the projection dir
 
 ---
 
+### Canonical Embedding
+
+**$\iota : \mathbb{C}^N \times \mathbb{C}^N \to \mathbb{C}^{2N}$** — *canonical embedding map*, defined by:
+$\iota(u, v) := \begin{bmatrix} u \\ v \end{bmatrix}$
+
+Used to embed relative spatial and directional offsets into the extended projection space $\mathbb{C}^{2N} \cong \mathbb{C}_\text{pos}^N \oplus \mathbb{C}_\text{dir}^N$.
+
+---
+
 ### Geometric Covariance Matrix
 
 **$\Sigma_j \in \mathbb{C}^{2N \times 2N}$** — *anisotropic localization matrix* associated with the projection coordinate $\ell_j = (z_j, \vec{d}_j)$ and attenuation parameters $\sigma_j^{\parallel}, \sigma_j^{\perp} \in \mathbb{R}_{>0}$.
@@ -131,6 +163,22 @@ It also defines a geometric coupling between the spatial domain and the higher s
 
 ---
 
+### Unnormalized Gaussian Envelope
+
+**$\rho_j(w) := \exp\left( -\pi \langle \Sigma_j^{-1} w, w \rangle \right)$** — *unnormalized anisotropic Gaussian* centered at field contribution $C_j$.
+
+Here $w = \iota(\tilde{z} - \tilde{z}_j, \vec{d} - \vec{d}_j) \in \mathbb{C}^{2N}$. The envelope is aligned via $\Sigma_j$ (see: *Geometric Covariance Matrix*).
+
+---
+
+### Periodized Envelope
+
+**$\psi_j^{\mathbb{T}}(z, \vec{d}) := \sum_{n \in \Lambda} \rho_j( \iota(\tilde{z} - \tilde{z}_j + n, \vec{d} - \vec{d}_j) )$** — *toroidally-periodized Gaussian envelope*.
+
+This sum restores $\Lambda$-periodicity in $z$, ensuring compatibility with the toroidal structure of $\mathbb{T}_\mathbb{C}^N$.
+
+---
+
 ### Spectral Content Vector
 
 **$\hat{T}_j \in \mathbb{C}^S$** — *semantic spectral vector* assigned to a contribution $C_j$.
@@ -153,6 +201,47 @@ $\hat{T}_j$ encodes localized semantic content directly in the spectral domain. 
 * scalar weight $\alpha_j \in \mathbb{R}_{\ge 0}$.
 
 This tuple defines a directionally localized generator of field structure. The geometric part defines a region of influence on the toroidal base, while the semantic part modulates the content delivered into that region. Through their collective interference, such contributions define the emergent semantic field on the second level of CPSF.
+
+---
+
+### Global Field Response
+
+**$T(z, \vec{d}) := \sum_{j \in \mathcal{J}} \alpha_j \cdot \psi_j^{\mathbb{T}}(z, \vec{d}) \cdot \hat{T}_j$** — *semantic field response* induced by a collection of contributions $\{C_j\}_{j \in \mathcal{J}}$.
+
+Maps projection coordinates $(z, \vec{d})$ to semantic values in $\mathbb{C}^S$. See: *Spectral Content Vector*, *Field Contribution*.
+
+---
+
+### Reference Field and Semantic Error
+
+* **$T^{\text{ref}}(z, \vec{d})$** — *reference projection response*, encoding ground truth or expected semantic content.
+
+* **$\Delta T(z, \vec{d}) := T^{\text{ref}}(z, \vec{d}) - T(z, \vec{d})$** — *semantic error field*, representing discrepancy between reference and model response.
+
+---
+
+### Projection Space Measure
+
+Let the field take values in $\mathbb{C}^S$. Define the product measure space:
+
+* $L^2(\mathbb{T}_\mathbb{C}^N \times \mathbb{C}^N; \mathbb{C}^S)$ — complex Hilbert space of square-integrable fields.
+* Inner product:
+  $\langle f, g \rangle := \int \sum_{s=1}^S \overline{f_s(z, \vec{d})} g_s(z, \vec{d}) \, d\mu(z) \, d\nu(\vec{d})$
+
+Here:
+
+* $d\mu(z)$: normalized Haar measure on $\mathbb{T}_\mathbb{C}^N$;
+* $d\nu(\vec{d})$: Lebesgue measure on $\mathbb{C}^N$.
+
+Used to define error projections and field energy norms.
+
+---
+
+### Semantic Error Projection
+
+**$\Delta \hat{T}_j := \frac{1}{\alpha_j} \cdot \frac{ \int \overline{\psi_j^{\mathbb{T}}} \cdot \Delta T }{ \int |\psi_j^{\mathbb{T}}|^2 }$** — *orthogonal projection of semantic error onto contribution mode*.
+
+Provides an update direction for $\hat{T}_j \in \mathbb{C}^S$, minimizing $L^2$-error under the localization defined by $\Sigma_j$.
 
 ---
 
