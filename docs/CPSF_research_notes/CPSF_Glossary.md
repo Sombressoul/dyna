@@ -56,6 +56,18 @@ This matrix defines a canonical local frame in $\mathbb{C}^N$ and is used to con
 
 ---
 
+### Extended Orthonormal Frame
+
+**$\mathcal{R}(\vec{d}) \in \mathrm{U}(2N)$** — *block-diagonal unitary matrix* defined as:
+
+$$
+\mathcal{R}(\vec{d}) := \mathrm{diag}(R(\vec{d}), R(\vec{d}))
+$$
+
+It defines a canonical frame in $\mathbb{C}^{2N}$, aligned with the projection direction $\vec{d} \in \mathbb{C}^N$. Used in the construction of directionally aligned anisotropic structures, such as the geometric covariance matrix $\Sigma_j$.
+
+---
+
 ### Spectral Content Vector
 
 **$\hat{T}_j \in \mathbb{C}^S$** — *semantic spectral vector* assigned to a contribution $C_j$.
