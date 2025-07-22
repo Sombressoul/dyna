@@ -68,6 +68,29 @@ It defines a canonical frame in $\mathbb{C}^{2N}$, aligned with the projection d
 
 ---
 
+### Geometric Covariance Matrix
+
+**$\Sigma_j \in \mathbb{C}^{2N \times 2N}$** — *anisotropic localization matrix* associated with the projection coordinate $\ell_j = (\vec{o}_j, \vec{d}_j)$.
+
+Constructed as:
+
+$$
+\Sigma_j := \mathcal{R}(\vec{d}_j)^\dagger \cdot
+\mathrm{diag}( 
+\sigma_j^{\parallel}, \sigma_j^{\perp} I_{N-1},
+\sigma_j^{\parallel}, \sigma_j^{\perp} I_{N-1} 
+) \cdot \mathcal{R}(\vec{d}_j)
+$$
+
+where:
+
+* $\sigma_j^{\parallel}, \sigma_j^{\perp} \in \mathbb{R}_{>0}$ are longitudinal and transverse attenuation scalars,
+* $\mathcal{R}(\vec{d}_j) \in \mathrm{U}(2N)$ is the extended orthonormal frame aligned with the direction $\vec{d}_j$.
+
+This matrix defines the local anisotropic Gaussian envelope centered at $\ell_j$ and determines the spatial footprint in the toroidal projection coordinate space $\mathbb{T}^{2N}$.
+
+---
+
 ### Spectral Content Vector
 
 **$\hat{T}_j \in \mathbb{C}^S$** — *semantic spectral vector* assigned to a contribution $C_j$.
