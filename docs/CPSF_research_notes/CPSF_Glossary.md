@@ -67,9 +67,11 @@ When it exists, it satisfies:
 * The remaining $N - 1$ columns span the orthogonal complement of $\vec{d}$ **with respect to the standard Hermitian inner product**.
 
 > **All orthogonality statements are defined with respect to the standard Hermitian inner product in $\mathbb{C}^N$:**
+>
 > $$
 > \langle u, v \rangle := \sum_{j=1}^N \overline{u_j} v_j
 > $$
+>
 > This form of orthogonality is preserved by unitary transformations and defines the geometry of $\mathrm{U}(N)$.
 
 The construction of $R(\vec{d})$ is defined separately (see **TODO**).
@@ -105,6 +107,8 @@ where:
 
 This matrix defines a local Gaussian envelope aligned with the projection ray, and determines the spatial footprint of the contribution in the complex toroidal domain $\mathbb{T}_\mathbb{C}^N \times \mathbb{C}^N$.
 
+It also defines a geometric coupling between the spatial domain and the higher semantic layer, acting as a weighting function for the influence of semantic content over the toroidal base.
+
 ---
 
 ### Spectral Content Vector
@@ -115,7 +119,7 @@ The dimensionality $S$ is arbitrary and model-defined, representing the number o
 
 $\hat{T}_j$ encodes localized semantic content directly in the spectral domain. It is not computed from other values, but defined as an intrinsic, stored parameter of the contribution. While not fixed in the sense of being immutable, it is persistent and modifiable through field operations.
 
-> The vector $\hat{T}_j \in \mathbb{C}^S$ resides outside the toroidal spectral domain and belongs to a higher semantic layer. It does not depend on the toroidal coordinates $z \in \mathbb{T}_\mathbb{C}^N$, but is coupled to it through localized geometric weighting.
+> The vector $\hat{T}_j \in \mathbb{C}^S$ resides outside the toroidal spectral domain and belongs to a higher semantic layer — the second level of the CPSF field. It is not directly embedded in $\mathbb{T}_\mathbb{C}^N$, but its effect is made spatially meaningful through the localized weighting induced by $\Sigma_j$. Thus, the toroidal geometry acts as a spatial lens through which semantic content is projected.
 
 ---
 
@@ -128,4 +132,4 @@ $\hat{T}_j$ encodes localized semantic content directly in the spectral domain. 
 * attenuation scalars $\sigma_j^{\parallel}, \sigma_j^{\perp} \in \mathbb{R}_{>0}$,
 * scalar weight $\alpha_j \in \mathbb{R}_{\ge 0}$.
 
-This tuple defines a directionally localized generator of field structure.
+This tuple defines a directionally localized generator of field structure. The geometric part defines a region of influence on the toroidal base, while the semantic part modulates the content delivered into that region. Through their collective interference, such contributions define the emergent semantic field on the second level of CPSF.
