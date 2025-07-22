@@ -4,7 +4,7 @@
 
 ### Complex Torus
 
-**$\mathbb{T}_\mathbb{C}^N := \mathbb{C}^N / \Lambda$** — *compact complex torus*, formed by quotienting complex space $\mathbb{C}^N$ by a full-rank lattice $\Lambda \subset \mathbb{C}^N$, typically $\Lambda = \mathbb{Z}^N + i \mathbb{Z}^N$. This generalizes the real torus and supports a global Fourier basis indexed by the dual lattice $\Lambda^* \subset \mathbb{C}^N$.
+**$\mathbb{T}_\mathbb{C}^N := \mathbb{C}^N / \Lambda$** — *compact complex torus*, formed by quotienting complex space $\mathbb{C}^N$ by a discrete full-rank lattice $\Lambda \subset \mathbb{C}^N$, typically $\Lambda = \mathbb{Z}^N + i \mathbb{Z}^N$. This generalizes the real torus and supports a global Fourier basis indexed by the dual lattice $\Lambda^* \subset \mathbb{C}^N$.
 
 > **Lattice structure clarification**:
 >
@@ -13,6 +13,10 @@
 > The torus $\mathbb{T}_\mathbb{C}^N = \mathbb{C}^N / \Lambda$ inherits its topology and metric from the Euclidean (Hermitian) norm on $\mathbb{C}^N$, and defines periodicity by identification $z \sim z + \lambda$ for all $\lambda \in \Lambda$.
 >
 > The dual lattice $\Lambda^* \subset \mathbb{C}^N$ is defined with respect to the Hermitian pairing $\langle m, z \rangle := \sum_{j=1}^N \overline{m_j} z_j$, and consists of all $m \in \mathbb{C}^N$ such that $\langle m, \lambda \rangle \in \mathbb{Z}$ for all $\lambda \in \Lambda$.
+>
+> This Hermitian pairing ensures compatibility with the geometry of $\mathbb{C}^N$, including the unitary structures defined elsewhere in CPSF.
+>
+> As the dual of a discrete lattice, $\Lambda^*$ is itself discrete and additive.
 
 ---
 
@@ -22,13 +26,7 @@
 
 All coordinates $z \in \mathbb{T}_\mathbb{C}^N$ are complex positions modulo the lattice $\Lambda \subset \mathbb{C}^N$. Arithmetic is periodic over $\mathbb{C}^N$ modulo $\Lambda$, enabling toroidal continuity and Fourier projection.
 
-**Spectral Basis** — Global toroidal harmonics
-
-$$
-\phi_m(z) := e^{2\pi i \langle m, z \rangle}, \quad m \in \Lambda^*
-$$
-
-form a complete orthonormal basis in $L^2(\mathbb{T}_\mathbb{C}^N)$. They satisfy $\phi_m(z + \lambda) = \phi_m(z) \cdot e^{2\pi i \langle m, \lambda \rangle}$ and are covariant under toroidal shifts.
+**Spectral Basis** — Global toroidal harmonics $\phi_m(z) := e^{2\pi i \langle m, z \rangle}$, $m \in \Lambda^*$ form a complete orthonormal basis in $L^2(\mathbb{T}_\mathbb{C}^N)$. They satisfy $\phi_m(z + \lambda) = \phi_m(z) \cdot e^{2\pi i \langle m, \lambda \rangle}$ and are covariant under toroidal shifts.
 
 The phase factor $e^{2\pi i \langle m, \lambda \rangle}$ encodes the shift symmetry of the basis under toroidal translations, ensuring covariance of the harmonic structure with respect to spatial shifts in $z$.
 
