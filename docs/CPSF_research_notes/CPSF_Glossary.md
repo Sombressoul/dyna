@@ -37,9 +37,11 @@ Defines the geometric configuration of directional observation or interaction wi
 ### Attenuation Parameters
 
 **$\sigma^{\parallel} \in \mathbb{R}_{>0}$** — *longitudinal attenuation scalar*.
+
 A single positive real value controlling the projection envelope's scale **along the ray direction** $\vec{d}$; determines the effective extent of contribution along the ray.
 
 **$\sigma^{\perp} \in \mathbb{R}_{>0}$** — *transverse attenuation scalar*.
+
 A single positive real value controlling isotropic decay **in all directions orthogonal to** $\vec{d}$ within the ambient space $\mathbb{C}^N$.
 
 ---
@@ -54,7 +56,7 @@ When it exists, it satisfies:
 * $R^\dagger R = I_N$ — the matrix is unitary;
 * The remaining $N - 1$ columns span the orthogonal complement of $\vec{d}$.
 
-The construction of $R(\vec{d})$ is defined separately (see \[**TODO**]).
+The construction of $R(\vec{d})$ is defined separately (see **TODO**).
 
 ---
 
