@@ -68,9 +68,7 @@ When it exists, it satisfies:
 
 > **All orthogonality statements are defined with respect to the standard Hermitian inner product in $\mathbb{C}^N$:**
 >
-> $$
-> \langle u, v \rangle := \sum_{j=1}^N \overline{u_j} v_j
-> $$
+> $\langle u, v \rangle := \sum_{j=1}^N \overline{u_j} v_j$
 >
 > This form of orthogonality is preserved by unitary transformations and defines the geometry of $\mathrm{U}(N)$.
 
