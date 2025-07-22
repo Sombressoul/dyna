@@ -26,7 +26,7 @@
 
 All coordinates $z \in \mathbb{T}_\mathbb{C}^N$ are complex positions modulo the lattice $\Lambda \subset \mathbb{C}^N$. Arithmetic is periodic over $\mathbb{C}^N$ modulo $\Lambda$, enabling toroidal continuity and Fourier projection.
 
-**Spectral Basis** — Global toroidal harmonics $\phi_m(z) := e^{2\pi i \langle m, z \rangle}$, $m \in \Lambda^*$ form a complete orthonormal basis in $L^2(\mathbb{T}_\mathbb{C}^N)$. They satisfy $\phi_m(z + \lambda) = \phi_m(z) \cdot e^{2\pi i \langle m, \lambda \rangle}$ and are covariant under toroidal shifts.
+**Spectral Basis** — Global toroidal harmonics $\phi_m(z) := e^{2\pi i \langle m, z \rangle}$, where $m \in \Lambda^*$ and $\langle m, z \rangle := \sum_{j=1}^N \overline{m_j} z_j$, form a complete orthonormal basis in $L^2(\mathbb{T}_\mathbb{C}^N)$. They satisfy $\phi_m(z + \lambda) = \phi_m(z) \cdot e^{2\pi i \langle m, \lambda \rangle}$ and are covariant under toroidal shifts.
 
 The phase factor $e^{2\pi i \langle m, \lambda \rangle}$ encodes the shift symmetry of the basis under toroidal translations, ensuring covariance of the harmonic structure with respect to spatial shifts in $z$.
 
@@ -89,6 +89,10 @@ The construction of $R(\vec{d})$ is defined separately (see **TODO**).
 $$
 \mathcal{R}(\vec{d}) := \mathrm{diag}(R(\vec{d}), R(\vec{d}))
 $$
+
+> **Rationale for block-diagonal structure**:
+>
+> The space $\mathbb{C}^{2N}$ is canonically interpreted as a product of position and frequency spaces: $\mathbb{C}^N_{\text{pos}} \oplus \mathbb{C}^N_{\text{freq}}$. The block-diagonal form of $\mathcal{R}(\vec{d})$ reflects this decomposition, applying the same rotation $R(\vec{d}) \in \mathrm{U}(N)$ to both the spatial and spectral components. This ensures directional alignment and anisotropic scaling are consistent across both domains when constructing the covariance matrix $\Sigma_j$.
 
 It defines a unitary frame in $\mathbb{C}^{2N}$, aligned with the projection direction $\vec{d} \in \mathbb{C}^N$. Used in the construction of directionally aligned anisotropic structures, such as the geometric covariance matrix $\Sigma_j$.
 
