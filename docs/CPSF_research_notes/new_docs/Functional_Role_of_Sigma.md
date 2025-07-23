@@ -6,7 +6,7 @@ This section defines the functional and geometric role of the matrix $\Sigma_j \
 
 ### 1. Geometric Context and Projection Coordinates
 
-Let $\ell_j := (z_j, \vec{d}_j) \in \mathbb{T}_\mathbb{C}^N \times \mathbb{S}_\mathbb{C}^{2N-1}$ be a projection coordinate as defined in *"CPSF: Core Terms — Projection Coordinates"*.
+Let $\ell_j := (z_j, \vec{d}_j) \in \mathbb{T}_\mathbb{C}^N \times \mathbb{S}_\mathbb{C}^{2N-1}$ be a projection coordinate as defined in *"Core Terms — Projection Coordinates"*.
 
 * $z_j \in \mathbb{T}_\mathbb{C}^N$ is a base point on the complex torus;
 * $\vec{d}_j \in \mathbb{S}_\mathbb{C}^{2N-1} \subset \mathbb{C}^N$ is a unit-norm complex direction vector (i.e., $\|\vec{d}_j\| = 1$).
@@ -23,7 +23,7 @@ $$
 
 ### 2. Aligned Orthonormal Frame
 
-As in *"CPSF: Core Terms — Orthonormal Frame"*, define the unitary matrix $R(\vec{d}_j) \in \mathrm{U}(N)$ satisfying:
+As in *"Core Terms — Orthonormal Frame"*, define the unitary matrix $R(\vec{d}_j) \in \mathrm{U}(N)$ satisfying:
 
 * $R(\vec{d}_j) e_1 = \vec{d}_j$
 * The remaining columns span $\vec{d}_j^\perp$ and are orthonormal with respect to the Hermitian inner product:
@@ -44,7 +44,7 @@ This acts on $\mathbb{C}_{\text{pos}}^N \oplus \mathbb{C}_{\text{dir}}^N \cong \
 
 ### 3. Attenuation and Covariance Matrix
 
-Let $\sigma_j^{\parallel}, \sigma_j^{\perp} \in \mathbb{R}_{>0}$ be the longitudinal and transverse attenuation parameters respectively (see *"CPSF: Core Terms — Attenuation Parameters"*).
+Let $\sigma_j^{\parallel}, \sigma_j^{\perp} \in \mathbb{R}_{>0}$ be the longitudinal and transverse attenuation parameters respectively (see *"Core Terms — Attenuation Parameters"*).
 
 Define the diagonal attenuation matrix:
 
@@ -58,13 +58,13 @@ $$
   \Sigma_j := \mathcal{R}(\vec{d}_j)^{\dagger} \cdot D_j \cdot \mathcal{R}(\vec{d}_j) \in \mathbb{C}^{2N \times 2N}
 $$
 
-By construction, $\Sigma_j$ is Hermitian and strictly positive definite. It defines an anisotropic Gaussian metric whose principal axes are aligned with the projection direction $\vec{d}_j$, and whose longitudinal and transverse variances are given by $\sigma_j^{\parallel}$ and $\sigma_j^{\perp}$, respectively (see *"CPSF: Core Terms — Geometric Covariance Matrix"*).
+By construction, $\Sigma_j$ is Hermitian and strictly positive definite. It defines an anisotropic Gaussian metric whose principal axes are aligned with the projection direction $\vec{d}_j$, and whose longitudinal and transverse variances are given by $\sigma_j^{\parallel}$ and $\sigma_j^{\perp}$, respectively (see *"Core Terms — Geometric Covariance Matrix"*).
 
 ---
 
 ### 4. Gaussian Envelope and Periodization
 
-Define the unnormalized anisotropic Gaussian envelope (see *"CPSF: Core Terms — Unnormalized Gaussian Envelope"*):
+Define the unnormalized anisotropic Gaussian envelope (see *"Core Terms — Unnormalized Gaussian Envelope"*):
 
 $$
   \rho_j(w) := \exp\left( -\pi \langle \Sigma_j^{-1} w, w \rangle \right)
@@ -72,13 +72,13 @@ $$
 
 where $w \in \mathbb{C}^{2N}$ is the relative offset defined above.
 
-To restore toroidal periodicity in $z \in \mathbb{T}_\mathbb{C}^N$, define the periodized envelope (see *"CPSF: Core Terms — Periodized Envelope"*):
+To restore toroidal periodicity in $z \in \mathbb{T}_\mathbb{C}^N$, define the periodized envelope (see *"Core Terms — Periodized Envelope"*):
 
 $$
   \psi_j^{\mathbb{T}}(z, \vec{d}) := \sum_{n \in \Lambda} \rho_j\left( \iota(\tilde{z} - \tilde{z}_j + n, \vec{d} - \vec{d}_j) \right)
 $$
 
-This function is smooth, $\Lambda$-periodic in $z$, rapidly decaying in $\vec{d}$, and invariant under the choice of lifted representatives $\tilde{z}, \tilde{z}_j \in \mathbb{C}^N$. This invariance follows from the lattice summation over all $n \in \Lambda$, which eliminates dependence on the specific choice of representatives (see *"CPSF: Core Terms — Periodized Envelope"*).
+This function is smooth, $\Lambda$-periodic in $z$, rapidly decaying in $\vec{d}$, and invariant under the choice of lifted representatives $\tilde{z}, \tilde{z}_j \in \mathbb{C}^N$. This invariance follows from the lattice summation over all $n \in \Lambda$, which eliminates dependence on the specific choice of representatives (see *"Core Terms — Periodized Envelope"*).
 
 The envelope $\psi_j^{\mathbb{T}}$ thus localizes the influence of each field contribution $C_j$ to a region in projection space whose shape is geometrically induced by $\Sigma_j$.
 
@@ -86,9 +86,9 @@ The envelope $\psi_j^{\mathbb{T}}$ thus localizes the influence of each field co
 
 ### 5. Field Construction and Semantic Projection
 
-Let $\mathcal{J} \subset \mathbb{N}$ index the finite collection of field contributions $C_j := (\ell_j, \hat{T}_j, \sigma_j^{\parallel}, \sigma_j^{\perp}, \alpha_j)$ as defined in *"CPSF: Core Terms — Field Contribution"*.
+Let $\mathcal{J} \subset \mathbb{N}$ index the finite collection of field contributions $C_j := (\ell_j, \hat{T}_j, \sigma_j^{\parallel}, \sigma_j^{\perp}, \alpha_j)$ as defined in *"Core Terms — Field Contribution"*.
 
-Then the global semantic field (see *"CPSF: Core Terms — Global Field Response") is:
+Then the global semantic field (see *"Core Terms — Global Field Response") is:
 
 $$
   T(z, \vec{d}) := \sum_{j \in \mathcal{J}} \alpha_j \cdot \psi_j^{\mathbb{T}}(z, \vec{d}) \cdot \hat{T}_j \in \mathbb{C}^S
@@ -100,13 +100,13 @@ $$
   \Delta T(z, \vec{d}) := T^{\text{ref}}(z, \vec{d}) - T(z, \vec{d})
 $$
 
-Projecting this error onto the envelope $\psi_j^{\mathbb{T}}$ with respect to the canonical Hilbert space (see *"CPSF: Core Terms — Projection Space Measure"*):
+Projecting this error onto the envelope $\psi_j^{\mathbb{T}}$ with respect to the canonical Hilbert space (see *"Core Terms — Projection Space Measure"*):
 
 $$
   L^2(\mathbb{T}_\mathbb{C}^N \times \mathbb{S}_\mathbb{C}^{2N-1}; \mathbb{C}^S)
 $$
 
-yields the orthogonal projection (see *"CPSF: Core Terms — Semantic Error Projection"*):
+yields the orthogonal projection (see *"Core Terms — Semantic Error Projection"*):
 
 $$
   \Delta \hat{T}_j := \frac{1}{\alpha_j} \cdot \frac{ \int_{\mathbb{T}_\mathbb{C}^N} \int_{\mathbb{S}_\mathbb{C}^{2N-1}} \overline{\psi_j^{\mathbb{T}}(z, \vec{d})} \cdot \Delta T(z, \vec{d}) \, d\sigma(\vec{d}) \, d\mu(z) }{ \int_{\mathbb{T}_\mathbb{C}^N} \int_{\mathbb{S}_\mathbb{C}^{2N-1}} |\psi_j^{\mathbb{T}}(z, \vec{d})|^2 \, d\sigma(\vec{d}) \, d\mu(z) }
