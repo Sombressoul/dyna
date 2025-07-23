@@ -240,9 +240,39 @@ Let the field take values in $\mathbb{C}^S$. Define the product measure space ov
 Here:
 
 * $d\mu(z)$: normalized Haar measure on the complex torus $\mathbb{T}_\mathbb{C}^N$;
-* $d\sigma(\vec{d})$: rotationally invariant surface measure on the unit sphere $\mathbb{S}^{2N-1}_\text{unit} := { \vec{d} \in \mathbb{C}^N : \|\vec{d}\| = 1 }$.
+* $d\sigma(\vec{d})$: rotationally invariant surface measure on the unit sphere $\mathbb{S}^{2N-1}_\text{unit} := { \vec{d} \in \mathbb{C}^N : \|\vec{d}\| = 1 }$ (see *"Core Terms — Rotationally Invariant Surface Measure"*).
 
 This space defines the functional domain in which projection fields $T(z, \vec{d}) \in \mathbb{C}^S$ and semantic error fields $\Delta T(z, \vec{d})$ are analytically defined and compared.
+
+---
+
+### Rotationally Invariant Surface Measure
+
+Let $\mathbb{S}^{2N-1}_\text{unit} := { \vec{d} \in \mathbb{C}^N : |\vec{d}|^2 = 1 }$ denote the unit sphere in $\mathbb{C}^N \cong \mathbb{R}^{2N}$.
+
+The symbol $d\sigma(\vec{d})$ refers to the **unique $\mathrm{U}(N)$-invariant Borel probability measure** on $\mathbb{S}^{2N-1}_\text{unit}$, normalized such that:
+
+$$
+\int_{\mathbb{S}^{2N-1}_\text{unit}} d\sigma(\vec{d}) = 1
+$$
+
+This measure arises as the **induced surface measure** on the regular level set of the function $\rho(\vec{d}) := |\vec{d}|^2$ under the standard Lebesgue measure $d^{2N} \vec{d}$ on $\mathbb{C}^N$.
+
+More precisely, $d\sigma$ is defined by the coarea formula:
+
+$$
+\int_{\mathbb{C}^N} f(\vec{d}) \, d^{2N}\vec{d} = \int_0^\infty \left( \int_{\|\vec{d}\|^2 = r^2} f(\vec{d}) \, d\sigma_r(\vec{d}) \right) \cdot r^{2N-1} dr
+$$
+
+where $d\sigma_r$ is the induced surface measure on the sphere of radius $r$. Then:
+
+$$
+d\sigma(\vec{d}) := \frac{1}{\omega_{2N-1}} \cdot d\sigma_1(\vec{d})
+$$
+
+with $\omega_{2N-1} := \mathrm{Vol}(\mathbb{S}^{2N-1}_\text{unit})$ the total surface area of the unit sphere.
+
+This construction guarantees that $d\sigma$ is smooth, $\mathrm{U}(N)$-invariant, and normalized on $\mathbb{S}^{2N-1}_\text{unit}$.
 
 ---
 
