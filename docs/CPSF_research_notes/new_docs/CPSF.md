@@ -67,13 +67,15 @@ $$
 z(t) = z + t \cdot \vec{d} \mod \Lambda
 $$
 
+All directions $\vec{d} \in \mathbb{C}^N$ are constrained to lie on the unit complex sphere $\mathbb{S}_\mathbb{C}^{2N-1} := { \vec{d} \in \mathbb{C}^N : \|\vec{d}\| = 1 }$. This constraint is enforced throughout all geometric and analytic constructions in CPSF.
+
 ---
 
 ### Projection Space
 
 **$\mathbb{T}_\mathbb{C}^N \times \mathbb{C}^N$** — *projection space*, the extended coordinate domain of the CPSF field.
 
-In the geometric layer of CPSF, this space represents the set of all possible ray configurations. While in many geometric constructions $\vec{d} \in \mathbb{C}^N$ is treated as a fixed parameter of a ray, analytic formulations (e.g., field integration or error projection) promote $\vec{d}$ to a variable of integration.
+In the geometric layer of CPSF, this space represents the set of all possible ray configurations. As the direction vector $\vec{d}$ is always unit-normed, the true domain of projection is the product manifold $\mathbb{T}_\mathbb{C}^N \times \mathbb{S}_\mathbb{C}^{2N-1}$, not the full space $\mathbb{C}^N$.
 
 Thus, the projection space unifies spatial and directional components as a domain for functions $T(z, \vec{d}) \in \mathbb{C}^S$.
 
@@ -208,6 +210,8 @@ $\hat{T}_j$ encodes localized semantic content directly in the spectral domain. 
 * attenuation scalars $\sigma_j^{\parallel}, \sigma_j^{\perp} \in \mathbb{R}_{>0}$,
 * scalar weight $\alpha_j \in \mathbb{R}_{\ge 0}$.
 
+Let $\mathcal{J} \subset \mathbb{N}$ denote a **finite** index set of contributions $\{ C_j \}_{j \in \mathcal{J}}$.
+
 This tuple defines a directionally localized generator of field structure. The geometric part defines a region of influence on the toroidal base, while the semantic part modulates the content delivered into that region. Through their collective interference, such contributions define the emergent semantic field on the second level of CPSF.
 
 ---
@@ -230,26 +234,29 @@ Maps projection coordinates $(z, \vec{d})$ to semantic values in $\mathbb{C}^S$.
 
 ### Projection Space Measure
 
-Let the field take values in $\mathbb{C}^S$. Define the product measure space:
+Let the field take values in $\mathbb{C}^S$. Define the product measure space over the projection domain $\mathbb{T}_\mathbb{C}^N \times \mathbb{S}_\mathbb{C}^{2N-1}$:
 
-* $L^2(\mathbb{T}_\mathbb{C}^N \times \mathbb{C}^N; \mathbb{C}^S)$ — complex Hilbert space of square-integrable fields.
-* Inner product:
-  $\langle f, g \rangle := \int \sum_{s=1}^S \overline{f_s(z, \vec{d})} g_s(z, \vec{d}) \, d\mu(z) \, d\nu(\vec{d})$
+* $L^2(\mathbb{T}_\mathbb{C}^N \times \mathbb{S}_\mathbb{C}^{2N-1}; \mathbb{C}^S)$ — the Hilbert space of square-integrable $\mathbb{C}^S$-valued functions over the torus-direction domain.
+* The inner product: $\langle f, g \rangle := \int_{\mathbb{T}_\mathbb{C}^N} \int_{\mathbb{S}_\mathbb{C}^{2N-1}} \sum_{s=1}^S \overline{f_s(z, \vec{d})} \cdot g_s(z, \vec{d})\, d\sigma(\vec{d})\, d\mu(z)$
 
 Here:
 
-* $d\mu(z)$: normalized Haar measure on $\mathbb{T}_\mathbb{C}^N$;
-* $d\nu(\vec{d})$: Lebesgue measure on $\mathbb{C}^N$.
+* $d\mu(z)$: normalized Haar measure on the complex torus $\mathbb{T}_\mathbb{C}^N$;
+* $d\sigma(\vec{d})$: rotationally invariant surface measure on the unit complex sphere $\mathbb{S}_\mathbb{C}^{2N-1} := { \vec{d} \in \mathbb{C}^N : \|\vec{d}\| = 1 }$.
 
-Used to define error projections and field energy norms.
+This space defines the functional domain in which projection fields $T(z, \vec{d}) \in \mathbb{C}^S$ and semantic error fields $\Delta T(z, \vec{d})$ are analytically defined and compared.
 
 ---
 
 ### Semantic Error Projection
 
-**$\Delta \hat{T}_j := \frac{1}{\alpha_j} \cdot \frac{ \int \overline{\psi_j^{\mathbb{T}}} \cdot \Delta T }{ \int |\psi_j^{\mathbb{T}}|^2 }$** — *orthogonal projection of semantic error onto contribution mode*.
+**$\Delta \hat{T}_j := \frac{1}{\alpha_j} \cdot \frac{ \int_{\mathbb{T}_\mathbb{C}^N} \int_{\mathbb{S}_\mathbb{C}^{2N-1}} \overline{\psi_j^{\mathbb{T}}(z, \vec{d})} \cdot \Delta T(z, \vec{d}) \, d\sigma(\vec{d}) \, d\mu(z) }{ \int_{\mathbb{T}_\mathbb{C}^N} \int_{\mathbb{S}_\mathbb{C}^{2N-1}} |\psi_j^{\mathbb{T}}(z, \vec{d})|^2 \, d\sigma(\vec{d}) \, d\mu(z) }$** — *orthogonal projection of semantic error onto contribution mode*.
 
-Provides an update direction for $\hat{T}_j \in \mathbb{C}^S$, minimizing $L^2$-error under the localization defined by $\Sigma_j$.
+This expression defines an $L^2$-orthogonal projection of the error field $\Delta T(z, \vec{d}) := T^{\text{ref}}(z, \vec{d}) - T(z, \vec{d})$ onto the localized envelope $\psi_j^{\mathbb{T}}$ associated with the contribution $C_j$.
+
+All integrals are evaluated over the product domain $\mathbb{T}_\mathbb{C}^N \times \mathbb{S}_\mathbb{C}^{2N-1}$ using the normalized Haar measure $d\mu(z)$ on the torus and the rotationally invariant surface measure $d\sigma(\vec{d})$ on the unit complex sphere.
+
+This projection yields the update direction $\Delta \hat{T}_j \in \mathbb{C}^S$, which minimizes the squared $L^2$-error under the geometric localization induced by $\Sigma_j$.
 
 ---
 
