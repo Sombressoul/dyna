@@ -61,11 +61,11 @@ $$
 z(t) = z + t \cdot \vec{d} \mod \Lambda
 $$
 
-All directions $\vec{d} \in \mathbb{C}^N$ are constrained to lie on the unit real sphere in $\mathbb{C}^N$:  
+All directions $\vec{d} \in \mathbb{C}^N$ are constrained to lie on the unit sphere in $\mathbb{C}^N$:  
 $$
-\mathbb{S}^{2N-1}_\mathbb{R} := \left\{ \vec{d} \in \mathbb{C}^N : \sum_{j=1}^N |d_j|^2 = 1 \right\}
+\mathbb{S}^{2N-1}_\text{unit} := \left\{ \vec{d} \in \mathbb{C}^N : \sum_{j=1}^N |d_j|^2 = 1 \right\}
 $$
-This is the real $(2N - 1)$-dimensional unit sphere in $\mathbb{R}^{2N} \cong \mathbb{C}^N$, equipped with the unitarily invariant surface measure. This constraint is enforced throughout all geometric and analytic constructions in CPSF.
+This is the $(2N - 1)$-dimensional unit sphere in $\mathbb{R}^{2N} \cong \mathbb{C}^N$, equipped with the unitarily invariant surface measure. This constraint is enforced throughout all geometric and analytic constructions in CPSF.
 
 ---
 
@@ -73,7 +73,7 @@ This is the real $(2N - 1)$-dimensional unit sphere in $\mathbb{R}^{2N} \cong \m
 
 **$\mathbb{T}_\mathbb{C}^N \times \mathbb{C}^N$** — *projection space*, the extended coordinate domain of the CPSF field.
 
-In the geometric layer of CPSF, this space represents the set of all possible ray configurations. As the direction vector $\vec{d}$ is always unit-normed, the true domain of projection is the product manifold $\mathbb{T}_\mathbb{C}^N \times \mathbb{S}^{2N-1}_\mathbb{R}$, not the full space $\mathbb{C}^N$.
+In the geometric layer of CPSF, this space represents the set of all possible ray configurations. As the direction vector $\vec{d}$ is always unit-normed, the true domain of projection is the product manifold $\mathbb{T}_\mathbb{C}^N \times \mathbb{S}^{2N-1}_\text{unit}$, not the full space $\mathbb{C}^N$.
 
 Thus, the projection space unifies spatial and directional components as a domain for functions $T(z, \vec{d}) \in \mathbb{C}^S$.
 
@@ -232,15 +232,15 @@ Maps projection coordinates $(z, \vec{d})$ to semantic values in $\mathbb{C}^S$.
 
 ### Projection Space Measure
 
-Let the field take values in $\mathbb{C}^S$. Define the product measure space over the projection domain $\mathbb{T}_\mathbb{C}^N \times \mathbb{S}^{2N-1}_\mathbb{R}$:
+Let the field take values in $\mathbb{C}^S$. Define the product measure space over the projection domain $\mathbb{T}_\mathbb{C}^N \times \mathbb{S}^{2N-1}_\text{unit}$:
 
-* $L^2(\mathbb{T}_\mathbb{C}^N \times \mathbb{S}^{2N-1}_\mathbb{R}; \mathbb{C}^S)$ — the Hilbert space of square-integrable $\mathbb{C}^S$-valued functions over the torus-direction domain.
-* The inner product: $\langle f, g \rangle := \int_{\mathbb{T}_\mathbb{C}^N} \int_{\mathbb{S}^{2N-1}_\mathbb{R}} \sum_{s=1}^S \overline{f_s(z, \vec{d})} \cdot g_s(z, \vec{d})\, d\sigma(\vec{d})\, d\mu(z)$
+* $L^2(\mathbb{T}_\mathbb{C}^N \times \mathbb{S}^{2N-1}_\text{unit}; \mathbb{C}^S)$ — the Hilbert space of square-integrable $\mathbb{C}^S$-valued functions over the torus-direction domain.
+* The inner product: $\langle f, g \rangle := \int_{\mathbb{T}_\mathbb{C}^N} \int_{\mathbb{S}^{2N-1}_\text{unit}} \sum_{s=1}^S \overline{f_s(z, \vec{d})} \cdot g_s(z, \vec{d})\, d\sigma(\vec{d})\, d\mu(z)$
 
 Here:
 
 * $d\mu(z)$: normalized Haar measure on the complex torus $\mathbb{T}_\mathbb{C}^N$;
-* $d\sigma(\vec{d})$: rotationally invariant surface measure on the unit sphere $\mathbb{S}^{2N-1}_\mathbb{R} := { \vec{d} \in \mathbb{C}^N : \|\vec{d}\| = 1 }$.
+* $d\sigma(\vec{d})$: rotationally invariant surface measure on the unit sphere $\mathbb{S}^{2N-1}_\text{unit} := { \vec{d} \in \mathbb{C}^N : \|\vec{d}\| = 1 }$.
 
 This space defines the functional domain in which projection fields $T(z, \vec{d}) \in \mathbb{C}^S$ and semantic error fields $\Delta T(z, \vec{d})$ are analytically defined and compared.
 
@@ -248,11 +248,11 @@ This space defines the functional domain in which projection fields $T(z, \vec{d
 
 ### Semantic Error Projection
 
-**$\Delta \hat{T}_j := \frac{1}{\alpha_j} \cdot \frac{ \int_{\mathbb{T}_\mathbb{C}^N} \int_{\mathbb{S}^{2N-1}_\mathbb{R}} \overline{\psi_j^{\mathbb{T}}(z, \vec{d})} \cdot \Delta T(z, \vec{d}) \, d\sigma(\vec{d}) \, d\mu(z) }{ \int_{\mathbb{T}_\mathbb{C}^N} \int_{\mathbb{S}^{2N-1}_\mathbb{R}} |\psi_j^{\mathbb{T}}(z, \vec{d})|^2 \, d\sigma(\vec{d}) \, d\mu(z) }$** — *orthogonal projection of semantic error onto contribution mode*.
+**$\Delta \hat{T}_j := \frac{1}{\alpha_j} \cdot \frac{ \int_{\mathbb{T}_\mathbb{C}^N} \int_{\mathbb{S}^{2N-1}_\text{unit}} \overline{\psi_j^{\mathbb{T}}(z, \vec{d})} \cdot \Delta T(z, \vec{d}) \, d\sigma(\vec{d}) \, d\mu(z) }{ \int_{\mathbb{T}_\mathbb{C}^N} \int_{\mathbb{S}^{2N-1}_\text{unit}} |\psi_j^{\mathbb{T}}(z, \vec{d})|^2 \, d\sigma(\vec{d}) \, d\mu(z) }$** — *orthogonal projection of semantic error onto contribution mode*.
 
 This expression defines an $L^2$-orthogonal projection of the error field $\Delta T(z, \vec{d}) := T^{\text{ref}}(z, \vec{d}) - T(z, \vec{d})$ onto the localized envelope $\psi_j^{\mathbb{T}}$ associated with the contribution $C_j$.
 
-All integrals are evaluated over the product domain $\mathbb{T}_\mathbb{C}^N \times \mathbb{S}^{2N-1}_\mathbb{R}$ using the normalized Haar measure $d\mu(z)$ on the torus and the rotationally invariant surface measure $d\sigma(\vec{d})$ on the unit sphere.
+All integrals are evaluated over the product domain $\mathbb{T}_\mathbb{C}^N \times \mathbb{S}^{2N-1}_\text{unit}$ using the normalized Haar measure $d\mu(z)$ on the torus and the rotationally invariant surface measure $d\sigma(\vec{d})$ on the unit sphere.
 
 This projection yields the update direction $\Delta \hat{T}_j \in \mathbb{C}^S$, which minimizes the squared $L^2$-error under the geometric localization induced by $\Sigma_j$.
 
@@ -288,18 +288,18 @@ This section defines the functional and geometric role of the matrix $\Sigma_j \
 
 ### 1. Geometric Context and Projection Coordinates
 
-Let $\ell_j := (z_j, \vec{d}_j) \in \mathbb{T}_\mathbb{C}^N \times \mathbb{S}^{2N-1}_\mathbb{R}$ be a projection coordinate as defined in *"Core Terms — Projection Coordinates"*.
+Let $\ell_j := (z_j, \vec{d}_j) \in \mathbb{T}_\mathbb{C}^N \times \mathbb{S}^{2N-1}_\text{unit}$ be a projection coordinate as defined in *"Core Terms — Projection Coordinates"*.
 
 * $z_j \in \mathbb{T}_\mathbb{C}^N$ is a base point on the complex torus;
-* $\vec{d}_j \in \mathbb{S}^{2N-1}_\mathbb{R} \subset \mathbb{C}^N$ is a unit-norm complex direction vector (i.e., $\|\vec{d}_j\| = 1$).
+* $\vec{d}_j \in \mathbb{S}^{2N-1}_\text{unit} \subset \mathbb{C}^N$ is a unit-norm complex direction vector (i.e., $\|\vec{d}_j\| = 1$).
 
-Let $(z, \vec{d}) \in \mathbb{T}_\mathbb{C}^N \times \mathbb{S}^{2N-1}_\mathbb{R}$ be an arbitrary projection coordinate. We use lifted representatives $\tilde{z}, \tilde{z}_j \in \mathbb{C}^N$ such that $\tilde{z} \equiv z \mod \Lambda$, and define the relative offset:
+Let $(z, \vec{d}) \in \mathbb{T}_\mathbb{C}^N \times \mathbb{S}^{2N-1}_\text{unit}$ be an arbitrary projection coordinate. We use lifted representatives $\tilde{z}, \tilde{z}_j \in \mathbb{C}^N$ such that $\tilde{z} \equiv z \mod \Lambda$, and define the relative offset:
 
 $$
   w := \iota(\tilde{z} - \tilde{z}_j, \vec{d} - \vec{d}_j), \quad \iota(u, v) := \begin{bmatrix} u \\ v \end{bmatrix} \in \mathbb{C}^{2N}
 $$
 
-> **Geometric remark**: While both $\vec{d}$ and $\vec{d}_j$ lie on the unit sphere $\mathbb{S}^{2N-1}_\mathbb{R}$, the difference $\vec{d} - \vec{d}_j$ does not. It is interpreted in the ambient space $\mathbb{C}^N$ as an approximation to angular deviation within the tangent space at $\vec{d}_j$, and is valid only under the assumption that $\vec{d} \approx \vec{d}_j$.
+> **Geometric remark**: While both $\vec{d}$ and $\vec{d}_j$ lie on the unit sphere $\mathbb{S}^{2N-1}_\text{unit}$, the difference $\vec{d} - \vec{d}_j$ does not. It is interpreted in the ambient space $\mathbb{C}^N$ as an approximation to angular deviation within the tangent space at $\vec{d}_j$, and is valid only under the assumption that $\vec{d} \approx \vec{d}_j$.
 
 ---
 
@@ -385,13 +385,13 @@ $$
 Projecting this error onto the envelope $\psi_j^{\mathbb{T}}$ with respect to the canonical Hilbert space (see *"Core Terms — Projection Space Measure"*):
 
 $$
-  L^2(\mathbb{T}_\mathbb{C}^N \times \mathbb{S}^{2N-1}_\mathbb{R}; \mathbb{C}^S)
+  L^2(\mathbb{T}_\mathbb{C}^N \times \mathbb{S}^{2N-1}_\text{unit}; \mathbb{C}^S)
 $$
 
 yields the orthogonal projection (see *"Core Terms — Semantic Error Projection"*):
 
 $$
-  \Delta \hat{T}_j := \frac{1}{\alpha_j} \cdot \frac{ \int_{\mathbb{T}_\mathbb{C}^N} \int_{\mathbb{S}^{2N-1}_\mathbb{R}} \overline{\psi_j^{\mathbb{T}}(z, \vec{d})} \cdot \Delta T(z, \vec{d}) \, d\sigma(\vec{d}) \, d\mu(z) }{ \int_{\mathbb{T}_\mathbb{C}^N} \int_{\mathbb{S}^{2N-1}_\mathbb{R}} |\psi_j^{\mathbb{T}}(z, \vec{d})|^2 \, d\sigma(\vec{d}) \, d\mu(z) }
+  \Delta \hat{T}_j := \frac{1}{\alpha_j} \cdot \frac{ \int_{\mathbb{T}_\mathbb{C}^N} \int_{\mathbb{S}^{2N-1}_\text{unit}} \overline{\psi_j^{\mathbb{T}}(z, \vec{d})} \cdot \Delta T(z, \vec{d}) \, d\sigma(\vec{d}) \, d\mu(z) }{ \int_{\mathbb{T}_\mathbb{C}^N} \int_{\mathbb{S}^{2N-1}_\text{unit}} |\psi_j^{\mathbb{T}}(z, \vec{d})|^2 \, d\sigma(\vec{d}) \, d\mu(z) }
 $$
 
 This projection yields the optimal semantic update $\Delta \hat{T}_j \in \mathbb{C}^S$ that minimizes the squared error weighted by the localization profile $\psi_j^{\mathbb{T}}$, which in turn is induced by $\Sigma_j$.
