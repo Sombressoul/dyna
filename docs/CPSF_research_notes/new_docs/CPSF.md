@@ -282,7 +282,16 @@ This construction guarantees that $d\sigma$ is smooth, $\mathrm{U}(N)$-invariant
 
 ### Semantic Error Projection
 
-**$\Delta \hat{T}_j := \frac{1}{\alpha_j} \cdot \frac{ \int_{\mathbb{T}_\mathbb{C}^N} \int_{\mathbb{S}^{2N-1}_\text{unit}} \overline{\psi_j^{\mathbb{T}}(z, \vec{d})} \cdot \Delta T(z, \vec{d}) \, d\sigma(\vec{d}) \, d\mu(z) }{ \int_{\mathbb{T}_\mathbb{C}^N} \int_{\mathbb{S}^{2N-1}_\text{unit}} |\psi_j^{\mathbb{T}}(z, \vec{d})|^2 \, d\sigma(\vec{d}) \, d\mu(z) }$** — *orthogonal projection of semantic error onto contribution mode*.
+Orthogonal projection of semantic error onto contribution mode is defined as (see *"Appendix A: Validity of the Semantic Error Projection Integral"*):
+$$
+\Delta \hat{T}_j := 
+\begin{cases}
+\frac{1}{\alpha_j} \cdot \frac{ \int_{\mathbb{T}_\mathbb{C}^N} \int_{\mathbb{S}^{2N-1}_\text{unit}} \overline{\psi_j^{\mathbb{T}}(z, \vec{d})} \cdot \Delta T(z, \vec{d}) \, d\sigma(\vec{d}) \, d\mu(z) }{ \int_{\mathbb{T}_\mathbb{C}^N} \int_{\mathbb{S}^{2N-1}_\text{unit}} |\psi_j^{\mathbb{T}}(z, \vec{d})|^2 \, d\sigma(\vec{d}) \, d\mu(z) }, & \text{if } \alpha_j > 0 \\
+0, & \text{if } \alpha_j = 0
+\end{cases}
+$$
+
+> **Note**: The update $\Delta \hat{T}_j$ is defined as zero whenever $\alpha_j = 0$, since such contributions exert no effect on the global field response and do not participate in the $L^2$ projection of the semantic error.
 
 This expression defines an $L^2$-orthogonal projection of the error field $\Delta T(z, \vec{d}) := T^{\text{ref}}(z, \vec{d}) - T(z, \vec{d})$ onto the localized envelope $\psi_j^{\mathbb{T}}$ associated with the contribution $C_j$.
 
@@ -422,10 +431,14 @@ $$
   L^2(\mathbb{T}_\mathbb{C}^N \times \mathbb{S}^{2N-1}_\text{unit}; \mathbb{C}^S)
 $$
 
-yields the orthogonal projection (see *"Core Terms — Semantic Error Projection"*):
+yields the orthogonal projection (see *"Core Terms — Semantic Error Projection"*, *"Appendix A: Validity of the Semantic Error Projection Integral"*):
 
 $$
-  \Delta \hat{T}_j := \frac{1}{\alpha_j} \cdot \frac{ \int_{\mathbb{T}_\mathbb{C}^N} \int_{\mathbb{S}^{2N-1}_\text{unit}} \overline{\psi_j^{\mathbb{T}}(z, \vec{d})} \cdot \Delta T(z, \vec{d}) \, d\sigma(\vec{d}) \, d\mu(z) }{ \int_{\mathbb{T}_\mathbb{C}^N} \int_{\mathbb{S}^{2N-1}_\text{unit}} |\psi_j^{\mathbb{T}}(z, \vec{d})|^2 \, d\sigma(\vec{d}) \, d\mu(z) }
+\Delta \hat{T}_j := 
+\begin{cases}
+\frac{1}{\alpha_j} \cdot \frac{ \int_{\mathbb{T}_\mathbb{C}^N} \int_{\mathbb{S}^{2N-1}_\text{unit}} \overline{\psi_j^{\mathbb{T}}(z, \vec{d})} \cdot \Delta T(z, \vec{d}) \, d\sigma(\vec{d}) \, d\mu(z) }{ \int_{\mathbb{T}_\mathbb{C}^N} \int_{\mathbb{S}^{2N-1}_\text{unit}} |\psi_j^{\mathbb{T}}(z, \vec{d})|^2 \, d\sigma(\vec{d}) \, d\mu(z) }, & \text{if } \alpha_j > 0 \\
+0, & \text{if } \alpha_j = 0
+\end{cases}
 $$
 
 This projection yields the optimal semantic update $\Delta \hat{T}_j \in \mathbb{C}^S$ that minimizes the squared error weighted by the localization profile $\psi_j^{\mathbb{T}}$, which in turn is induced by $\Sigma_j$ (see *"Appendix A: Validity of the Semantic Error Projection Integral"* for justification of the projection formula).
@@ -447,10 +460,16 @@ This projection yields the optimal semantic update $\Delta \hat{T}_j \in \mathbb
 This addendum rigorously establishes the mathematical validity of the semantic error projection formula
 
 $$
-\Delta \hat{T}_j := \frac{1}{\alpha_j} \cdot \frac{ \int_{\mathbb{T}_\mathbb{C}^N} \int_{\mathbb{S}^{2N-1}_\text{unit}} \overline{\psi_j^{\mathbb{T}}(z, \vec{d})} \cdot \Delta T(z, \vec{d}) \, d\sigma(\vec{d})\, d\mu(z)}{ \int_{\mathbb{T}_\mathbb{C}^N} \int_{\mathbb{S}^{2N-1}_\text{unit}} |\psi_j^{\mathbb{T}}(z, \vec{d})|^2 \, d\sigma(\vec{d})\, d\mu(z) }
+\Delta \hat{T}_j := 
+\begin{cases}
+\frac{1}{\alpha_j} \cdot \frac{ \int_{\mathbb{T}_\mathbb{C}^N} \int_{\mathbb{S}^{2N-1}_\text{unit}} \overline{\psi_j^{\mathbb{T}}(z, \vec{d})} \cdot \Delta T(z, \vec{d}) \, d\sigma(\vec{d}) \, d\mu(z) }{ \int_{\mathbb{T}_\mathbb{C}^N} \int_{\mathbb{S}^{2N-1}_\text{unit}} |\psi_j^{\mathbb{T}}(z, \vec{d})|^2 \, d\sigma(\vec{d}) \, d\mu(z) }, & \text{if } \alpha_j > 0 \\
+0, & \text{if } \alpha_j = 0
+\end{cases}
 $$
 
 under the definitions and assumptions of the CPSF framework.
+
+If $\alpha_j = 0$, then by definition $\Delta \hat{T}_j := 0$ and no integrals are evaluated. The rest of the proof concerns only the case $\alpha_j > 0$.
 
 ---
 
@@ -461,7 +480,7 @@ Let:
 * $\Delta T \in L^2(\mathbb{T}_\mathbb{C}^N \times \mathbb{S}^{2N-1}_\text{unit}; \mathbb{C}^S)$ be the semantic error field;
 * $\psi_j^{\mathbb{T}}(z, \vec{d}) := \sum_{n \in \Lambda} \rho_j(w_n)$, with $w_n := \iota(\tilde{z} - \tilde{z}_j + n, \vec{d} - \vec{d}_j)$;
 * $\rho_j(w) := \exp(-\pi \langle \Sigma_j^{-1} w, w \rangle)$, where $\Sigma_j \in \mathbb{C}^{2N \times 2N}$ is Hermitian and positive-definite;
-* $\alpha_j > 0$ by field definition;
+* $\alpha_j > 0$ by definition;
 * Measures: $d\mu(z)$ — normalized Haar measure on $\mathbb{T}_\mathbb{C}^N$; $d\sigma(\vec{d})$ — $\mathrm{U}(N)$-invariant probability measure on $\mathbb{S}^{2N-1}_\text{unit}$.
 
 ---
