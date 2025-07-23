@@ -366,7 +366,7 @@ The envelope $\psi_j^{\mathbb{T}}$ thus localizes the influence of each field co
 
 Let $\mathcal{J} \subset \mathbb{N}$ index the finite collection of field contributions $C_j := (\ell_j, \hat{T}_j, \sigma_j^{\parallel}, \sigma_j^{\perp}, \alpha_j)$ as defined in *"Core Terms — Field Contribution"*.
 
-Then the global semantic field (see *"Core Terms — Global Field Response") is:
+Then the global semantic field (see *"Core Terms — Global Field Response"*) is:
 
 $$
   T(z, \vec{d}) := \sum_{j \in \mathcal{J}} \alpha_j \cdot \psi_j^{\mathbb{T}}(z, \vec{d}) \cdot \hat{T}_j \in \mathbb{C}^S
