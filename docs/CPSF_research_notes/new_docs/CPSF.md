@@ -6,7 +6,7 @@
 
 ---
 
-## CPSF: Glossary of Core Terms
+## CPSF: Core Terms
 
 ---
 

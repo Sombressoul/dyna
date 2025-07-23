@@ -1,88 +1,125 @@
-### Functional Role of $\Sigma_j$
+## Functional Role of $\Sigma_j$
 
-The matrix $\Sigma_j \in \mathbb{C}^{2N \times 2N}$ defines the covariance of an anisotropic complex-valued Gaussian envelope on the extended projection space $\mathbb{C}^{2N} \cong \mathbb{C}^N_{\text{pos}} \oplus \mathbb{C}^N_{\text{dir}}$, aligned with the projection ray direction $\vec{d}_j$.
+This section defines the functional and geometric role of the matrix $\Sigma_j \in \mathbb{C}^{2N \times 2N}$, which governs the anisotropic localization of field contributions in the Continuous Projective Semantic Fields (CPSF).
 
-Let the projection coordinate $\ell_j := (z_j, \vec{d}_j) \in \mathbb{T}_\mathbb{C}^N \times \mathbb{C}^N$. To define localization relative to $\ell_j$, we introduce a lift $\tilde{z} \in \mathbb{C}^N$ of the toroidal position $z \in \mathbb{T}_\mathbb{C}^N$, and analogously $\tilde{z}_j \in \mathbb{C}^N$ such that $\tilde{z} \equiv z$, $\tilde{z}_j \equiv z_j$ modulo $\Lambda$.
+---
 
-Define the canonical embedding:
+### 1. Geometric Context and Projection Coordinates
 
-$\iota : \mathbb{C}^N \times \mathbb{C}^N \rightarrow \mathbb{C}^{2N}, \quad (u, v) \mapsto w := \begin{bmatrix} u \\ v \end{bmatrix}$
+Let $\ell_j := (z_j, \vec{d}_j) \in \mathbb{T}_\mathbb{C}^N \times \mathbb{S}_\mathbb{C}^{2N-1}$ be a projection coordinate as defined in *"CPSF: Core Terms — Projection Coordinates"*.
 
-and set:
+* $z_j \in \mathbb{T}_\mathbb{C}^N$ is a base point on the complex torus;
+* $\vec{d}_j \in \mathbb{S}_\mathbb{C}^{2N-1} \subset \mathbb{C}^N$ is a unit-norm complex direction vector (i.e., $\|\vec{d}_j\| = 1$).
 
-$w := \iota(\tilde{z} - \tilde{z}_j, \vec{d} - \vec{d}_j) \in \mathbb{C}^{2N}$
+Let $(z, \vec{d}) \in \mathbb{T}_\mathbb{C}^N \times \mathbb{S}_\mathbb{C}^{2N-1}$ be an arbitrary projection coordinate. We use lifted representatives $\tilde{z}, \tilde{z}_j \in \mathbb{C}^N$ such that $\tilde{z} \equiv z \mod \Lambda$, and define the relative offset:
 
-To explicitly define $\Sigma_j$, we introduce the unitary matrix $R(\vec{d}_j) \in \mathrm{U}(N)$, known as the orthonormal frame aligned with $\vec{d}_j$, satisfying:
+$$
+  w := \iota(\tilde{z} - \tilde{z}_j, \vec{d} - \vec{d}_j), \quad \iota(u, v) := \begin{bmatrix} u \\ v \end{bmatrix} \in \mathbb{C}^{2N}
+$$
+
+> **Geometric remark**: While both $\vec{d}$ and $\vec{d}_j$ lie on the unit sphere $\mathbb{S}_\mathbb{C}^{2N-1}$, the difference $\vec{d} - \vec{d}_j$ does not. It is interpreted in the ambient space $\mathbb{C}^N$ as an approximation to angular deviation within the tangent space at $\vec{d}_j$, and is valid only under the assumption that $\vec{d} \approx \vec{d}_j$.
+
+---
+
+### 2. Aligned Orthonormal Frame
+
+As in *"CPSF: Core Terms — Orthonormal Frame"*, define the unitary matrix $R(\vec{d}_j) \in \mathrm{U}(N)$ satisfying:
 
 * $R(\vec{d}_j) e_1 = \vec{d}_j$
-* $R(\vec{d}_j)^\dagger R(\vec{d}_j) = I_N$
+* The remaining columns span $\vec{d}_j^\perp$ and are orthonormal with respect to the Hermitian inner product:
 
-A canonical choice of $R(\vec{d}_j)$ is given via the exponential of an anti-Hermitian generator using a generalized Rodrigues construction. Let:
+$$
+  \langle u, v \rangle := \sum_{k=1}^N \overline{u_k} v_k
+$$
 
-$u := e_1, \quad v := \vec{d}_j, \quad w := v - \langle v, u \rangle u$
+Define the extended block-diagonal frame:
 
-If $\|w\| > 0$, define:
+$$
+  \mathcal{R}(\vec{d}_j) := \mathrm{diag}(R(\vec{d}_j), R(\vec{d}_j)) \in \mathrm{U}(2N)
+$$
 
-$\hat{w} := \frac{w}{\|w\|}, \quad A := \hat{w} u^\dagger - u \hat{w}^\dagger \in \mathfrak{u}(N)$
+This acts on $\mathbb{C}_{\text{pos}}^N \oplus \mathbb{C}_{\text{dir}}^N \cong \mathbb{C}^{2N}$, aligning both spatial and directional components with $\vec{d}_j$.
 
-Let $\theta := \arccos(\Re \langle v, u \rangle)$. Then:
+---
 
-$R(\vec{d}_j) := e^{\theta A} \in \mathrm{U}(N)$
+### 3. Attenuation and Covariance Matrix
 
-This yields a minimal rotation in the complex plane mapping $e_1$ to $\vec{d}_j$, with the remaining columns forming an orthonormal completion. The case $\vec{d}_j = e^{i\phi} e_1$ reduces to identity rotation. See *CPSF: Orthonormal Frame Construction* for further discussion.
+Let $\sigma_j^{\parallel}, \sigma_j^{\perp} \in \mathbb{R}_{>0}$ be the longitudinal and transverse attenuation parameters respectively (see *"CPSF: Core Terms — Attenuation Parameters"*).
 
-We then construct the extended orthonormal frame:
+Define the diagonal attenuation matrix:
 
-$\mathcal{R}(\vec{d}_j) := \mathrm{diag}(R(\vec{d}_j), R(\vec{d}_j)) \in \mathrm{U}(2N)$
+$$
+  D_j := \mathrm{diag}(\sigma_j^{\parallel}, \underbrace{\sigma_j^{\perp}, \dotsc, \sigma_j^{\perp}}_{N-1}, \sigma_j^{\parallel}, \underbrace{\sigma_j^{\perp}, \dotsc, \sigma_j^{\perp}}_{N-1}) \in \mathbb{R}^{2N \times 2N}
+$$
 
-and define the diagonal attenuation matrix:
+Then the geometric covariance matrix is:
 
-$D_j := \mathrm{diag}(\sigma_j^{\parallel}, \underbrace{\sigma_j^{\perp}, \dotsc, \sigma_j^{\perp}}_{N-1}, \sigma_j^{\parallel}, \underbrace{\sigma_j^{\perp}, \dotsc, \sigma_j^{\perp}}_{N-1}) \in \mathbb{R}^{2N \times 2N}$
+$$
+  \Sigma_j := \mathcal{R}(\vec{d}_j)^{\dagger} \cdot D_j \cdot \mathcal{R}(\vec{d}_j) \in \mathbb{C}^{2N \times 2N}
+$$
 
-Assume that both attenuation scalars $\sigma_j^{\parallel}, \sigma_j^{\perp} \in \mathbb{R}_{>0}$ are strictly positive real numbers. Consequently, the diagonal matrix $D_j$ is positive definite, and the similarity transformation $\Sigma_j = \mathcal{R}(\vec{d}_j)^\dagger D_j \mathcal{R}(\vec{d}_j)$ implies that $\Sigma_j$ is Hermitian and strictly positive definite. Therefore, $\Sigma_j^{-1}$ exists and is also Hermitian positive definite.
+By construction, $\Sigma_j$ is Hermitian and strictly positive definite. It defines an anisotropic Gaussian metric whose principal axes are aligned with the projection direction $\vec{d}_j$, and whose longitudinal and transverse variances are given by $\sigma_j^{\parallel}$ and $\sigma_j^{\perp}$, respectively (see *"CPSF: Core Terms — Geometric Covariance Matrix"*).
 
-Then the covariance matrix $\Sigma_j$ is defined by:
+---
 
-$\Sigma_j := \mathcal{R}(\vec{d}_j)^\dagger \cdot D_j \cdot \mathcal{R}(\vec{d}_j)$
+### 4. Gaussian Envelope and Periodization
 
-This definition ensures that the Gaussian envelope is anisotropic and aligned with the ray direction $\vec{d}_j$ in both spatial and directional subspaces.
+Define the unnormalized anisotropic Gaussian envelope (see *"CPSF: Core Terms — Unnormalized Gaussian Envelope"*):
 
-The unnormalized Gaussian envelope centered at $\ell_j$ is:
+$$
+  \rho_j(w) := \exp\left( -\pi \langle \Sigma_j^{-1} w, w \rangle \right)
+$$
 
-$\rho_j(w) := \exp\left( -\pi \left\langle \Sigma_j^{-1} w, w \right\rangle \right)$
+where $w \in \mathbb{C}^{2N}$ is the relative offset defined above.
 
-where the Hermitian inner product is:
+To restore toroidal periodicity in $z \in \mathbb{T}_\mathbb{C}^N$, define the periodized envelope (see *"CPSF: Core Terms — Periodized Envelope"*):
 
-$\langle u, v \rangle := \sum_{k=1}^{2N} \overline{u_k} v_k$
+$$
+  \psi_j^{\mathbb{T}}(z, \vec{d}) := \sum_{n \in \Lambda} \rho_j\left( \iota(\tilde{z} - \tilde{z}_j + n, \vec{d} - \vec{d}_j) \right)
+$$
 
-To restore toroidal periodicity, define the periodized envelope via lattice summation:
+This function is smooth, $\Lambda$-periodic in $z$, rapidly decaying in $\vec{d}$, and invariant under the choice of lifted representatives $\tilde{z}, \tilde{z}_j \in \mathbb{C}^N$. This invariance follows from the lattice summation over all $n \in \Lambda$, which eliminates dependence on the specific choice of representatives (see *"CPSF: Core Terms — Periodized Envelope"*).
 
-$\psi_j^{\mathbb{T}}(z, \vec{d}) := \sum_{n \in \Lambda} \rho_j\left( \iota(\tilde{z} - \tilde{z}_j + n, \vec{d} - \vec{d}_j) \right)$
+The envelope $\psi_j^{\mathbb{T}}$ thus localizes the influence of each field contribution $C_j$ to a region in projection space whose shape is geometrically induced by $\Sigma_j$.
 
-Although the lifted coordinates $\tilde{z}, \tilde{z}_j \in \mathbb{C}^N$ are not uniquely defined modulo $\Lambda$, the periodized envelope $\psi_j^{\mathbb{T}}(z, \vec{d})$ is invariant under these choices. This follows from the fact that the summation over $n \in \Lambda$ effectively integrates over all toroidal shifts, rendering the final value independent of the specific representatives $\tilde{z}, \tilde{z}_j$.
+---
 
-This function is smooth, $\Lambda$-periodic in $z$, and rapidly decaying in $\vec{d}$, assuming $\Re(\Sigma_j^{-1}) > 0$.
+### 5. Field Construction and Semantic Projection
 
-Let the complex vector space of field values be $\mathbb{C}^S$. Define the global field response:
+Let $\mathcal{J} \subset \mathbb{N}$ index the finite collection of field contributions $C_j := (\ell_j, \hat{T}_j, \sigma_j^{\parallel}, \sigma_j^{\perp}, \alpha_j)$ as defined in *"CPSF: Core Terms — Field Contribution"*.
 
-$T : \mathbb{T}_\mathbb{C}^N \times \mathbb{C}^N \rightarrow \mathbb{C}^S, \quad T(z, \vec{d}) := \sum_{j \in \mathcal{J}} \alpha_j \cdot \psi_j^{\mathbb{T}}(z, \vec{d}) \cdot \hat{T}_j$
+Then the global semantic field (see *"CPSF: Core Terms — Global Field Response") is:
 
-where $\mathcal{J}$ is the index set of contributions and $\hat{T}_j \in \mathbb{C}^S$ is the spectral content vector of $C_j$.
+$$
+  T(z, \vec{d}) := \sum_{j \in \mathcal{J}} \alpha_j \cdot \psi_j^{\mathbb{T}}(z, \vec{d}) \cdot \hat{T}_j \in \mathbb{C}^S
+$$
 
-Let $T^{\text{ref}}(z, \vec{d})$ denote the expected projection response. Then the discrepancy is:
+Let $T^{\text{ref}}(z, \vec{d}) \in \mathbb{C}^S$ denote a reference field. Define the semantic error field:
 
-$\Delta T(z, \vec{d}) := T^{\text{ref}}(z, \vec{d}) - T(z, \vec{d})$
+$$
+  \Delta T(z, \vec{d}) := T^{\text{ref}}(z, \vec{d}) - T(z, \vec{d})
+$$
 
-Assume the Hilbert space $L^2(\mathbb{T}_\mathbb{C}^N \times \mathbb{C}^N; \mathbb{C}^S)$ with inner product:
+Projecting this error onto the envelope $\psi_j^{\mathbb{T}}$ with respect to the canonical Hilbert space (see *"CPSF: Core Terms — Projection Space Measure"*):
 
-$\langle f, g \rangle := \int_{\mathbb{T}_\mathbb{C}^N \times \mathbb{C}^N} \sum_{s=1}^S \overline{f_s(z, \vec{d})} \cdot g_s(z, \vec{d}) \, d\mu(z) \, d\nu(\vec{d})$
+$$
+  L^2(\mathbb{T}_\mathbb{C}^N \times \mathbb{S}_\mathbb{C}^{2N-1}; \mathbb{C}^S)
+$$
 
-where $d\mu(z)$ is the normalized Haar measure and $d\nu(\vec{d})$ is Lebesgue measure.
+yields the orthogonal projection (see *"CPSF: Core Terms — Semantic Error Projection"*):
 
-Then the orthogonal projection of $\Delta T$ onto the mode $\psi_j^{\mathbb{T}}$ yields:
+$$
+  \Delta \hat{T}_j := \frac{1}{\alpha_j} \cdot \frac{ \int_{\mathbb{T}_\mathbb{C}^N} \int_{\mathbb{S}_\mathbb{C}^{2N-1}} \overline{\psi_j^{\mathbb{T}}(z, \vec{d})} \cdot \Delta T(z, \vec{d}) \, d\sigma(\vec{d}) \, d\mu(z) }{ \int_{\mathbb{T}_\mathbb{C}^N} \int_{\mathbb{S}_\mathbb{C}^{2N-1}} |\psi_j^{\mathbb{T}}(z, \vec{d})|^2 \, d\sigma(\vec{d}) \, d\mu(z) }
+$$
 
-$\Delta \hat{T}_j = \frac{1}{\alpha_j} \cdot \frac{ \int \overline{\psi_j^{\mathbb{T}}(z, \vec{d})} \cdot \Delta T(z, \vec{d}) \, d\mu(z) \, d\nu(\vec{d}) }{ \int |\psi_j^{\mathbb{T}}(z, \vec{d})|^2 \, d\mu(z) \, d\nu(\vec{d}) }$
+This projection yields the optimal semantic update $\Delta \hat{T}_j \in \mathbb{C}^S$ that minimizes the squared error weighted by the localization profile $\psi_j^{\mathbb{T}}$, which in turn is induced by $\Sigma_j$.
 
-This expression defines an analytic update of $\hat{T}_j$, minimizing the squared $L^2$-error under the localization induced by $\Sigma_j$.
+---
 
-Thus, $\Sigma_j$ not only defines spatial and directional extent of $C_j$, but also enables precise localization of semantic error $\Delta T$ onto its mode $\hat{T}_j$.
+### 6. Summary
+
+* $\Sigma_j$ defines a directionally aligned, anisotropic envelope centered at $\ell_j$;
+* Its construction follows from a block-diagonal frame $\mathcal{R}(\vec{d}_j)$ aligned with $\vec{d}_j$, and a diagonal attenuation matrix $D_j$;
+* The Gaussian envelope $\psi_j^{\mathbb{T}}$ provides localized spatial and directional weighting for both field synthesis and semantic projection;
+* The projection $\Delta \hat{T}_j$ minimizes the localized semantic error with respect to $\psi_j^{\mathbb{T}}$, making $\Sigma_j$ central to the semantic learning process;
+* All constructions are fully and rigorously consistent with the canonical structure of CPSF.
