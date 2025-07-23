@@ -109,7 +109,7 @@ It satisfies:
 >
 > This form of orthogonality is preserved by unitary transformations and defines the geometry of $\mathrm{U}(N)$.
 
-The construction of $R(\vec{d})$ is defined separately (see *CPSF: Orthonormal Frame Construction*).
+The construction of $R(\vec{d})$ is defined separately (see *"Orthonormal Frame Construction"*).
 
 ---
 
@@ -175,7 +175,11 @@ It also defines a geometric coupling between the spatial domain and the higher s
 
 **$\rho_j(w) := \exp\left( -\pi \langle \Sigma_j^{-1} w, w \rangle \right)$** — *unnormalized anisotropic Gaussian* centered at field contribution $C_j$.
 
-Here $w = \iota(\tilde{z} - \tilde{z}_j, \vec{d} - \vec{d}_j) \in \mathbb{C}^{2N}$. The envelope is aligned via $\Sigma_j$ (see: *Geometric Covariance Matrix*).
+Here $w = \iota(\tilde{z} - \tilde{z}_j, \vec{d} - \vec{d}_j) \in \mathbb{C}^{2N}$. The envelope is aligned via $\Sigma_j$.
+
+See: *"Core Terms — Canonical Embedding"*, *"Core Terms — Geometric Covariance Matrix"*.
+
+> **Clarification.** The term $\vec{d} - \vec{d}_j$ is treated as a locally linear surrogate in $\mathbb{C}^N$, justified by the compactness of the unit sphere. Its use within the lifting map $\iota$ is structurally and analytically valid, as all resulting quantities remain bounded and compatible with Gaussian decay over the lattice $\Lambda$.
 
 ---
 
@@ -218,7 +222,7 @@ This tuple defines a directionally localized generator of field structure. The g
 
 **$T(z, \vec{d}) := \sum_{j \in \mathcal{J}} \alpha_j \cdot \psi_j^{\mathbb{T}}(z, \vec{d}) \cdot \hat{T}_j$** — *semantic field response* induced by a collection of contributions $\{C_j\}_{j \in \mathcal{J}}$.
 
-Maps projection coordinates $(z, \vec{d})$ to semantic values in $\mathbb{C}^S$. See: *Spectral Content Vector*, *Field Contribution*.
+Maps projection coordinates $(z, \vec{d})$ to semantic values in $\mathbb{C}^S$. See: *"Core Terms — Spectral Content Vector"*, *"Core Terms — Field Contribution"*.
 
 ---
 
@@ -323,7 +327,7 @@ Let $\ell_j := (z_j, \vec{d}_j) \in \mathbb{T}_\mathbb{C}^N \times \mathbb{S}^{2
 * $z_j \in \mathbb{T}_\mathbb{C}^N$ is a base point on the complex torus;
 * $\vec{d}_j \in \mathbb{S}^{2N-1}_\text{unit} \subset \mathbb{C}^N$ is a unit-norm complex direction vector (i.e., $\|\vec{d}_j\| = 1$).
 
-Let $(z, \vec{d}) \in \mathbb{T}_\mathbb{C}^N \times \mathbb{S}^{2N-1}_\text{unit}$ be an arbitrary projection coordinate. We use lifted representatives $\tilde{z}, \tilde{z}_j \in \mathbb{C}^N$ such that $\tilde{z} \equiv z \mod \Lambda$, and define the relative offset:
+Let $(z, \vec{d}) \in \mathbb{T}_\mathbb{C}^N \times \mathbb{S}^{2N-1}_\text{unit}$ be an arbitrary projection coordinate. We use lifted representatives $\tilde{z}, \tilde{z}_j \in \mathbb{C}^N$ such that $\tilde{z} \equiv z \mod \Lambda$, and define the relative offset (see: *"Core Terms — Canonical Embedding"*):
 
 $$
   w := \iota(\tilde{z} - \tilde{z}_j, \vec{d} - \vec{d}_j), \quad \iota(u, v) := \begin{bmatrix} u \\ v \end{bmatrix} \in \mathbb{C}^{2N}
@@ -424,7 +428,7 @@ $$
   \Delta \hat{T}_j := \frac{1}{\alpha_j} \cdot \frac{ \int_{\mathbb{T}_\mathbb{C}^N} \int_{\mathbb{S}^{2N-1}_\text{unit}} \overline{\psi_j^{\mathbb{T}}(z, \vec{d})} \cdot \Delta T(z, \vec{d}) \, d\sigma(\vec{d}) \, d\mu(z) }{ \int_{\mathbb{T}_\mathbb{C}^N} \int_{\mathbb{S}^{2N-1}_\text{unit}} |\psi_j^{\mathbb{T}}(z, \vec{d})|^2 \, d\sigma(\vec{d}) \, d\mu(z) }
 $$
 
-This projection yields the optimal semantic update $\Delta \hat{T}_j \in \mathbb{C}^S$ that minimizes the squared error weighted by the localization profile $\psi_j^{\mathbb{T}}$, which in turn is induced by $\Sigma_j$.
+This projection yields the optimal semantic update $\Delta \hat{T}_j \in \mathbb{C}^S$ that minimizes the squared error weighted by the localization profile $\psi_j^{\mathbb{T}}$, which in turn is induced by $\Sigma_j$ (see *"Appendix A: Validity of the Semantic Error Projection Integral"* for justification of the projection formula).
 
 ---
 
@@ -435,3 +439,59 @@ This projection yields the optimal semantic update $\Delta \hat{T}_j \in \mathbb
 * The Gaussian envelope $\psi_j^{\mathbb{T}}$ provides localized spatial and directional weighting for both field synthesis and semantic projection;
 * The projection $\Delta \hat{T}_j$ minimizes the localized semantic error with respect to $\psi_j^{\mathbb{T}}$, making $\Sigma_j$ central to the semantic learning process;
 * All constructions are fully and rigorously consistent with the canonical structure of CPSF.
+
+---
+
+## Appendix A: Validity of the Semantic Error Projection Integral
+
+This addendum rigorously establishes the mathematical validity of the semantic error projection formula
+
+$$
+\Delta \hat{T}_j := \frac{1}{\alpha_j} \cdot \frac{ \int_{\mathbb{T}_\mathbb{C}^N} \int_{\mathbb{S}^{2N-1}_\text{unit}} \overline{\psi_j^{\mathbb{T}}(z, \vec{d})} \cdot \Delta T(z, \vec{d}) \, d\sigma(\vec{d})\, d\mu(z)}{ \int_{\mathbb{T}_\mathbb{C}^N} \int_{\mathbb{S}^{2N-1}_\text{unit}} |\psi_j^{\mathbb{T}}(z, \vec{d})|^2 \, d\sigma(\vec{d})\, d\mu(z) }
+$$
+
+under the definitions and assumptions of the CPSF framework.
+
+---
+
+### Setup and Notation
+
+Let:
+
+* $\Delta T \in L^2(\mathbb{T}_\mathbb{C}^N \times \mathbb{S}^{2N-1}_\text{unit}; \mathbb{C}^S)$ be the semantic error field;
+* $\psi_j^{\mathbb{T}}(z, \vec{d}) := \sum_{n \in \Lambda} \rho_j(w_n)$, with $w_n := \iota(\tilde{z} - \tilde{z}_j + n, \vec{d} - \vec{d}_j)$;
+* $\rho_j(w) := \exp(-\pi \langle \Sigma_j^{-1} w, w \rangle)$, where $\Sigma_j \in \mathbb{C}^{2N \times 2N}$ is Hermitian and positive-definite;
+* $\alpha_j > 0$ by field definition;
+* Measures: $d\mu(z)$ — normalized Haar measure on $\mathbb{T}_\mathbb{C}^N$; $d\sigma(\vec{d})$ — $\mathrm{U}(N)$-invariant probability measure on $\mathbb{S}^{2N-1}_\text{unit}$.
+
+---
+
+### Theorem (Well-definedness of $\Delta \hat{T}_j$)
+
+The scalar field $\psi_j^{\mathbb{T}}(z, \vec{d})$ belongs to $L^2(\mathbb{T}_\mathbb{C}^N \times \mathbb{S}^{2N-1}_\text{unit})$, and the projection expression for $\Delta \hat{T}_j$ is finite and well-defined in $\mathbb{C}^S$.
+
+---
+
+### Proof
+
+1. **Square-integrability of $\psi_j^{\mathbb{T}}$**:
+
+   * Each term in the sum $\rho_j(w_n) \le \exp(-\pi c \|w_n\|^2)$ for some $c > 0$ since $\Sigma_j^{-1} \ge c I$;
+   * For fixed $z, \vec{d}$, $\|w_n\|^2 \ge \|n\|^2 - 2R\|n\| + C$ with bounded $\tilde{z} - \tilde{z}_j$ and $\vec{d} - \vec{d}_j \in \mathbb{S}^{2N-1}_\text{unit} - \vec{d}_j \subset B(0,2)$;
+   * Hence $\rho_j(w_n)^2 \le M_n := \exp(-2\pi c \|n\|^2 + K)$, where the constant $K$ does not depend on $z, \vec{d}$;
+   * Then $\sum_n \rho_j(w_n)^2 \le \sum_n M_n =: M < \infty$ uniformly in $z, \vec{d}$, allowing use of dominated convergence;
+   * Therefore $\psi_j^{\mathbb{T}} \in L^2$, since $|\psi_j^{\mathbb{T}}|^2 \le M$ and integration over compact domain yields finite norm.
+
+2. **Numerator finiteness**:
+
+   * $\Delta T \in L^2$, $\psi_j^{\mathbb{T}} \in L^2$;
+   * Then $\overline{\psi_j^{\mathbb{T}}} \cdot \Delta T \in L^1$ (Cauchy–Schwarz);
+   * Therefore, the integral in the numerator converges in $\mathbb{C}^S$.
+
+3. **Denominator positivity**:
+
+   * Since $\rho_j(w) > 0$ for all $w \in \mathbb{C}^{2N}$, and the term $\rho_j(0) = 1$ appears in the sum for $\psi_j^{\mathbb{T}}(z_j, \vec{d}_j)$, we have $\psi_j^{\mathbb{T}}(z_j, \vec{d}_j) \ge 1$;
+   * By continuity of $\psi_j^{\mathbb{T}}$, there exists an open neighborhood $U \subset \mathbb{T}_\mathbb{C}^N \times \mathbb{S}^{2N-1}_\text{unit}$ such that $|\psi_j^{\mathbb{T}}|^2 \ge \varepsilon > 0$ on $U$;
+   * The total measure of $U$ is positive under $d\mu(z) \times d\sigma(\vec{d})$, hence the integral $\int |\psi_j^{\mathbb{T}}|^2 > 0$.
+
+---
