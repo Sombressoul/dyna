@@ -224,17 +224,19 @@ It also defines a geometric coupling between the spatial domain and the higher s
 
 **$\rho_j(w) := \exp\left( -\pi \langle \Sigma_j^{-1} w, w \rangle \right)$** — *unnormalized anisotropic Gaussian* centered at field contribution $C_j$.
 
-Here $w = \iota(\tilde{z} - \tilde{z}_j, \vec{d} - \vec{d}_j) \in \mathbb{C}^{2N}$. The envelope is aligned via $\Sigma_j$.
+Here $w = \iota(\tilde{z} - \tilde{z}_j, \delta \vec{d}) \in \mathbb{C}^{2N}$. The envelope is aligned via $\Sigma_j$.
 
-See: *"Core Terms — Embedding Map"*, *"Core Terms — Geometric Covariance Matrix"*.
+See: *"Core Terms — Embedding Map"*, *"Core Terms — Geometric Covariance Matrix"*, *"Core Terms — Directional Offset and Angular Distance"*.
 
-> **Clarification.** The term $\vec{d} - \vec{d}_j$ is treated as a locally linear surrogate in $\mathbb{C}^N$, justified by the compactness of the unit sphere. Its use within the lifting map $\iota$ is structurally and analytically valid, as all resulting quantities remain bounded and compatible with Gaussian decay over the lattice $\Lambda$.
+> **Clarification.** The vector $\delta \vec{d}$ lies in the tangent space $T_{\vec{d}_j} \mathbb{S}^{2N-1}_\text{unit} \subset \mathbb{C}^N$ and encodes the angular displacement between direction vectors under the Hermitian metric. Its construction ensures smoothness, $\mathrm{U}(N)$-invariance, and compatibility with anisotropic Gaussian decay in the extended projection space $\mathbb{C}^{2N}$.
 
 ---
 
 ### Periodized Envelope
 
-**$\psi_j^{\mathbb{T}}(z, \vec{d}) := \sum_{n \in \Lambda} \rho_j( \iota(\tilde{z} - \tilde{z}_j + n, \vec{d} - \vec{d}_j) )$** — *toroidally-periodized Gaussian envelope*.
+**$\psi_j^{\mathbb{T}}(z, \vec{d}) := \sum_{n \in \Lambda} \rho_j( \iota(\tilde{z} - \tilde{z}_j + n, \delta \vec{d}) )$** — *toroidally-periodized Gaussian envelope*.
+
+See: *"Core Terms — Embedding Map"*, *"Core Terms — Directional Offset and Angular Distance"*.
 
 This sum restores $\Lambda$-periodicity in $z$, ensuring compatibility with the toroidal structure of $\mathbb{T}_\mathbb{C}^N$.
 
@@ -388,10 +390,10 @@ Let $\ell_j := (z_j, \vec{d}_j) \in \mathbb{T}_\mathbb{C}^N \times \mathbb{S}^{2
 Let $(z, \vec{d}) \in \mathbb{T}_\mathbb{C}^N \times \mathbb{S}^{2N-1}_\text{unit}$ be an arbitrary projection coordinate. We use lifted representatives $\tilde{z}, \tilde{z}_j \in \mathbb{C}^N$ such that $\tilde{z} \equiv z \mod \Lambda$, and define the relative offset (see: *"Core Terms — Embedding Map"*):
 
 $$
-  w := \iota(\tilde{z} - \tilde{z}_j, \vec{d} - \vec{d}_j), \quad \iota(u, v) := \begin{bmatrix} u \\ v \end{bmatrix} \in \mathbb{C}^{2N}
+  w := \iota(\tilde{z} - \tilde{z}_j, \delta \vec{d}), \quad \iota(u, v) := \begin{bmatrix} u \\ v \end{bmatrix} \in \mathbb{C}^{2N}
 $$
 
-> **Geometric remark**: While both $\vec{d}$ and $\vec{d}_j$ lie on the unit sphere $\mathbb{S}^{2N-1}_\text{unit}$, the difference $\vec{d} - \vec{d}_j$ does not. It is interpreted in the ambient space $\mathbb{C}^N$ as an approximation to angular deviation within the tangent space at $\vec{d}_j$, and is valid only under the assumption that $\vec{d} \approx \vec{d}_j$.
+where $\delta \vec{d}$ encodes the angular displacement from $\vec{d}_j$ to $\vec{d}$ under the Hermitian geometry of the unit sphere (see: *"Core Terms — Directional Offset and Angular Distance"*).
 
 ---
 
@@ -449,10 +451,10 @@ where $w \in \mathbb{C}^{2N}$ is the relative offset defined above.
 To restore toroidal periodicity in $z \in \mathbb{T}_\mathbb{C}^N$, define the periodized envelope (see: *"Core Terms — Periodized Envelope"*):
 
 $$
-  \psi_j^{\mathbb{T}}(z, \vec{d}) := \sum_{n \in \Lambda} \rho_j\left( \iota(\tilde{z} - \tilde{z}_j + n, \vec{d} - \vec{d}_j) \right)
+  \psi_j^{\mathbb{T}}(z, \vec{d}) := \sum_{n \in \Lambda} \rho_j\left( \iota(\tilde{z} - \tilde{z}_j + n, \delta \vec{d}) \right)
 $$
 
-This function is smooth, $\Lambda$-periodic in $z$, rapidly decaying in $\vec{d}$, and invariant under the choice of lifted representatives $\tilde{z}, \tilde{z}_j \in \mathbb{C}^N$. This invariance follows from the lattice summation over all $n \in \Lambda$, which eliminates dependence on the specific choice of representatives (see: *"Core Terms — Periodized Envelope"*).
+This function is smooth, $\Lambda$-periodic in $z$, rapidly decaying in $\vec{d}$, and invariant under the choice of lifted representatives $\tilde{z}, \tilde{z}_j \in \mathbb{C}^N$. This invariance follows from the lattice summation over all $n \in \Lambda$, which eliminates dependence on the specific choice of representatives.
 
 The envelope $\psi_j^{\mathbb{T}}$ thus localizes the influence of each field contribution $C_j$ to a region in projection space whose shape is geometrically induced by $\Sigma_j$.
 
