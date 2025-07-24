@@ -114,7 +114,7 @@ It satisfies:
 >
 > This form of orthogonality is preserved by unitary transformations and defines the geometry of $\mathrm{U}(N)$.
 
-The construction of $R(\vec{d})$ is defined separately (see *"Orthonormal Frame Construction"*).
+The construction of $R(\vec{d})$ is defined separately (see: *"Orthonormal Frame Construction"*).
 
 ---
 
@@ -249,7 +249,7 @@ Let the field take values in $\mathbb{C}^S$. Define the product measure space ov
 Here:
 
 * $d\mu(z)$: normalized Haar measure on the complex torus $\mathbb{T}_\mathbb{C}^N$;
-* $d\sigma(\vec{d})$: rotationally invariant surface measure on the unit sphere $\mathbb{S}^{2N-1}_\text{unit} := { \vec{d} \in \mathbb{C}^N : \|\vec{d}\| = 1 }$ (see *"Core Terms — Rotationally Invariant Surface Measure"*).
+* $d\sigma(\vec{d})$: rotationally invariant surface measure on the unit sphere $\mathbb{S}^{2N-1}_\text{unit} := { \vec{d} \in \mathbb{C}^N : \|\vec{d}\| = 1 }$ (see: *"Core Terms — Rotationally Invariant Surface Measure"*).
 
 This space defines the functional domain in which projection fields $T(z, \vec{d}) \in \mathbb{C}^S$ and semantic error fields $\Delta T(z, \vec{d})$ are analytically defined and compared.
 
@@ -287,7 +287,7 @@ This construction guarantees that $d\sigma$ is smooth, $\mathrm{U}(N)$-invariant
 
 ### Semantic Error Projection
 
-Orthogonal projection of semantic error onto contribution mode is defined as (see *"Appendix A: Validity of the Semantic Error Projection Integral"*):
+Orthogonal projection of semantic error onto contribution mode is defined as (see: *"Appendix A: Validity of the Semantic Error Projection Integral"*):
 $$
 \Delta \hat{T}_j := 
 \begin{cases}
@@ -374,7 +374,7 @@ This acts on $\mathbb{C}_{\text{pos}}^N \oplus \mathbb{C}_{\text{dir}}^N \cong \
 
 ### 3. Attenuation and Covariance Matrix
 
-Let $\sigma_j^{\parallel}, \sigma_j^{\perp} \in \mathbb{R}_{>0}$ be the longitudinal and transverse attenuation parameters respectively (see *"Core Terms — Attenuation Parameters"*).
+Let $\sigma_j^{\parallel}, \sigma_j^{\perp} \in \mathbb{R}_{>0}$ be the longitudinal and transverse attenuation parameters respectively (see: *"Core Terms — Attenuation Parameters"*).
 
 Define the diagonal attenuation matrix:
 
@@ -388,13 +388,13 @@ $$
   \Sigma_j := \mathcal{R}(\vec{d}_j)^{\dagger} \cdot D_j \cdot \mathcal{R}(\vec{d}_j) \in \mathbb{C}^{2N \times 2N}
 $$
 
-By construction, $\Sigma_j$ is Hermitian and strictly positive definite. It defines an anisotropic Gaussian metric whose principal axes are aligned with the projection direction $\vec{d}_j$, and whose longitudinal and transverse variances are given by $\sigma_j^{\parallel}$ and $\sigma_j^{\perp}$, respectively (see *"Core Terms — Geometric Covariance Matrix"*).
+By construction, $\Sigma_j$ is Hermitian and strictly positive definite. It defines an anisotropic Gaussian metric whose principal axes are aligned with the projection direction $\vec{d}_j$, and whose longitudinal and transverse variances are given by $\sigma_j^{\parallel}$ and $\sigma_j^{\perp}$, respectively (see: *"Core Terms — Geometric Covariance Matrix"*).
 
 ---
 
 ### 4. Gaussian Envelope and Periodization
 
-Define the unnormalized anisotropic Gaussian envelope (see *"Core Terms — Unnormalized Gaussian Envelope"*):
+Define the unnormalized anisotropic Gaussian envelope (see: *"Core Terms — Unnormalized Gaussian Envelope"*):
 
 $$
   \rho_j(w) := \exp\left( -\pi \langle \Sigma_j^{-1} w, w \rangle \right)
@@ -402,13 +402,13 @@ $$
 
 where $w \in \mathbb{C}^{2N}$ is the relative offset defined above.
 
-To restore toroidal periodicity in $z \in \mathbb{T}_\mathbb{C}^N$, define the periodized envelope (see *"Core Terms — Periodized Envelope"*):
+To restore toroidal periodicity in $z \in \mathbb{T}_\mathbb{C}^N$, define the periodized envelope (see: *"Core Terms — Periodized Envelope"*):
 
 $$
   \psi_j^{\mathbb{T}}(z, \vec{d}) := \sum_{n \in \Lambda} \rho_j\left( \iota(\tilde{z} - \tilde{z}_j + n, \vec{d} - \vec{d}_j) \right)
 $$
 
-This function is smooth, $\Lambda$-periodic in $z$, rapidly decaying in $\vec{d}$, and invariant under the choice of lifted representatives $\tilde{z}, \tilde{z}_j \in \mathbb{C}^N$. This invariance follows from the lattice summation over all $n \in \Lambda$, which eliminates dependence on the specific choice of representatives (see *"Core Terms — Periodized Envelope"*).
+This function is smooth, $\Lambda$-periodic in $z$, rapidly decaying in $\vec{d}$, and invariant under the choice of lifted representatives $\tilde{z}, \tilde{z}_j \in \mathbb{C}^N$. This invariance follows from the lattice summation over all $n \in \Lambda$, which eliminates dependence on the specific choice of representatives (see: *"Core Terms — Periodized Envelope"*).
 
 The envelope $\psi_j^{\mathbb{T}}$ thus localizes the influence of each field contribution $C_j$ to a region in projection space whose shape is geometrically induced by $\Sigma_j$.
 
@@ -418,7 +418,7 @@ The envelope $\psi_j^{\mathbb{T}}$ thus localizes the influence of each field co
 
 Let $\mathcal{J} \subset \mathbb{N}$ index the finite collection of field contributions $C_j := (\ell_j, \hat{T}_j, \sigma_j^{\parallel}, \sigma_j^{\perp}, \alpha_j)$ as defined in *"Core Terms — Field Contribution"*.
 
-Then the global semantic field (see *"Core Terms — Global Field Response"*) is:
+Then the global semantic field (see: *"Core Terms — Global Field Response"*) is:
 
 $$
   T(z, \vec{d}) := \sum_{j \in \mathcal{J}} \alpha_j \cdot \psi_j^{\mathbb{T}}(z, \vec{d}) \cdot \hat{T}_j \in \mathbb{C}^S
@@ -430,13 +430,13 @@ $$
   \Delta T(z, \vec{d}) := T^{\text{ref}}(z, \vec{d}) - T(z, \vec{d})
 $$
 
-Projecting this error onto the envelope $\psi_j^{\mathbb{T}}$ with respect to the canonical Hilbert space (see *"Core Terms — Projection Space Measure"*):
+Projecting this error onto the envelope $\psi_j^{\mathbb{T}}$ with respect to the canonical Hilbert space (see: *"Core Terms — Projection Space Measure"*):
 
 $$
   L^2(\mathbb{T}_\mathbb{C}^N \times \mathbb{S}^{2N-1}_\text{unit}; \mathbb{C}^S)
 $$
 
-yields the orthogonal projection (see *"Core Terms — Semantic Error Projection"*, *"Appendix A: Validity of the Semantic Error Projection Integral"*):
+yields the orthogonal projection (see: *"Core Terms — Semantic Error Projection"*, *"Appendix A: Validity of the Semantic Error Projection Integral"*):
 
 $$
 \Delta \hat{T}_j := 
@@ -446,7 +446,7 @@ $$
 \end{cases}
 $$
 
-This projection yields the optimal semantic update $\Delta \hat{T}_j \in \mathbb{C}^S$ that minimizes the squared error weighted by the localization profile $\psi_j^{\mathbb{T}}$, which in turn is induced by $\Sigma_j$ (see *"Appendix A: Validity of the Semantic Error Projection Integral"* for justification of the projection formula).
+This projection yields the optimal semantic update $\Delta \hat{T}_j \in \mathbb{C}^S$ that minimizes the squared error weighted by the localization profile $\psi_j^{\mathbb{T}}$, which in turn is induced by $\Sigma_j$ (see: *"Appendix A: Validity of the Semantic Error Projection Integral"* for justification of the projection formula).
 
 ---
 
