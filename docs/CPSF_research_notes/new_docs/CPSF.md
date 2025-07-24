@@ -100,7 +100,7 @@ $$
 \delta \vec{d} := \theta \cdot \frac{P^{\perp}_{\vec{d}_j}(\vec{d})}{\sqrt{\max\left(1 - |\langle \vec{d}, \vec{d}_j \rangle|^2,\ \varepsilon\right)}} \in T_{\vec{d}_j} \mathbb{S}^{2N-1}_\text{unit},
 $$
 
-where $\varepsilon > 0$ is a fixed regularization constant.
+where $\varepsilon > 0$ is a fixed constant used to control the denominator in the projection normalization and to ensure smooth, well-defined behavior near the collinear limit $\theta \to 0$. When $\sin^2\theta < \varepsilon$, the offset norm satisfies $|\delta \vec{d}| = \theta / \sqrt{\varepsilon} > \theta$. For $\theta \gg \sqrt{\varepsilon}$, the offset converges asymptotically to $|\delta \vec{d}| \approx \theta$, recovering agreement with the geodesic angular distance. The regularization induces a scale-dependent deviation from spherical geometry near alignment, while maintaining stability and differentiability over the entire domain.
 
 The construction of $\delta \vec{d}$ ensures that $\|\delta \vec{d}\| \to \theta$ as $\varepsilon \to 0$ uniformly away from the collinear limit $|\langle \vec{d}, \vec{d}_j \rangle| \to 1$. For fixed $\varepsilon > 0$, $\|\delta \vec{d}\| < \theta$, but the deviation vanishes as angular separation increases.
 
@@ -108,6 +108,10 @@ This offset satisfies:
 
 * $\delta \vec{d} \in T_{\vec{d}_j} \mathbb{S}^{2N-1}_\text{unit}$;
 * smoothness and $\mathrm{U}(N)$-invariance.
+
+> **Clarification on Regularized Angular Offset Estimation:**
+>
+> The canonical logarithmic map on $\mathbb{S}^{2N-1}$ yields exact angular displacement but introduces numerical instability when $\theta \to 0$, due to division by vanishing norms. The regularized formulation avoids this instability while preserving smooth angular sensitivity and invariant tangent structure.
 
 > **Implementation Note:**
 >
