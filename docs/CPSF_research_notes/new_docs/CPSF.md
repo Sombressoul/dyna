@@ -74,6 +74,50 @@ This is the $(2N - 1)$-dimensional unit sphere in $\mathbb{R}^{2N} \cong \mathbb
 
 ---
 
+### Directional Offset and Angular Distance
+
+Let $\vec{d}, \vec{d}_j \in \mathbb{S}^{2N-1}_\text{unit} \subset \mathbb{C}^N$ be unit-norm direction vectors (see: *"Core Terms — Projection Coordinates"*).
+
+Define the **angular distance**:
+
+$$
+\theta := \arccos \left|\langle \vec{d}, \vec{d}_j \rangle\right| \in [0, \pi],
+$$
+
+where $\langle u, v \rangle := \sum_{k=1}^N \overline{u_k} v_k$ is the standard Hermitian inner product on $\mathbb{C}^N$.
+
+Let
+
+$$
+P^{\perp}_{\vec{d}_j}(\vec{d}) := \vec{d} - \langle \vec{d}, \vec{d}_j \rangle \cdot \vec{d}_j \in T_{\vec{d}_j} \mathbb{S}^{2N-1}_\text{unit}
+$$
+
+be the Hermitian-orthogonal projection onto the tangent space at $\vec{d}_j$.
+
+Then the **directional offset** is defined as:
+
+$$
+\delta \vec{d} := \theta \cdot \frac{P^{\perp}_{\vec{d}_j}(\vec{d})}{\sqrt{\max\left(1 - |\langle \vec{d}, \vec{d}_j \rangle|^2,\ \varepsilon\right)}} \in T_{\vec{d}_j} \mathbb{S}^{2N-1}_\text{unit},
+$$
+
+where $\varepsilon > 0$ is a fixed regularization constant.
+
+This offset satisfies:
+
+* $\delta \vec{d} \in T_{\vec{d}_j} \mathbb{S}^{2N-1}_\text{unit}$;
+* $\|\delta \vec{d}\| = \theta$;
+* smoothness and $\mathrm{U}(N)$-invariance.
+
+> **Implementation Note:**
+>
+> As a consequence, contributions $C_j$ with orthogonal directions $\vec{d}_j \perp \vec{d}$ do not vanish strictly but are exponentially suppressed by the decay (see: *"Core Terms — Unnormalized Gaussian Envelope"*):
+>
+> $$
+> \rho_j(w) \sim \exp\left(-\pi \|\delta \vec{d}\|^2\right), \quad \text{with } \|\delta \vec{d}\| = \theta.
+> $$
+
+---
+
 ### Projection Space
 
 **$\mathbb{T}_\mathbb{C}^N \times \mathbb{C}^N$** — *projection space*, the extended coordinate domain of the CPSF field.
