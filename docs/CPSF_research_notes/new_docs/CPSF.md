@@ -135,9 +135,9 @@ It defines a unitary frame in $\mathbb{C}^{2N}$, aligned with the projection dir
 
 ---
 
-### Canonical Embedding
+### Embedding Map
 
-**$\iota : \mathbb{C}^N \times \mathbb{C}^N \to \mathbb{C}^{2N}$** — *canonical embedding map*, defined by:
+**$\iota : \mathbb{C}^N \times \mathbb{C}^N \to \mathbb{C}^{2N}$** — *embedding map*, defined by:
 $\iota(u, v) := \begin{bmatrix} u \\ v \end{bmatrix}$
 
 Used to embed relative spatial and directional offsets into the extended projection space $\mathbb{C}^{2N} \cong \mathbb{C}_\text{pos}^N \oplus \mathbb{C}_\text{dir}^N$.
@@ -182,7 +182,7 @@ It also defines a geometric coupling between the spatial domain and the higher s
 
 Here $w = \iota(\tilde{z} - \tilde{z}_j, \vec{d} - \vec{d}_j) \in \mathbb{C}^{2N}$. The envelope is aligned via $\Sigma_j$.
 
-See: *"Core Terms — Canonical Embedding"*, *"Core Terms — Geometric Covariance Matrix"*.
+See: *"Core Terms — Embedding Map"*, *"Core Terms — Geometric Covariance Matrix"*.
 
 > **Clarification.** The term $\vec{d} - \vec{d}_j$ is treated as a locally linear surrogate in $\mathbb{C}^N$, justified by the compactness of the unit sphere. Its use within the lifting map $\iota$ is structurally and analytically valid, as all resulting quantities remain bounded and compatible with Gaussian decay over the lattice $\Lambda$.
 
@@ -341,7 +341,7 @@ Let $\ell_j := (z_j, \vec{d}_j) \in \mathbb{T}_\mathbb{C}^N \times \mathbb{S}^{2
 * $z_j \in \mathbb{T}_\mathbb{C}^N$ is a base point on the complex torus;
 * $\vec{d}_j \in \mathbb{S}^{2N-1}_\text{unit} \subset \mathbb{C}^N$ is a unit-norm complex direction vector (i.e., $\|\vec{d}_j\| = 1$).
 
-Let $(z, \vec{d}) \in \mathbb{T}_\mathbb{C}^N \times \mathbb{S}^{2N-1}_\text{unit}$ be an arbitrary projection coordinate. We use lifted representatives $\tilde{z}, \tilde{z}_j \in \mathbb{C}^N$ such that $\tilde{z} \equiv z \mod \Lambda$, and define the relative offset (see: *"Core Terms — Canonical Embedding"*):
+Let $(z, \vec{d}) \in \mathbb{T}_\mathbb{C}^N \times \mathbb{S}^{2N-1}_\text{unit}$ be an arbitrary projection coordinate. We use lifted representatives $\tilde{z}, \tilde{z}_j \in \mathbb{C}^N$ such that $\tilde{z} \equiv z \mod \Lambda$, and define the relative offset (see: *"Core Terms — Embedding Map"*):
 
 $$
   w := \iota(\tilde{z} - \tilde{z}_j, \vec{d} - \vec{d}_j), \quad \iota(u, v) := \begin{bmatrix} u \\ v \end{bmatrix} \in \mathbb{C}^{2N}
@@ -456,7 +456,6 @@ This projection yields the optimal semantic update $\Delta \hat{T}_j \in \mathbb
 * Its construction follows from a block-diagonal frame $\mathcal{R}(\vec{d}_j)$ aligned with $\vec{d}_j$, and a diagonal attenuation matrix $D_j$;
 * The Gaussian envelope $\psi_j^{\mathbb{T}}$ provides localized spatial and directional weighting for both field synthesis and semantic projection;
 * The projection $\Delta \hat{T}_j$ minimizes the localized semantic error with respect to $\psi_j^{\mathbb{T}}$, making $\Sigma_j$ central to the semantic learning process;
-* All constructions are fully and rigorously consistent with the canonical structure of CPSF.
 
 ---
 
