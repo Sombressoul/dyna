@@ -102,19 +102,18 @@ $$
 
 where $\varepsilon > 0$ is a fixed regularization constant.
 
+The construction of $\delta \vec{d}$ ensures that $\|\delta \vec{d}\| \to \theta$ as $\varepsilon \to 0$ uniformly away from the collinear limit $|\langle \vec{d}, \vec{d}_j \rangle| \to 1$. For fixed $\varepsilon > 0$, $\|\delta \vec{d}\| < \theta$, but the deviation vanishes as angular separation increases.
+
 This offset satisfies:
 
 * $\delta \vec{d} \in T_{\vec{d}_j} \mathbb{S}^{2N-1}_\text{unit}$;
-* $\|\delta \vec{d}\| = \theta$;
 * smoothness and $\mathrm{U}(N)$-invariance.
 
 > **Implementation Note:**
 >
 > As a consequence, contributions $C_j$ with orthogonal directions $\vec{d}_j \perp \vec{d}$ do not vanish strictly but are exponentially suppressed by the decay (see: *"Core Terms — Unnormalized Gaussian Envelope"*):
 >
-> $$
-> \rho_j(w) \sim \exp\left(-\pi \|\delta \vec{d}\|^2\right), \quad \text{with } \|\delta \vec{d}\| = \theta.
-> $$
+> $\rho_j(w) \sim \exp(-\pi \|\delta \vec{d}\|^2)$, with $\|\delta \vec{d}\| \le \theta$ and $\|\delta \vec{d}\| \to \theta$ as $\varepsilon \to 0$ uniformly away from $|\langle \vec{d}, \vec{d}_j \rangle| \to 1$.
 
 ---
 
