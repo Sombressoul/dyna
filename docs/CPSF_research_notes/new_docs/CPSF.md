@@ -81,7 +81,7 @@ Let $\vec{d}, \vec{d}_j \in \mathbb{S}^{2N-1}_\text{unit} \subset \mathbb{C}^N$ 
 Define the **angular distance**:
 
 $$
-\theta := \arccos \left|\langle \vec{d}, \vec{d}_j \rangle\right| \in [0, \pi],
+\theta := \arccos \left|\langle \vec{d}, \vec{d}_j \rangle\right| \in [0, \tfrac{\pi}{2}],
 $$
 
 where $\langle u, v \rangle := \sum_{k=1}^N \overline{u_k} v_k$ is the standard Hermitian inner product on $\mathbb{C}^N$.
@@ -533,7 +533,7 @@ Let:
 
 $$
 \delta \vec{d} := \theta \cdot \frac{P^{\perp}_{\vec{d}_j}(\vec{d})}{\sqrt{\max(1 - |\langle \vec{d}, \vec{d}_j \rangle|^2,\ \varepsilon)}},
-\quad \text{with } \theta := \arccos |\langle \vec{d}, \vec{d}_j \rangle| \in [0, \pi]
+\quad \text{with } \theta := \arccos |\langle \vec{d}, \vec{d}_j \rangle| \in [0, \tfrac{\pi}{2}]
 $$
 
 * $\rho_j(w) := \exp(-\pi \langle \Sigma_j^{-1} w, w \rangle)$, where $\Sigma_j \in \mathbb{C}^{2N \times 2N}$ is Hermitian and positive-definite;
@@ -555,7 +555,7 @@ The scalar field $\psi_j^{\mathbb{T}}(z, \vec{d})$ belongs to $L^2(\mathbb{T}_\m
    * Each term in the sum satisfies $\rho_j(w_n) \le \exp(-\pi c \|w_n\|^2)$ for some $c > 0$, since $\Sigma_j^{-1} \ge c I$;
    * For fixed $z, \vec{d}$, we write:  
      $\|w_n\|^2 = \|\tilde{z} - \tilde{z}_j + n\|^2 + \|\delta \vec{d}\|^2 \ge \|n\|^2 - 2R\|n\| + C$  
-     where $R = \|\tilde{z} - \tilde{z}_j\|$ and $C = \|\delta \vec{d}\|^2 = \theta^2 \in [0, \pi^2]$;  
+     where $R = \|\tilde{z} - \tilde{z}_j\|$ and $C = \|\delta \vec{d}\|^2 = \theta^2 \in [0, \tfrac{\pi}{2}^2]$;  
    * Hence $\rho_j(w_n)^2 \le M_n := \exp(-2\pi c \|n\|^2 + K)$, where the constant $K$ depends only on $R$ and $\pi^2$, and is independent of $z, \vec{d}$;
    * Then $\sum_n \rho_j(w_n)^2 \le \sum_n M_n =: M < \infty$ uniformly in $z, \vec{d}$, allowing use of dominated convergence;
    * Therefore $\psi_j^{\mathbb{T}} \in L^2$, since $|\psi_j^{\mathbb{T}}|^2 \le M$ and integration over a compact domain yields finite norm.
