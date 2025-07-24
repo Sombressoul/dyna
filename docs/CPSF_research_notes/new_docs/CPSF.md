@@ -507,12 +507,12 @@ This projection yields the optimal semantic update $\Delta \hat{T}_j \in \mathbb
 
 ## Appendix A: Validity of the Semantic Error Projection Integral
 
-This addendum rigorously establishes the mathematical validity of the semantic error projection formula
+This addendum rigorously establishes the mathematical validity of the semantic error projection formula:
 
 $$
 \Delta \hat{T}_j := 
 \begin{cases}
-\frac{1}{\alpha_j} \cdot \frac{ \int_{\mathbb{T}_\mathbb{C}^N} \int_{\mathbb{S}^{2N-1}_\text{unit}} \overline{\psi_j^{\mathbb{T}}(z, \vec{d})} \cdot \Delta T(z, \vec{d}) \, d\sigma(\vec{d}) \, d\mu(z) }{ \int_{\mathbb{T}_\mathbb{C}^N} \int_{\mathbb{S}^{2N-1}_\text{unit}} |\psi_j^{\mathbb{T}}(z, \vec{d})|^2 \, d\sigma(\vec{d}) \, d\mu(z) }, & \text{if } \alpha_j > 0 \\
+\dfrac{1}{\alpha_j} \cdot \dfrac{ \int_{\mathbb{T}_\mathbb{C}^N} \int_{\mathbb{S}^{2N-1}_\text{unit}} \overline{\psi_j^{\mathbb{T}}(z, \vec{d})} \cdot \Delta T(z, \vec{d}) \, d\sigma(\vec{d}) \, d\mu(z) }{ \int_{\mathbb{T}_\mathbb{C}^N} \int_{\mathbb{S}^{2N-1}_\text{unit}} |\psi_j^{\mathbb{T}}(z, \vec{d})|^2 \, d\sigma(\vec{d}) \, d\mu(z) }, & \text{if } \alpha_j > 0 \\[1ex]
 0, & \text{if } \alpha_j = 0
 \end{cases}
 $$
@@ -528,7 +528,14 @@ If $\alpha_j = 0$, then by definition $\Delta \hat{T}_j := 0$ and no integrals a
 Let:
 
 * $\Delta T \in L^2(\mathbb{T}_\mathbb{C}^N \times \mathbb{S}^{2N-1}_\text{unit}; \mathbb{C}^S)$ be the semantic error field;
-* $\psi_j^{\mathbb{T}}(z, \vec{d}) := \sum_{n \in \Lambda} \rho_j(w_n)$, with $w_n := \iota(\tilde{z} - \tilde{z}_j + n, \vec{d} - \vec{d}_j)$;
+* $\psi_j^{\mathbb{T}}(z, \vec{d}) := \sum_{n \in \Lambda} \rho_j(w_n)$, with $w_n := \iota(\tilde{z} - \tilde{z}_j + n, \delta \vec{d})$;
+* The vector $\delta \vec{d} \in T_{\vec{d}_j} \mathbb{S}^{2N-1}_\text{unit} \subset \mathbb{C}^N$ is the angular offset from $\vec{d}_j$ to $\vec{d}$, defined by (see: *"Core Terms — Directional Offset and Angular Distance"*):
+
+$$
+\delta \vec{d} := \theta \cdot \frac{P^{\perp}_{\vec{d}_j}(\vec{d})}{\sqrt{\max(1 - |\langle \vec{d}, \vec{d}_j \rangle|^2,\ \varepsilon)}},
+\quad \text{with } \theta := \arccos |\langle \vec{d}, \vec{d}_j \rangle| \in [0, \pi]
+$$
+
 * $\rho_j(w) := \exp(-\pi \langle \Sigma_j^{-1} w, w \rangle)$, where $\Sigma_j \in \mathbb{C}^{2N \times 2N}$ is Hermitian and positive-definite;
 * $\alpha_j > 0$ by definition;
 * Measures: $d\mu(z)$ — normalized Haar measure on $\mathbb{T}_\mathbb{C}^N$; $d\sigma(\vec{d})$ — $\mathrm{U}(N)$-invariant probability measure on $\mathbb{S}^{2N-1}_\text{unit}$.
@@ -545,21 +552,24 @@ The scalar field $\psi_j^{\mathbb{T}}(z, \vec{d})$ belongs to $L^2(\mathbb{T}_\m
 
 1. **Square-integrability of $\psi_j^{\mathbb{T}}$**:
 
-   * Each term in the sum $\rho_j(w_n) \le \exp(-\pi c \|w_n\|^2)$ for some $c > 0$ since $\Sigma_j^{-1} \ge c I$;
-   * For fixed $z, \vec{d}$, $\|w_n\|^2 \ge \|n\|^2 - 2R\|n\| + C$ with bounded $\tilde{z} - \tilde{z}_j$ and $\vec{d} - \vec{d}_j \in \mathbb{S}^{2N-1}_\text{unit} - \vec{d}_j \subset B(0,2)$;
-   * Hence $\rho_j(w_n)^2 \le M_n := \exp(-2\pi c \|n\|^2 + K)$, where the constant $K$ does not depend on $z, \vec{d}$;
+   * Each term in the sum satisfies $\rho_j(w_n) \le \exp(-\pi c \|w_n\|^2)$ for some $c > 0$, since $\Sigma_j^{-1} \ge c I$;
+   * For fixed $z, \vec{d}$, we write:  
+     $\|w_n\|^2 = \|\tilde{z} - \tilde{z}_j + n\|^2 + \|\delta \vec{d}\|^2 \ge \|n\|^2 - 2R\|n\| + C$  
+     where $R = \|\tilde{z} - \tilde{z}_j\|$ and $C = \|\delta \vec{d}\|^2 = \theta^2 \in [0, \pi^2]$;  
+   * Hence $\rho_j(w_n)^2 \le M_n := \exp(-2\pi c \|n\|^2 + K)$, where the constant $K$ depends only on $R$ and $\pi^2$, and is independent of $z, \vec{d}$;
    * Then $\sum_n \rho_j(w_n)^2 \le \sum_n M_n =: M < \infty$ uniformly in $z, \vec{d}$, allowing use of dominated convergence;
-   * Therefore $\psi_j^{\mathbb{T}} \in L^2$, since $|\psi_j^{\mathbb{T}}|^2 \le M$ and integration over compact domain yields finite norm.
+   * Therefore $\psi_j^{\mathbb{T}} \in L^2$, since $|\psi_j^{\mathbb{T}}|^2 \le M$ and integration over a compact domain yields finite norm.
 
 2. **Numerator finiteness**:
 
    * $\Delta T \in L^2$, $\psi_j^{\mathbb{T}} \in L^2$;
-   * Then $\overline{\psi_j^{\mathbb{T}}} \cdot \Delta T \in L^1$ (Cauchy–Schwarz);
+   * Then $\overline{\psi_j^{\mathbb{T}}} \cdot \Delta T \in L^1$ (by Cauchy–Schwarz inequality);
    * Therefore, the integral in the numerator converges in $\mathbb{C}^S$.
 
 3. **Denominator positivity**:
 
-   * Since $\rho_j(w) > 0$ for all $w \in \mathbb{C}^{2N}$, and the term $\rho_j(0) = 1$ appears in the sum for $\psi_j^{\mathbb{T}}(z_j, \vec{d}_j)$, we have $\psi_j^{\mathbb{T}}(z_j, \vec{d}_j) \ge 1$;
+   * At the point $(z_j, \vec{d}_j)$, we have $\delta \vec{d} = 0 \Rightarrow w_0 = \iota(0, 0) \Rightarrow \rho_j(w_0) = 1$;
+   * Thus $\psi_j^{\mathbb{T}}(z_j, \vec{d}_j) \ge 1$;
    * By continuity of $\psi_j^{\mathbb{T}}$, there exists an open neighborhood $U \subset \mathbb{T}_\mathbb{C}^N \times \mathbb{S}^{2N-1}_\text{unit}$ such that $|\psi_j^{\mathbb{T}}|^2 \ge \varepsilon > 0$ on $U$;
    * The total measure of $U$ is positive under $d\mu(z) \times d\sigma(\vec{d})$, hence the integral $\int |\psi_j^{\mathbb{T}}|^2 > 0$.
 
