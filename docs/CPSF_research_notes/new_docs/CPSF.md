@@ -1,6 +1,11 @@
 ## Core Terms
 
-This section establishes the fundamental mathematical objects and notation used throughout CPSF. All definitions employ the standard Hermitian inner product $\langle u, v \rangle := \sum_{j=1}^N \overline{u_j} v_j$ in $\mathbb{C}^N$.
+This section establishes the fundamental mathematical objects and notation used throughout CPSF.
+
+All definitions employ the standard Hermitian inner product:
+$$
+\langle u, v \rangle := \sum_{j=1}^N \overline{u_j} v_j \in \mathbb{C}
+$$
 
 ---
 
