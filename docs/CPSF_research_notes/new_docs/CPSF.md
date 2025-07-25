@@ -355,6 +355,20 @@ This projection yields the update direction $\Delta \hat{T}j \in \mathbb{C}^S$ d
 
 ---
 
+### Spectral Weighting Operator
+
+A fixed Hermitian positive-definite matrix $A \in \mathbb{C}^{S \times S}$ that defines the intrinsic weighting structure on the semantic space $\mathbb{C}^S$. The operator $A$ appears in the resolvent formulation of the semantic update:
+
+$$
+\Delta \hat{T}_j := (\alpha_j I + \varepsilon A)^{-1} \cdot v_j
+$$
+
+and determines the direction and componentwise attenuation of the projection $\Delta \hat{T}_j$ in spectral space. In the canonical configuration, $A := I_S$, so that the resolvent reduces to uniform scaling by $\frac{1}{\alpha_j + \varepsilon}$ (see: *"Resolvent Projection for Spectral Contribution"*).
+
+> **Note.** Arbitrary choices of $A \succ 0$ induce spectrally adaptive projection dynamics in the semantic layer. The spectral geometry of $A$ modulates the update sensitivity along each semantic component, while preserving compatibility with the analytic structure of the CPSF architecture.
+
+---
+
 ### Dual Field Structure
 
 **Dual Field Structure** — the foundational architecture of CPSF, consisting of two interdependent levels:
