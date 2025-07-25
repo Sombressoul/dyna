@@ -76,48 +76,70 @@ This is the $(2N - 1)$-dimensional unit sphere in $\mathbb{R}^{2N} \cong \mathbb
 
 ### Directional Offset and Angular Distance
 
-Let $\vec{d}, \vec{d}_j \in \mathbb{S}^{2N-1}_\text{unit} \subset \mathbb{C}^N$ be unit-norm direction vectors (see: *"Core Terms — Projection Coordinates"*).
-
-Define the **angular distance**:
+Let $\vec{d}, \vec{d}_j \in \mathbb{S}^{2N-1}_\text{unit} \subset \mathbb{C}^N$ be unit-norm direction vectors (see: *"Core Terms — Projection Coordinates"*), then the associated scalar overlap is denoted as:
 
 $$
-\theta := \arccos \left|\langle \vec{d}, \vec{d}_j \rangle\right| \in [0, \tfrac{\pi}{2}],
+ c := |\langle \vec{d}, \vec{d}_j \rangle| \in [0,1]
 $$
 
-where $\langle u, v \rangle := \sum_{k=1}^N \overline{u_k} v_k$ is the standard Hermitian inner product on $\mathbb{C}^N$.
-
-Let
+The **angular distance** between $\vec{d}$ and $\vec{d}_j$ is defined as:
 
 $$
-P^{\perp}_{\vec{d}_j}(\vec{d}) := \vec{d} - \langle \vec{d}, \vec{d}_j \rangle \cdot \vec{d}_j \in T_{\vec{d}_j} \mathbb{S}^{2N-1}_\text{unit}
+\theta := \arccos(c) \in [0, \tfrac{\pi}{2}]
 $$
 
-be the Hermitian-orthogonal projection onto the tangent space at $\vec{d}_j$.
-
-Then the **directional offset** is defined as:
+The Hermitian-orthogonal projection of $\vec{d}$ onto the tangent space at $\vec{d}_j$ is given by:
 
 $$
-\delta \vec{d} := \theta \cdot \frac{P^{\perp}_{\vec{d}_j}(\vec{d})}{\sqrt{\max\left(1 - |\langle \vec{d}, \vec{d}_j \rangle|^2,\ \varepsilon\right)}} \in T_{\vec{d}_j} \mathbb{S}^{2N-1}_\text{unit},
+P^{\perp}_{\vec{d}_j}(\vec{d}) := \vec{d} - \langle \vec{d}, \vec{d}_j \rangle \, \vec{d}_j \in T_{\vec{d}_j} \mathbb{S}^{2N-1}_\text{unit}
 $$
 
-where $\varepsilon > 0$ is a fixed constant used to control the denominator in the projection normalization and to ensure smooth, well-defined behavior near the collinear limit $\theta \to 0$. When $\sin^2\theta < \varepsilon$, the offset norm satisfies $|\delta \vec{d}| = \theta / \sqrt{\varepsilon} > \theta$. For $\theta \gg \sqrt{\varepsilon}$, the offset converges asymptotically to $|\delta \vec{d}| \approx \theta$, recovering agreement with the geodesic angular distance. The regularization induces a scale-dependent deviation from spherical geometry near alignment, while maintaining stability and differentiability over the entire domain.
+Define the regularized normalization factor:
 
-The construction of $\delta \vec{d}$ ensures that $\|\delta \vec{d}\| \to \theta$ as $\varepsilon \to 0$ uniformly away from the collinear limit $|\langle \vec{d}, \vec{d}_j \rangle| \to 1$. For fixed $\varepsilon > 0$, $\|\delta \vec{d}\| < \theta$, but the deviation vanishes as angular separation increases.
+$$
+N_\varepsilon(c) := \sqrt{1 - c^2 + \varepsilon \, \exp\left(-\frac{1 - c^2}{\varepsilon}\right)}, \quad \varepsilon > 0
+$$
 
-This offset satisfies:
+The **directional offset vector** is then defined as:
 
-* $\delta \vec{d} \in T_{\vec{d}_j} \mathbb{S}^{2N-1}_\text{unit}$;
-* smoothness and $\mathrm{U}(N)$-invariance.
+$$
+\delta \vec{d} := \theta \, \frac{P^{\perp}_{\vec{d}_j}(\vec{d})}{N_\varepsilon(c)} \in T_{\vec{d}_j} \mathbb{S}^{2N-1}_\text{unit}
+$$
 
-> **Clarification on Regularized Angular Offset Estimation:**
+Thus, the full expanded form becomes:
+
+$$
+\boxed{
+\delta \vec{d} = \arccos\left( \left| \langle \vec{d}, \vec{d}_j \rangle \right| \right)
+\cdot \frac{\vec{d} - \langle \vec{d}, \vec{d}_j \rangle \cdot \vec{d}_j}
+{\sqrt{1 - \left| \langle \vec{d}, \vec{d}_j \rangle \right|^2 + \varepsilon \, \exp\left( -\frac{1 - \left| \langle \vec{d}, \vec{d}_j \rangle \right|^2}{\varepsilon} \right)}}
+}
+$$
+
+This construction satisfies:
+
+* $\delta \vec{d} \in T_{\vec{d}_j} \mathbb{S}^{2N-1}_\text{unit}$ by linearity and orthogonality;
+* $\|\delta \vec{d}\| = \theta \, \sqrt{1 - c^2} / N_\varepsilon(c)$;
+* $\|\delta \vec{d}\| \to \theta$ as $\varepsilon \to 0$, uniformly for $c < 1$;
+* the map $\vec{d} \mapsto \delta \vec{d}$ is $C^\infty$-smooth on $\mathbb{S}^{2N-1}$, and equivariant under the natural action of $\mathrm{U}(N)$.
+
+> **Remark:**
 >
-> The canonical logarithmic map on $\mathbb{S}^{2N-1}$ yields exact angular displacement but introduces numerical instability when $\theta \to 0$, due to division by vanishing norms. The regularized formulation avoids this instability while preserving smooth angular sensitivity and invariant tangent structure.
+> The canonical Riemannian logarithmic map on $\mathbb{S}^{2N-1}$ at basepoint $\vec{d}_j$ diverges in norm as $\vec{d} \to \vec{d}_j$. The regularization factor $N_\varepsilon(c)$ provides a smooth surrogate denominator that preserves asymptotic consistency while ensuring bounded and differentiable behavior over the entire domain.
+>
+> In particular, when $1 - c^2 \ll \varepsilon$, the normalization satisfies $N_\varepsilon(c) \approx \sqrt{\varepsilon}$, and the offset norm approaches $\|\delta \vec{d}\| \approx \theta / \sqrt{\varepsilon} > \theta$. Conversely, when $1 - c^2 \gg \varepsilon$, the exponential term is negligible, and $\|\delta \vec{d}\| \approx \theta$, recovering the exact geodesic length. The parameter $\varepsilon$ thus determines the scale of regularization near the collinear limit.
 
-> **Implementation Note:**
+> **Usage:**
 >
-> As a consequence, contributions $C_j$ with orthogonal directions $\vec{d}_j \perp \vec{d}$ do not vanish strictly but are exponentially suppressed by the decay (see: *"Core Terms — Unnormalized Gaussian Envelope"*):
+> The offset $\delta \vec{d}$ defines the angular component of the joint displacement vector $w := \iota(\tilde{z} - \tilde{z}_j, \delta \vec{d}) \in \mathbb{C}^{2N}$, which enters the anisotropic Gaussian envelope $\rho_j(w) := \exp(-\pi \langle \Sigma_j^{-1} w, w \rangle)$. In particular,
 >
-> $\rho_j(w) \sim \exp(-\pi \|\delta \vec{d}\|^2)$, with $\|\delta \vec{d}\| \le \theta$ and $\|\delta \vec{d}\| \to \theta$ as $\varepsilon \to 0$ uniformly away from $|\langle \vec{d}, \vec{d}_j \rangle| \to 1$.
+> $$
+> \rho_j(w) \sim \exp(-\pi \|\delta \vec{d}\|^2),
+> $$
+>
+> and contributions with misaligned directions are exponentially suppressed as $\|\delta \vec{d}\|$ increases.
+>
+> See: *"Core Terms — Unnormalized Gaussian Envelope"*, *"Core Terms — Embedding Map"*.
 
 ---
 
@@ -406,7 +428,7 @@ Let $\ell_j := (z_j, \vec{d}_j) \in \mathbb{T}_\mathbb{C}^N \times \mathbb{S}^{2
 * $z_j \in \mathbb{T}_\mathbb{C}^N$ is a base point on the complex torus;
 * $\vec{d}_j \in \mathbb{S}^{2N-1}_\text{unit} \subset \mathbb{C}^N$ is a unit-norm complex direction vector (i.e., $\|\vec{d}_j\| = 1$).
 
-Let $(z, \vec{d}) \in \mathbb{T}_\mathbb{C}^N \times \mathbb{S}^{2N-1}_\text{unit}$ be an arbitrary projection coordinate. We use lifted representatives $\tilde{z}, \tilde{z}_j \in \mathbb{C}^N$ such that $\tilde{z} \equiv z \mod \Lambda$, and define the relative offset (see: *"Core Terms — Embedding Map"*):
+Let $(z, \vec{d}) \in \mathbb{T}_\mathbb{C}^N \times \mathbb{S}^{2N-1}_\text{unit}$ be an arbitrary projection coordinate. Lifted representatives $\tilde{z}, \tilde{z}_j \in \mathbb{C}^N$ are chosen such that $\tilde{z} \equiv z \mod \Lambda$, and the relative offset is defined accordingly (see: *"Core Terms — Embedding Map"*).
 
 $$
   w := \iota(\tilde{z} - \tilde{z}_j, \delta \vec{d}), \quad \iota(u, v) := \begin{bmatrix} u \\ v \end{bmatrix} \in \mathbb{C}^{2N}
@@ -637,7 +659,7 @@ The scalar field $\psi_j^{\mathbb{T}}(z, \vec{d})$ belongs to $L^2(\mathbb{T}_\m
 1. **Square-integrability of $\psi_j^{\mathbb{T}}$**:
 
    * Each term in the sum satisfies $\rho_j(w_n) \le \exp(-\pi c \|w_n\|^2)$ for some $c > 0$, since $\Sigma_j^{-1} \ge c I$;
-   * For fixed $z, \vec{d}$, we write:  
+   * For fixed $z, \vec{d}$, write:  
      $\|w_n\|^2 = \|\tilde{z} - \tilde{z}_j + n\|^2 + \|\delta \vec{d}\|^2 \ge \|n\|^2 - 2R\|n\| + C$  
      where $R = \|\tilde{z} - \tilde{z}_j\|$ and $C = \|\delta \vec{d}\|^2 \le \theta^2 \in [0, \tfrac{\pi}{2}^2]$;  
    * Hence $\rho_j(w_n)^2 \le M_n := \exp(-2\pi c \|n\|^2 + K)$, where the constant $K$ depends only on $R$ and $\pi^2$, and is independent of $z, \vec{d}$;
@@ -652,7 +674,7 @@ The scalar field $\psi_j^{\mathbb{T}}(z, \vec{d})$ belongs to $L^2(\mathbb{T}_\m
 
 3. **Denominator positivity**:
 
-   * At the point $(z_j, \vec{d}_j)$, we have $\delta \vec{d} = 0 \Rightarrow w_0 = \iota(0, 0) \Rightarrow \rho_j(w_0) = 1$;
+   * At the point $(z_j, \vec{d}_j)$, it holds that $\delta \vec{d} = 0 \Rightarrow w_0 = \iota(0, 0) \Rightarrow \rho_j(w_0) = 1$;
    * Thus $\psi_j^{\mathbb{T}}(z_j, \vec{d}_j) \ge 1$;
    * By continuity of $\psi_j^{\mathbb{T}}$, there exists an open neighborhood $U \subset \mathbb{T}_\mathbb{C}^N \times \mathbb{S}^{2N-1}_\text{unit}$ such that $|\psi_j^{\mathbb{T}}|^2 \ge \varepsilon > 0$ on $U$;
    * The total measure of $U$ is positive under $d\mu(z) \times d\sigma(\vec{d})$, hence the integral $\int |\psi_j^{\mathbb{T}}|^2 > 0$.
