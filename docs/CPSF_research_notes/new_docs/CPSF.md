@@ -351,7 +351,7 @@ This expression defines an $L^2$-orthogonal projection of the error field $\Delt
 
 All integrals are evaluated over the product domain $\mathbb{T}_\mathbb{C}^N \times \mathbb{S}^{2N-1}_\text{unit}$ using the normalized Haar measure $d\mu(z)$ on the torus and the rotationally invariant surface measure $d\sigma(\vec{d})$ on the unit sphere.
 
-This projection yields the update direction $\Delta \hat{T}_j \in \mathbb{C}^S$, which minimizes the squared $L^2$-error under the geometric localization induced by $\Sigma_j$.
+This projection yields the update direction $\Delta \hat{T}j \in \mathbb{C}^S$ defined as the $L^2$-orthogonal component of the semantic error field $\Delta T(z, \vec{d})$ along the envelope $\psi_j^{\mathbb{T}}$. The projection is evaluated with respect to the canonical inner product on $L^2(\mathbb{T}\mathbb{C}^N \times \mathbb{S}_\text{unit}^{2N-1}; \mathbb{C}^S)$, and weighted by the localization geometry induced by $\Sigma_j$. This construction isolates the contribution of $C_j$ within its region of influence, without invoking global optimization.
 
 ---
 
@@ -505,7 +505,15 @@ $$
 >
 > The term $\varepsilon > 0$ prevents this discontinuity by inducing smooth decay of the update magnitude near zero amplitude, and coincides with the resolvent regularization detailed in *"Resolvent Projection for Spectral Contribution"*.
 
-This projection yields the optimal semantic update $\Delta \hat{T}_j \in \mathbb{C}^S$ that minimizes the squared error weighted by the localization profile $\psi_j^{\mathbb{T}}$, which in turn is induced by $\Sigma_j$ (see: *"Appendix A: Validity of the Semantic Error Projection Integral"* for justification of the projection formula).
+This projection defines a localized $L^2$-orthogonal component of the semantic error field $\Delta T(z, \vec{d})$ along the envelope $\psi_j^{\mathbb{T}}$. The resulting update $\Delta \hat{T}_j \in \mathbb{C}^S$ isolates the influence of the contribution $C_j$ within its domain of support, providing a regularized correction term that reflects the mismatch between reference and actual field response weighted by $\psi_j^{\mathbb{T}}$.
+
+The updated spectral vector $\hat{T}_j \in \mathbb{C}^S$ is defined by the additive update:
+
+$$
+\hat{T}_j \leftarrow \hat{T}_j + \Delta \hat{T}_j
+$$
+
+where $\Delta \hat{T}_j$ is given by the orthogonal projection defined above.
 
 ---
 
@@ -514,7 +522,7 @@ This projection yields the optimal semantic update $\Delta \hat{T}_j \in \mathbb
 * $\Sigma_j$ defines a directionally aligned, anisotropic envelope centered at $\ell_j$;
 * Its construction follows from a block-diagonal frame $\mathcal{R}(\vec{d}_j)$ aligned with $\vec{d}_j$, and a diagonal attenuation matrix $D_j$;
 * The Gaussian envelope $\psi_j^{\mathbb{T}}$ provides localized spatial and directional weighting for both field synthesis and semantic projection;
-* The projection $\Delta \hat{T}_j$ minimizes the localized semantic error with respect to $\psi_j^{\mathbb{T}}$, making $\Sigma_j$ central to the semantic learning process;
+* The covariance matrix $\Sigma_j$ governs the geometric structure of the envelope $\psi_j^{\mathbb{T}}$, and thereby determines the spatial and directional localization of the update $\Delta \hat{T}_j$ applied to $\hat{T}_j$.
 
 ---
 
