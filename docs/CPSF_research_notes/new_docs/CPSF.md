@@ -198,7 +198,9 @@ Used to embed relative spatial and directional offsets into the extended project
 Defined as:
 
 $$
-\Sigma_j := \mathcal{R}(\vec{d}_j)^\dagger \cdot \mathrm{diag}(\sigma_j^{\parallel}, \underbrace{\sigma_j^{\perp}, \dotsc, \sigma_j^{\perp}}_{N-1}, \sigma_j^{\parallel}, \underbrace{\sigma_j^{\perp}, \dotsc, \sigma_j^{\perp}}_{N-1}) \cdot \mathcal{R}(\vec{d}_j)
+\boxed{
+\Sigma_j := \mathcal{R}(\vec{d}_j)^\dagger \cdot \mathrm{diag}(\overbrace{\sigma_j^{\parallel}, \underbrace{\sigma_j^{\perp}, \dotsc, \sigma_j^{\perp}}_{N-1}}^{\text{pos}}, \overbrace{\sigma_j^{\parallel}, \underbrace{\sigma_j^{\perp}, \dotsc, \sigma_j^{\perp}}_{N-1}}^{\text{dir}}) \cdot \mathcal{R}(\vec{d}_j)
+}
 $$
 
 where:
@@ -439,7 +441,7 @@ This acts on $\mathbb{C}_{\text{pos}}^N \oplus \mathbb{C}_{\text{dir}}^N \cong \
 
 Let $\sigma_j^{\parallel}, \sigma_j^{\perp} \in \mathbb{R}_{>0}$ be the longitudinal and transverse attenuation parameters respectively (see: *"Core Terms — Attenuation Parameters"*).
 
-Define the diagonal attenuation matrix:
+Define the diagonal attenuation matrix (see: *"Core Terms — Geometric Covariance Matrix"*):
 
 $$
   D_j := \mathrm{diag}(\sigma_j^{\parallel}, \underbrace{\sigma_j^{\perp}, \dotsc, \sigma_j^{\perp}}_{N-1}, \sigma_j^{\parallel}, \underbrace{\sigma_j^{\perp}, \dotsc, \sigma_j^{\perp}}_{N-1}) \in \mathbb{R}^{2N \times 2N}
