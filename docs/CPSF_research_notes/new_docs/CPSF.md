@@ -336,11 +336,11 @@ This construction guarantees that $d\sigma$ is smooth, $\mathrm{U}(N)$-invariant
 
 ### Semantic Error Projection
 
-Orthogonal projection of semantic error onto contribution mode is defined as (see: *"Appendix A: Validity of the Semantic Error Projection Integral"*):
+Orthogonal projection of semantic error onto contribution mode is defined as (see: *"Functional Role of $\Sigma_j$"*, *"Resolvent Projection for Spectral Contribution"*, *"Appendix A: Validity of the Semantic Error Projection Integral"*):
 $$
 \Delta \hat{T}_j := 
 \begin{cases}
-\frac{1}{\alpha_j} \cdot \frac{ \int_{\mathbb{T}_\mathbb{C}^N} \int_{\mathbb{S}^{2N-1}_\text{unit}} \overline{\psi_j^{\mathbb{T}}(z, \vec{d})} \cdot \Delta T(z, \vec{d}) \, d\sigma(\vec{d}) \, d\mu(z) }{ \int_{\mathbb{T}_\mathbb{C}^N} \int_{\mathbb{S}^{2N-1}_\text{unit}} |\psi_j^{\mathbb{T}}(z, \vec{d})|^2 \, d\sigma(\vec{d}) \, d\mu(z) }, & \text{if } \alpha_j > 0 \\
+\dfrac{1}{\alpha_j + \varepsilon} \cdot \dfrac{ \int_{\mathbb{T}_\mathbb{C}^N} \int_{\mathbb{S}^{2N-1}_\text{unit}} \overline{\psi_j^{\mathbb{T}}(z, \vec{d})} \cdot \Delta T(z, \vec{d}) \, d\sigma(\vec{d}) \, d\mu(z) }{ \int_{\mathbb{T}_\mathbb{C}^N} \int_{\mathbb{S}^{2N-1}_\text{unit}} |\psi_j^{\mathbb{T}}(z, \vec{d})|^2 \, d\sigma(\vec{d}) \, d\mu(z) }, & \text{if } \alpha_j > 0 \\
 0, & \text{if } \alpha_j = 0
 \end{cases}
 $$
@@ -485,14 +485,16 @@ $$
   L^2(\mathbb{T}_\mathbb{C}^N \times \mathbb{S}^{2N-1}_\text{unit}; \mathbb{C}^S)
 $$
 
-yields the orthogonal projection (see: *"Core Terms — Semantic Error Projection"*, *"Appendix A: Validity of the Semantic Error Projection Integral"*):
+yields the orthogonal projection (see: *"Resolvent Projection for Spectral Contribution"*, *"Appendix A: Validity of the Semantic Error Projection Integral"*):
 
 $$
+\boxed{
 \Delta \hat{T}_j := 
 \begin{cases}
-\frac{1}{\alpha_j} \cdot \frac{ \int_{\mathbb{T}_\mathbb{C}^N} \int_{\mathbb{S}^{2N-1}_\text{unit}} \overline{\psi_j^{\mathbb{T}}(z, \vec{d})} \cdot \Delta T(z, \vec{d}) \, d\sigma(\vec{d}) \, d\mu(z) }{ \int_{\mathbb{T}_\mathbb{C}^N} \int_{\mathbb{S}^{2N-1}_\text{unit}} |\psi_j^{\mathbb{T}}(z, \vec{d})|^2 \, d\sigma(\vec{d}) \, d\mu(z) }, & \text{if } \alpha_j > 0 \\
+\dfrac{1}{\alpha_j + \varepsilon} \cdot \dfrac{ \int_{\mathbb{T}_\mathbb{C}^N} \int_{\mathbb{S}^{2N-1}_\text{unit}} \overline{\psi_j^{\mathbb{T}}(z, \vec{d})} \cdot \Delta T(z, \vec{d}) \, d\sigma(\vec{d}) \, d\mu(z) }{ \int_{\mathbb{T}_\mathbb{C}^N} \int_{\mathbb{S}^{2N-1}_\text{unit}} |\psi_j^{\mathbb{T}}(z, \vec{d})|^2 \, d\sigma(\vec{d}) \, d\mu(z) }, & \text{if } \alpha_j > 0 \\
 0, & \text{if } \alpha_j = 0
 \end{cases}
+}
 $$
 
 This projection yields the optimal semantic update $\Delta \hat{T}_j \in \mathbb{C}^S$ that minimizes the squared error weighted by the localization profile $\psi_j^{\mathbb{T}}$, which in turn is induced by $\Sigma_j$ (see: *"Appendix A: Validity of the Semantic Error Projection Integral"* for justification of the projection formula).
@@ -508,14 +510,61 @@ This projection yields the optimal semantic update $\Delta \hat{T}_j \in \mathbb
 
 ---
 
+## Resolvent Projection for Spectral Contribution
+
+For each contribution $C_j$ (see: *"Core Terms — Field Contribution"*), the spectral parameter $\hat{T}_j$ is updated via projection of the residual field $\Delta T := T^{\mathrm{ref}} - T$ onto the corresponding envelope $\psi_j^{\mathbb{T}}$ (see: *"Core Terms — Periodized Envelope"*), scaled by the contribution amplitude $\alpha_j$ (see: *"Functional Role of $\Sigma_j$"*).
+
+The projection is regularized by a resolvent operator:
+
+$$
+\boxed{
+\Delta \hat{T}_j := (\alpha_j I + \varepsilon A)^{-1} \cdot v_j,
+\quad v_j := \frac{\langle \psi_j^{\mathbb{T}}, \Delta T \rangle}{\langle \psi_j^{\mathbb{T}}, \psi_j^{\mathbb{T}} \rangle} \in \mathbb{C}^S
+}
+$$
+
+Here:
+
+* $\varepsilon \in \mathbb{R}_{>0}$ is a regularization constant, typically chosen on the order of the mean contribution weight, i.e., $\varepsilon \sim \mathbb{E}[\alpha_j]$, to balance suppression of weak components and stability of dominant ones;
+* $A \in \mathbb{C}^{S \times S}$, $A \succ 0$, is a fixed Hermitian positive-definite matrix;
+* All inner products refer to $L^2(\mathbb{T}_\mathbb{C}^N \times \mathbb{S}_\text{unit}^{2N-1}; \mathbb{C}^S)$.
+
+### Special Case: Uniform Spectral Weighting
+
+In the standard configuration, all spectral dimensions are treated as equally significant:
+
+$$
+A := I_S
+$$
+
+The resolvent reduces to scalar scaling:
+
+$$
+(\alpha_j I + \varepsilon I)^{-1} = \frac{1}{\alpha_j + \varepsilon} \cdot I
+$$
+
+and the update becomes:
+
+$$
+\Delta \hat{T}_j := \frac{1}{\alpha_j + \varepsilon} \cdot v_j
+$$
+
+This formulation ensures smoothness and boundedness near $\alpha_j = 0$, with $\varepsilon$ controlling maximum update magnitude and preserving differentiability.
+
+### Spectral Weighting and Generalized Operators
+
+Arbitrary $A \succ 0$ yields spectrally adaptive update mechanisms in the semantic layer. Frequency sensitivity follows from the spectral geometry of $A$, modulating update strength componentwise. The operator $(\alpha_j I + \varepsilon A)^{-1}$ governs update direction in $\mathbb{C}^S$, preserving analytic and geometric compatibility with the CPSF architecture.
+
+---
+
 ## Appendix A: Validity of the Semantic Error Projection Integral
 
-This addendum rigorously establishes the mathematical validity of the semantic error projection formula:
+This addendum rigorously establishes the mathematical validity of the semantic error projection formula (see: *"Functional Role of $\Sigma_j$"*, *"Resolvent Projection for Spectral Contribution"*):
 
 $$
 \Delta \hat{T}_j := 
 \begin{cases}
-\dfrac{1}{\alpha_j} \cdot \dfrac{ \int_{\mathbb{T}_\mathbb{C}^N} \int_{\mathbb{S}^{2N-1}_\text{unit}} \overline{\psi_j^{\mathbb{T}}(z, \vec{d})} \cdot \Delta T(z, \vec{d}) \, d\sigma(\vec{d}) \, d\mu(z) }{ \int_{\mathbb{T}_\mathbb{C}^N} \int_{\mathbb{S}^{2N-1}_\text{unit}} |\psi_j^{\mathbb{T}}(z, \vec{d})|^2 \, d\sigma(\vec{d}) \, d\mu(z) }, & \text{if } \alpha_j > 0 \\[1ex]
+\dfrac{1}{\alpha_j + \varepsilon} \cdot \dfrac{ \int_{\mathbb{T}_\mathbb{C}^N} \int_{\mathbb{S}^{2N-1}_\text{unit}} \overline{\psi_j^{\mathbb{T}}(z, \vec{d})} \cdot \Delta T(z, \vec{d}) \, d\sigma(\vec{d}) \, d\mu(z) }{ \int_{\mathbb{T}_\mathbb{C}^N} \int_{\mathbb{S}^{2N-1}_\text{unit}} |\psi_j^{\mathbb{T}}(z, \vec{d})|^2 \, d\sigma(\vec{d}) \, d\mu(z) }, & \text{if } \alpha_j > 0 \\[1ex]
 0, & \text{if } \alpha_j = 0
 \end{cases}
 $$
