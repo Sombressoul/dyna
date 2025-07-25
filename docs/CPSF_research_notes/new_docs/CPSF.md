@@ -497,6 +497,14 @@ $$
 }
 $$
 
+> **Regularized Inversion in Semantic Projection.**
+>
+> The expression $\frac{1}{\alpha_j + \varepsilon}$ appearing in the update $\Delta \hat{T}_j$ arises as a regularized inverse of the scalar amplitude $\alpha_j$, stabilizing the projection onto the envelope $\psi_j^{\mathbb{T}}$.
+>
+> In the absence of regularization, the canonical scaling would be $\frac{1}{\alpha_j}$, ensuring exact cancellation of the amplitude factor in the field expression (see: *"Core Terms — Global Field Response"*). However, this leads to singular behavior as $\alpha_j \to 0^+$, while the update is explicitly set to zero for $\alpha_j = 0$ (see: *"Core Terms — Semantic Error Projection"*).
+>
+> The term $\varepsilon > 0$ prevents this discontinuity by inducing smooth decay of the update magnitude near zero amplitude, and coincides with the resolvent regularization detailed in *"Resolvent Projection for Spectral Contribution"*.
+
 This projection yields the optimal semantic update $\Delta \hat{T}_j \in \mathbb{C}^S$ that minimizes the squared error weighted by the localization profile $\psi_j^{\mathbb{T}}$, which in turn is induced by $\Sigma_j$ (see: *"Appendix A: Validity of the Semantic Error Projection Integral"* for justification of the projection formula).
 
 ---
