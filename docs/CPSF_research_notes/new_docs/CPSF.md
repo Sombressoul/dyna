@@ -658,25 +658,26 @@ The scalar field $\psi_j^{\mathbb{T}}(z, \vec{d})$ belongs to $L^2(\mathbb{T}_\m
 
 1. **Square-integrability of $\psi_j^{\mathbb{T}}$**:
 
-   * Each term in the sum satisfies $\rho_j(w_n) \le \exp(-\pi c \|w_n\|^2)$ for some $c > 0$, since $\Sigma_j^{-1} \ge c I$;
-   * For fixed $z, \vec{d}$, write:  
-     $\|w_n\|^2 = \|\tilde{z} - \tilde{z}_j + n\|^2 + \|\delta \vec{d}\|^2 \ge \|n\|^2 - 2R\|n\| + C$  
-     where $R = \|\tilde{z} - \tilde{z}_j\|$ and $C = \|\delta \vec{d}\|^2 \le \theta^2 \in [0, \tfrac{\pi}{2}^2]$;  
-   * Hence $\rho_j(w_n)^2 \le M_n := \exp(-2\pi c \|n\|^2 + K)$, where the constant $K$ depends only on $R$ and $\pi^2$, and is independent of $z, \vec{d}$;
-   * Then $\sum_n \rho_j(w_n)^2 \le \sum_n M_n =: M < \infty$ uniformly in $z, \vec{d}$, allowing use of dominated convergence;
-   * Therefore $\psi_j^{\mathbb{T}} \in L^2$, since $|\psi_j^{\mathbb{T}}|^2 \le M$ and integration over a compact domain yields finite norm.
+    * Each term in the sum satisfies $\rho_j(w_n) \le \exp(-\pi c \|w_n\|^2)$ for some $c > 0$, since $\Sigma_j^{-1} \ge c I$;
+    * For fixed $z, \vec{d}$, write:  
+      $\|w_n\|^2 = \|\tilde{z} - \tilde{z}_j + n\|^2 + \|\delta \vec{d}\|^2 \ge \|n\|^2 - 2R\|n\| + C$  
+      where $R = \|\tilde{z} - \tilde{z}_j\|$ and $C = \|\delta \vec{d}\|^2 \le \theta^2 \in [0, \tfrac{\pi}{2}^2]$;  
+    * Hence $\rho_j(w_n)^2 \le M_n := \exp(-2\pi c \|n\|^2 + K)$, where the constant $K$ depends only on $R$ and $\pi^2$, and is independent of $z, \vec{d}$;
+    * Then $\sum_n \rho_j(w_n)^2 \le \sum_n M_n =: M < \infty$ uniformly in $z, \vec{d}$, allowing use of dominated convergence;
+    * This follows from the standard result that for any full-rank lattice $ \Lambda \subset \mathbb{R}^{2N} $, the Gaussian sum $\sum_{n \in \Lambda} \exp(-a \|n\|^2) < \infty$ for all $a > 0$ converges. This guarantees that $ \sum_n M_n < \infty $, since $ M_n = \exp(-2\pi c \|n\|^2 + K) $ is of this form with a constant shift;
+    * Therefore $\psi_j^{\mathbb{T}} \in L^2$, since $|\psi_j^{\mathbb{T}}|^2 \le M$ and integration over a compact domain yields finite norm.
 
 2. **Numerator finiteness**:
 
-   * $\Delta T \in L^2$, $\psi_j^{\mathbb{T}} \in L^2$;
-   * Then $\overline{\psi_j^{\mathbb{T}}} \cdot \Delta T \in L^1$ (by Cauchy–Schwarz inequality);
-   * Therefore, the integral in the numerator converges in $\mathbb{C}^S$.
+    * $\Delta T \in L^2$, $\psi_j^{\mathbb{T}} \in L^2$;
+    * Then $\overline{\psi_j^{\mathbb{T}}} \cdot \Delta T \in L^1$ (by Cauchy–Schwarz inequality);
+    * Therefore, the integral in the numerator converges in $\mathbb{C}^S$.
 
 3. **Denominator positivity**:
 
-   * At the point $(z_j, \vec{d}_j)$, it holds that $\delta \vec{d} = 0 \Rightarrow w_0 = \iota(0, 0) \Rightarrow \rho_j(w_0) = 1$;
-   * Thus $\psi_j^{\mathbb{T}}(z_j, \vec{d}_j) \ge 1$;
-   * By continuity of $\psi_j^{\mathbb{T}}$, there exists an open neighborhood $U \subset \mathbb{T}_\mathbb{C}^N \times \mathbb{S}^{2N-1}_\text{unit}$ such that $|\psi_j^{\mathbb{T}}|^2 \ge \varepsilon > 0$ on $U$;
-   * The total measure of $U$ is positive under $d\mu(z) \times d\sigma(\vec{d})$, hence the integral $\int |\psi_j^{\mathbb{T}}|^2 > 0$.
+    * At the point $(z_j, \vec{d}_j)$, it holds that $\delta \vec{d} = 0 \Rightarrow w_0 = \iota(0, 0) \Rightarrow \rho_j(w_0) = 1$;
+    * Thus $\psi_j^{\mathbb{T}}(z_j, \vec{d}_j) \ge 1$;
+    * By continuity of $\psi_j^{\mathbb{T}}$, there exists an open neighborhood $U \subset \mathbb{T}_\mathbb{C}^N \times \mathbb{S}^{2N-1}_\text{unit}$ such that $|\psi_j^{\mathbb{T}}|^2 \ge \varepsilon > 0$ on $U$;
+    * The total measure of $U$ is positive under $d\mu(z) \times d\sigma(\vec{d})$, hence the integral $\int |\psi_j^{\mathbb{T}}|^2 > 0$.
 
 ---
