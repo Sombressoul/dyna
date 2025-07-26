@@ -638,7 +638,9 @@ Let:
 * The vector $\delta \vec{d} \in T_{\vec{d}_j} \mathbb{S}^{2N-1}_\text{unit} \subset \mathbb{C}^N$ is the angular offset from $\vec{d}_j$ to $\vec{d}$, defined by (see: *"Core Terms — Directional Offset and Angular Distance"*):
 
 $$
-\delta \vec{d} := \theta \cdot \frac{P^{\perp}_{\vec{d}_j}(\vec{d})}{\sqrt{\max(1 - |\langle \vec{d}, \vec{d}_j \rangle|^2,\ \varepsilon)}},
+\delta \vec{d} = \theta
+\cdot \frac{\vec{d} - \langle \vec{d}, \vec{d}_j \rangle \cdot \vec{d}_j}
+{\sqrt{1 - \left| \langle \vec{d}, \vec{d}_j \rangle \right|^2 + \varepsilon \, \exp\left( -\frac{1 - \left| \langle \vec{d}, \vec{d}_j \rangle \right|^2}{\varepsilon} \right)}},
 \quad \text{with } \theta := \arccos |\langle \vec{d}, \vec{d}_j \rangle| \in [0, \tfrac{\pi}{2}]
 $$
 
