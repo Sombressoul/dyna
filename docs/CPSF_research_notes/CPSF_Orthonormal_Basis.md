@@ -1,3 +1,7 @@
+DEPRECATED DEPRECATED DEPRECATED DEPRECATED DEPRECATED DEPRECATED DEPRECATED DEPRECATED DEPRECATED DEPRECATED DEPRECATED DEPRECATED DEPRECATED DEPRECATED
+
+---
+
 ## CPSF: Definition and Construction of the Orthonormal Basis  
 
 Let $D \in \mathbb{N}$, $\vec{d} \in \mathbb{C}^D$ such that $\|\vec{d}\| = 1$, and let $\vec{e}_1 = (1, 0, \ldots, 0)^\top \in \mathbb{C}^D$.  

@@ -1,3 +1,7 @@
+DRAFT DRAFT DRAFT DRAFT DRAFT DRAFT DRAFT DRAFT DRAFT DRAFT DRAFT DRAFT DRAFT DRAFT DRAFT DRAFT DRAFT DRAFT DRAFT DRAFT DRAFT DRAFT DRAFT DRAFT DRAFT DRAFT
+
+---
+
 ## Semantic Inverse Projection
 
 This section introduces a mathematically rigorous inverse operation within the CPSF architecture, allowing the inference of a projection coordinate $\ell^* = (z^*, \vec{d}^*) \in \mathbb{T}_\mathbb{C}^N \times \mathbb{S}_\mathbb{C}^{2N-1}$ that best aligns with a desired semantic target $T^* \in \mathbb{C}^S$.
