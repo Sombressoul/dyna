@@ -683,3 +683,24 @@ The scalar field $\psi_j^{\mathbb{T}}(z, \vec{d})$ belongs to $L^2(\mathbb{T}_\m
     * The total measure of $U$ is positive under $d\mu(z) \times d\sigma(\vec{d})$, hence the integral $\int |\psi_j^{\mathbb{T}}|^2 > 0$.
 
 ---
+
+### Smoothness and Uniform Convergence of Derivatives
+
+Since $\rho_j(w) \in C^\infty(\mathbb{C}^{2N})$ and all terms in the sum defining $\psi_j^{\mathbb{T}}$ decay exponentially in the lattice index $n \in \Lambda$, the sum:
+
+$$
+\psi_j^{\mathbb{T}}(z, \vec{d}) := \sum_{n \in \Lambda} \rho_j\left( \iota(\tilde{z} - \tilde{z}_j + n, \delta \vec{d}) \right)
+$$
+
+and all its partial derivatives of all orders with respect to $z$ and $\vec{d}$ converge **uniformly** over compact subsets of $\mathbb{T}_\mathbb{C}^N \times \mathbb{S}^{2N-1}_\text{unit}$.
+
+This holds because:
+
+- The directional offset $\delta \vec{d} \in C^\infty(\mathbb{S}^{2N-1}_\text{unit})$;
+- The embedding $\iota$ is linear and smooth;
+- The composition $\rho_j \circ \iota \circ (\cdot, \delta \vec{d})$ is $C^\infty$ jointly in $z, \vec{d}$;
+- The Gaussian decay ensures domination of all derivatives by an integrable majorant.
+
+Hence, $\psi_j^{\mathbb{T}} \in C^\infty(\mathbb{T}_\mathbb{C}^N \times \mathbb{S}^{2N-1}_\text{unit})$, and all error projections and updates defined through it are smooth in direction.
+
+---
