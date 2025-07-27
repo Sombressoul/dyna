@@ -121,11 +121,11 @@ This construction satisfies:
 * $\delta \vec{d} \in T_{\vec{d}_j} \mathbb{S}^{2N-1}_\text{unit}$ by linearity and orthogonality;
 * $\|\delta \vec{d}\| = \theta \, \sqrt{1 - c^2} / N_\varepsilon(c)$;
 * $\|\delta \vec{d}\| \to \theta$ as $\varepsilon \to 0$, uniformly for $c < 1$;
-* the map $\vec{d} \mapsto \delta \vec{d}$ is $C^\infty$-smooth on $\mathbb{S}^{2N-1}$, and equivariant under the natural action of $\mathrm{U}(N)$.
+* the map $\vec{d} \mapsto \delta \vec{d}$ is $C^\infty$-smooth on $\mathbb{S}^{2N-1}_\text{unit}$, and equivariant under the natural action of $\mathrm{U}(N)$.
 
 > **Remark:**
 >
-> The canonical Riemannian logarithmic map on $\mathbb{S}^{2N-1}$ at basepoint $\vec{d}_j$ diverges in norm as $\vec{d} \to \vec{d}_j$. The regularization factor $N_\varepsilon(c)$ provides a smooth surrogate denominator that preserves asymptotic consistency while ensuring bounded and differentiable behavior over the entire domain.
+> The canonical Riemannian logarithmic map on $\mathbb{S}^{2N-1}_\text{unit}$ at basepoint $\vec{d}_j$ diverges in norm as $\vec{d} \to \vec{d}_j$. The regularization factor $N_\varepsilon(c)$ provides a smooth surrogate denominator that preserves asymptotic consistency while ensuring bounded and differentiable behavior over the entire domain.
 >
 > In particular, when $1 - c^2 \ll \varepsilon$, the normalization satisfies $N_\varepsilon(c) \approx \sqrt{\varepsilon}$, and the offset norm approaches $\|\delta \vec{d}\| \approx \theta / \sqrt{\varepsilon} > \theta$. Conversely, when $1 - c^2 \gg \varepsilon$, the exponential term is negligible, and $\|\delta \vec{d}\| \approx \theta$, recovering the exact geodesic length. The parameter $\varepsilon$ thus determines the scale of regularization near the collinear limit.
 
@@ -375,7 +375,7 @@ This expression defines an $L^2$-orthogonal projection of the error field $\Delt
 
 All integrals are evaluated over the product domain $\mathbb{T}_\mathbb{C}^N \times \mathbb{S}^{2N-1}_\text{unit}$ using the normalized Haar measure $d\mu(z)$ on the torus and the rotationally invariant surface measure $d\sigma(\vec{d})$ on the unit sphere.
 
-This projection yields the update direction $\Delta \hat{T}j \in \mathbb{C}^S$ defined as the $L^2$-orthogonal component of the semantic error field $\Delta T(z, \vec{d})$ along the envelope $\psi_j^{\mathbb{T}}$. The projection is evaluated with respect to the canonical inner product on $L^2(\mathbb{T}\mathbb{C}^N \times \mathbb{S}_\text{unit}^{2N-1}; \mathbb{C}^S)$, and weighted by the localization geometry induced by $\Sigma_j$. This construction isolates the contribution of $C_j$ within its region of influence, without invoking global optimization.
+This projection yields the update direction $\Delta \hat{T}j \in \mathbb{C}^S$ defined as the $L^2$-orthogonal component of the semantic error field $\Delta T(z, \vec{d})$ along the envelope $\psi_j^{\mathbb{T}}$. The projection is evaluated with respect to the canonical inner product on $L^2(\mathbb{T}\mathbb{C}^N \times \mathbb{S}^{2N-1}_\text{unit}; \mathbb{C}^S)$, and weighted by the localization geometry induced by $\Sigma_j$. This construction isolates the contribution of $C_j$ within its region of influence, without invoking global optimization.
 
 ---
 
@@ -581,7 +581,7 @@ Here:
 
 * $\varepsilon \in \mathbb{R}_{>0}$ is a regularization constant, typically chosen on the order of the mean contribution weight, i.e., $\varepsilon \sim \mathbb{E}[\alpha_j]$, to balance suppression of weak components and stability of dominant ones;
 * $A \in \mathbb{C}^{S \times S}$, $A \succ 0$, is a fixed Hermitian positive-definite matrix;
-* All inner products refer to $L^2(\mathbb{T}_\mathbb{C}^N \times \mathbb{S}_\text{unit}^{2N-1}; \mathbb{C}^S)$.
+* All inner products refer to $L^2(\mathbb{T}_\mathbb{C}^N \times \mathbb{S}^{2N-1}_\text{unit}; \mathbb{C}^S)$.
 
 ### Special Case: Uniform Spectral Weighting
 
