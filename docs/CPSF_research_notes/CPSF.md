@@ -477,6 +477,18 @@ $$
 
 By construction, $\Sigma_j$ is Hermitian and strictly positive definite. It defines an anisotropic Gaussian metric whose principal axes are aligned with the projection direction $\vec{d}_j$, and whose longitudinal and transverse variances are given by $\sigma_j^{\parallel}$ and $\sigma_j^{\perp}$, respectively (see: *"Core Terms — Geometric Covariance Matrix"*).
 
+> **Smooth dependence of $\Sigma_j$ on $\vec{d}_j$.**
+>
+> The map $\vec{d}_j \mapsto R(\vec{d}_j) \in \mathrm{U}(N)$ is smooth by construction (see: *"Core Terms — Orthonormal Frame"*), and so is the extended block-diagonal frame $\mathcal{R}(\vec{d}_j) \in \mathrm{U}(2N)$.
+>
+> Since the attenuation matrix $D_j \in \mathbb{R}^{2N \times 2N}$ is constant with respect to $\vec{d}_j$, it follows that the covariance matrix:
+>
+> $$
+> \Sigma_j := \mathcal{R}(\vec{d}_j)^\dagger \cdot D_j \cdot \mathcal{R}(\vec{d}_j)
+> $$
+>
+> depends smoothly on $\vec{d}_j \in \mathbb{S}^{2N-1}_\text{unit}$. Thus, all quantities defined via $\Sigma_j$, including $\rho_j(w)$, $\psi_j^{\mathbb{T}}$, and projection updates $\Delta \hat{T}_j$, inherit this smooth dependence.
+
 ---
 
 ### 4. Gaussian Envelope and Periodization
@@ -692,7 +704,7 @@ $$
 \psi_j^{\mathbb{T}}(z, \vec{d}) := \sum_{n \in \Lambda} \rho_j\left( \iota(\tilde{z} - \tilde{z}_j + n, \delta \vec{d}) \right)
 $$
 
-and all its partial derivatives of all orders with respect to $z$ and $\vec{d}$ converge **uniformly** over compact subsets of $\mathbb{T}_\mathbb{C}^N \times \mathbb{S}^{2N-1}_\text{unit}$.
+and all its partial derivatives of all orders with respect to $z$ and $\vec{d}$ converge uniformly over compact subsets of $\mathbb{T}_\mathbb{C}^N \times \mathbb{S}^{2N-1}_\text{unit}$.
 
 This holds because:
 
