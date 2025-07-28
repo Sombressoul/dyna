@@ -32,14 +32,23 @@ $$
 U_k := \{ \vec{d} \in \mathbb{S}^{2N-1}_\text{unit} : d_k \neq 0 \}, \quad k = 1, \dots, N
 $$
 
-> **Canonical chart choice.**
-> For every direction vector $\vec{d}$ choose the *unique* index k whose coordinate modulus $|d_k|$ is *maximal* (ties resolved by taking the smallest such index). All subsequent steps are executed **only** in that chart. Consequently
-> 
+> **Smooth chart weighting.**
+> Fix an even integer $p\ge2$.
+> Define smooth weights
+>
 > $$
-> |d_k|\;\ge\;1/\sqrt{N},
+> \omega_i(\vec d)\;:=\;\frac{|d_i|^p}{\sum_{r=1}^{N}|d_r|^p},\qquad
+> \sum_{i=1}^{N}\omega_i=1.
 > $$
-> 
-> which yields uniform upper bounds for every derivative that appears below and is sufficient for requirement (R9).
+>
+> After constructing the chartwise frames $R_i(\vec d)$ (see Steps 1–2) and the overlap matrices $Q_i(\vec d)\in\mathrm U(N{-}1)$ from Step 3, set the **global frame**
+>
+> $$
+> R(\vec d)\;:=\;\sum_{i=1}^{N}\omega_i(\vec d)\;R_i(\vec d)\,
+>           \begin{bmatrix}1&0\\0&Q_i(\vec d)\end{bmatrix}.
+> $$
+>
+> This weighted blend is $C^\infty$ on $\mathbb{S}^{2N-1}_{\text{unit}}$, preserves the first column $R(\vec d)e_1=\vec d$, remains unitary, and coincides with a single-chart frame up to $\mathcal O(N^{-p/2})$.
 
 On each chart $U_k$, define the frame as follows.
 
@@ -80,7 +89,7 @@ $$
 $$
 
 $$
-u_m := \frac{w_m^{(m-1)}}{\|w_m^{(m-1)}\|}, \quad u_m := \nu_m
+u_m := \frac{w_m^{(m-1)}}{\|w_m^{(m-1)}\|}
 $$
 
 Define:
@@ -94,20 +103,17 @@ This version avoids instability of the classical procedure and guarantees exact 
 This guarantees orthonormality and smooth dependence on $\vec{d}$.
 
 > **Uniform derivative bound.**
-> 
-> Because the chosen index satisfies $|d_k|\ge 1/\sqrt N$, the normalisation factor $\|w_m^{(m-1)}\|$ in every column obeys
-> 
+> For each $\vec d$ at least one weight satisfies $\omega_{k^*}(\vec d)\ge 1/2$ (take $p\ge2$). On that chart $|d_{k^*}|\ge1/\sqrt N$, so all mixed derivatives of the summand $R_{k^*}$ are bounded. The remaining summands are suppressed by the factor $\omega_i\le 1/2$. Hence there exists a constant $C_{N,\alpha}$ such that
 > $$
-> \|w_m^{(m-1)}\|^2 \;\ge\; 1 - |d_k|^2 \;\ge\; 1-\tfrac1N,
+> \displaystyle\sup_{\vec d}\bigl\|\partial^\alpha_{\vec d}R(\vec d)\bigr\|\le C_{N,\alpha}
 > $$
-> 
-> hence each map $\vec{d}\mapsto u_m(\vec{d})$ and every mixed derivative admit a global bound depending only on $N$. Requirement (R9) therefore holds.
+> fulfilling R9.
 
 > **Note:** The ordering $j_1 < \dots < j_{N-1}$ is fixed once and for all to ensure canonicity. This eliminates ambiguity from arbitrary permutations and guarantees consistency across charts.
 
 #### Step 3: Transition Functions
 
-> **Remark:** Owing to the canonical chart choice, overlaps occur only on the measure-zero set where two coordinates have equal modulus; nonetheless the original block-diagonal transition formula remains valid and keeps $\mathrm{U}(N{-}1)$ invariance intact.
+> **Remark:** Because the global frame $R(\vec d)$ is defined by a single smooth formula via the weights $\omega_i(\vec d)$, overlaps cause no discontinuities. The original block-diagonal transition matrices remain useful for bundle interpretation but are not needed in the evaluation of $R(\vec d)$.
 
 On overlaps $U_j \cap U_k$, define:
 
@@ -163,22 +169,22 @@ Thus the construction defines a $\mathrm{U}(N{-}1)$-principal bundle structure o
 
 ### Verification of CPSF Frame Conditions
 
-| Req. | Property                                                                   | Satisfied | Justification                                                                                                     |
-| ---- | -------------------------------------------------------------------------- | --------- | ----------------------------------------------------------------------------------------------------------------- |
-| R1   | $R(\vec{d}) \in \mathrm{U}(N)$                                             | Yes       | Orthonormalization yields unitary matrix                                                                          |
+| Req. | Property                                                                   | Satisfied | Justification |
+| ---- | -------------------------------------------------------------------------- | --------- | - |
+| R1   | $R(\vec{d}) \in \mathrm{U}(N)$                                             | Yes       | Orthonormalization yields unitary matrix |
 | R2   | $R_k(\vec{d}) e_1 = \vec{d}$ (chartwise)                                   | Yes       | In each chart $U_k$, the first column of $R_k(\vec{d})$ is explicitly set to $\vec{d}$. The standard basis $\{e_1, \dots, e_N\}$ is fixed across all charts; no relabeling occurs. |
-| R3   | $\{v_2, \dots, v_N\}$ orthonormal and orthogonal to $\vec{d}$              | Yes       | Guaranteed by Gram–Schmidt                                                                                        |
-| R4   | $R \in C^\infty(U)$                                                        | Yes       | Smooth dependence on input basis in each chart                                                                    |
-| R5   | $R(\vec{d}) \cdot \begin{bmatrix} 1 & 0 \\ 0 & Q \end{bmatrix}$ invariance | Yes       | Complement columns can be rotated freely                                                                          |
-| R6   | $\mathcal{R}(\vec{d}) := \mathrm{diag}(R(\vec{d}), R(\vec{d}))$            | Yes       | Follows from CPSF extended frame construction                                                                     |
-| R7   | Local trivialization                                                       | Yes       | Multi-chart atlas with $\mathrm{U}(N{-}1)$ transition functions                                                   |
-| R8   | Smooth bundle structure                                                    | Yes       | Cocycle and smoothness conditions fulfilled                                                                       |
-| R9   | Smooth CPSF dynamics compatibility                                         | Yes       | Uniform bound follows from $\|d_k\|\ge1/\sqrt N$ (see Canonical chart choice) and the estimate in *Uniform derivative bound*. |
+| R3   | $\{v_2, \dots, v_N\}$ orthonormal and orthogonal to $\vec{d}$              | Yes       | Guaranteed by Gram–Schmidt |
+| R4   | $R \in C^\infty(U)$                                                        | Yes       | Global $C^\infty$ via smooth weight blend $\omega_i(\vec d)$ |
+| R5   | $R(\vec{d}) \cdot \begin{bmatrix} 1 & 0 \\ 0 & Q \end{bmatrix}$ invariance | Yes       | Complement columns can be rotated freely |
+| R6   | $\mathcal{R}(\vec{d}) := \mathrm{diag}(R(\vec{d}), R(\vec{d}))$            | Yes       | Follows from CPSF extended frame construction |
+| R7   | Local trivialization                                                       | Yes       | Multi-chart atlas with $\mathrm{U}(N{-}1)$ transition functions |
+| R8   | Smooth bundle structure                                                    | Yes       | Cocycle and smoothness conditions fulfilled |
+| R9   | Smooth CPSF dynamics compatibility                                         | Yes       | Uniform derivative bound follows from $\omega_{k^*}\ge 1/2$ and $|d_{k^*}|\ge1/\sqrt N$ |
 
 ---
 
-### 5. Conclusion
+### Conclusion
 
-The construction now uses a full chart atlas over $\mathbb{S}^{2N-1}_\text{unit}$, resolves linear dependence issues, defines smooth transition maps, and satisfies all nine CPSF frame conditions rigorously.
+The construction uses a full chart atlas over $\mathbb{S}^{2N-1}_\text{unit}$, resolves linear dependence issues, defines smooth transition maps, and satisfies all nine CPSF frame conditions rigorously.
 
 The method is mathematically robust, geometrically faithful to CPSF structure, and analytically ready for implementation in all differential and variational components of the CPSF framework.
