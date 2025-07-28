@@ -42,7 +42,7 @@ $$
 v_1 := \vec{d} \in \mathbb{C}^N
 $$
 
-### Step 2: Construct orthonormal complement via Gram–Schmidt
+### Step 2: Construct orthonormal complement via Modified Gram–Schmidt
 
 Let $\mathcal{I}_k := \{1, \dots, N\} \setminus \{k\}$, and let $e_{j_1}, \dots, e_{j_{N-1}}$ denote the standard basis vectors indexed by $\mathcal{I}_k$ in strictly increasing order:
 
@@ -56,17 +56,20 @@ $$
 [v_1 := \vec{d}, e_{j_1}, e_{j_2}, \dots, e_{j_{N-1}}]
 $$
 
-Apply Gram–Schmidt recursively:
+**Apply Modified Gram–Schmidt (MGS):**
+
+Let $u_1 := \vec{d}$. Then, for $m = 2, \dots, N$, define:
 
 $$
-\tilde{v}_1 := \vec{d}, \quad u_1 := \vec{d}
+w_m^{(0)} := e_{j_{m-1}}
 $$
 
-Then for $m = 2, \dots, N$:
+$$
+\text{for } l = 1, \dots, m-1:\quad w_m^{(l)} := w_m^{(l-1)} - \langle u_l, w_m^{(l-1)} \rangle u_l
+$$
 
 $$
-\tilde{v}_m := e_{j_{m-1}} - \sum_{l=1}^{m-1} \langle e_{j_{m-1}}, u_l \rangle u_l, \quad
-u_m := \frac{\tilde{v}_m}{\|\tilde{v}_m\|}
+u_m := \frac{w_m^{(m-1)}}{\|w_m^{(m-1)}\|}, \quad u_m := \nu_m
 $$
 
 Define:
@@ -75,7 +78,11 @@ $$
 R_k(\vec{d}) := [u_1, u_2, \dots, u_N] \in \mathrm{U}(N)
 $$
 
+This version avoids instability of the classical procedure and guarantees exact orthonormality at every step. All operations (inner products, subtractions, norms) are smooth in $\vec{d}$, hence each column $u_m(\vec{d})$ depends smoothly on $\vec{d} \in U_k$.
+
 This guarantees orthonormality and smooth dependence on $\vec{d}$.
+
+> **Canonicalization Note:** The ordering $j_1 < \dots < j_{N-1}$ is fixed once and for all to ensure canonicity. This eliminates ambiguity from arbitrary permutations and guarantees consistency across charts.
 
 ### Step 3: Transition Functions
 
@@ -92,6 +99,8 @@ $$
 * All $R_k(\vec{d})$ are constructed from smooth Gram–Schmidt applied to smooth input sets;
 * Their first columns coincide: $R_j(\vec{d}) e_1 = R_k(\vec{d}) e_1 = \vec{d}$;
 * Their remaining columns form orthonormal bases of $\vec{d}^\perp$, so the relative basis change lies in $\mathrm{U}(N{-}1)$ and varies smoothly.
+
+> **Smoothness across charts:** Since the ordered list of orthogonalized vectors is constructed using a fixed global indexing convention, and all scalar products and norms are smooth in $\vec{d}$, the resulting transition maps $Q_{jk}(\vec{d})$ are smooth not only within each chart but also across overlaps $U_j \cap U_k$.
 
 **Block structure justification:**
 
@@ -112,6 +121,8 @@ Thus, $e_1$ is an eigenvector of $Q_{jk}(\vec{d})$ with eigenvalue 1. Since $Q_{
 $$
 Q_{jk}(\vec{d}) = \begin{bmatrix} 1 & 0 \\ 0 & \tilde{Q}_{jk}(\vec{d}) \end{bmatrix}, \quad \tilde{Q}_{jk}(\vec{d}) \in \mathrm{U}(N{-}1).
 $$
+
+> **Cocycle verification:** The cocycle condition $Q_{ij}(\vec{d}) Q_{jk}(\vec{d}) = Q_{ik}(\vec{d})$ follows from associativity of matrix multiplication and the construction $Q_{jk} := R_j^{-1} R_k$. Since all frames $R_j$ are smooth and transition maps are defined via composition of unitaries, the cocycle condition holds identically on triple overlaps $U_i \cap U_j \cap U_k$.
 
 ---
 
