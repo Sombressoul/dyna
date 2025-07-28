@@ -187,7 +187,6 @@ The construction of $R(\vec{d})$ is defined separately (see: *"Orthonormal Frame
 
 > **Note**: The construction of the orthonormal frame makes use of a fixed coordinate basis $\{e_j\}$ and a constant parameter $\varepsilon > 0$ to ensure numerical stability. While the resulting frame matrix $R(\vec{d}) \in \mathrm{U}(N)$ is not itself invariant under right multiplication by block matrices of the form $\mathrm{diag}(1, Q)$, where $Q \in \mathrm{U}(N{-}1)$, all geometric and functional CPSF quantities that depend on $R(\vec{d})$ — such as the joint covariance matrix $\Sigma_j$, the anisotropic envelope $\psi_j^{\mathbb{T}}$, the field response $T(z, \vec{d})$, and the projection update $\Delta \hat{T}_j$ — remain **strictly invariant** under such transformations. This guarantees full compatibility with the symmetry structure and functional model of CPSF.
 
-
 ---
 
 ### Extended Orthonormal Frame
@@ -516,7 +515,8 @@ This definition ensures:
 > $$
 >
 > To show $R(\vec{d}) e_1 = \vec{d}$, it suffices to prove $w = e_1$.
-> As $H e_1 = M^\dagger \vec{d}$ and $\vec{d}$ is the first column of $M$, we have:
+>
+> Since $H e_1 = M^\dagger \vec{d}$, and $\vec{d}$ is the first column of $M$, it follows that:
 >
 > $$
 > (H e_1)_1 = \langle \vec{d}, \vec{d} \rangle = 1, \quad (H e_1)_j = \langle m_j, \vec{d} \rangle = 0 \quad \text{for } j \ge 2.
