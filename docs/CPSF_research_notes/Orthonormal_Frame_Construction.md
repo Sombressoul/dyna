@@ -1,6 +1,6 @@
-# Canonical Orthonormal Frame Construction for CPSF
+## Orthonormal Frame Construction
 
-## 1. Objective
+### Objective
 
 Construct a smooth local section
 
@@ -24,7 +24,7 @@ Global existence over $\mathbb{S}^{2N-1}_\text{unit}$ is topologically obstructe
 
 ---
 
-## 2. Construction Method (Multi-Chart Atlas)
+### Construction Method (Multi-Chart Atlas)
 
 To ensure global smoothness and avoid linear dependence in Gram–Schmidt, define an atlas:
 
@@ -34,7 +34,7 @@ $$
 
 On each chart $U_k$, define the frame as follows.
 
-### Step 1: First column
+#### Step 1: First column
 
 Set:
 
@@ -42,7 +42,9 @@ $$
 v_1 := \vec{d} \in \mathbb{C}^N
 $$
 
-### Step 2: Construct orthonormal complement via Modified Gram–Schmidt
+> **Note:** The standard basis ${e_1, \dots, e_N}$ is used uniformly in all charts. No index relabeling (e.g., $e_1 \mapsto e_k$) is performed. The ordering of the basis vectors for orthogonalization is fixed by removing $e_k$ from the list, but the basis itself remains unchanged.
+
+#### Step 2: Construct orthonormal complement via Modified Gram–Schmidt
 
 Let $\mathcal{I}_k := \{1, \dots, N\} \setminus \{k\}$, and let $e_{j_1}, \dots, e_{j_{N-1}}$ denote the standard basis vectors indexed by $\mathcal{I}_k$ in strictly increasing order:
 
@@ -82,9 +84,9 @@ This version avoids instability of the classical procedure and guarantees exact 
 
 This guarantees orthonormality and smooth dependence on $\vec{d}$.
 
-> **Canonicalization Note:** The ordering $j_1 < \dots < j_{N-1}$ is fixed once and for all to ensure canonicity. This eliminates ambiguity from arbitrary permutations and guarantees consistency across charts.
+> **Note:** The ordering $j_1 < \dots < j_{N-1}$ is fixed once and for all to ensure canonicity. This eliminates ambiguity from arbitrary permutations and guarantees consistency across charts.
 
-### Step 3: Transition Functions
+#### Step 3: Transition Functions
 
 On overlaps $U_j \cap U_k$, define:
 
@@ -126,7 +128,7 @@ $$
 
 ---
 
-## 3. Local Trivialization and Bundle Structure
+### Local Trivialization and Bundle Structure
 
 The atlas $\{U_k\}$ provides a full open cover of $\mathbb{S}^{2N-1}_\text{unit}$. Each frame map $R_k: U_k \to \mathrm{U}(N)$ satisfies:
 
@@ -138,12 +140,12 @@ Thus the construction defines a $\mathrm{U}(N{-}1)$-principal bundle structure o
 
 ---
 
-## 4. Verification of CPSF Frame Conditions
+### Verification of CPSF Frame Conditions
 
 | Req. | Property                                                                   | Satisfied | Justification                                                                                                     |
 | ---- | -------------------------------------------------------------------------- | --------- | ----------------------------------------------------------------------------------------------------------------- |
 | R1   | $R(\vec{d}) \in \mathrm{U}(N)$                                             | Yes       | Orthonormalization yields unitary matrix                                                                          |
-| R2   | $R_k(\vec{d}) e_1 = \vec{d}$ (chartwise)                                   | Yes       | First column is $\vec{d}$ in each chart $U_k$ with relabeled basis $e_1 \mapsto e_k$                              |
+| R2   | $R_k(\vec{d}) e_1 = \vec{d}$ (chartwise)                                   | Yes       | In each chart $U_k$, the first column of $R_k(\vec{d})$ is explicitly set to $\vec{d}$. The standard basis $\{e_1, \dots, e_N\}$ is fixed across all charts; no relabeling occurs. |
 | R3   | $\{v_2, \dots, v_N\}$ orthonormal and orthogonal to $\vec{d}$              | Yes       | Guaranteed by Gram–Schmidt                                                                                        |
 | R4   | $R \in C^\infty(U)$                                                        | Yes       | Smooth dependence on input basis in each chart                                                                    |
 | R5   | $R(\vec{d}) \cdot \begin{bmatrix} 1 & 0 \\ 0 & Q \end{bmatrix}$ invariance | Yes       | Complement columns can be rotated freely                                                                          |
@@ -154,7 +156,7 @@ Thus the construction defines a $\mathrm{U}(N{-}1)$-principal bundle structure o
 
 ---
 
-## 5. Conclusion
+### 5. Conclusion
 
 The construction now uses a full chart atlas over $\mathbb{S}^{2N-1}_\text{unit}$, resolves linear dependence issues, defines smooth transition maps, and satisfies all nine CPSF frame conditions rigorously.
 
