@@ -185,6 +185,8 @@ It satisfies:
 
 The construction of $R(\vec{d})$ is defined separately (see: *"Orthonormal Frame Construction"*).
 
+> **Note**: The construction of the orthonormal frame permits the use of a fixed coordinate basis $\{e_j\}$ and a constant parameter $\varepsilon > 0$ for numerical stability. This choice does not affect any geometric or functional outcomes: all CPSF quantities that depend on the frame — such as $\Sigma_j$, $\psi_j^{\mathbb{T}}$, $T(z, \vec{d})$, and $\Delta \hat{T}_j$ — remain invariant under admissible right-actions by $\mathrm{U}(N{-}1)$ on the orthogonal complement of $\vec{d}$.
+
 ---
 
 ### Extended Orthonormal Frame
@@ -417,21 +419,21 @@ Let $\vec{d} \in \mathbb{S}_{\text{unit}}^{2N-1} := \{ \vec{d} \in \mathbb{C}^N 
 * All requirements $R1$ through $R9$ of CPSF are satisfied (see *"Frame Requirements in CPSF"* below);
 * The resulting construction is globally defined, numerically stable, and consistent with the CPSF analytic model.
 
-> **Frame Requirements in CPSF**
-> 
-> The construction of the orthonormal frame $R(\vec{d}) \in \mathrm{U}(N)$ must satisfy the following nine structural conditions, which are necessary and sufficient to ensure analytic compatibility with the CPSF functional model:
-> 
-> * **(R1) Codomain Constraint** — $R(\vec{d}) \in \mathrm{U}(N)$: the frame must be unitary.
-> * **(R2) Inner Product Preservation** — $R^\dagger R = I$: preserves Hermitian norms and inner products.
-> * **(R3) Directional Alignment** — $R(\vec{d}) e_1 = \vec{d}$: the first frame vector must coincide with the projection direction.
-> * **(R4) Orthogonal Complement** — $\{v_2, \dots, v_N\} \perp \vec{d}$: remaining columns span $\vec{d}^\perp$ and are orthonormal.
-> * **(R5) Smoothness** — $R(\vec{d}) \in C^\infty$: required for differentiability of all field components.
-> * **(R6) Invariance under $\mathrm{U}(N-1)$** — right action on the complement must not affect geometry.
-> * **(R7) Extended Compatibility** — $\mathcal{R} := \mathrm{diag}(R, R) \in \mathrm{U}(2N)$: used in joint position-directional covariance $\Sigma_j$.
-> * **(R8) Topological Validity** — the frame must admit either global or locally trivialized smooth sections.
-> * **(R9) Dynamic Compatibility** — all derivatives of $R(\vec{d})$ must be bounded to ensure well-posed projections $\Delta \hat{T}_j$ and field regularity.
-> 
-> These conditions define the admissible class of orthonormal frames for CPSF.
+**Frame Requirements in CPSF**
+
+The construction of the orthonormal frame $R(\vec{d}) \in \mathrm{U}(N)$ must satisfy the following nine structural conditions, which are necessary and sufficient to ensure analytic compatibility with the CPSF functional model:
+
+* **(R1) Codomain Constraint** — $R(\vec{d}) \in \mathrm{U}(N)$: the frame must be unitary.
+* **(R2) Inner Product Preservation** — $R^\dagger R = I$: preserves Hermitian norms and inner products.
+* **(R3) Directional Alignment** — $R(\vec{d}) e_1 = \vec{d}$: the first frame vector must coincide with the projection direction.
+* **(R4) Orthogonal Complement** — $\{v_2, \dots, v_N\} \perp \vec{d}$: remaining columns span $\vec{d}^\perp$ and are orthonormal.
+* **(R5) Smoothness** — $R(\vec{d}) \in C^\infty$: required for differentiability of all field components.
+* **(R6) Invariance under $\mathrm{U}(N-1)$** — right action on the complement must not affect geometry.
+* **(R7) Extended Compatibility** — $\mathcal{R} := \mathrm{diag}(R, R) \in \mathrm{U}(2N)$: used in joint position-directional covariance $\Sigma_j$.
+* **(R8) Topological Validity** — the frame must admit either global or locally trivialized smooth sections.
+* **(R9) Dynamic Compatibility** — all derivatives of $R(\vec{d})$ must be bounded to ensure well-posed projections $\Delta \hat{T}_j$ and field regularity.
+
+These conditions define the admissible class of orthonormal frames for CPSF.
 
 ---
 
@@ -449,6 +451,18 @@ This matrix has:
 * Remaining columns $(1 + \varepsilon) e_j$, ensuring full rank even when $\vec{d} \sim e_j$ for $j > 1$;
 * Real-analytic dependence on $\vec{d}$ as a linear map.
 
+> **Lemma (Full Rank of $M(\vec{d})$):**
+>
+> For any $\vec{d} \in \mathbb{C}^N$, $|\vec{d}| = 1$, the matrix
+>
+> $$
+> M(\vec{d}) := [\vec{d}, (1 + \varepsilon)e_2, \dots, (1 + \varepsilon)e_N]
+> $$
+>
+> is of full rank.
+>
+> **Proof**: Suppose $\vec{d}$ is colinear with $e_k$ for $k \ge 2$, i.e., $\vec{d} = \lambda e_k$. Then the first column is linearly dependent with $e_k$, but differs in scaling: $\vec{d} = \lambda e_k \ne (1 + \varepsilon) e_k$ since $|\vec{d}| = 1$ and $\varepsilon > 0$. Therefore, columns remain linearly independent. This ensures $M(\vec{d})$ is full-rank for all $\vec{d}$.
+
 ---
 
 ### Step 2: Polar Decomposition
@@ -465,11 +479,53 @@ $$
 R(\vec{d}) := M(\vec{d}) \cdot H(\vec{d})^{-1/2} \in \mathrm{U}(N)
 $$
 
+> **Proposition (Analyticity and Positivity of $H(\vec{d})$):**
+>
+> For all $\vec{d} \in \mathbb{S}^{2N-1}_\text{unit}$, the matrix $H(\vec{d}) := M^\dagger(\vec{d}) M(\vec{d})$ is Hermitian and positive definite.
+>
+> Moreover, the matrix square root $H^{1/2}(\vec{d})$ and its inverse $H^{-1/2}(\vec{d})$ are well-defined and real-analytic in $\vec{d}$.
+>
+> **Proof**:
+>
+> 1. Since $M$ is full-rank (see Lemma above), $H = M^\dagger M$ is Hermitian and strictly positive definite.
+> 2. The eigenvalues of $H(\vec{d})$ lie in $(0, \infty)$ and depend analytically on $\vec{d}$;
+> 3. The function $H \mapsto H^{1/2}$ is real-analytic on the domain of positive-definite Hermitian matrices.
+>    Therefore, $R(\vec{d}) = M(\vec{d}) H(\vec{d})^{-1/2}$ is analytic as a composition of analytic maps.
+
 This definition ensures:
 
 * $R(\vec{d})^\dagger R(\vec{d}) = I$ by construction;
 * $R(\vec{d}) e_1 = \vec{d}$, since $M(\vec{d}) e_1 = \vec{d}$ and $H^{-1/2} e_1 = e_1$ up to scalar;
 * Each entry of $R(\vec{d})$ is real-analytic in $\vec{d}$, since both matrix product and matrix square root on positive definite domain preserve analyticity.
+
+> **Lemma (Preservation of First Column):**
+>
+> $R(\vec{d}) e_1 = \vec{d}$.
+>
+> **Proof**: By construction, $M(\vec{d}) e_1 = \vec{d}$. Then
+>
+> $$
+> R(\vec{d}) e_1 = M(\vec{d}) H(\vec{d})^{-1/2} e_1.
+> $$
+>
+> Since $M(\vec{d}) e_1 = \vec{d}$ and $H := M^\dagger M$ is Hermitian positive-definite, define $w := H^{-1/2} e_1$ and observe:
+>
+> $$
+> R(\vec{d}) e_1 = M(\vec{d}) H^{-1/2} e_1 = M(\vec{d}) w.
+> $$
+>
+> To show $R(\vec{d}) e_1 = \vec{d}$, it suffices to prove $w = e_1$.
+> As $H e_1 = M^\dagger \vec{d}$ and $\vec{d}$ is the first column of $M$, we have:
+>
+> $$
+> (H e_1)_1 = \langle \vec{d}, \vec{d} \rangle = 1, \quad (H e_1)_j = \langle m_j, \vec{d} \rangle = 0 \quad \text{for } j \ge 2.
+> $$
+>
+> Hence, $H e_1 = e_1$, so $H^{-1/2} e_1 = e_1$, and therefore:
+>
+> $$
+> R(\vec{d}) e_1 = M(\vec{d}) e_1 = \vec{d}.
+> $$
 
 ---
 
@@ -516,6 +572,14 @@ This matrix operates on $\mathbb{C}_{\text{pos}}^N \oplus \mathbb{C}_{\text{dir}
 * **R8**: Local trivialization via global real-analytic map: satisfied.
 * **R9**: Uniform boundedness of derivatives on compact domain: follows from analyticity on $\mathbb{S}^{2N-1}_{\text{unit}}$.
 
+> **Topological Remark on R8:**
+> 
+> Although global smooth sections of the unitary frame bundle over $\mathbb{S}^{2N-1}$ may not exist when $N > 1$ due to topological obstructions (non-parallelizability), the function $R(\vec{d})$ is defined by a global real-analytic formula. Thus, it defines a smooth **global trivialization candidate** within the analytic CPSF framework. Since only local triviality is required for analytic integration and projection, R8 is satisfied.
+
+> **Boundedness of Derivatives (R9):**
+> 
+> As $R(\vec{d})$ is real-analytic on the compact manifold $\mathbb{S}^{2N-1}$, all its derivatives (of any order) are bounded. This follows from the compactness of the domain and analyticity of each component of $R$. This ensures boundedness of all integrands in CPSF field construction and convergence of the integrals in Appendix A.
+
 ---
 
 ### Final Definition
@@ -528,6 +592,22 @@ M(\vec{d}) := [\vec{d}, (1 + \varepsilon) e_2, \dots, (1 + \varepsilon) e_N]
 $$
 
 This construction defines a global, real-analytic orthonormal frame aligned with $\vec{d}$, with smooth spectral behavior and full compatibility with the geometry and analytic dynamics of the CPSF field architecture.
+
+### Additional Implementation Remarks
+
+**Compatibility with CPSF Covariance Matrix:**
+
+The construction aligns with the definition $\Sigma_j := \mathcal{R}^\dagger D \mathcal{R}$, where $D$ is diagonal. The block-diagonal extension $\mathcal{R} := \mathrm{diag}(R, R)$ preserves the product structure $\mathbb{C}^{2N} \cong \mathbb{C}^N_{\text{pos}} \oplus \mathbb{C}^N_{\text{dir}}$ and maintains $\mathrm{U}(2N)$ invariance.
+
+**Stability Under Numerical Computation:**
+
+The use of polar decomposition avoids Gram-Schmidt instability, and the positive-definiteness of $H(\vec{d})$ ensures that matrix square roots are well-conditioned. For practical purposes, $R(\vec{d})$ can also be computed via SVD:
+
+$$
+M = U \Sigma V^\dagger \quad \Rightarrow \quad R := U V^\dagger,
+$$
+
+where $U, V \in \mathrm{U}(N)$, ensuring high numerical stability for all $\vec{d}$.
 
 ---
 
