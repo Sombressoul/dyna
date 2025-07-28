@@ -594,6 +594,8 @@ $$
 
 This construction defines a global, real-analytic orthonormal frame aligned with $\vec{d}$, with smooth spectral behavior and full compatibility with the geometry and analytic dynamics of the CPSF field architecture.
 
+---
+
 ### Additional Implementation Remarks
 
 **Compatibility with CPSF Covariance Matrix:**
