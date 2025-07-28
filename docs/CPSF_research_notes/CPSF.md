@@ -185,7 +185,8 @@ It satisfies:
 
 The construction of $R(\vec{d})$ is defined separately (see: *"Orthonormal Frame Construction"*).
 
-> **Note**: The construction of the orthonormal frame permits the use of a fixed coordinate basis $\{e_j\}$ and a constant parameter $\varepsilon > 0$ for numerical stability. This choice does not affect any geometric or functional outcomes: all CPSF quantities that depend on the frame — such as $\Sigma_j$, $\psi_j^{\mathbb{T}}$, $T(z, \vec{d})$, and $\Delta \hat{T}_j$ — remain invariant under admissible right-actions by $\mathrm{U}(N{-}1)$ on the orthogonal complement of $\vec{d}$.
+> **Note**: The construction of the orthonormal frame makes use of a fixed coordinate basis $\{e_j\}$ and a constant parameter $\varepsilon > 0$ to ensure numerical stability. While the resulting frame matrix $R(\vec{d}) \in \mathrm{U}(N)$ is not itself invariant under right multiplication by block matrices of the form $\mathrm{diag}(1, Q)$, where $Q \in \mathrm{U}(N{-}1)$, all geometric and functional CPSF quantities that depend on $R(\vec{d})$ — such as the joint covariance matrix $\Sigma_j$, the anisotropic envelope $\psi_j^{\mathbb{T}}$, the field response $T(z, \vec{d})$, and the projection update $\Delta \hat{T}_j$ — remain **strictly invariant** under such transformations. This guarantees full compatibility with the symmetry structure and functional model of CPSF.
+
 
 ---
 
