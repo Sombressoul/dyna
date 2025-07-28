@@ -32,6 +32,15 @@ $$
 U_k := \{ \vec{d} \in \mathbb{S}^{2N-1}_\text{unit} : d_k \neq 0 \}, \quad k = 1, \dots, N
 $$
 
+> **Canonical chart choice.**
+> For every direction vector $\vec{d}$ choose the *unique* index k whose coordinate modulus $|d_k|$ is *maximal* (ties resolved by taking the smallest such index). All subsequent steps are executed **only** in that chart. Consequently
+> 
+> $$
+> |d_k|\;\ge\;1/\sqrt{N},
+> $$
+> 
+> which yields uniform upper bounds for every derivative that appears below and is sufficient for requirement (R9).
+
 On each chart $U_k$, define the frame as follows.
 
 #### Step 1: First column
@@ -84,9 +93,21 @@ This version avoids instability of the classical procedure and guarantees exact 
 
 This guarantees orthonormality and smooth dependence on $\vec{d}$.
 
+> **Uniform derivative bound.**
+> 
+> Because the chosen index satisfies $|d_k|\ge 1/\sqrt N$, the normalisation factor $\|w_m^{(m-1)}\|$ in every column obeys
+> 
+> $$
+> \|w_m^{(m-1)}\|^2 \;\ge\; 1 - |d_k|^2 \;\ge\; 1-\tfrac1N,
+> $$
+> 
+> hence each map $\vec{d}\mapsto u_m(\vec{d})$ and every mixed derivative admit a global bound depending only on $N$. Requirement (R9) therefore holds.
+
 > **Note:** The ordering $j_1 < \dots < j_{N-1}$ is fixed once and for all to ensure canonicity. This eliminates ambiguity from arbitrary permutations and guarantees consistency across charts.
 
 #### Step 3: Transition Functions
+
+> **Remark:** Owing to the canonical chart choice, overlaps occur only on the measure-zero set where two coordinates have equal modulus; nonetheless the original block-diagonal transition formula remains valid and keeps $\mathrm{U}(N{-}1)$ invariance intact.
 
 On overlaps $U_j \cap U_k$, define:
 
@@ -152,7 +173,7 @@ Thus the construction defines a $\mathrm{U}(N{-}1)$-principal bundle structure o
 | R6   | $\mathcal{R}(\vec{d}) := \mathrm{diag}(R(\vec{d}), R(\vec{d}))$            | Yes       | Follows from CPSF extended frame construction                                                                     |
 | R7   | Local trivialization                                                       | Yes       | Multi-chart atlas with $\mathrm{U}(N{-}1)$ transition functions                                                   |
 | R8   | Smooth bundle structure                                                    | Yes       | Cocycle and smoothness conditions fulfilled                                                                       |
-| R9   | Smooth CPSF dynamics compatibility                                         | Yes       | $R \in C^\infty \Rightarrow \mathcal{R}, \Sigma_j, w, \rho_j, \psi_j^{\mathbb{T}}, \Delta \hat{T}_j \in C^\infty$ |
+| R9   | Smooth CPSF dynamics compatibility                                         | Yes       | Uniform bound follows from $\|d_k\|\ge1/\sqrt N$ (see Canonical chart choice) and the estimate in *Uniform derivative bound*. |
 
 ---
 
