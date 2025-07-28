@@ -97,13 +97,24 @@ This definition ensures:
 > R(\vec{d}) e_1 = M(\vec{d}) H(\vec{d})^{-1/2} e_1.
 > $$
 >
-> Since $H = M^\dagger M$, we compute:
+> Since $M(\vec{d}) e_1 = \vec{d}$ and $H := M^\dagger M$ is Hermitian positive-definite, define $w := H^{-1/2} e_1$ and observe:
 >
 > $$
-> \|M e_1\|^2 = \langle M e_1, M e_1 \rangle = \langle \vec{d}, \vec{d} \rangle = 1,
+> R(\vec{d}) e_1 = M(\vec{d}) H^{-1/2} e_1 = M(\vec{d}) w.
 > $$
 >
-> so $H^{1/2} e_1 = e_1$, and thus $R e_1 = M e_1 = \vec{d}$.
+> To show $R(\vec{d}) e_1 = \vec{d}$, it suffices to prove $w = e_1$.
+> As $H e_1 = M^\dagger \vec{d}$ and $\vec{d}$ is the first column of $M$, we have:
+>
+> $$
+> (H e_1)_1 = \langle \vec{d}, \vec{d} \rangle = 1, \quad (H e_1)_j = \langle m_j, \vec{d} \rangle = 0 \quad \text{for } j \ge 2.
+> $$
+>
+> Hence, $H e_1 = e_1$, so $H^{-1/2} e_1 = e_1$, and therefore:
+>
+> $$
+> R(\vec{d}) e_1 = M(\vec{d}) e_1 = \vec{d}.
+> $$
 
 ---
 
