@@ -1,4 +1,4 @@
-## $\lambda^*$
+### $\lambda^*$
 
 The $\lambda^*$ is the unique positive value that satisfies:
 
