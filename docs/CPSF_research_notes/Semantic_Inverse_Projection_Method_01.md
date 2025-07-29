@@ -44,74 +44,19 @@ $$
 
 ---
 
-### Step 3: Directional boundary projection
+### Step 3: TODO
 
-Let $z^* \in \mathbb{T}_\mathbb{C}^N$ and $\vec{d}^* \in \mathbb{S}^{2N-1}_\text{unit}$ be defined by Step 2. Define a ray:
+**Given** $z^*$ and $\vec{d}^*$ from Step 1, **find** $\lambda \in \mathbb{R}$ such that $\ell^* = (z^* - \lambda \cdot \vec{d}^*,\ \vec{d}^*)$ **minimizes the discrepancy** between $T(\ell^*)$ and the target $T^* \in \mathbb{C}^S$.
 
-$$
-z(\lambda) := z^* - \lambda \cdot \vec{d}^*, \quad \lambda \in \mathbb{R}_{\geq 0}
-$$
+**In other words**, $\lambda$ marks the boundary beyond which the error between $T(\ell^*)$ and $T^*$ starts to increase.
 
-Define the projected field response:
+**Constraints:**
 
-$$
-T^{\text{proj}}(\lambda) := \sum_{j \in \mathcal{J}} \alpha_j \cdot \psi_j^{\mathbb{T}}(z^*, \vec{d}^*) \cdot e^{- \frac{1}{2} \lambda^2 / \sigma_j^2} \cdot \hat{T}_j
-$$
-
-Define the normalized deviation:
-
-$$
-\tau^2(\lambda) := \frac{ \|T^*\|^2 - 2 \Re \langle T^{\text{proj}}(\lambda), T^* \rangle + \|T^{\text{proj}}(\lambda)\|^2 }{ \|T^* - T(z^*, \vec{d}^*)\|^2 }
-$$
-
-Then define the boundary-projected coordinate:
-
-$$
-z^{**} := z^* - \lambda^* \cdot \vec{d}^*
-$$
-
-where $\lambda^* \in \mathbb{R}_{>0}$ is chosen such that:
-
-$$
-\lambda^* := \underset{\lambda \ge 0}{\argmin} \; \|T^{\text{proj}}(\lambda) - T^*\|^2
-$$
-
-Alternatively, $\lambda^*$ may be determined as the unique root of:
-
-$$
-\frac{d}{d\lambda} \tau^2(\lambda) = 0
-$$
-
----
-
-### About $\lambda^*$
-
-The $\lambda^*$ is the unique positive value that satisfies:
-
-$$
-\sum_{j \in \mathcal{J}} \frac{1}{\sigma_j^2} e^{- \frac{1}{2} (\lambda^*)^2 / \sigma_j^2} \cdot \Re \langle \alpha_j \psi_j^{\mathbb{T}}(z^*, \vec{d}^*) \hat{T}_j, T^* \rangle = \frac{1}{2} \sum_{j, k \in \mathcal{J}} \left( \frac{1}{\sigma_j^2} + \frac{1}{\sigma_k^2} \right) \langle \alpha_j \psi_j^{\mathbb{T}}(z^*, \vec{d}^*) \hat{T}_j, \alpha_k \psi_k^{\mathbb{T}}(z^*, \vec{d}^*) \hat{T}_k \rangle e^{- \frac{1}{2} (\lambda^*)^2 \left( \frac{1}{\sigma_j^2} + \frac{1}{\sigma_k^2} \right)}
-$$
-
-After simplifying the given expressions, $\lambda^*$ is defined as the positive root of the following transcendental equation:
-
-$$
-\boxed{
-\sum_{j \in \mathcal{J}} a_j e^{- \frac{1}{2} (\lambda^*)^2 a_j} c_j = \frac{1}{2} \sum_{j, k \in \mathcal{J}} (a_j + a_k) \langle b_j, b_k \rangle e^{- \frac{1}{2} (\lambda^*)^2 (a_j + a_k)}
-}
-$$
-
-where the terms are defined as:
-
-- $a_j = \frac{1}{\sigma_j^2}$
-- $b_j = \alpha_j \psi_j^{\mathbb{T}}(z^*, \vec{d}^*) \hat{T}_j$
-- $c_j = \Re \langle b_j, T^* \rangle$
-
-### Explanation of Terms:
-- **$\mathcal{J}$**: The index set over which the sums are taken.
-- **$\sigma_j^2$**: Variance associated with index $j$.
-- **$\alpha_j$**: A scalar coefficient for index $j$.
-- **$\psi_j^{\mathbb{T}}(z^*, \vec{d}^*)$**: A function or transformation evaluated at optimal points $z^*$ and $\vec{d}^*$.
-- **$\hat{T}_j$**: A vector or operator associated with index $j$.
-- **$T^*$**: A reference vector or target variable.
-- **$\Re \langle \cdot, \cdot \rangle$**: The real part of an inner product.
-- **$\langle b_j, b_k \rangle$**: The inner product between $b_j$ and $b_k$.
+1. Iterative methods are prohibited.
+2. Numerical methods (e.g., $\arg\max$, $\arg\min$, etc.) are prohibited.
+3. The solution must be in closed form.
+4. The solution must be strictly analytic.
+5. The solution must be one-step.
+6. The solution must be smooth.
+7. The solution must be numerically stable.
+8. The solution must be practically implementable.
