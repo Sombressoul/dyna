@@ -44,6 +44,7 @@ class CPSF(nn.Module):
         self,
         vec_d: torch.Tensor,
         vec_d_j: torch.Tensor,
+        epsilon: float = 1.0e-6,
     ) -> torch.Tensor:
         
         # TODO: see: "Core Terms — Directional Offset and Angular Distance"
@@ -86,7 +87,10 @@ class CPSF(nn.Module):
 
     def Sigma_j(
         self,
-        j: int,
+        vec_d_j: torch.Tensor,
+        R_ext_vec_d_j: torch.Tensor,
+        sigma_j_parallel: torch.Tensor,
+        sigma_j_perp: torch.Tensor,
     ) -> torch.Tensor:
 
         # TODO: see: "Functional Role of $\Sigma_j$ — 3. Attenuation and Covariance Matrix", "Core Terms — Geometric Covariance Matrix"
@@ -97,7 +101,7 @@ class CPSF(nn.Module):
     def rho_j(
         self,
         w: torch.Tensor,
-        j: int,
+        Sigma_j: torch.Tensor,
     ) -> torch.Tensor:
 
         # TODO: see: "Functional Role of $\Sigma_j$ — 4. Gaussian Envelope and Periodization", "Core Terms — Unnormalized Gaussian Envelope"
@@ -108,8 +112,10 @@ class CPSF(nn.Module):
     def psi_T_j(
         self,
         z: torch.Tensor,
+        z_j: torch.Tensor,
         vec_d: torch.Tensor,
-        j: int,
+        vec_d_j: torch.Tensor,
+        Sigma_j: torch.Tensor,
     ) -> torch.Tensor:
 
         # TODO: see: "Functional Role of $\Sigma_j$ — 4. Gaussian Envelope and Periodization", "Core Terms — Periodized Envelope"
@@ -121,6 +127,8 @@ class CPSF(nn.Module):
         self,
         z: torch.Tensor,
         vec_d: torch.Tensor,
+        alpha_j: torch.Tensor,
+        T_hat_j: torch.Tensor,
     ) -> torch.Tensor:
 
         # TODO: see: "Functional Role of $\Sigma_j$ — 5. Field Construction and Semantic Projection", "Core Terms — Global Field Response"
