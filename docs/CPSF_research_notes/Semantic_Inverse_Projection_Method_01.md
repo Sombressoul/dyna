@@ -46,6 +46,8 @@ $$
 
 ### Step 3: TODO
 
+#### OPTION 1:
+
 **Given** $z^*$ and $\vec{d}^*$ from Step 1, **find** $\lambda \in \mathbb{R}$ such that $\ell^* = (z^* - \lambda \cdot \vec{d}^*,\ \vec{d}^*)$ **minimizes the discrepancy** between $T(\ell^*)$ and the target $T^* \in \mathbb{C}^S$.
 
 **In other words**, $\lambda$ marks the boundary beyond which the error between $T(\ell^*)$ and $T^*$ starts to increase.
@@ -60,3 +62,7 @@ $$
 6. The solution must be smooth.
 7. The solution must be numerically stable.
 8. The solution must be practically implementable.
+
+#### OPTION 2:
+
+**Refine** $z^*$ and $\vec{d}^*$ from Step 1, considering them as the reference coordinate and direction (as "first look").
