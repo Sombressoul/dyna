@@ -34,7 +34,7 @@ class CPSF(nn.Module):
         self,
         z: torch.Tensor,
     ) -> torch.Tensor:
-        
+
         # TODO: see: "Core Terms — Lifted Coordinates"
         tilda_z = ...
 
@@ -46,12 +46,12 @@ class CPSF(nn.Module):
         vec_d_j: torch.Tensor,
         epsilon: float = 1.0e-6,
     ) -> torch.Tensor:
-        
+
         # TODO: see: "Core Terms — Directional Offset and Angular Distance"
         delta_vec_d = ...
 
         return delta_vec_d
-    
+
     def iota(
         self,
         tilda_z: torch.Tensor,
@@ -63,7 +63,7 @@ class CPSF(nn.Module):
         w = ...
 
         return w
-    
+
     def R(
         self,
         vec_d: torch.Tensor,
