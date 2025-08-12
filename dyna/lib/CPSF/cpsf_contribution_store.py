@@ -223,6 +223,23 @@ class CPSFContributionStore:
 
         return idx_list
 
+    def _normalize_fields_arg(
+        self,
+        fields: Optional[Union[CPSFContributionField, Iterable[CPSFContributionField]]],
+    ) -> Optional[list[CPSFContributionField]]:
+        if fields is None:
+            return None
+
+        if isinstance(fields, CPSFContributionField):
+            return [fields]
+
+        if not isinstance(fields, Iterable):
+            raise TypeError("fields must be iterable or a CPSFContributionField.")
+        if not all(isinstance(field, CPSFContributionField) for field in fields):
+            raise TypeError("fields must be instances of CPSFContributionField.")
+
+        return list(fields)
+
     def idx_format_to_internal(
         self,
         idx: IndexLike,
@@ -280,6 +297,7 @@ class CPSFContributionStore:
         fields: list[CPSFContributionField] = None,
     ) -> CPSFContributionSet:
         idx_list = self._idx_format(idx)
+        fields = self._normalize_fields_arg(fields)
         inactive_set = set(self.idx_inactive())
 
         if any(i in inactive_set for i in idx_list):
@@ -298,13 +316,6 @@ class CPSFContributionStore:
 
             contributions_set = self._flat_to_set(contributions_flat)
         else:  # Partial read.
-            fields = [fields] if isinstance(fields, CPSFContributionField) else fields
-
-            if not isinstance(fields, Iterable):
-                raise TypeError("fields must be iterable.")
-            if not all([isinstance(field, CPSFContributionField) for field in fields]):
-                raise TypeError("fields must be an instance of CPSFContributionField.")
-
             # TODO: Implement partial read operation.
 
             raise NotImplementedError("Partial read is not yet implemented.")
@@ -318,7 +329,10 @@ class CPSFContributionStore:
         contribution_set: CPSFContributionSet,
         fields: list[CPSFContributionField] = None,
     ) -> None:
+        fields = self._normalize_fields_arg(fields)
+
         # TODO: Implementation.
+
         raise NotImplementedError("update is not yet implemented.")
 
     def delete(
