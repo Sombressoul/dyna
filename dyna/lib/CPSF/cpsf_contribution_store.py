@@ -335,7 +335,7 @@ class CPSFContributionStore:
         idx: Union[int, IndexLike],
     ) -> list[bool]:
         ids_test = self._idx_format(idx)
-        ids_active = set(self.ids_active()) # O(1) check
+        ids_active = set(self.ids_active())  # O(1) check
         return [id in ids_active for id in ids_test]
 
     def ids_active(
@@ -353,11 +353,28 @@ class CPSFContributionStore:
         }
         return sorted(inactive_set)
 
+    def ids_permanent(
+        self,
+        active: bool = True,
+    ) -> list[int]:
+        if active:
+            inactive = set(self._C_inactive.permanent)
+            return [i for i in range(len(self._C)) if i not in inactive]
+        else:
+            return list(range(len(self._C)))
+
     def ids_buffer(
         self,
+        active: bool = True,
     ) -> list[int]:
-        # TODO: Return a list of bufferized contributions ids.
-        pass
+        buffer_offset = len(self._C)
+        ids_buffer = set(range(buffer_offset, len(self)))
+
+        if active:
+            inactive = {buffer_offset + i for i in self._C_inactive.buffer}
+            return sorted(ids_buffer - inactive)
+        else:
+            return sorted(ids_buffer)
 
     def clear_buffer(
         self,
