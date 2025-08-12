@@ -1,7 +1,11 @@
 import torch
 
 from collections.abc import Iterable
-from dataclasses import dataclass, field
+from dataclasses import (
+    dataclass,
+    field as dataclasses_field,
+    fields as dataclasses_fields,
+)
 from enum import Enum, auto as enum_auto
 from typing import Sequence, Optional, Union
 
@@ -22,8 +26,8 @@ class CPSFContributionSet:
 
 @dataclass
 class CPSFContributionStoreIDList:
-    permanent: list[int] = field(default_factory=list)
-    buffer: list[int] = field(default_factory=list)
+    permanent: list[int] = dataclasses_field(default_factory=list)
+    buffer: list[int] = dataclasses_field(default_factory=list)
 
 
 class CPSFContributionField(Enum):
@@ -240,6 +244,30 @@ class CPSFContributionStore:
 
         return list(fields)
 
+    def _validate_contribution_set(
+        self,
+        contribution_set: CPSFContributionSet,
+    ) -> None:
+        if not isinstance(contribution_set, CPSFContributionSet):
+            raise TypeError("Expected CPSFContributionSet instance.")
+
+        field_names = [
+            f.name for f in dataclasses_fields(CPSFContributionSet) if f.name != "idx"
+        ]
+
+        batch_sizes = [
+            getattr(contribution_set, name).shape[0]
+            for name in field_names
+            if getattr(contribution_set, name) is not None
+        ]
+
+        if not batch_sizes:
+            raise ValueError("CPSFContributionSet contains no data.")
+        if any(s != batch_sizes[0] for s in batch_sizes):
+            raise ValueError("Inconsistent batch size among fields.")
+        if batch_sizes[0] == 0:
+            raise ValueError("CPSFContributionSet is empty.")
+
     def idx_format_to_internal(
         self,
         idx: IndexLike,
@@ -271,8 +299,7 @@ class CPSFContributionStore:
         self,
         contribution_set: CPSFContributionSet,
     ) -> None:
-        if not isinstance(contribution_set, CPSFContributionSet):
-            raise TypeError("Expected CPSFContributionSet instance.")
+        self._validate_contribution_set(contribution_set)
 
         if not self._is_full_contribution_set(contribution_set):
             raise ValueError("CPSFContributionSet must be complete for create().")
@@ -329,9 +356,17 @@ class CPSFContributionStore:
         contribution_set: CPSFContributionSet,
         fields: list[CPSFContributionField] = None,
     ) -> None:
-        fields = self._normalize_fields_arg(fields)
+        self._validate_contribution_set(contribution_set)
 
-        # TODO: Implementation.
+        fields = self._normalize_fields_arg(fields)
+        if fields is None:  # Full update
+            if not self._is_full_contribution_set(contribution_set):
+                raise ValueError("CPSFContributionSet must be complete for non-partial update().")
+            # TODO: Full update implementation.
+            ...
+        else:
+            # TODO: Partial update implementation.
+            ...
 
         raise NotImplementedError("update is not yet implemented.")
 
