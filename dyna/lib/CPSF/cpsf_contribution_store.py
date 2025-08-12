@@ -119,15 +119,8 @@ class CPSFContributionStore:
         contribution_set: CPSFContributionSet,
     ) -> bool:
         return all(
-            getattr(contribution_set, field_name) is not None
-            for field_name in (
-                "z",
-                "vec_d",
-                "T_hat",
-                "sigma_par",
-                "sigma_perp",
-                "alpha",
-            )
+            getattr(contribution_set, f.name) is not None
+            for f in dataclasses_fields(CPSFContributionSet) if f.name != "idx"
         )
 
     def _flat_to_set(
