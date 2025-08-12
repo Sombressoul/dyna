@@ -296,15 +296,12 @@ class CPSFContributionStore:
         """
 
         idx_list = self._idx_format(idx)
-
-        buffer_offset = len(self._C)
-        inactive_set = set(self._C_inactive.permanent) | {
-            buffer_offset + i for i in self._C_inactive.buffer
-        }
+        inactive_set = set(self.ids_inactive())
 
         if any(i in inactive_set for i in idx_list):
             raise IndexError("Requested index refers to an inactive contribution.")
 
+        buffer_offset = len(self._C)
         parts = []
         for i in idx_list:
             if i < buffer_offset:
@@ -335,22 +332,26 @@ class CPSFContributionStore:
 
     def is_active(
         self,
-        idx: IndexLike,
-    ) -> bool:
-        # TODO: Check if target contribution is active.
-        pass
+        idx: Union[int, IndexLike],
+    ) -> list[bool]:
+        ids_test = self._idx_format(idx)
+        ids_active = set(self.ids_active()) # O(1) check
+        return [id in ids_active for id in ids_test]
 
     def ids_active(
         self,
     ) -> list[int]:
-        # TODO: Return a list of active ids.
-        pass
+        inactive_set = set(self.ids_inactive())
+        return [i for i in range(len(self)) if i not in inactive_set]
 
     def ids_inactive(
         self,
     ) -> list[int]:
-        # TODO: Return a list of inactive ids.
-        pass
+        buffer_offset = len(self._C)
+        inactive_set = set(self._C_inactive.permanent) | {
+            buffer_offset + i for i in self._C_inactive.buffer
+        }
+        return sorted(inactive_set)
 
     def ids_buffer(
         self,
