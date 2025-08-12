@@ -1,6 +1,7 @@
 import torch
 
 from dataclasses import dataclass, field
+from enum import Enum, auto as enum_auto
 from typing import Sequence, Optional, Union
 
 
@@ -9,19 +10,28 @@ IndexLike = Union[torch.Tensor, Sequence[int]]
 
 @dataclass
 class CPSFContributionSet:
-    idx: Optional[IndexLike]
-    z: torch.Tensor
-    vec_d: torch.Tensor
-    T_hat: torch.Tensor
-    sigma_par: torch.Tensor
-    sigma_perp: torch.Tensor
-    alpha: torch.Tensor
+    idx: Optional[IndexLike] = None
+    z: Optional[torch.Tensor] = None
+    vec_d: Optional[torch.Tensor] = None
+    T_hat: Optional[torch.Tensor] = None
+    sigma_par: Optional[torch.Tensor] = None
+    sigma_perp: Optional[torch.Tensor] = None
+    alpha: Optional[torch.Tensor] = None
 
 
 @dataclass
 class CPSFContributionStoreIDList:
     permanent: list[int] = field(default_factory=list)
     buffer: list[int] = field(default_factory=list)
+
+
+class CPSFContributionField(Enum):
+    Z = enum_auto()
+    VEC_D = enum_auto()
+    T_HAT = enum_auto()
+    SIGMA_PAR = enum_auto()
+    SIGMA_PERP = enum_auto()
+    ALPHA = enum_auto()
 
 
 class CPSFContributionStore:
@@ -99,6 +109,22 @@ class CPSFContributionStore:
     def __len__(self) -> int:
         return len(self._C) + len(self._C_buffer)
 
+    def _is_full_contribution_set(
+        self,
+        contribution_set: CPSFContributionSet,
+    ) -> bool:
+        return all(
+            getattr(contribution_set, field_name) is not None
+            for field_name in (
+                "z",
+                "vec_d",
+                "T_hat",
+                "sigma_par",
+                "sigma_perp",
+                "alpha",
+            )
+        )
+
     def _flat_to_set(
         self,
         contribution_flat: torch.Tensor,
@@ -134,6 +160,9 @@ class CPSFContributionStore:
         self,
         contribution_set: CPSFContributionSet,
     ) -> torch.Tensor:
+        if not self._is_full_contribution_set(contribution_set):
+            raise ValueError("_set_to_flat() requires a complete CPSFContributionSet.")
+
         z_real = torch.real(contribution_set.z)
         z_imag = torch.imag(contribution_set.z)
         z_flat = torch.cat([z_real, z_imag], dim=1)
@@ -224,26 +253,11 @@ class CPSFContributionStore:
         self,
         contribution_set: CPSFContributionSet,
     ) -> None:
-        """
-        Add one or more new contributions to the buffer.
+        if not isinstance(contribution_set, CPSFContributionSet):
+            raise TypeError("Expected CPSFContributionSet instance.")
 
-        Each contribution is stored as a separate torch.nn.Parameter of shape
-        [1, contribution_length] with requires_grad=True, ready for merging
-        into the main storage via consolidate().
-
-        Does not touch self._C; call consolidate() to materialize into the
-        main storage.
-
-        Parameters
-        ----------
-        contribution_set : CPSFContributionSet
-            Contribution(s) to be added. May contain a batch of size > 1.
-
-        Raises
-        ------
-        ValueError
-            If the provided CPSFContributionSet contains no contributions.
-        """
+        if not self._is_full_contribution_set(contribution_set):
+            raise ValueError("CPSFContributionSet must be complete for create().")
 
         contribution_flat = self._set_to_flat(contribution_set)
         target = dict(device=self._C.device, dtype=self.target_dtype_r)
@@ -263,40 +277,6 @@ class CPSFContributionStore:
         self,
         idx: IndexLike,
     ) -> CPSFContributionSet:
-        """
-        Retrieve one or more contributions from the store as a CPSFContributionSet,
-        preserving the order of the requested indices and ensuring all are active.
-
-        Parameters
-        ----------
-        idx : IndexLike
-            External contribution index or indices to retrieve. May be:
-            - int: a single index.
-            - list[int] or tuple[int]: multiple indices.
-            - torch.Tensor: integer tensor of arbitrary shape (flattened internally).
-
-        Returns
-        -------
-        CPSFContributionSet
-            Object containing the decoded contribution components for the requested
-            indices, with `.idx` reflecting the original query order.
-
-        Raises
-        ------
-        IndexError
-            If any requested index corresponds to an inactive contribution.
-
-        Notes
-        -----
-        - Order Preservation:
-        The output order of contributions in `.idx` and in the returned batch
-        matches exactly the order of the input `idx`, regardless of whether
-        indices refer to permanent or buffered contributions.
-        - Inactive Filtering:
-        No inactive contributions are returned; presence of any requested
-        inactive index aborts the operation with `IndexError`.
-        """
-
         idx_list = self._idx_format(idx)
         inactive_set = set(self.idx_inactive())
 
