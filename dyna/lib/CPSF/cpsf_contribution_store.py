@@ -77,7 +77,7 @@ class CPSFContributionStore:
         )
 
         # Define full contribution length.
-        self._contribution_length = self._slice_sigma_perp.stop
+        self._contribution_length = self._slice_alpha.stop
 
         # Main contributions storage.
         self._C = torch.nn.Parameter(
@@ -184,10 +184,12 @@ class CPSFContributionStore:
             raise TypeError(f"Unsupported index type: {type(idx)}")
 
         idx_list = [int(i) for i in idx_list]
-        assert all(i >= 0 for i in idx_list), "Index must be non-negative"
+        if not all(i >= 0 for i in idx_list):
+            raise IndexError("Index must be non-negative")
 
         total_len = len(self._C) + len(self._C_buffer)
-        assert all(i < total_len for i in idx_list), "Index out of range"
+        if not all(i < total_len for i in idx_list):
+            raise IndexError("Index out of range")
 
         return idx_list
 
@@ -395,13 +397,6 @@ class CPSFContributionStore:
     ) -> CPSFContributionSet:
         return self.read(idx=self.idx_active())
 
-    def read_chunk(
-        self,
-        chunks: list[IndexLike],
-    ) -> list[CPSFContributionSet]:
-        # TODO: Return a batch of CPSFContributionSet chunks.
-        pass
-
     def consolidate(self) -> bool:
         """
         Merge active contributions from the main storage and buffer into a single
@@ -488,6 +483,7 @@ class CPSFContributionStore:
                 ],
                 dim=0,
             ).contiguous(),
+            requires_grad=True,
         )
         self._C_buffer = []
         self._C_inactive = CPSFContributionStoreIDList()
