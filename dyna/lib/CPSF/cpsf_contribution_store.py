@@ -388,8 +388,7 @@ class CPSFContributionStore:
     def read_all_active(
         self,
     ) -> CPSFContributionSet:
-        # TODO: Return all active contributions as CPSFContributionSet.
-        pass
+        return self.read(idx=self.ids_active())
 
     def read_chunk(
         self,
