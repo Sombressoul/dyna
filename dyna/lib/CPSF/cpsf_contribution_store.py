@@ -316,6 +316,7 @@ class CPSFContributionStore:
     def update(
         self,
         contribution_set: CPSFContributionSet,
+        fields: list[CPSFContributionField] = None,
     ) -> None:
         # TODO: Implementation.
         raise NotImplementedError("update is not yet implemented.")
