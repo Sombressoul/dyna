@@ -296,7 +296,7 @@ class CPSFContributionStore:
         """
 
         idx_list = self._idx_format(idx)
-        inactive_set = set(self.ids_inactive())
+        inactive_set = set(self.idx_inactive())
 
         if any(i in inactive_set for i in idx_list):
             raise IndexError("Requested index refers to an inactive contribution.")
@@ -325,26 +325,31 @@ class CPSFContributionStore:
 
     def delete(
         self,
-        idx: IndexLike,
+        idx: Union[int, IndexLike],
     ) -> None:
-        # TODO: Implementation through self._C_inactive
-        pass
+        idx_delete = self.idx_format_to_internal(idx)
+        self._C_inactive.permanent = sorted(
+            set(self._C_inactive.permanent) | set(idx_delete.permanent)
+        )
+        self._C_inactive.buffer = sorted(
+            set(self._C_inactive.buffer) | set(idx_delete.buffer)
+        )
 
     def is_active(
         self,
         idx: Union[int, IndexLike],
     ) -> list[bool]:
-        ids_test = self._idx_format(idx)
-        ids_active = set(self.ids_active())  # O(1) check
-        return [id in ids_active for id in ids_test]
+        idx_test = self._idx_format(idx)
+        idx_active = set(self.idx_active())  # O(1) check
+        return [id in idx_active for id in idx_test]
 
-    def ids_active(
+    def idx_active(
         self,
     ) -> list[int]:
-        inactive_set = set(self.ids_inactive())
+        inactive_set = set(self.idx_inactive())
         return [i for i in range(len(self)) if i not in inactive_set]
 
-    def ids_inactive(
+    def idx_inactive(
         self,
     ) -> list[int]:
         buffer_offset = len(self._C)
@@ -353,7 +358,7 @@ class CPSFContributionStore:
         }
         return sorted(inactive_set)
 
-    def ids_permanent(
+    def idx_permanent(
         self,
         active: bool = True,
     ) -> list[int]:
@@ -363,18 +368,18 @@ class CPSFContributionStore:
         else:
             return list(range(len(self._C)))
 
-    def ids_buffer(
+    def idx_buffer(
         self,
         active: bool = True,
     ) -> list[int]:
         buffer_offset = len(self._C)
-        ids_buffer = set(range(buffer_offset, len(self)))
+        idx_buffer = set(range(buffer_offset, len(self)))
 
         if active:
             inactive = {buffer_offset + i for i in self._C_inactive.buffer}
-            return sorted(ids_buffer - inactive)
+            return sorted(idx_buffer - inactive)
         else:
-            return sorted(ids_buffer)
+            return sorted(idx_buffer)
 
     def clear_buffer(
         self,
@@ -388,7 +393,7 @@ class CPSFContributionStore:
     def read_all_active(
         self,
     ) -> CPSFContributionSet:
-        return self.read(idx=self.ids_active())
+        return self.read(idx=self.idx_active())
 
     def read_chunk(
         self,
