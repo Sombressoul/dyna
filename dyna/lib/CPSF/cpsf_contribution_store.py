@@ -101,54 +101,54 @@ class CPSFContributionStore:
 
     def _flat_to_set(
         self,
-        flat_contribution: torch.Tensor,
+        contribution_flat: torch.Tensor,
     ) -> CPSFContributionSet:
-        if flat_contribution.shape[1] != self._contribution_length:
+        if contribution_flat.shape[1] != self._contribution_length:
             raise ValueError(
                 f"Flat contributions must have shape (batch, {self._contribution_length}), "
-                f"but got {flat_contribution.shape}."
+                f"but got {contribution_flat.shape}."
             )
 
         contributions_set = CPSFContributionSet(
             idx=None,
             z=torch.complex(
-                real=flat_contribution[:, self._slice_z][:, : self.N],
-                imag=flat_contribution[:, self._slice_z][:, self.N :],
+                real=contribution_flat[:, self._slice_z][:, : self.N],
+                imag=contribution_flat[:, self._slice_z][:, self.N :],
             ).to(dtype=self.target_dtype_c),
             vec_d=torch.complex(
-                real=flat_contribution[:, self._slice_vec_d][:, : self.N],
-                imag=flat_contribution[:, self._slice_vec_d][:, self.N :],
+                real=contribution_flat[:, self._slice_vec_d][:, : self.N],
+                imag=contribution_flat[:, self._slice_vec_d][:, self.N :],
             ).to(dtype=self.target_dtype_c),
             T_hat=torch.complex(
-                real=flat_contribution[:, self._slice_T_hat][:, : self.S],
-                imag=flat_contribution[:, self._slice_T_hat][:, self.S :],
+                real=contribution_flat[:, self._slice_T_hat][:, : self.S],
+                imag=contribution_flat[:, self._slice_T_hat][:, self.S :],
             ).to(dtype=self.target_dtype_c),
-            sigma_par=flat_contribution[:, self._slice_sigma_par],
-            sigma_perp=flat_contribution[:, self._slice_sigma_perp],
-            alpha=flat_contribution[:, self._slice_alpha],
+            sigma_par=contribution_flat[:, self._slice_sigma_par],
+            sigma_perp=contribution_flat[:, self._slice_sigma_perp],
+            alpha=contribution_flat[:, self._slice_alpha],
         )
 
         return contributions_set
 
     def _set_to_flat(
         self,
-        contributions_set: CPSFContributionSet,
+        contribution_set: CPSFContributionSet,
     ) -> torch.Tensor:
-        z_real = torch.real(contributions_set.z)
-        z_imag = torch.imag(contributions_set.z)
+        z_real = torch.real(contribution_set.z)
+        z_imag = torch.imag(contribution_set.z)
         z_flat = torch.cat([z_real, z_imag], dim=1)
 
-        vec_d_real = torch.real(contributions_set.vec_d)
-        vec_d_imag = torch.imag(contributions_set.vec_d)
+        vec_d_real = torch.real(contribution_set.vec_d)
+        vec_d_imag = torch.imag(contribution_set.vec_d)
         vec_d_flat = torch.cat([vec_d_real, vec_d_imag], dim=1)
 
-        T_hat_real = torch.real(contributions_set.T_hat)
-        T_hat_imag = torch.imag(contributions_set.T_hat)
+        T_hat_real = torch.real(contribution_set.T_hat)
+        T_hat_imag = torch.imag(contribution_set.T_hat)
         T_hat_flat = torch.cat([T_hat_real, T_hat_imag], dim=1)
 
-        sigma_par_flat = contributions_set.sigma_par
-        sigma_perp_flat = contributions_set.sigma_perp
-        alpha_flat = contributions_set.alpha
+        sigma_par_flat = contribution_set.sigma_par
+        sigma_perp_flat = contribution_set.sigma_perp
+        alpha_flat = contribution_set.alpha
 
         flat_contribution = torch.cat(
             [
@@ -222,8 +222,40 @@ class CPSFContributionStore:
         self,
         contribution_set: CPSFContributionSet,
     ) -> None:
-        # TODO: Implementation.
-        pass
+        """
+        Add one or more new contributions to the buffer.
+
+        Each contribution is stored as a separate torch.nn.Parameter of shape
+        [1, contribution_length] with requires_grad=True, ready for merging
+        into the main storage via consolidate().
+
+        Does not touch self._C; call consolidate() to materialize into the
+        main storage.
+
+        Parameters
+        ----------
+        contribution_set : CPSFContributionSet
+            Contribution(s) to be added. May contain a batch of size > 1.
+
+        Raises
+        ------
+        ValueError
+            If the provided CPSFContributionSet contains no contributions.
+        """
+
+        contribution_flat = self._set_to_flat(contribution_set)
+        target = dict(device=self._C.device, dtype=self.target_dtype_r)
+
+        if contribution_flat.numel() == 0:
+            raise ValueError("Cannot create from an empty CPSFContributionSet.")
+
+        for entry in contribution_flat.unbind(dim=0):
+            self._C_buffer.append(
+                torch.nn.Parameter(
+                    data=entry.unsqueeze(0).to(**target),
+                    requires_grad=True,
+                )
+            )
 
     def read(
         self,
