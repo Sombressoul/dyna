@@ -333,6 +333,50 @@ class CPSFContributionStore:
         # TODO: Implementation through self._C_inactive
         pass
 
+    def is_active(
+        self,
+        idx: IndexLike,
+    ) -> bool:
+        # TODO: Check if target contribution is active.
+        pass
+
+    def ids_active(
+        self,
+    ) -> list[int]:
+        # TODO: Return a list of active ids.
+        pass
+
+    def ids_inactive(
+        self,
+    ) -> list[int]:
+        # TODO: Return a list of inactive ids.
+        pass
+
+    def ids_buffer(
+        self,
+    ) -> list[int]:
+        # TODO: Return a list of bufferized contributions ids.
+        pass
+
+    def clear_buffer(
+        self,
+    ) -> None:
+        # TODO: Clear contributions buffer.
+        pass
+
+    def read_all_active(
+        self,
+    ) -> CPSFContributionSet:
+        # TODO: Return all active contributions as CPSFContributionSet.
+        pass
+
+    def read_chunk(
+        self,
+        chunks: list[IndexLike],
+    ) -> list[CPSFContributionSet]:
+        # TODO: Return a batch of CPSFContributionSet chunks.
+        pass
+
     def consolidate(self) -> bool:
         """
         Merge active contributions from the main storage and buffer into a single
