@@ -378,9 +378,12 @@ class CPSFContributionStore:
 
     def clear_buffer(
         self,
-    ) -> None:
-        # TODO: Clear contributions buffer.
-        pass
+    ) -> bool:
+        changed = bool(self._C_buffer or self._C_inactive.buffer)
+        if changed:
+            self._C_buffer.clear()
+            self._C_inactive.buffer.clear()
+        return changed
 
     def read_all_active(
         self,
