@@ -260,7 +260,7 @@ class CPSFContributionStore:
     def read(
         self,
         idx: IndexLike,
-    ) -> None:
+    ) -> CPSFContributionSet:
         """
         Retrieve one or more contributions from the store as a CPSFContributionSet,
         preserving the order of the requested indices and ensuring all are active.
