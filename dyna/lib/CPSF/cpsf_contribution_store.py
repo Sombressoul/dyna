@@ -300,9 +300,6 @@ class CPSFContributionStore:
         contribution_flat = self._set_to_flat(contribution_set)
         target = dict(device=self._C.device, dtype=self.target_dtype_r)
 
-        if contribution_flat.numel() == 0:
-            raise ValueError("Cannot create from an empty CPSFContributionSet.")
-
         for entry in contribution_flat.unbind(dim=0):
             self._C_buffer.append(
                 torch.nn.Parameter(
