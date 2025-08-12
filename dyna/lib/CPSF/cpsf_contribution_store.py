@@ -1,5 +1,6 @@
 import torch
 
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from enum import Enum, auto as enum_auto
 from typing import Sequence, Optional, Union
@@ -276,6 +277,7 @@ class CPSFContributionStore:
     def read(
         self,
         idx: IndexLike,
+        fields: list[CPSFContributionField] = None,
     ) -> CPSFContributionSet:
         idx_list = self._idx_format(idx)
         inactive_set = set(self.idx_inactive())
@@ -283,17 +285,30 @@ class CPSFContributionStore:
         if any(i in inactive_set for i in idx_list):
             raise IndexError("Requested index refers to an inactive contribution.")
 
-        buffer_offset = len(self._C)
-        parts = []
-        for i in idx_list:
-            if i < buffer_offset:
-                parts.append(self._C[i].unsqueeze(0))
-            else:
-                parts.append(self._C_buffer[i - buffer_offset])
+        if fields is None:  # Direct full read (fallback)
+            buffer_offset = len(self._C)
+            parts = []
+            for i in idx_list:
+                if i < buffer_offset:
+                    parts.append(self._C[i].unsqueeze(0))
+                else:
+                    parts.append(self._C_buffer[i - buffer_offset])
 
-        contributions_flat = torch.cat(parts, dim=0)
+            contributions_flat = torch.cat(parts, dim=0)
 
-        contributions_set = self._flat_to_set(contributions_flat)
+            contributions_set = self._flat_to_set(contributions_flat)
+        else:  # Partial read.
+            fields = [fields] if isinstance(fields, CPSFContributionField) else fields
+
+            if not isinstance(fields, Iterable):
+                raise TypeError("fields must be iterable.")
+            if not all([isinstance(field, CPSFContributionField) for field in fields]):
+                raise TypeError("fields must be an instance of CPSFContributionField.")
+
+            # TODO: Implement partial read operation.
+
+            raise NotImplementedError("Partial read is not yet implemented.")
+
         contributions_set.idx = idx_list
 
         return contributions_set
@@ -303,7 +318,7 @@ class CPSFContributionStore:
         contribution_set: CPSFContributionSet,
     ) -> None:
         # TODO: Implementation.
-        pass
+        raise NotImplementedError("update is not yet implemented.")
 
     def delete(
         self,
