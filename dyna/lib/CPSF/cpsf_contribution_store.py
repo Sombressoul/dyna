@@ -104,7 +104,7 @@ class CPSFContributionStore:
         )
 
         # Buffer contributions storage for dynamic interactions.
-        self._C_buffer = []
+        self._C_buffer: list[torch.Tensor] = []
 
         # A list of IDs of inactive contributions awaiting deletion.
         self._C_inactive = CPSFContributionStoreIDList()
@@ -120,7 +120,8 @@ class CPSFContributionStore:
     ) -> bool:
         return all(
             getattr(contribution_set, f.name) is not None
-            for f in dataclasses_fields(CPSFContributionSet) if f.name != "idx"
+            for f in dataclasses_fields(CPSFContributionSet)
+            if f.name != "idx"
         )
 
     def _flat_to_set(
@@ -345,20 +346,40 @@ class CPSFContributionStore:
         self,
         contribution_set: CPSFContributionSet,
         fields: list[CPSFContributionField] = None,
+        preserve_grad: bool = True,
     ) -> None:
         self._validate_contribution_set(contribution_set)
 
         fields = self._normalize_fields_arg(fields)
         if fields is None:  # Full update
             if not self._is_full_contribution_set(contribution_set):
-                raise ValueError("CPSFContributionSet must be complete for non-partial update().")
-            # TODO: Full update implementation.
-            ...
+                raise ValueError("contribution_set must be complete for full update().")
+
+            contribution_flat = self._set_to_flat(contribution_set)
+
+            if contribution_flat.shape[0] != len(contribution_set.idx):
+                raise ValueError("Batch size does not match index count.")
+
+            buffer_offset = len(self._C)
+            idx_formatted = self._idx_format(contribution_set.idx)
+
+            for idx_ext, src_row in zip(idx_formatted, contribution_flat):
+                if idx_ext < buffer_offset:
+                    if preserve_grad:
+                        delta = src_row - self._C[idx_ext]
+                        self._C[idx_ext].add_(delta)
+                    else:
+                        self._C.data[idx_ext].copy_(src_row)
+                else:
+                    idx_buf = idx_ext - buffer_offset
+                    if preserve_grad:
+                        delta = src_row - self._C_buffer[idx_buf]
+                        self._C_buffer[idx_buf].add_(delta)
+                    else:
+                        self._C_buffer[idx_buf].data.copy_(src_row)
         else:
             # TODO: Partial update implementation.
-            ...
-
-        raise NotImplementedError("update is not yet implemented.")
+            raise NotImplementedError("Partial update is not yet implemented.")
 
     def delete(
         self,
@@ -429,8 +450,12 @@ class CPSFContributionStore:
 
     def read_all_active(
         self,
+        fields: list[CPSFContributionField] = None,
     ) -> CPSFContributionSet:
-        return self.read(idx=self.idx_active())
+        return self.read(
+            idx=self.idx_active(),
+            fields=fields,
+        )
 
     def consolidate(self) -> bool:
         """
