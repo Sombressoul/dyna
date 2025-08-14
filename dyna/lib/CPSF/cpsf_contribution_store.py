@@ -309,6 +309,33 @@ class CPSFContributionStore:
                 )
             )
 
+    def _read_full(
+        self,
+        idx_list: list[int],
+    ) -> CPSFContributionSet:
+        buffer_offset = len(self._C)
+        parts = []
+        for i in idx_list:
+            if i < buffer_offset:
+                parts.append(self._C[i].unsqueeze(0))
+            else:
+                parts.append(self._C_buffer[i - buffer_offset])
+
+        contributions_flat = torch.cat(parts, dim=0)
+        contributions_set = self._flat_to_set(contributions_flat)
+
+        contributions_set.idx = idx_list
+
+        return contributions_set
+
+    def _read_partial(
+        self,
+        idx_list: list[int],
+        fields: list[CPSFContributionField],
+    ) -> CPSFContributionSet:
+        # TODO: Implement partial read operation.
+        raise NotImplementedError("Partial read is not yet implemented.")
+
     def read(
         self,
         idx: IndexLike,
@@ -321,26 +348,10 @@ class CPSFContributionStore:
         if any(i in inactive_set for i in idx_list):
             raise IndexError("Requested index refers to an inactive contribution.")
 
-        if fields is None:  # Direct full read (fallback)
-            buffer_offset = len(self._C)
-            parts = []
-            for i in idx_list:
-                if i < buffer_offset:
-                    parts.append(self._C[i].unsqueeze(0))
-                else:
-                    parts.append(self._C_buffer[i - buffer_offset])
-
-            contributions_flat = torch.cat(parts, dim=0)
-
-            contributions_set = self._flat_to_set(contributions_flat)
-        else:  # Partial read.
-            # TODO: Implement partial read operation.
-
-            raise NotImplementedError("Partial read is not yet implemented.")
-
-        contributions_set.idx = idx_list
-
-        return contributions_set
+        if fields is None:
+            return self._read_full(idx_list=idx_list)
+        else:
+            return self._read_partial(idx_list=idx_list, fields=fields)
 
     def update(
         self,
