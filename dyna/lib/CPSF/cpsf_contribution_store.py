@@ -407,7 +407,7 @@ class CPSFContributionStore:
     def _update_full(
         self,
         contribution_set: CPSFContributionSet,
-        preserve_grad: bool = True,
+        preserve_grad: bool,
     ) -> None:
         if not self._is_full_contribution_set(contribution_set):
             raise ValueError("contribution_set must be complete for full update().")
@@ -438,8 +438,8 @@ class CPSFContributionStore:
     def _update_partial(
         self,
         contribution_set: CPSFContributionSet,
-        fields: list[CPSFContributionField] = None,
-        preserve_grad: bool = True,
+        fields: list[CPSFContributionField],
+        preserve_grad: bool,
     ) -> None:
         # TODO: Partial update implementation.
         raise NotImplementedError("Partial update is not yet implemented.")
