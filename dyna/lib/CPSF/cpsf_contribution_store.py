@@ -262,6 +262,35 @@ class CPSFContributionStore:
         if batch_sizes[0] == 0:
             raise ValueError("CPSFContributionSet is empty.")
 
+    def _slice_for_field(
+        self,
+        field: CPSFContributionField,
+    ) -> slice:
+        if field == CPSFContributionField.Z:
+            return self._slice_z
+        elif field == CPSFContributionField.VEC_D:
+            return self._slice_vec_d
+        elif field == CPSFContributionField.T_HAT:
+            return self._slice_T_hat
+        elif field == CPSFContributionField.SIGMA_PAR:
+            return self._slice_sigma_par
+        elif field == CPSFContributionField.SIGMA_PERP:
+            return self._slice_sigma_perp
+        elif field == CPSFContributionField.ALPHA:
+            return self._slice_alpha
+        else:
+            raise ValueError(f"Unknown CPSFContributionField: {field}")
+
+    def _is_complex_field(
+        self,
+        field: CPSFContributionField,
+    ) -> bool:
+        return field in (
+            CPSFContributionField.Z,
+            CPSFContributionField.VEC_D,
+            CPSFContributionField.T_HAT,
+        )
+
     def idx_format_to_internal(
         self,
         idx: IndexLike,
@@ -333,8 +362,30 @@ class CPSFContributionStore:
         idx_list: list[int],
         fields: list[CPSFContributionField],
     ) -> CPSFContributionSet:
-        # TODO: Implement partial read operation.
-        raise NotImplementedError("Partial read is not yet implemented.")
+        contribution_set = CPSFContributionSet(idx=idx_list)
+
+        buffer_offset = len(self._C)
+
+        for field in fields:
+            sl = self._slice_for_field(field)
+            is_complex = self._is_complex_field(field)
+
+            parts = []
+            for i in idx_list:
+                if i < buffer_offset:
+                    parts.append(self._C[i, sl].unsqueeze(0))
+                else:
+                    parts.append(self._C_buffer[i - buffer_offset][:, sl])
+
+            field_data = torch.cat(parts, dim=0)
+
+            if is_complex:
+                mid = field_data.shape[1] // 2
+                field_data = torch.complex(field_data[:, :mid], field_data[:, mid:])
+
+            setattr(contribution_set, field.name.lower(), field_data)
+
+        return contribution_set
 
     def read(
         self,
@@ -353,6 +404,46 @@ class CPSFContributionStore:
         else:
             return self._read_partial(idx_list=idx_list, fields=fields)
 
+    def _update_full(
+        self,
+        contribution_set: CPSFContributionSet,
+        preserve_grad: bool = True,
+    ) -> None:
+        if not self._is_full_contribution_set(contribution_set):
+            raise ValueError("contribution_set must be complete for full update().")
+
+        contribution_flat = self._set_to_flat(contribution_set)
+
+        if contribution_flat.shape[0] != len(contribution_set.idx):
+            raise ValueError("Batch size does not match index count.")
+
+        buffer_offset = len(self._C)
+        idx_formatted = self._idx_format(contribution_set.idx)
+
+        for idx_ext, src_row in zip(idx_formatted, contribution_flat):
+            if idx_ext < buffer_offset:
+                if preserve_grad:
+                    delta = src_row - self._C[idx_ext]
+                    self._C[idx_ext].add_(delta)
+                else:
+                    self._C.data[idx_ext].copy_(src_row)
+            else:
+                idx_buf = idx_ext - buffer_offset
+                if preserve_grad:
+                    delta = src_row - self._C_buffer[idx_buf]
+                    self._C_buffer[idx_buf].add_(delta)
+                else:
+                    self._C_buffer[idx_buf].data.copy_(src_row)
+
+    def _update_partial(
+        self,
+        contribution_set: CPSFContributionSet,
+        fields: list[CPSFContributionField] = None,
+        preserve_grad: bool = True,
+    ) -> None:
+        # TODO: Partial update implementation.
+        raise NotImplementedError("Partial update is not yet implemented.")
+
     def update(
         self,
         contribution_set: CPSFContributionSet,
@@ -362,35 +453,17 @@ class CPSFContributionStore:
         self._validate_contribution_set(contribution_set)
 
         fields = self._normalize_fields_arg(fields)
-        if fields is None:  # Full update
-            if not self._is_full_contribution_set(contribution_set):
-                raise ValueError("contribution_set must be complete for full update().")
-
-            contribution_flat = self._set_to_flat(contribution_set)
-
-            if contribution_flat.shape[0] != len(contribution_set.idx):
-                raise ValueError("Batch size does not match index count.")
-
-            buffer_offset = len(self._C)
-            idx_formatted = self._idx_format(contribution_set.idx)
-
-            for idx_ext, src_row in zip(idx_formatted, contribution_flat):
-                if idx_ext < buffer_offset:
-                    if preserve_grad:
-                        delta = src_row - self._C[idx_ext]
-                        self._C[idx_ext].add_(delta)
-                    else:
-                        self._C.data[idx_ext].copy_(src_row)
-                else:
-                    idx_buf = idx_ext - buffer_offset
-                    if preserve_grad:
-                        delta = src_row - self._C_buffer[idx_buf]
-                        self._C_buffer[idx_buf].add_(delta)
-                    else:
-                        self._C_buffer[idx_buf].data.copy_(src_row)
+        if fields is None:
+            self._update_full(
+                contribution_set=contribution_set,
+                preserve_grad=preserve_grad,
+            )
         else:
-            # TODO: Partial update implementation.
-            raise NotImplementedError("Partial update is not yet implemented.")
+            self._update_partial(
+                contribution_set=contribution_set,
+                fields=fields,
+                preserve_grad=preserve_grad,
+            )
 
     def delete(
         self,
