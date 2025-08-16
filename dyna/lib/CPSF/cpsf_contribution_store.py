@@ -441,8 +441,53 @@ class CPSFContributionStore:
         fields: list[CPSFContributionField],
         preserve_grad: bool,
     ) -> None:
-        # TODO: Partial update implementation.
-        raise NotImplementedError("Partial update is not yet implemented.")
+        buffer_offset = len(self._C)
+        idx_formatted = self._idx_format(contribution_set.idx)
+
+        for field in fields:
+            sl = self._slice_for_field(field)
+            is_complex = self._is_complex_field(field)
+
+            field_data = getattr(contribution_set, field.name.lower())
+            if field_data is None:
+                raise ValueError(f"Field {field} is None in contribution_set.")
+
+            if field_data.shape[0] != len(idx_formatted):
+                raise ValueError(
+                    f"Batch size mismatch for {field.name}: "
+                    f"got {field_data.shape[0]}, expected {len(idx_formatted)}"
+                )
+
+            if is_complex:
+                field_data = torch.view_as_real(field_data).flatten(1)
+
+            idx_perm = [i for i in idx_formatted if i < buffer_offset]
+            idx_buf = [i - buffer_offset for i in idx_formatted if i >= buffer_offset]
+
+            if idx_perm:
+                mask_perm = [
+                    k for k, i in enumerate(idx_formatted) if i < buffer_offset
+                ]
+                rows = field_data[mask_perm]
+                if preserve_grad:
+                    delta = rows - self._C[idx_perm][:, sl]
+                    self._C[idx_perm][:, sl].add_(delta)
+                else:
+                    self._C.data[idx_perm][:, sl].copy_(rows)
+
+            if idx_buf:
+                mask_buf = [
+                    k for k, i in enumerate(idx_formatted) if i >= buffer_offset
+                ]
+                rows = field_data[mask_buf]
+                if preserve_grad:
+                    # (for) - since buffer is a list of 1D tensors.
+                    for row, i_buf in zip(rows, idx_buf):
+                        delta = row - self._C_buffer[i_buf][0, sl]
+                        self._C_buffer[i_buf][0, sl].add_(delta)
+                else:
+                    for row, i_buf in zip(rows, idx_buf):
+                        self._C_buffer[i_buf].data[0, sl].copy_(row)
 
     def update(
         self,
