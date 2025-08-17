@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 
 
-class CPSF(nn.Module):
+class Field(nn.Module):
     def __init__(
         self,
         N: int,
