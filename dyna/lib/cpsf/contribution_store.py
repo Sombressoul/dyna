@@ -18,8 +18,9 @@ class ContributionStore:
         self,
         N: int,
         S: int,
-        dtype_r: torch.dtype,
-        dtype_c: torch.dtype,
+        dtype_r: torch.dtype = torch.float16,
+        dtype_c: torch.dtype = torch.complex64,
+        dtype_intermediate: torch.dtype = torch.float32,
     ) -> None:
         if torch.is_complex(torch.empty((), dtype=dtype_r)):
             raise TypeError("dtype_r must be a real floating dtype.")
@@ -31,6 +32,7 @@ class ContributionStore:
         self.S = int(S)
         self.target_dtype_r = dtype_r
         self.target_dtype_c = dtype_c
+        self.target_dtype_intermediate = dtype_intermediate
 
         # Define slices.
         # Data order: (z, vec_d, T_hat, sigma_par, sigma_perp, alpha)
@@ -111,16 +113,28 @@ class ContributionStore:
         contributions_set = ContributionSet(
             idx=None,
             z=torch.complex(
-                real=contribution_flat[:, self._slice_z][:, : self.N],
-                imag=contribution_flat[:, self._slice_z][:, self.N :],
+                real=contribution_flat[:, self._slice_z][:, : self.N].to(
+                    dtype=self.target_dtype_intermediate
+                ),
+                imag=contribution_flat[:, self._slice_z][:, self.N :].to(
+                    dtype=self.target_dtype_intermediate
+                ),
             ).to(dtype=self.target_dtype_c),
             vec_d=torch.complex(
-                real=contribution_flat[:, self._slice_vec_d][:, : self.N],
-                imag=contribution_flat[:, self._slice_vec_d][:, self.N :],
+                real=contribution_flat[:, self._slice_vec_d][:, : self.N].to(
+                    dtype=self.target_dtype_intermediate
+                ),
+                imag=contribution_flat[:, self._slice_vec_d][:, self.N :].to(
+                    dtype=self.target_dtype_intermediate
+                ),
             ).to(dtype=self.target_dtype_c),
             T_hat=torch.complex(
-                real=contribution_flat[:, self._slice_T_hat][:, : self.S],
-                imag=contribution_flat[:, self._slice_T_hat][:, self.S :],
+                real=contribution_flat[:, self._slice_T_hat][:, : self.S].to(
+                    dtype=self.target_dtype_intermediate
+                ),
+                imag=contribution_flat[:, self._slice_T_hat][:, self.S :].to(
+                    dtype=self.target_dtype_intermediate
+                ),
             ).to(dtype=self.target_dtype_c),
             sigma_par=contribution_flat[:, self._slice_sigma_par],
             sigma_perp=contribution_flat[:, self._slice_sigma_perp],
@@ -355,7 +369,10 @@ class ContributionStore:
 
             if is_complex:
                 mid = field_data.shape[1] // 2
-                field_data = torch.complex(field_data[:, :mid], field_data[:, mid:])
+                field_data = torch.complex(
+                    real=field_data[:, :mid].to(dtype=self.target_dtype_intermediate),
+                    imag=field_data[:, mid:].to(dtype=self.target_dtype_intermediate),
+                )
 
             setattr(contribution_set, field.name.lower(), field_data)
 
@@ -398,14 +415,14 @@ class ContributionStore:
             if idx_ext < buffer_offset:
                 if preserve_grad:
                     delta = src_row - self._C[idx_ext]
-                    self._C[idx_ext].add_(delta)
+                    self._C[idx_ext] = self._C[idx_ext] + delta
                 else:
                     self._C.data[idx_ext].copy_(src_row)
             else:
                 idx_buf = idx_ext - buffer_offset
                 if preserve_grad:
                     delta = src_row - self._C_buffer[idx_buf]
-                    self._C_buffer[idx_buf].add_(delta)
+                    self._C_buffer[idx_buf] = self._C_buffer[idx_buf] + delta
                 else:
                     self._C_buffer[idx_buf].data.copy_(src_row)
 
@@ -445,7 +462,7 @@ class ContributionStore:
                 rows = field_data[mask_perm]
                 if preserve_grad:
                     delta = rows - self._C[idx_perm][:, sl]
-                    self._C[idx_perm][:, sl].add_(delta)
+                    self._C[idx_perm][:, sl] = self._C[idx_perm][:, sl] + delta
                 else:
                     self._C.data[idx_perm][:, sl].copy_(rows)
 
@@ -458,7 +475,7 @@ class ContributionStore:
                     # (for) - since buffer is a list of 1D tensors.
                     for row, i_buf in zip(rows, idx_buf):
                         delta = row - self._C_buffer[i_buf][0, sl]
-                        self._C_buffer[i_buf][0, sl].add_(delta)
+                        self._C_buffer[i_buf][0, sl] = self._C_buffer[i_buf][0, sl] + delta
                 else:
                     for row, i_buf in zip(rows, idx_buf):
                         self._C_buffer[i_buf].data[0, sl].copy_(row)
