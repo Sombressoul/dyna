@@ -415,14 +415,14 @@ class ContributionStore:
             if idx_ext < buffer_offset:
                 if preserve_grad:
                     delta = src_row - self._C[idx_ext]
-                    self._C[idx_ext] = self._C[idx_ext] + delta
+                    self._C[idx_ext].data.add_(delta) # NOTE: Potential gradient bug.
                 else:
                     self._C.data[idx_ext].copy_(src_row)
             else:
                 idx_buf = idx_ext - buffer_offset
                 if preserve_grad:
                     delta = src_row - self._C_buffer[idx_buf]
-                    self._C_buffer[idx_buf] = self._C_buffer[idx_buf] + delta
+                    self._C_buffer[idx_buf].data.add_(delta) # NOTE: Potential gradient bug.
                 else:
                     self._C_buffer[idx_buf].data.copy_(src_row)
 
@@ -462,7 +462,7 @@ class ContributionStore:
                 rows = field_data[mask_perm]
                 if preserve_grad:
                     delta = rows - self._C[idx_perm][:, sl]
-                    self._C[idx_perm][:, sl] = self._C[idx_perm][:, sl] + delta
+                    self._C[idx_perm][:, sl].data.add_(delta) # NOTE: Potential gradient bug.
                 else:
                     self._C.data[idx_perm][:, sl].copy_(rows)
 
@@ -475,7 +475,7 @@ class ContributionStore:
                     # (for) - since buffer is a list of 1D tensors.
                     for row, i_buf in zip(rows, idx_buf):
                         delta = row - self._C_buffer[i_buf][0, sl]
-                        self._C_buffer[i_buf][0, sl] = self._C_buffer[i_buf][0, sl] + delta
+                        self._C_buffer[i_buf][0, sl].data.add_(delta) # NOTE: Potential gradient bug.
                 else:
                     for row, i_buf in zip(rows, idx_buf):
                         self._C_buffer[i_buf].data[0, sl].copy_(row)
