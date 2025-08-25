@@ -337,6 +337,7 @@ class ContributionStore:
         buffer_offset = len(self._C)
         parts = []
         for i in idx_list:
+            # TODO: implement delta-overlay STE.
             if i < buffer_offset:
                 parts.append(self._C[i].unsqueeze(0))
             else:
@@ -359,6 +360,7 @@ class ContributionStore:
         buffer_offset = len(self._C)
 
         for field in fields:
+            # TODO: implement delta-overlay STE.
             sl = self._slice_for_field(field)
             is_complex = self._is_complex_field(field)
 
@@ -417,21 +419,24 @@ class ContributionStore:
 
         for idx_ext, src_row in zip(idx_formatted, contribution_flat):
             update = src_row.to(self._C.device, self.target_dtype_r)
+
             if idx_ext < buffer_offset:
                 if preserve_grad:
-                    target_row = update.unsqueeze(0).contiguous().detach()
-                    self._overlay_C[idx_ext] = target_row
+                    base_row = self._C[idx_ext]
+                    delta_row = (update - base_row).contiguous().detach()
+                    self._overlay_C[idx_ext] = delta_row.unsqueeze(0)
                     self._overlay_C[idx_ext].requires_grad_(False)
                 else:
-                    self._C.data[idx_ext].copy_(update)
+                    self._C.data[idx_ext] = update
             else:
                 idx_buf = idx_ext - buffer_offset
                 if preserve_grad:
-                    target_row = update.unsqueeze(0).contiguous().detach()
-                    self._overlay_buffer[idx_buf] = target_row
+                    base_row = self._C_buffer[idx_buf][0]
+                    delta_row = (update - base_row).contiguous().detach()
+                    self._overlay_buffer[idx_buf] = delta_row.unsqueeze(0)
                     self._overlay_buffer[idx_buf].requires_grad_(False)
                 else:
-                    self._C_buffer[idx_buf].data.copy_(update.unsqueeze(0))
+                    self._C_buffer[idx_buf].data[0] = update
 
     def _update_partial(
         self,
@@ -473,21 +478,21 @@ class ContributionStore:
                     .contiguous()
                 )
                 if preserve_grad:
-                    # (for) – overlay_C stores per-row [1, D] tensors (dict by index)
-                    for row, i_perm in zip(rows, idx_perm):
+                    base_slices = self._C[idx_perm][:, sl]
+                    delta_slices = (rows - base_slices).contiguous().detach()
+                    for delta, i_perm in zip(delta_slices, idx_perm):
                         if i_perm not in self._overlay_C:
-                            base = (
-                                self._C[i_perm]
-                                .clone()
+                            base_zero = (
+                                torch.zeros_like(self._C[i_perm])
                                 .unsqueeze(0)
                                 .contiguous()
                                 .detach()
                             )
-                            self._overlay_C[i_perm] = base
+                            self._overlay_C[i_perm] = base_zero
                             self._overlay_C[i_perm].requires_grad_(False)
-                        self._overlay_C[i_perm][0, sl] = row
+                        self._overlay_C[i_perm][0, sl] = delta
                 else:
-                    self._C.data[idx_perm][:, sl].copy_(rows)
+                    self._C.data[idx_perm, sl] = rows
 
             if idx_buf:
                 mask_buf = [
@@ -499,16 +504,21 @@ class ContributionStore:
                     .contiguous()
                 )
                 if preserve_grad:
-                    # (for) - since buffer is a list of 1D tensors.
                     for row, i_buf in zip(rows, idx_buf):
+                        base_slice = self._C_buffer[i_buf][0, sl]
+                        delta_slice = (row - base_slice).contiguous().detach()
                         if i_buf not in self._overlay_buffer:
-                            base = self._C_buffer[i_buf].clone().contiguous().detach()
-                            self._overlay_buffer[i_buf] = base
+                            base_zero = (
+                                torch.zeros_like(self._C_buffer[i_buf])
+                                .contiguous()
+                                .detach()
+                            )
+                            self._overlay_buffer[i_buf] = base_zero
                             self._overlay_buffer[i_buf].requires_grad_(False)
-                        self._overlay_buffer[i_buf][0, sl] = row
+                        self._overlay_buffer[i_buf][0, sl] = delta_slice
                 else:
                     for row, i_buf in zip(rows, idx_buf):
-                        self._C_buffer[i_buf].data[0, sl].copy_(row)
+                        self._C_buffer[i_buf].data[0, sl] = row
 
     def update(
         self,
@@ -535,6 +545,7 @@ class ContributionStore:
         self,
         idx: Union[int, IndexLike],
     ) -> None:
+        # TODO: also remove from overlay.
         idx_delete = self.idx_format_to_internal(idx)
         self._C_inactive.permanent = sorted(
             set(self._C_inactive.permanent) | set(idx_delete.permanent)
@@ -628,6 +639,8 @@ class ContributionStore:
         All active permanent contributions appear first, followed by all active
         buffered contributions.
         """
+
+        # TODO: consolidate with influence of delta-overlays.
 
         if not (
             self._C_inactive.permanent or self._C_inactive.buffer or self._C_buffer
