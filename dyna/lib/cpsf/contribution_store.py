@@ -82,6 +82,10 @@ class ContributionStore:
         # Buffer contributions storage for dynamic interactions.
         self._C_buffer: list[torch.Tensor] = []
 
+        # Overlay storages for update methods with gradient preservation.
+        self._overlay_C: dict[int, torch.Tensor] = dict()
+        self._overlay_buffer: dict[int, torch.Tensor] = dict()
+
         # A list of IDs of inactive contributions awaiting deletion.
         self._C_inactive = ContributionStoreIDList()
 
@@ -412,19 +416,22 @@ class ContributionStore:
         idx_formatted = self._idx_format(contribution_set.idx)
 
         for idx_ext, src_row in zip(idx_formatted, contribution_flat):
+            update = src_row.to(self._C.device, self.target_dtype_r)
             if idx_ext < buffer_offset:
                 if preserve_grad:
-                    delta = src_row - self._C[idx_ext]
-                    self._C[idx_ext].data.add_(delta) # NOTE: Potential gradient bug.
+                    target_row = update.unsqueeze(0).contiguous().detach()
+                    self._overlay_C[idx_ext] = target_row
+                    self._overlay_C[idx_ext].requires_grad_(False)
                 else:
-                    self._C.data[idx_ext].copy_(src_row)
+                    self._C.data[idx_ext].copy_(update)
             else:
                 idx_buf = idx_ext - buffer_offset
                 if preserve_grad:
-                    delta = src_row - self._C_buffer[idx_buf]
-                    self._C_buffer[idx_buf].data.add_(delta) # NOTE: Potential gradient bug.
+                    target_row = update.unsqueeze(0).contiguous().detach()
+                    self._overlay_buffer[idx_buf] = target_row
+                    self._overlay_buffer[idx_buf].requires_grad_(False)
                 else:
-                    self._C_buffer[idx_buf].data.copy_(src_row)
+                    self._C_buffer[idx_buf].data.copy_(update.unsqueeze(0))
 
     def _update_partial(
         self,
@@ -450,7 +457,8 @@ class ContributionStore:
                 )
 
             if is_complex:
-                field_data = torch.view_as_real(field_data).flatten(1)
+                ri = torch.view_as_real(field_data)
+                field_data = torch.cat([ri[..., 0], ri[..., 1]], dim=1)
 
             idx_perm = [i for i in idx_formatted if i < buffer_offset]
             idx_buf = [i - buffer_offset for i in idx_formatted if i >= buffer_offset]
@@ -459,10 +467,25 @@ class ContributionStore:
                 mask_perm = [
                     k for k, i in enumerate(idx_formatted) if i < buffer_offset
                 ]
-                rows = field_data[mask_perm]
+                rows = (
+                    field_data[mask_perm]
+                    .to(self._C.device, self.target_dtype_r)
+                    .contiguous()
+                )
                 if preserve_grad:
-                    delta = rows - self._C[idx_perm][:, sl]
-                    self._C[idx_perm][:, sl].data.add_(delta) # NOTE: Potential gradient bug.
+                    # (for) – overlay_C stores per-row [1, D] tensors (dict by index)
+                    for row, i_perm in zip(rows, idx_perm):
+                        if i_perm not in self._overlay_C:
+                            base = (
+                                self._C[i_perm]
+                                .clone()
+                                .unsqueeze(0)
+                                .contiguous()
+                                .detach()
+                            )
+                            self._overlay_C[i_perm] = base
+                            self._overlay_C[i_perm].requires_grad_(False)
+                        self._overlay_C[i_perm][0, sl] = row
                 else:
                     self._C.data[idx_perm][:, sl].copy_(rows)
 
@@ -470,12 +493,19 @@ class ContributionStore:
                 mask_buf = [
                     k for k, i in enumerate(idx_formatted) if i >= buffer_offset
                 ]
-                rows = field_data[mask_buf]
+                rows = (
+                    field_data[mask_buf]
+                    .to(self._C.device, self.target_dtype_r)
+                    .contiguous()
+                )
                 if preserve_grad:
                     # (for) - since buffer is a list of 1D tensors.
                     for row, i_buf in zip(rows, idx_buf):
-                        delta = row - self._C_buffer[i_buf][0, sl]
-                        self._C_buffer[i_buf][0, sl].data.add_(delta) # NOTE: Potential gradient bug.
+                        if i_buf not in self._overlay_buffer:
+                            base = self._C_buffer[i_buf].clone().contiguous().detach()
+                            self._overlay_buffer[i_buf] = base
+                            self._overlay_buffer[i_buf].requires_grad_(False)
+                        self._overlay_buffer[i_buf][0, sl] = row
                 else:
                     for row, i_buf in zip(rows, idx_buf):
                         self._C_buffer[i_buf].data[0, sl].copy_(row)
