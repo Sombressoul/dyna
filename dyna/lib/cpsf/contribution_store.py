@@ -35,7 +35,7 @@ class ContributionStore:
         self.target_dtype_intermediate = dtype_intermediate
 
         # Define slices.
-        # Data order: (z, vec_d, T_hat, sigma_par, sigma_perp, alpha)
+        # Data order: (z, vec_d, t_hat, sigma_par, sigma_perp, alpha)
         self._slice_z = slice(
             0,
             self.N * 2,
@@ -46,14 +46,14 @@ class ContributionStore:
             self._slice_z.stop + self.N * 2,
             1,
         )
-        self._slice_T_hat = slice(
+        self._slice_t_hat = slice(
             self._slice_vec_d.stop,
             self._slice_vec_d.stop + self.S * 2,
             1,
         )
         self._slice_sigma_par = slice(
-            self._slice_T_hat.stop,
-            self._slice_T_hat.stop + 1,
+            self._slice_t_hat.stop,
+            self._slice_t_hat.stop + 1,
             1,
         )
         self._slice_sigma_perp = slice(
@@ -132,11 +132,11 @@ class ContributionStore:
                     dtype=self.target_dtype_intermediate
                 ),
             ).to(dtype=self.target_dtype_c),
-            T_hat=torch.complex(
-                real=contribution_flat[:, self._slice_T_hat][:, : self.S].to(
+            t_hat=torch.complex(
+                real=contribution_flat[:, self._slice_t_hat][:, : self.S].to(
                     dtype=self.target_dtype_intermediate
                 ),
-                imag=contribution_flat[:, self._slice_T_hat][:, self.S :].to(
+                imag=contribution_flat[:, self._slice_t_hat][:, self.S :].to(
                     dtype=self.target_dtype_intermediate
                 ),
             ).to(dtype=self.target_dtype_c),
@@ -162,9 +162,9 @@ class ContributionStore:
         vec_d_imag = torch.imag(contribution_set.vec_d)
         vec_d_flat = torch.cat([vec_d_real, vec_d_imag], dim=1)
 
-        T_hat_real = torch.real(contribution_set.T_hat)
-        T_hat_imag = torch.imag(contribution_set.T_hat)
-        T_hat_flat = torch.cat([T_hat_real, T_hat_imag], dim=1)
+        t_hat_real = torch.real(contribution_set.t_hat)
+        t_hat_imag = torch.imag(contribution_set.t_hat)
+        t_hat_flat = torch.cat([t_hat_real, t_hat_imag], dim=1)
 
         sigma_par_flat = contribution_set.sigma_par
         sigma_perp_flat = contribution_set.sigma_perp
@@ -174,7 +174,7 @@ class ContributionStore:
             [
                 z_flat,
                 vec_d_flat,
-                T_hat_flat,
+                t_hat_flat,
                 sigma_par_flat,
                 sigma_perp_flat,
                 alpha_flat,
@@ -263,7 +263,7 @@ class ContributionStore:
         elif field == ContributionField.VEC_D:
             return self._slice_vec_d
         elif field == ContributionField.T_HAT:
-            return self._slice_T_hat
+            return self._slice_t_hat
         elif field == ContributionField.SIGMA_PAR:
             return self._slice_sigma_par
         elif field == ContributionField.SIGMA_PERP:
@@ -325,7 +325,7 @@ class ContributionStore:
         for entry in contribution_flat.unbind(dim=0):
             self._C_buffer.append(
                 torch.nn.Parameter(
-                    data=entry.unsqueeze(0).to(**target),
+                    data=entry.unsqueeze(0).detach().to(**target),
                     requires_grad=True,
                 )
             )

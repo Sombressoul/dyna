@@ -16,7 +16,7 @@ class ContributionSet:
     idx: Optional[IndexLike] = None
     z: Optional[torch.Tensor] = None
     vec_d: Optional[torch.Tensor] = None
-    T_hat: Optional[torch.Tensor] = None
+    t_hat: Optional[torch.Tensor] = None
     sigma_par: Optional[torch.Tensor] = None
     sigma_perp: Optional[torch.Tensor] = None
     alpha: Optional[torch.Tensor] = None
