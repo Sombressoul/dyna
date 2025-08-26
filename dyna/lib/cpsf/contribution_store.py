@@ -335,24 +335,26 @@ class ContributionStore:
         idx_list: list[int],
     ) -> ContributionSet:
         buffer_offset = len(self._C)
-        parts = []
+        rows = []
         for i in idx_list:
             if i < buffer_offset:
+                row_base = self._C[i].unsqueeze(0)
                 row = (
-                    self._C[i].unsqueeze(0) + self._overlay_C[i].detach()
+                    row_base + self._overlay_C[i].detach()
                     if i in self._overlay_C
-                    else self._C[i].unsqueeze(0)
+                    else row_base
                 )
             else:
                 i_buf = i - buffer_offset
+                row_base = self._C_buffer[i_buf]
                 row = (
-                    self._C_buffer[i_buf] + self._overlay_C_buffer[i_buf].detach()
+                    row_base + self._overlay_C_buffer[i_buf].detach()
                     if i_buf in self._overlay_C_buffer
-                    else self._C_buffer[i_buf]
+                    else row_base
                 )
-            parts.append(row)
+            rows.append(row)
 
-        contributions_flat = torch.cat(parts, dim=0)
+        contributions_flat = torch.cat(rows, dim=0)
         contributions_set = self._flat_to_set(contributions_flat)
 
         contributions_set.idx = idx_list
@@ -630,13 +632,13 @@ class ContributionStore:
     def clear_buffer(
         self,
     ) -> bool:
-        # TODO: also remove from delta-overlay.
         changed = bool(
-            self._C_buffer or self._C_inactive.buffer
-        )  # TODO: Change logic for delta-overlay changes support.
+            self._C_buffer or self._C_inactive.buffer or self._overlay_C_buffer
+        )
         if changed:
             self._C_buffer.clear()
             self._C_inactive.buffer.clear()
+            self._overlay_C_buffer.clear()
         return changed
 
     def read_all_active(
