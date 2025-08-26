@@ -564,14 +564,22 @@ class ContributionStore:
         self,
         idx: Union[int, IndexLike],
     ) -> None:
-        # TODO: also remove from delta-overlay.
         idx_delete = self.idx_format_to_internal(idx)
+
         self._C_inactive.permanent = sorted(
             set(self._C_inactive.permanent) | set(idx_delete.permanent)
         )
         self._C_inactive.buffer = sorted(
             set(self._C_inactive.buffer) | set(idx_delete.buffer)
         )
+
+        for i in idx_delete.permanent:
+            if i in self._overlay_C:
+                del self._overlay_C[i]
+
+        for i in idx_delete.buffer:
+            if i in self._overlay_C_buffer:
+                del self._overlay_C_buffer[i]
 
     def is_active(
         self,
