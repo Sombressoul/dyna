@@ -369,7 +369,6 @@ class ContributionStore:
         buffer_offset = len(self._C)
 
         for field in fields:
-            # TODO: implement delta-overlay STE.
             sl = self._slice_for_field(field)
             is_complex = self._is_complex_field(field)
 
@@ -378,14 +377,14 @@ class ContributionStore:
                 if i < buffer_offset:
                     part_base = self._C[i, sl].unsqueeze(0)
                     part = (
-                        part_base + self._overlay_C[i][:, sl]
+                        part_base + self._overlay_C[i][:, sl].detach()
                         if i in self._overlay_C
                         else part_base
                     )
                 else:
                     part_base = self._C_buffer[i - buffer_offset][:, sl]
                     part = (
-                        part_base + self._overlay_C_buffer[i][:, sl]
+                        part_base + self._overlay_C_buffer[i][:, sl].detach()
                         if i in self._overlay_C_buffer
                         else part_base
                     )
@@ -565,7 +564,7 @@ class ContributionStore:
         self,
         idx: Union[int, IndexLike],
     ) -> None:
-        # TODO: also remove from overlay.
+        # TODO: also remove from delta-overlay.
         idx_delete = self.idx_format_to_internal(idx)
         self._C_inactive.permanent = sorted(
             set(self._C_inactive.permanent) | set(idx_delete.permanent)
@@ -623,7 +622,10 @@ class ContributionStore:
     def clear_buffer(
         self,
     ) -> bool:
-        changed = bool(self._C_buffer or self._C_inactive.buffer)
+        # TODO: also remove from delta-overlay.
+        changed = bool(
+            self._C_buffer or self._C_inactive.buffer
+        )  # TODO: Change logic for delta-overlay changes support.
         if changed:
             self._C_buffer.clear()
             self._C_inactive.buffer.clear()
