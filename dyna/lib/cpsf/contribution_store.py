@@ -203,7 +203,7 @@ class ContributionStore:
         else:
             raise TypeError(f"Unsupported index type: {type(idx)}")
 
-        if any([type(v) is not int for v in idx_list]):
+        if any(type(v) is not int for v in idx_list):
             err = "\n".join(
                 f"id:{pos} -> {type(val)}"
                 for pos, val in enumerate(idx_list)
