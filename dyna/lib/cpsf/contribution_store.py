@@ -710,12 +710,10 @@ class ContributionStore:
 
         # Collect active bufferized.
         if self._C_buffer:
-            # TODO: consolidate buffer with influence of delta-overlays.
             if self._C_inactive.buffer:
+                inactive_buffer = set(self._C_inactive.buffer)
                 active_buffer_indices = [
-                    i
-                    for i in range(len(self._C_buffer))
-                    if i not in self._C_inactive.buffer
+                    i for i in range(len(self._C_buffer)) if i not in inactive_buffer
                 ]
                 if active_buffer_indices:
                     active_buffer = torch.cat(
@@ -724,8 +722,18 @@ class ContributionStore:
                     )
                 else:
                     active_buffer = empty_C
+                if active_buffer_indices and self._overlay_C_buffer:
+                    with torch.no_grad():
+                        for i, row in zip(active_buffer_indices, active_buffer):
+                            delta = self._overlay_C_buffer.get(i, None)
+                            if delta is not None:
+                                row.add_(delta.squeeze(0))
             else:
                 active_buffer = torch.cat(self._C_buffer, dim=0)
+                if self._overlay_C_buffer:
+                    with torch.no_grad():
+                        for i, delta in self._overlay_C_buffer.items():
+                            active_buffer[i].add_(delta.squeeze(0))
         else:
             active_buffer = empty_C
 
