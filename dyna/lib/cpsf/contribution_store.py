@@ -152,7 +152,7 @@ class ContributionStore:
         contribution_set: ContributionSet,
     ) -> torch.Tensor:
         if not self._is_full_contribution_set(contribution_set):
-            raise ValueError("_set_to_flat() requires a complete CPSFContributionSet.")
+            raise ValueError("_set_to_flat() requires a complete ContributionSet.")
 
         z_real = torch.real(contribution_set.z)
         z_imag = torch.imag(contribution_set.z)
@@ -224,9 +224,9 @@ class ContributionStore:
             return [fields]
 
         if not isinstance(fields, Iterable):
-            raise TypeError("fields must be iterable or a CPSFContributionField.")
+            raise TypeError("fields must be iterable or a ContributionField.")
         if not all(isinstance(field, ContributionField) for field in fields):
-            raise TypeError("fields must be instances of CPSFContributionField.")
+            raise TypeError("fields must be instances of ContributionField.")
 
         return list(fields)
 
@@ -235,7 +235,7 @@ class ContributionStore:
         contribution_set: ContributionSet,
     ) -> None:
         if not isinstance(contribution_set, ContributionSet):
-            raise TypeError("Expected CPSFContributionSet instance.")
+            raise TypeError("Expected ContributionSet instance.")
 
         field_names = [
             f.name for f in dataclasses_fields(ContributionSet) if f.name != "idx"
@@ -248,11 +248,11 @@ class ContributionStore:
         ]
 
         if not batch_sizes:
-            raise ValueError("CPSFContributionSet contains no data.")
+            raise ValueError("ContributionSet contains no data.")
         if any(s != batch_sizes[0] for s in batch_sizes):
             raise ValueError("Inconsistent batch size among fields.")
         if batch_sizes[0] == 0:
-            raise ValueError("CPSFContributionSet is empty.")
+            raise ValueError("ContributionSet is empty.")
 
     def _slice_for_field(
         self,
@@ -271,7 +271,7 @@ class ContributionStore:
         elif field == ContributionField.ALPHA:
             return self._slice_alpha
         else:
-            raise ValueError(f"Unknown CPSFContributionField: {field}")
+            raise ValueError(f"Unknown ContributionField: {field}")
 
     def _is_complex_field(
         self,
@@ -317,7 +317,7 @@ class ContributionStore:
         self._validate_contribution_set(contribution_set)
 
         if not self._is_full_contribution_set(contribution_set):
-            raise ValueError("CPSFContributionSet must be complete for create().")
+            raise ValueError("ContributionSet must be complete for create().")
 
         contribution_flat = self._set_to_flat(contribution_set)
         target = dict(device=self._C.device, dtype=self.target_dtype_r)
@@ -672,10 +672,12 @@ class ContributionStore:
         buffered contributions.
         """
 
-        # TODO: consolidate with influence of delta-overlays.
-
         if not (
-            self._C_inactive.permanent or self._C_inactive.buffer or self._C_buffer
+            self._C_inactive.permanent
+            or self._C_inactive.buffer
+            or self._C_buffer
+            or self._overlay_C
+            or self._overlay_C_buffer
         ):
             return False
 
@@ -684,19 +686,31 @@ class ContributionStore:
 
         # Collect active permanent.
         if self._C_inactive.permanent:
+            inactive_perm = set(self._C_inactive.permanent)
             active_permanent_indices = [
-                i for i in range(len(self._C)) if i not in self._C_inactive.permanent
+                i for i in range(len(self._C)) if i not in inactive_perm
             ]
             active_permanent = (
                 self._C[active_permanent_indices]
                 if active_permanent_indices
                 else empty_C
             )
+            if active_permanent_indices and self._overlay_C:
+                with torch.no_grad():
+                    for i, row in zip(active_permanent_indices, active_permanent):
+                        delta = self._overlay_C.get(i, None)
+                        if delta is not None:
+                            row.add_(delta.squeeze(0))
         else:
             active_permanent = self._C
+            if self._overlay_C:
+                with torch.no_grad():
+                    for i, delta in self._overlay_C.items():
+                        active_permanent[i].add_(delta.squeeze(0))
 
         # Collect active bufferized.
         if self._C_buffer:
+            # TODO: consolidate buffer with influence of delta-overlays.
             if self._C_inactive.buffer:
                 active_buffer_indices = [
                     i
@@ -740,7 +754,11 @@ class ContributionStore:
             ).contiguous(),
             requires_grad=True,
         )
+
+        # Clean up tails.
         self._C_buffer = []
         self._C_inactive = ContributionStoreIDList()
+        self._overlay_C.clear()
+        self._overlay_C_buffer.clear()
 
         return True
