@@ -203,6 +203,14 @@ class ContributionStore:
         else:
             raise TypeError(f"Unsupported index type: {type(idx)}")
 
+        if any([type(v) is not int for v in idx_list]):
+            err = "\n".join(
+                f"id:{pos} -> {type(val)}"
+                for pos, val in enumerate(idx_list)
+                if type(val) is not int
+            )
+            raise TypeError(f"Unsupported index type:\n{err}")
+
         idx_list = [int(i) for i in idx_list]
         if not all(i >= 0 for i in idx_list):
             raise IndexError("Index must be non-negative")
@@ -384,10 +392,11 @@ class ContributionStore:
                         else part_base
                     )
                 else:
-                    part_base = self._C_buffer[i - buffer_offset][:, sl]
+                    i_buf = i - buffer_offset
+                    part_base = self._C_buffer[i_buf][:, sl]
                     part = (
-                        part_base + self._overlay_C_buffer[i][:, sl].detach()
-                        if i in self._overlay_C_buffer
+                        part_base + self._overlay_C_buffer[i_buf][:, sl].detach()
+                        if i_buf in self._overlay_C_buffer
                         else part_base
                     )
                 parts.append(part)
@@ -416,6 +425,9 @@ class ContributionStore:
 
         if any(i in inactive_set for i in idx_list):
             raise IndexError("Requested index refers to an inactive contribution.")
+
+        if not idx_list:
+            raise ValueError("Empty index list.")
 
         if fields is None:
             return self._read_full(idx_list=idx_list)
