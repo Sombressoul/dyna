@@ -5,15 +5,17 @@ from dataclasses import (
     field as dataclasses_field,
 )
 from enum import Enum, auto as enum_auto
-from typing import Sequence, Optional, Union
+from typing import Sequence, Optional, Union, Literal
 
 
-IndexLike = Union[torch.Tensor, Sequence[int]]
+CPSFIndexLike = Union[torch.Tensor, Sequence[int]]
+CPSFConsistency = Literal["snapshot", "live"]
+CPSFSelection = Union[slice, torch.LongTensor, list, tuple]
 
 
 @dataclass
-class ContributionSet:
-    idx: Optional[IndexLike] = None
+class CPSFContributionSet:
+    idx: Optional[CPSFIndexLike] = None
     z: Optional[torch.Tensor] = None
     vec_d: Optional[torch.Tensor] = None
     t_hat: Optional[torch.Tensor] = None
@@ -23,15 +25,46 @@ class ContributionSet:
 
 
 @dataclass
-class ContributionStoreIDList:
+class CPSFContributionStoreIDList:
     permanent: list[int] = dataclasses_field(default_factory=list)
     buffer: list[int] = dataclasses_field(default_factory=list)
 
 
-class ContributionField(Enum):
+class CPSFContributionField(Enum):
     Z = enum_auto()
     VEC_D = enum_auto()
     T_HAT = enum_auto()
     SIGMA_PAR = enum_auto()
     SIGMA_PERP = enum_auto()
     ALPHA = enum_auto()
+
+
+@dataclass
+class CPSFChunkPolicy:
+    J_tile: int
+    Q_tile: int
+    S_tile: Optional[int] = None
+
+
+@dataclass
+class CPSFLatticeSumPolicy:
+    kind: Literal["full", "window"] = "window"
+    window: Optional[Union[int, Sequence[torch.LongTensor]]] = None
+
+    def fixed_window(self) -> torch.LongTensor:
+        raise NotImplementedError
+
+
+@dataclass
+class CPSFIntegrationPolicy:
+    kind: Literal["quad", "mc", "strat"] = "quad"
+    samples: int = 0
+    seed: Optional[int] = None
+
+
+@dataclass
+class CPSFDTypes:
+    dtype_r: torch.dtype
+    dtype_c: torch.dtype
+    accum_dtype: torch.dtype
+    device: torch.device

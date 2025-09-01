@@ -6,14 +6,14 @@ from typing import Optional, Union
 
 
 from dyna.lib.cpsf.structures import (
-    IndexLike,
-    ContributionField,
-    ContributionSet,
-    ContributionStoreIDList,
+    CPSFIndexLike,
+    CPSFContributionField,
+    CPSFContributionSet,
+    CPSFContributionStoreIDList,
 )
 
 
-class ContributionStore:
+class CPSFContributionStore:
     def __init__(
         self,
         N: int,
@@ -87,7 +87,7 @@ class ContributionStore:
         self._overlay_C_buffer: dict[int, torch.Tensor] = dict()
 
         # A list of IDs of inactive contributions awaiting deletion.
-        self._C_inactive = ContributionStoreIDList()
+        self._C_inactive = CPSFContributionStoreIDList()
 
         pass
 
@@ -96,25 +96,25 @@ class ContributionStore:
 
     def _is_full_contribution_set(
         self,
-        contribution_set: ContributionSet,
+        contribution_set: CPSFContributionSet,
     ) -> bool:
         return all(
             getattr(contribution_set, f.name) is not None
-            for f in dataclasses_fields(ContributionSet)
+            for f in dataclasses_fields(CPSFContributionSet)
             if f.name != "idx"
         )
 
     def _flat_to_set(
         self,
         contribution_flat: torch.Tensor,
-    ) -> ContributionSet:
+    ) -> CPSFContributionSet:
         if contribution_flat.shape[1] != self._contribution_length:
             raise ValueError(
                 f"Flat contributions must have shape (batch, {self._contribution_length}), "
                 f"but got {contribution_flat.shape}."
             )
 
-        contributions_set = ContributionSet(
+        contributions_set = CPSFContributionSet(
             idx=None,
             z=torch.complex(
                 real=contribution_flat[:, self._slice_z][:, : self.N].to(
@@ -149,7 +149,7 @@ class ContributionStore:
 
     def _set_to_flat(
         self,
-        contribution_set: ContributionSet,
+        contribution_set: CPSFContributionSet,
     ) -> torch.Tensor:
         if not self._is_full_contribution_set(contribution_set):
             raise ValueError("_set_to_flat() requires a complete ContributionSet.")
@@ -192,7 +192,7 @@ class ContributionStore:
 
     def _idx_format(
         self,
-        idx: IndexLike,
+        idx: CPSFIndexLike,
     ) -> list[int]:
         if isinstance(idx, torch.Tensor):
             idx_list = idx.flatten().tolist()
@@ -223,30 +223,30 @@ class ContributionStore:
 
     def _normalize_fields_arg(
         self,
-        fields: Optional[Union[ContributionField, Iterable[ContributionField]]],
-    ) -> Optional[list[ContributionField]]:
+        fields: Optional[Union[CPSFContributionField, Iterable[CPSFContributionField]]],
+    ) -> Optional[list[CPSFContributionField]]:
         if fields is None:
             return None
 
-        if isinstance(fields, ContributionField):
+        if isinstance(fields, CPSFContributionField):
             return [fields]
 
         if not isinstance(fields, Iterable):
             raise TypeError("fields must be iterable or a ContributionField.")
-        if not all(isinstance(field, ContributionField) for field in fields):
+        if not all(isinstance(field, CPSFContributionField) for field in fields):
             raise TypeError("fields must be instances of ContributionField.")
 
         return list(fields)
 
     def _validate_contribution_set(
         self,
-        contribution_set: ContributionSet,
+        contribution_set: CPSFContributionSet,
     ) -> None:
-        if not isinstance(contribution_set, ContributionSet):
+        if not isinstance(contribution_set, CPSFContributionSet):
             raise TypeError("Expected ContributionSet instance.")
 
         field_names = [
-            f.name for f in dataclasses_fields(ContributionSet) if f.name != "idx"
+            f.name for f in dataclasses_fields(CPSFContributionSet) if f.name != "idx"
         ]
 
         batch_sizes = [
@@ -264,38 +264,38 @@ class ContributionStore:
 
     def _slice_for_field(
         self,
-        field: ContributionField,
+        field: CPSFContributionField,
     ) -> slice:
-        if field == ContributionField.Z:
+        if field == CPSFContributionField.Z:
             return self._slice_z
-        elif field == ContributionField.VEC_D:
+        elif field == CPSFContributionField.VEC_D:
             return self._slice_vec_d
-        elif field == ContributionField.T_HAT:
+        elif field == CPSFContributionField.T_HAT:
             return self._slice_t_hat
-        elif field == ContributionField.SIGMA_PAR:
+        elif field == CPSFContributionField.SIGMA_PAR:
             return self._slice_sigma_par
-        elif field == ContributionField.SIGMA_PERP:
+        elif field == CPSFContributionField.SIGMA_PERP:
             return self._slice_sigma_perp
-        elif field == ContributionField.ALPHA:
+        elif field == CPSFContributionField.ALPHA:
             return self._slice_alpha
         else:
             raise ValueError(f"Unknown ContributionField: {field}")
 
     def _is_complex_field(
         self,
-        field: ContributionField,
+        field: CPSFContributionField,
     ) -> bool:
         return field in (
-            ContributionField.Z,
-            ContributionField.VEC_D,
-            ContributionField.T_HAT,
+            CPSFContributionField.Z,
+            CPSFContributionField.VEC_D,
+            CPSFContributionField.T_HAT,
         )
 
     def idx_format_to_internal(
         self,
-        idx: IndexLike,
-    ) -> ContributionStoreIDList:
-        idx_internal = ContributionStoreIDList()
+        idx: CPSFIndexLike,
+    ) -> CPSFContributionStoreIDList:
+        idx_internal = CPSFContributionStoreIDList()
 
         idx_list = self._idx_format(idx)
 
@@ -309,7 +309,7 @@ class ContributionStore:
 
     def idx_format_to_external(
         self,
-        idx: ContributionStoreIDList,
+        idx: CPSFContributionStoreIDList,
     ) -> list[int]:
         idx_external = list(idx.permanent)
 
@@ -320,7 +320,7 @@ class ContributionStore:
 
     def create(
         self,
-        contribution_set: ContributionSet,
+        contribution_set: CPSFContributionSet,
     ) -> None:
         self._validate_contribution_set(contribution_set)
 
@@ -341,7 +341,7 @@ class ContributionStore:
     def _read_full(
         self,
         idx_list: list[int],
-    ) -> ContributionSet:
+    ) -> CPSFContributionSet:
         buffer_offset = len(self._C)
         rows = []
         for i in idx_list:
@@ -372,9 +372,9 @@ class ContributionStore:
     def _read_partial(
         self,
         idx_list: list[int],
-        fields: list[ContributionField],
-    ) -> ContributionSet:
-        contribution_set = ContributionSet(idx=idx_list)
+        fields: list[CPSFContributionField],
+    ) -> CPSFContributionSet:
+        contribution_set = CPSFContributionSet(idx=idx_list)
 
         buffer_offset = len(self._C)
 
@@ -416,9 +416,9 @@ class ContributionStore:
 
     def read(
         self,
-        idx: IndexLike,
-        fields: list[ContributionField] = None,
-    ) -> ContributionSet:
+        idx: CPSFIndexLike,
+        fields: list[CPSFContributionField] = None,
+    ) -> CPSFContributionSet:
         idx_list = self._idx_format(idx)
         fields = self._normalize_fields_arg(fields)
         inactive_set = set(self.idx_inactive())
@@ -436,7 +436,7 @@ class ContributionStore:
 
     def _update_full(
         self,
-        contribution_set: ContributionSet,
+        contribution_set: CPSFContributionSet,
         preserve_grad: bool,
     ) -> None:
         if not self._is_full_contribution_set(contribution_set):
@@ -473,8 +473,8 @@ class ContributionStore:
 
     def _update_partial(
         self,
-        contribution_set: ContributionSet,
-        fields: list[ContributionField],
+        contribution_set: CPSFContributionSet,
+        fields: list[CPSFContributionField],
         preserve_grad: bool,
     ) -> None:
         buffer_offset = len(self._C)
@@ -555,8 +555,8 @@ class ContributionStore:
 
     def update(
         self,
-        contribution_set: ContributionSet,
-        fields: list[ContributionField] = None,
+        contribution_set: CPSFContributionSet,
+        fields: list[CPSFContributionField] = None,
         preserve_grad: bool = True,
     ) -> None:
         self._validate_contribution_set(contribution_set)
@@ -576,7 +576,7 @@ class ContributionStore:
 
     def delete(
         self,
-        idx: Union[int, IndexLike],
+        idx: Union[int, CPSFIndexLike],
     ) -> None:
         idx_delete = self.idx_format_to_internal(idx)
 
@@ -597,7 +597,7 @@ class ContributionStore:
 
     def is_active(
         self,
-        idx: Union[int, IndexLike],
+        idx: Union[int, CPSFIndexLike],
     ) -> list[bool]:
         idx_test = self._idx_format(idx)
         idx_active = set(self.idx_active())  # O(1) check
@@ -655,8 +655,8 @@ class ContributionStore:
 
     def read_all_active(
         self,
-        fields: list[ContributionField] = None,
-    ) -> ContributionSet:
+        fields: list[CPSFContributionField] = None,
+    ) -> CPSFContributionSet:
         return self.read(
             idx=self.idx_active(),
             fields=fields,
@@ -777,7 +777,7 @@ class ContributionStore:
 
         # Clean up tails.
         self._C_buffer = []
-        self._C_inactive = ContributionStoreIDList()
+        self._C_inactive = CPSFContributionStoreIDList()
         self._overlay_C.clear()
         self._overlay_C_buffer.clear()
 
