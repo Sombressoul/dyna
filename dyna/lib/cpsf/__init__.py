@@ -1,3 +1,5 @@
+from dyna.lib.cpsf import functional
+
 from dyna.lib.cpsf.context import (
     CPSFContext,
     CPSFGeometryCache,
@@ -15,7 +17,6 @@ from dyna.lib.cpsf.errors import (
 from dyna.lib.cpsf.module import CPSFModule
 from dyna.lib.cpsf.projection import CPSFProjection
 from dyna.lib.cpsf.contribution_store import CPSFContributionStore
-from dyna.lib.cpsf import functional
 from dyna.lib.cpsf.structures import (
     CPSFChunkPolicy,
     CPSFConsistency,
