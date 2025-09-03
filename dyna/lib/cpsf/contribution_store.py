@@ -364,7 +364,7 @@ class CPSFContributionStore:
                         if i_buf in self._overlay_C_buffer and active_overlay
                         else row_base
                     )
-            if row:
+            if row is not None:
                 rows.append(row)
 
         contributions_flat = torch.cat(rows, dim=0)
@@ -408,7 +408,7 @@ class CPSFContributionStore:
                             if i_buf in self._overlay_C_buffer and active_overlay
                             else part_base
                         )
-                if part:
+                if part is not None:
                     parts.append(part)
 
             field_data = torch.cat(parts, dim=0).to(dtype=self.target_dtype_r)
@@ -434,10 +434,10 @@ class CPSFContributionStore:
         idx_list = self._idx_format(idx)
         fields = self._normalize_fields_arg(fields)
         inactive_set = set(self.idx_inactive())
+        buffer_offset = len(self._C)
 
-        # TODO: check idx_list for buffer ids in case of active_buffer==False, raise an error.
-        #       Otherwise there could be an error inside _read_full() and _read_partial() because
-        #       of empty collected list of tensors passed into torch.cat().
+        if not active_buffer and any(i >= buffer_offset for i in idx_list):
+            raise ValueError("Buffer indices are not allowed when active_buffer=False.")
 
         if any(i in inactive_set for i in idx_list):
             raise IndexError("Requested index refers to an inactive contribution.")

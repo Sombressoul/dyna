@@ -4,10 +4,11 @@ from typing import Optional, Iterable
 
 
 from dyna.lib.cpsf.structures import (
-    CPSFContributionSet,
     CPSFContributionField,
+    CPSFContributionSet,
     CPSFIndexLike,
 )
+from dyna.lib.cpsf.context import CPSFContext
 from dyna.lib.cpsf.contribution_store import CPSFContributionStore
 
 
@@ -15,13 +16,16 @@ class CPSFContributionStoreFacade:
     def __init__(
         self,
         store: CPSFContributionStore,
+        context: CPSFContext,
     ):
         self.store = store
-        self.epoch: int = 0
+        self.ctx = context
 
     def read_full(
         self,
         idx: CPSFIndexLike,
+        active_buffer: bool = True,
+        active_overlay: bool = True,
     ) -> CPSFContributionSet:
         raise NotImplementedError
 
@@ -29,6 +33,8 @@ class CPSFContributionStoreFacade:
         self,
         idx: CPSFIndexLike,
         fields: list[CPSFContributionField],
+        active_buffer: bool = True,
+        active_overlay: bool = True,
     ) -> CPSFContributionSet:
         raise NotImplementedError
 
@@ -54,4 +60,5 @@ class CPSFContributionStoreFacade:
     def begin_snapshot(
         self,
     ) -> int:
-        raise NotImplementedError
+        self.ctx.epoch += 1
+        return self.ctx.epoch
