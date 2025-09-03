@@ -21,22 +21,19 @@ class CPSFContributionStoreFacade:
         self.store = store
         self.ctx = context
 
-    def read_full(
+    def read(
         self,
         idx: CPSFIndexLike,
+        fields: Optional[Iterable[CPSFContributionField]] = None,
         active_buffer: bool = True,
         active_overlay: bool = True,
-    ) -> CPSFContributionSet:
-        raise NotImplementedError
-
-    def read_fields(
-        self,
-        idx: CPSFIndexLike,
-        fields: list[CPSFContributionField],
-        active_buffer: bool = True,
-        active_overlay: bool = True,
-    ) -> CPSFContributionSet:
-        raise NotImplementedError
+    ) -> list[CPSFContributionSet]:
+        return self.store.read(
+            idx=idx,
+            fields=fields,
+            active_buffer=active_buffer,
+            active_overlay=active_overlay,
+        )
 
     def update(
         self,
