@@ -1,7 +1,4 @@
-import torch
-
 from typing import Optional, Iterable
-
 
 from dyna.lib.cpsf.structures import (
     CPSFContributionField,
@@ -37,22 +34,28 @@ class CPSFContributionStoreFacade:
 
     def update(
         self,
-        cs: CPSFContributionSet,
+        contribution_set: CPSFContributionSet,
         fields: Optional[Iterable[CPSFContributionField]] = None,
         preserve_grad: bool = True,
     ) -> None:
-        raise NotImplementedError
+        self.store.update(
+            contribution_set=contribution_set,
+            fields=fields,
+            preserve_grad=preserve_grad,
+        )
 
     def delete(
         self,
         idx: CPSFIndexLike,
     ) -> None:
-        raise NotImplementedError
+        self.store.delete(
+            idx=idx,
+        )
 
     def consolidate(
         self,
-    ) -> None:
-        raise NotImplementedError
+    ) -> bool:
+        return self.store.consolidate()
 
     def begin_snapshot(
         self,
