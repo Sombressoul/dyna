@@ -9,8 +9,28 @@ from typing import Sequence, Optional, Union, Literal
 
 
 CPSFIndexLike = Union[torch.Tensor, Sequence[int]]
-CPSFConsistency = Literal["snapshot", "live"]
 CPSFSelection = Union[slice, torch.LongTensor, list, tuple]
+
+
+class CPSFConsistency(Enum):
+    snapshot = enum_auto()
+    live = enum_auto()
+
+
+@dataclass
+class CPSFModuleReadFlags:
+    """
+    Optional behavior overrides for CPSFModule for a single call.
+    Does not change the canon; only affects the Store read policy.
+
+    active_buffer  — True: read from buffer (new entries) as well,
+                     False: ignore buffer (permanent only).
+    active_overlay — True: consider overlay deltas when reading,
+                     False: ignore overlay when reading.
+    """
+
+    active_buffer: Optional[bool] = None
+    active_overlay: Optional[bool] = None
 
 
 @dataclass
