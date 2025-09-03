@@ -341,26 +341,31 @@ class CPSFContributionStore:
     def _read_full(
         self,
         idx_list: list[int],
+        active_buffer: bool = True,
+        active_overlay: bool = True,
     ) -> CPSFContributionSet:
         buffer_offset = len(self._C)
         rows = []
         for i in idx_list:
+            row = None
             if i < buffer_offset:
                 row_base = self._C[i].unsqueeze(0)
                 row = (
                     row_base + self._overlay_C[i].detach()
-                    if i in self._overlay_C
+                    if i in self._overlay_C and active_overlay
                     else row_base
                 )
             else:
-                i_buf = i - buffer_offset
-                row_base = self._C_buffer[i_buf]
-                row = (
-                    row_base + self._overlay_C_buffer[i_buf].detach()
-                    if i_buf in self._overlay_C_buffer
-                    else row_base
-                )
-            rows.append(row)
+                if active_buffer:
+                    i_buf = i - buffer_offset
+                    row_base = self._C_buffer[i_buf]
+                    row = (
+                        row_base + self._overlay_C_buffer[i_buf].detach()
+                        if i_buf in self._overlay_C_buffer and active_overlay
+                        else row_base
+                    )
+            if row:
+                rows.append(row)
 
         contributions_flat = torch.cat(rows, dim=0)
         contributions_set = self._flat_to_set(contributions_flat)
@@ -373,6 +378,8 @@ class CPSFContributionStore:
         self,
         idx_list: list[int],
         fields: list[CPSFContributionField],
+        active_buffer: bool = True,
+        active_overlay: bool = True,
     ) -> CPSFContributionSet:
         contribution_set = CPSFContributionSet(idx=idx_list)
 
@@ -384,22 +391,25 @@ class CPSFContributionStore:
 
             parts = []
             for i in idx_list:
+                part = None
                 if i < buffer_offset:
                     part_base = self._C[i, sl].unsqueeze(0)
                     part = (
                         part_base + self._overlay_C[i][:, sl].detach()
-                        if i in self._overlay_C
+                        if i in self._overlay_C and active_overlay
                         else part_base
                     )
                 else:
-                    i_buf = i - buffer_offset
-                    part_base = self._C_buffer[i_buf][:, sl]
-                    part = (
-                        part_base + self._overlay_C_buffer[i_buf][:, sl].detach()
-                        if i_buf in self._overlay_C_buffer
-                        else part_base
-                    )
-                parts.append(part)
+                    if active_buffer:
+                        i_buf = i - buffer_offset
+                        part_base = self._C_buffer[i_buf][:, sl]
+                        part = (
+                            part_base + self._overlay_C_buffer[i_buf][:, sl].detach()
+                            if i_buf in self._overlay_C_buffer and active_overlay
+                            else part_base
+                        )
+                if part:
+                    parts.append(part)
 
             field_data = torch.cat(parts, dim=0).to(dtype=self.target_dtype_r)
 
@@ -418,10 +428,16 @@ class CPSFContributionStore:
         self,
         idx: CPSFIndexLike,
         fields: list[CPSFContributionField] = None,
+        active_buffer: bool = True,
+        active_overlay: bool = True,
     ) -> CPSFContributionSet:
         idx_list = self._idx_format(idx)
         fields = self._normalize_fields_arg(fields)
         inactive_set = set(self.idx_inactive())
+
+        # TODO: check idx_list for buffer ids in case of active_buffer==False, raise an error.
+        #       Otherwise there could be an error inside _read_full() and _read_partial() because
+        #       of empty collected list of tensors passed into torch.cat().
 
         if any(i in inactive_set for i in idx_list):
             raise IndexError("Requested index refers to an inactive contribution.")
@@ -430,9 +446,18 @@ class CPSFContributionStore:
             raise ValueError("Empty index list.")
 
         if fields is None:
-            return self._read_full(idx_list=idx_list)
+            return self._read_full(
+                idx_list=idx_list,
+                active_buffer=active_buffer,
+                active_overlay=active_overlay,
+            )
         else:
-            return self._read_partial(idx_list=idx_list, fields=fields)
+            return self._read_partial(
+                idx_list=idx_list,
+                fields=fields,
+                active_buffer=active_buffer,
+                active_overlay=active_overlay,
+            )
 
     def _update_full(
         self,
