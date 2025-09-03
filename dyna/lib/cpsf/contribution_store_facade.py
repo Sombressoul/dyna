@@ -27,7 +27,7 @@ class CPSFContributionStoreFacade:
         fields: Optional[Iterable[CPSFContributionField]] = None,
         active_buffer: bool = True,
         active_overlay: bool = True,
-    ) -> list[CPSFContributionSet]:
+    ) -> CPSFContributionSet:
         return self.store.read(
             idx=idx,
             fields=fields,
