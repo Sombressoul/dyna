@@ -41,7 +41,12 @@ class CPSFModule:
         if overrides is not None:
             if not isinstance(overrides, CPSFModuleReadFlags):
                 raise TypeError(
-                    f"overrides must be CPSFModuleReadFlags; got {type(overrides)}"
+                    "\n".join(
+                        [
+                            f"overrides must be CPSFModuleReadFlags.",
+                            f"Got {type(overrides)}",
+                        ]
+                    )
                 )
 
             flags.active_buffer = (
