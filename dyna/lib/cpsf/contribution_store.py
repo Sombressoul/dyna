@@ -681,10 +681,14 @@ class CPSFContributionStore:
     def read_all_active(
         self,
         fields: list[CPSFContributionField] = None,
+        active_buffer: bool = True,
+        active_overlay: bool = True,
     ) -> CPSFContributionSet:
         return self.read(
             idx=self.idx_active(),
             fields=fields,
+            active_buffer=active_buffer,
+            active_overlay=active_overlay,
         )
 
     def consolidate(self) -> bool:
