@@ -685,7 +685,7 @@ class CPSFContributionStore:
         active_overlay: bool = True,
     ) -> CPSFContributionSet:
         return self.read(
-            idx=self.idx_active(),
+            idx=self.idx_active() if active_buffer else self.idx_permanent(),
             fields=fields,
             active_buffer=active_buffer,
             active_overlay=active_overlay,
