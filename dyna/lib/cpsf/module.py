@@ -18,7 +18,7 @@ class CPSFModule:
         store_facade: CPSFContributionStoreFacade,
     ):
         self.ctx = context
-        self.store = store_facade
+        self.store_facade = store_facade
 
     def _resolve_read_flags(
         self,
