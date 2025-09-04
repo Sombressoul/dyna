@@ -7,8 +7,6 @@ from dataclasses import (
 from enum import Enum, auto as enum_auto
 from typing import Sequence, Optional, Union, Literal
 
-from dyna.lib.cpsf.functional.lattice import fixed_window
-
 
 CPSFIndexLike = Union[torch.Tensor, Sequence[int]]
 CPSFSelection = Union[slice, torch.LongTensor, list, tuple]
@@ -68,6 +66,11 @@ class CPSFChunkPolicy:
     S_tile: Optional[int] = None
 
 
+class CPSFLatticeSumPolicyKind(Enum):
+    FULL = enum_auto()
+    WINDOW = enum_auto()
+
+
 @dataclass
 class CPSFLatticeSumPolicy:
     kind: Literal["full", "window"] = "window"
@@ -77,7 +80,8 @@ class CPSFLatticeSumPolicy:
         self,
         N: int,
     ) -> torch.LongTensor:
-        return fixed_window(self)
+        from dyna.lib.cpsf.functional.lattice import fixed_window as _fw
+        return _fw(self, N)
 
 
 @dataclass
