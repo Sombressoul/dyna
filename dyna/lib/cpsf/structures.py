@@ -73,7 +73,10 @@ class CPSFLatticeSumPolicy:
     kind: Literal["full", "window"] = "window"
     window: Optional[Union[int, Sequence[torch.LongTensor]]] = None
 
-    def fixed_window(self) -> torch.LongTensor:
+    def fixed_window(
+        self,
+        N: int,
+    ) -> torch.LongTensor:
         return fixed_window(self)
 
 
