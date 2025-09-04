@@ -3,6 +3,7 @@ import torch
 
 from dyna.lib.cpsf.structures import CPSFLatticeSumPolicy
 
+# TODO: remove.
 
 def fixed_window(
     policy: CPSFLatticeSumPolicy,

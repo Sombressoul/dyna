@@ -73,6 +73,7 @@ class CPSFLatticeSumPolicyKind(Enum):
 
 @dataclass
 class CPSFLatticeSumPolicy:
+    # TODO: remove.
     kind: Literal["full", "window"] = "window"
     window: Optional[Union[int, Sequence[torch.LongTensor]]] = None
 
