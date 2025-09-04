@@ -3,11 +3,12 @@ from dyna.lib.cpsf.functional.sv_transform import (
     vector_to_spectrum,
 )
 from dyna.lib.cpsf.functional.lattice import fixed_window
-from dyna.lib.cpsf.functional.numerics import cholesky_spd, tri_solve_norm_sq
+from dyna.lib.cpsf.functional.numerics import hermitianize, cholesky_spd, tri_solve_norm_sq
 
 __all__ = [
     "cholesky_spd",
     "fixed_window",
+    "hermitianize",
     "spectrum_to_vector",
     "tri_solve_norm_sq",
     "vector_to_spectrum",
