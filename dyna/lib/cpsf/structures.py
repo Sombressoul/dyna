@@ -7,6 +7,8 @@ from dataclasses import (
 from enum import Enum, auto as enum_auto
 from typing import Sequence, Optional, Union, Literal
 
+from dyna.lib.cpsf.functional.lattice import fixed_window
+
 
 CPSFIndexLike = Union[torch.Tensor, Sequence[int]]
 CPSFSelection = Union[slice, torch.LongTensor, list, tuple]
@@ -72,7 +74,7 @@ class CPSFLatticeSumPolicy:
     window: Optional[Union[int, Sequence[torch.LongTensor]]] = None
 
     def fixed_window(self) -> torch.LongTensor:
-        raise NotImplementedError
+        return fixed_window(self)
 
 
 @dataclass
