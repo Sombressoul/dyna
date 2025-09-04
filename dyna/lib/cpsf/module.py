@@ -67,7 +67,7 @@ class CPSFModule:
         z: torch.Tensor,
         d: torch.Tensor,
         consistency: CPSFConsistency = CPSFConsistency.snapshot,
-        overrides: Optional[Dict[str, Any]] = None,
+        overrides: Optional[CPSFModuleReadFlags] = None,
         return_report: bool = False,
     ) -> Union[torch.Tensor, Tuple[torch.Tensor, dict]]:
         raise NotImplementedError
@@ -78,7 +78,7 @@ class CPSFModule:
         d: torch.Tensor,
         T_ref: torch.Tensor,
         consistency: CPSFConsistency = CPSFConsistency.snapshot,
-        overrides: Optional[Dict[str, Any]] = None,
+        overrides: Optional[CPSFModuleReadFlags] = None,
         return_report: bool = False,
     ) -> Union[torch.Tensor, Tuple[torch.Tensor, dict]]:
         raise NotImplementedError
@@ -92,7 +92,7 @@ class CPSFModule:
         apply: bool = False,
         preserve_grad: bool = True,
         consistency: CPSFConsistency = CPSFConsistency.snapshot,
-        overrides: Optional[Dict[str, Any]] = None,
+        overrides: Optional[CPSFModuleReadFlags] = None,
         return_report: bool = False,
     ) -> Union[Dict[str, torch.Tensor], Tuple[Dict[str, torch.Tensor], dict]]:
         raise NotImplementedError
@@ -101,7 +101,7 @@ class CPSFModule:
         self,
         T_star: torch.Tensor,
         consistency: CPSFConsistency = CPSFConsistency.snapshot,
-        overrides: Optional[Dict[str, Any]] = None,
+        overrides: Optional[CPSFModuleReadFlags] = None,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         raise NotImplementedError
 
@@ -110,7 +110,7 @@ class CPSFModule:
         T_star: torch.Tensor,
         delta: Optional[torch.Tensor] = None,
         consistency: CPSFConsistency = CPSFConsistency.snapshot,
-        overrides: Optional[Dict[str, Any]] = None,
+        overrides: Optional[CPSFModuleReadFlags] = None,
     ) -> torch.Tensor:
         raise NotImplementedError
 
@@ -119,6 +119,6 @@ class CPSFModule:
         T_star: torch.Tensor,
         delta: Optional[torch.Tensor] = None,
         consistency: CPSFConsistency = CPSFConsistency.snapshot,
-        overrides: Optional[Dict[str, Any]] = None,
+        overrides: Optional[CPSFModuleReadFlags] = None,
     ) -> Dict[str, Any]:
         raise NotImplementedError
