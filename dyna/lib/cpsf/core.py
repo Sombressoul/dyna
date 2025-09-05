@@ -17,14 +17,39 @@ class CPSFCore:
     def R(
         self,
         d: torch.Tensor,
+        eps: float = 1.0e-3,
     ) -> torch.Tensor:
-        raise NotImplementedError
+        *B, N = d.shape
+        dtype = d.dtype
+        device = d.device
+
+        if d.dim() < 1:
+            raise ValueError(f"R(d): expected [..., N], got {tuple(d.shape)}")
+
+        E = torch.eye(N, dtype=dtype, device=device).expand(*B, N, N).clone()
+        M = E * (1.0 + eps)
+        M[..., :, 0] = d
+        U, S, Vh = torch.linalg.svd(M, full_matrices=False)
+        R = U @ Vh
+
+        return R
 
     def R_ext(
         self,
         R: torch.Tensor,
     ) -> torch.Tensor:
-        raise NotImplementedError
+        *B, N, _ = R.shape
+        twoN = 2 * N
+
+        if R.dim() < 2 or R.shape[-1] != R.shape[-2]:
+            raise ValueError(f"R_ext(R): expected [..., N, N], got {tuple(R.shape)}")
+
+        R_ext = torch.zeros(*B, twoN, twoN, dtype=R.dtype, device=R.device)
+
+        R_ext[..., :N, :N] = R
+        R_ext[..., N:, N:] = R
+
+        return R_ext
 
     def build_sigma(
         self,
