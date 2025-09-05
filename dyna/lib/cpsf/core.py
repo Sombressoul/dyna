@@ -21,12 +21,12 @@ class CPSFCore:
         d: torch.Tensor,
         eps: float = 1.0e-3,
     ) -> torch.Tensor:
+        if d.dim() < 1:
+            raise ValueError(f"R(d): expected [..., N], got {tuple(d.shape)}")
+
         *B, N = d.shape
         dtype = d.dtype
         device = d.device
-
-        if d.dim() < 1:
-            raise ValueError(f"R(d): expected [..., N], got {tuple(d.shape)}")
 
         E = torch.eye(N, dtype=dtype, device=device).expand(*B, N, N).clone()
         M = E * (1.0 + eps)
