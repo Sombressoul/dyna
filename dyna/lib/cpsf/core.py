@@ -40,11 +40,11 @@ class CPSFCore:
         self,
         R: torch.Tensor,
     ) -> torch.Tensor:
-        *B, N, _ = R.shape
-        twoN = 2 * N
-
         if R.dim() < 2 or R.shape[-1] != R.shape[-2]:
             raise ValueError(f"R_ext(R): expected [..., N, N], got {tuple(R.shape)}")
+
+        *B, N, _ = R.shape
+        twoN = 2 * N
 
         R_ext = torch.zeros(*B, twoN, twoN, dtype=R.dtype, device=R.device)
 
