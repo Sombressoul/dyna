@@ -4,9 +4,16 @@ from dyna.lib.cpsf.functional.numerics import (
     cholesky_spd,
     tri_solve_norm_sq,
 )
+from dyna.lib.cpsf.context import CPSFContext
 
 
 class CPSFCore:
+    def __init__(
+        self,
+        context: CPSFContext,
+    ):
+        self.ctx = context
+
     def R(
         self,
         d: torch.Tensor,
@@ -64,4 +71,4 @@ class CPSFCore:
         self,
         q: torch.Tensor,
     ) -> torch.Tensor:
-        raise NotImplementedError
+        return torch.exp(-torch.pi * torch.clamp(q, max=self.ctx.exp_clip_q_max))
