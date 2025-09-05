@@ -1,5 +1,10 @@
 import torch
 
+from dyna.lib.cpsf.functional.numerics import (
+    cholesky_spd,
+    tri_solve_norm_sq,
+)
+
 
 class CPSFCore:
     def R(
@@ -26,7 +31,7 @@ class CPSFCore:
         self,
         Sigma: torch.Tensor,
     ) -> torch.Tensor:
-        raise NotImplementedError
+        return cholesky_spd(Sigma)
 
     def delta_vec_d(
         self,
@@ -53,7 +58,7 @@ class CPSFCore:
         L: torch.Tensor,
         w: torch.Tensor,
     ) -> torch.Tensor:
-        raise NotImplementedError
+        return tri_solve_norm_sq(L, w)
 
     def rho_q(
         self,
