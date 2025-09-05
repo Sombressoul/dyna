@@ -72,20 +72,6 @@ class CPSFLatticeSumPolicyKind(Enum):
 
 
 @dataclass
-class CPSFLatticeSumPolicy:
-    # TODO: remove.
-    kind: Literal["full", "window"] = "window"
-    window: Optional[Union[int, Sequence[torch.LongTensor]]] = None
-
-    def fixed_window(
-        self,
-        N: int,
-    ) -> torch.LongTensor:
-        from dyna.lib.cpsf.functional.lattice import fixed_window as _fw
-        return _fw(self, N)
-
-
-@dataclass
 class CPSFIntegrationPolicy:
     kind: Literal["quad", "mc", "strat"] = "quad"
     samples: int = 0

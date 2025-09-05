@@ -3,10 +3,10 @@ import torch
 
 from dyna.lib.cpsf.structures import (
     CPSFChunkPolicy,
-    CPSFLatticeSumPolicy,
     CPSFIntegrationPolicy,
     CPSFDTypes,
 )
+from dyna.lib.cpsf.lattice import CPSFLattice
 
 
 class CPSFGeometryCache:
@@ -25,7 +25,7 @@ class CPSFContext:
     def __init__(
         self,
         chunk: CPSFChunkPolicy,
-        lattice: CPSFLatticeSumPolicy,
+        lattice: CPSFLattice,
         integration: CPSFIntegrationPolicy,
         dtypes: CPSFDTypes,
         exp_clip_q_max: float = 60.0,

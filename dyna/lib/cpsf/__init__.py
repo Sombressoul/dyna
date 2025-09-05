@@ -14,6 +14,7 @@ from dyna.lib.cpsf.errors import (
     ZeroMaterializationError,
     SnapshotViolationError,
 )
+from dyna.lib.cpsf.lattice import CPSFLattice
 from dyna.lib.cpsf.module import CPSFModule
 from dyna.lib.cpsf.projection import CPSFProjection
 from dyna.lib.cpsf.contribution_store import CPSFContributionStore
@@ -27,7 +28,7 @@ from dyna.lib.cpsf.structures import (
     CPSFDTypes,
     CPSFIndexLike,
     CPSFIntegrationPolicy,
-    CPSFLatticeSumPolicy,
+    CPSFLatticeSumPolicyKind,
 )
 
 __all__ = [
@@ -38,6 +39,7 @@ __all__ = [
     "CPSFCore",
     "CPSFDerivedCache",
     "CPSFGeometryCache",
+    "CPSFLattice",
     "CPSFModule",
     "CPSFProjection",
 
@@ -51,7 +53,7 @@ __all__ = [
     "CPSFDTypes",
     "CPSFIndexLike",
     "CPSFIntegrationPolicy",
-    "CPSFLatticeSumPolicy",
+    "CPSFLatticeSumPolicyKind",
 
     # Subcomponents.
     "functional",
