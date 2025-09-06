@@ -11,6 +11,67 @@ def R(
     p: float = 2.0,  # exponent for J_E weights
     qmix: float = 2.0,  # "temperature" of energy-based anchor mixing
 ) -> torch.Tensor:
+    """
+    Construct a CPSF-orthonormal frame R(d) ∈ U(N) over C^N.
+
+    Given a complex, nonzero vector d ∈ C^{..., N}, this routine returns a unitary
+    frame
+        R(d) = [ b(d) | Q⊥(d) ]  ∈ C^{..., N, N},
+    where
+        b(d) = d / ‖d‖                    (first column; exact alignment, CPSF-R3)
+        Q⊥(d) ∈ C^{..., N, N-1}           (orthonormal basis of b(d)⊥, CPSF-R4)
+    and the whole matrix is unitary (CPSF-R1+R2). The construction is smooth in d,
+    right-U(N-1) equivariant on the complement (CPSF-R6), and designed to satisfy
+    the CPSF regularity criteria (local trivialization / continuity CPSF-R8 and
+    bounded derivative proxy CPSF-R9) in machine precision.
+
+    Algorithm (complex-only)
+    ------------------------
+    1) Normalize b = d / max(‖d‖, √eps) and form the projector P⊥ = I - b bᴴ.
+    2) Build three N*(N-1) “anchors” in C^N:
+    • J_E  - coordinate anchor (standard basis without e₁) with smooth weights,
+    • J_F1 - complex Fourier-like anchor, phases 2π i k / N,
+    • J_F2 - complex Fourier-like anchor, phases 2π i (k+½) / N.
+    3) Project anchors to b⊥: Zᵢ = P⊥ Jᵢ, and mix them with smooth, energy-based
+    weights aᵢ ∝ (‖Zᵢ‖_F² + sigma)^{qmix} (sigma,qmix control switching smoothness).
+    4) Polar orthonormalization in the (N-1)-subspace: Q̃ = Z (ZᴴZ)^{-1/2} with a
+    scale-aware SPD jitter (jitter) to keep ZᴴZ well-conditioned.
+    5) Re-project and re-polarize once more: Q⊥ = proj_{b⊥}(Q̃) · (Q̃ᴴQ̃)^{-1/2}.
+    6) Concatenate R = [ b | Q⊥ ].
+
+    Parameters
+    ----------
+    d : torch.Tensor, complex dtype (torch.complex64 or torch.complex128)
+        Input vectors of shape [..., N]. Real dtypes are not supported by the CPSF canon.
+    kappa : float, default 1e-3
+        Soft de-clumping for the J_E weights to avoid dominance by large |b_j|.
+    sigma : float, default 1e-3
+        Smoothing for anchor mixing (prevents hard switches between anchors).
+    jitter : float, default 1e-6
+        Scale-aware SPD jitter added to ZᴴZ (and to the second polar) for numerical stability.
+    p : float, default 2.0
+        Exponent in the J_E weighting (controls emphasis of less-aligned coordinates).
+    qmix : float, default 2.0
+        “Temperature” of the energy-based anchor mixing; lower is sharper, higher is smoother.
+
+    Returns
+    -------
+    torch.Tensor
+        A unitary matrix R(d) of shape [..., N, N] with:
+        • first column exactly b(d) (R3),
+        • columns 2..N orthonormal and orthogonal to b(d) (R4),
+        • RᴴR = RRᴴ = I (R1-R2).
+        For N == 1, returns [..., 1, 1] with the single column b(d).
+
+    Notes
+    -----
+    • Complex-only: raises TypeError if d is not complex.
+    • Fully batched and differentiable (uses Hermitian eigendecompositions on (N-1)*(N-1) SPD
+    matrices). Computational cost is O((N-1)³) per batch element.
+    • Small constants (√eps from real(d.dtype), sigma, jitter) are chosen to ensure smoothness and
+    numerical robustness consistent with CPSF R5/R8/R9 in float32/float64 precision.
+    """
+
     if d.dim() < 1:
         raise ValueError(f"R(d): expected [..., N], got {tuple(d.shape)}")
     if not torch.is_complex(d):
