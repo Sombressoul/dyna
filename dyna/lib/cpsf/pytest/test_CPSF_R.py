@@ -153,7 +153,7 @@ def test_R1_R2_unitarity(name, R_fn, dtype, N):
     assert torch.allclose(
         left, I, atol=_get_ATOL(R), rtol=_get_RTOL(R)
     ) and torch.allclose(
-        right, I, atol=_get_ATOL(R), rtol=_get_ATOL(R)
+        right, I, atol=_get_ATOL(R), rtol=_get_RTOL(R)
     ), f"{name}: R is not unitary (R1–R2)."
 
     col_norms = torch.linalg.vector_norm(R, dim=0)
