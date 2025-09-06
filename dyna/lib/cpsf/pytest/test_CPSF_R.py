@@ -7,8 +7,8 @@ from typing import Callable, List, Tuple
 from dyna.lib.cpsf.functional.core_math import R
 
 TARGET_DEVICE = torch.device("cpu")
-R_IMPLS: List[Tuple[str, Callable[[torch.Tensor, float], torch.Tensor]]] = [
-    ("R", lambda d: R(d))
+R_IMPLS: List[Tuple[str, Callable[[torch.Tensor], torch.Tensor]]] = [
+    ("R", lambda d: R(d)),
 ]
 DTYPES = [torch.complex128]
 NS = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
