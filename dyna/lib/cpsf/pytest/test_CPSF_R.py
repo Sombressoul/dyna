@@ -1,3 +1,6 @@
+# Run as (example):
+# > pytest -q .\dyna\lib\cpsf\pytest\test_CPSF_R.py
+
 import torch
 import math
 import pytest
