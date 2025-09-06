@@ -1,7 +1,6 @@
 import torch
 import math
 import pytest
-
 from typing import Callable, List, Tuple
 
 from dyna.lib.cpsf.functional.core_math import R
@@ -10,14 +9,15 @@ TARGET_DEVICE = torch.device("cpu")
 R_IMPLS: List[Tuple[str, Callable[[torch.Tensor], torch.Tensor]]] = [
     ("R", lambda d: R(d)),
 ]
-DTYPES = [torch.complex128]
+DTYPES = [torch.complex64, torch.complex128]
 NS = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
-SEED = 12345
-EPS_DEFAULT = 1.0e-3
+SEED = 1337
 
 # R1+R2, R3, R4, R6, R7
-ATOL = 1e-13  # c64: 1.0e-5; c128: 1.0e-13
-RTOL = 1e-10  # c64: 1.0e-3; c128: 1.0e-10
+ATOL_128 = 1e-13
+RTOL_128 = 1e-10
+ATOL_64 = 1e-5
+RTOL_64 = 1e-3
 
 # R5
 H_VALS_R5 = [2.0 ** (-k) for k in range(3, 9)]
@@ -42,6 +42,28 @@ H_VALS = [2.0 ** (-k) for k in range(3, 9)]
 # Helpers
 # =========================
 g = torch.Generator(device=TARGET_DEVICE).manual_seed(SEED)
+
+
+def _get_ATOL(
+    x: torch.Tensor,
+) -> float:
+    if x.dtype in [torch.complex64, torch.float32]:
+        return ATOL_64
+    elif x.dtype in [torch.complex128, torch.float64]:
+        return ATOL_128
+    else:
+        raise ValueError(f"Unsupported dtype: {x.dtype}")
+
+
+def _get_RTOL(
+    x: torch.Tensor,
+) -> float:
+    if x.dtype in [torch.complex64, torch.float32]:
+        return RTOL_64
+    elif x.dtype in [torch.complex128, torch.float64]:
+        return RTOL_128
+    else:
+        raise ValueError(f"Unsupported dtype: {x.dtype}")
 
 
 def rand_unit_vector(
@@ -128,8 +150,10 @@ def test_R1_R2_unitarity(name, R_fn, dtype, N):
     left = Rt @ R
     right = R @ Rt
 
-    assert torch.allclose(left, I, atol=ATOL, rtol=RTOL) and torch.allclose(
-        right, I, atol=ATOL, rtol=RTOL
+    assert torch.allclose(
+        left, I, atol=_get_ATOL(R), rtol=_get_RTOL(R)
+    ) and torch.allclose(
+        right, I, atol=_get_ATOL(R), rtol=_get_ATOL(R)
     ), f"{name}: R is not unitary (R1–R2)."
 
     col_norms = torch.linalg.vector_norm(R, dim=0)
@@ -137,10 +161,10 @@ def test_R1_R2_unitarity(name, R_fn, dtype, N):
     one_c = torch.ones_like(col_norms)
     one_r = torch.ones_like(row_norms)
     assert torch.allclose(
-        col_norms, one_c, atol=ATOL, rtol=RTOL
+        col_norms, one_c, atol=_get_ATOL(R), rtol=_get_RTOL(R)
     ), f"{name}: some column norms deviate from 1 (R1)."
     assert torch.allclose(
-        row_norms, one_r, atol=ATOL, rtol=RTOL
+        row_norms, one_r, atol=_get_ATOL(R), rtol=_get_RTOL(R)
     ), f"{name}: some row norms deviate from 1 (R2)."
 
     off_cols = left - I
@@ -149,10 +173,10 @@ def test_R1_R2_unitarity(name, R_fn, dtype, N):
     off_max_cols = off_cols.abs()[mask].max().item() if N > 1 else 0.0
     off_max_rows = off_rows.abs()[mask].max().item() if N > 1 else 0.0
     assert off_max_cols <= (
-        ATOL + RTOL
+        _get_ATOL(R) + _get_RTOL(R)
     ), f"{name}: column Gram off-diagonals too large (R1): {off_max_cols:.3e}"
     assert off_max_rows <= (
-        ATOL + RTOL
+        _get_ATOL(R) + _get_RTOL(R)
     ), f"{name}: row Gram off-diagonals too large (R2): {off_max_rows:.3e}"
 
 
@@ -176,23 +200,27 @@ def test_R3_alignment(name, R_fn, dtype, N):
     b = d / torch.clamp(dn, min=tiny)
 
     r1 = R[:, 0]
-    assert torch.allclose(r1, b, atol=ATOL, rtol=RTOL), f"{name}: R e1 != d (R3)."
+    assert torch.allclose(
+        r1, b, atol=_get_ATOL(R), rtol=_get_RTOL(R)
+    ), f"{name}: R e1 != d (R3)."
 
     n1 = torch.linalg.vector_norm(r1)
     one = torch.tensor(1.0, dtype=n1.dtype, device=n1.device)
-    assert torch.allclose(n1, one, atol=ATOL, rtol=RTOL), f"{name}: ||R e1|| != 1 (R3)."
+    assert torch.allclose(
+        n1, one, atol=_get_ATOL(R), rtol=_get_RTOL(R)
+    ), f"{name}: ||R e1|| != 1 (R3)."
 
     if dtype.is_complex:
         inner = torch.sum(torch.conj(b) * r1)
         one_c = torch.ones((), dtype=R.dtype, device=R.device)
         assert torch.allclose(
-            inner, one_c, atol=ATOL, rtol=RTOL
+            inner, one_c, atol=_get_ATOL(R), rtol=_get_RTOL(R)
         ), f"{name}: <b, R e1> != 1 (R3)."
     else:
         inner = torch.sum(b * r1)
         one_r = torch.tensor(1.0, dtype=inner.dtype, device=inner.device)
         assert torch.allclose(
-            inner, one_r, atol=ATOL, rtol=RTOL
+            inner, one_r, atol=_get_ATOL(R), rtol=_get_RTOL(R)
         ), f"{name}: <b, R e1> != 1 (R3)."
 
 
@@ -220,18 +248,18 @@ def test_R4_orthogonal_complement(name, R_fn, dtype, N):
     inner = (b.conj().unsqueeze(0) @ Q) if is_c else (b.unsqueeze(0) @ Q)
     Z = torch.zeros_like(inner)
     assert torch.allclose(
-        inner, Z, atol=ATOL, rtol=RTOL
+        inner, Z, atol=_get_ATOL(R), rtol=_get_RTOL(R)
     ), f"{name}: complement not ⟂ b (R4)."
 
     G = Q.mH @ Q if is_c else Q.transpose(-2, -1) @ Q
     I_nm1 = torch.eye(N - 1, dtype=G.dtype, device=G.device)
     assert torch.allclose(
-        G, I_nm1, atol=ATOL, rtol=RTOL
+        G, I_nm1, atol=_get_ATOL(R), rtol=_get_RTOL(R)
     ), f"{name}: columns 2..N not orthonormal (R4)."
 
     QQh = Q @ (Q.mH if is_c else Q.transpose(-2, -1))
     assert torch.allclose(
-        QQh, P_perp, atol=ATOL, rtol=RTOL
+        QQh, P_perp, atol=_get_ATOL(R), rtol=_get_RTOL(R)
     ), f"{name}: QQ^H != P_perp (R4)."
 
 
@@ -336,9 +364,9 @@ def test_R6_right_U_invariance_local(name, R_fn, dtype, N):
     def _is_unitary(X: torch.Tensor) -> bool:
         Xt = X.mH if dtype.is_complex else X.transpose(-2, -1)
         I = torch.eye(X.shape[-1], dtype=X.dtype, device=X.device)
-        return torch.allclose(Xt @ X, I, atol=ATOL, rtol=RTOL) and torch.allclose(
-            X @ Xt, I, atol=ATOL, rtol=RTOL
-        )
+        return torch.allclose(
+            Xt @ X, I, atol=_get_ATOL(R), rtol=_get_RTOL(R)
+        ) and torch.allclose(X @ Xt, I, atol=_get_ATOL(R), rtol=_get_RTOL(R))
 
     def _projector_from_b(bb: torch.Tensor) -> torch.Tensor:
         I = torch.eye(bb.shape[0], dtype=bb.dtype, device=bb.device)
@@ -354,16 +382,16 @@ def test_R6_right_U_invariance_local(name, R_fn, dtype, N):
             (b.conj().unsqueeze(0) @ Q) if dtype.is_complex else (b.unsqueeze(0) @ Q)
         )
         assert torch.allclose(
-            ortho, torch.zeros_like(ortho), atol=ATOL, rtol=RTOL
+            ortho, torch.zeros_like(ortho), atol=_get_ATOL(R), rtol=_get_RTOL(R)
         ), f"{name}: base complement not ⟂ b (R6 precondition)."
         G = Q.mH @ Q if dtype.is_complex else Q.transpose(-2, -1) @ Q
         I_nm1 = torch.eye(N - 1, dtype=G.dtype, device=G.device)
         assert torch.allclose(
-            G, I_nm1, atol=ATOL, rtol=RTOL
+            G, I_nm1, atol=_get_ATOL(R), rtol=_get_RTOL(R)
         ), f"{name}: base complement not orthonormal (R6 precondition)."
         QQh = Q @ (Q.mH if dtype.is_complex else Q.transpose(-2, -1))
         assert torch.allclose(
-            QQh, P_perp, atol=ATOL, rtol=RTOL
+            QQh, P_perp, atol=_get_ATOL(R), rtol=_get_RTOL(R)
         ), f"{name}: base projector QQ^H != P_perp (R6 precondition)."
 
     U_list = []
@@ -401,7 +429,7 @@ def test_R6_right_U_invariance_local(name, R_fn, dtype, N):
 
         b_ext = R_ext[:, 0]
         assert torch.allclose(
-            b_ext, b, atol=ATOL, rtol=RTOL
+            b_ext, b, atol=_get_ATOL(R), rtol=_get_RTOL(R)
         ), f"{name}: first column changed under right action (R6)."
 
         if N > 1:
@@ -412,7 +440,7 @@ def test_R6_right_U_invariance_local(name, R_fn, dtype, N):
                 else (b.unsqueeze(0) @ Q_ext)
             )
             assert torch.allclose(
-                inner, torch.zeros_like(inner), atol=ATOL, rtol=RTOL
+                inner, torch.zeros_like(inner), atol=_get_ATOL(R), rtol=_get_RTOL(R)
             ), f"{name}: complement not ⟂ b after right action (R6)."
             G_ext = (
                 Q_ext.mH @ Q_ext
@@ -421,13 +449,13 @@ def test_R6_right_U_invariance_local(name, R_fn, dtype, N):
             )
             I_nm1 = torch.eye(N - 1, dtype=G_ext.dtype, device=G_ext.device)
             assert torch.allclose(
-                G_ext, I_nm1, atol=ATOL, rtol=RTOL
+                G_ext, I_nm1, atol=_get_ATOL(R), rtol=_get_RTOL(R)
             ), f"{name}: complement columns not orthonormal after right action (R6)."
             QQh_ext = Q_ext @ (
                 Q_ext.mH if dtype.is_complex else Q_ext.transpose(-2, -1)
             )
             assert torch.allclose(
-                QQh_ext, P_perp, atol=ATOL, rtol=RTOL
+                QQh_ext, P_perp, atol=_get_ATOL(R), rtol=_get_RTOL(R)
             ), f"{name}: projector changed under right action (R6)."
 
 
@@ -463,14 +491,14 @@ def test_R7_extended_frame_unitary(name, R_fn, dtype, N):
     def _is_unitary(X: torch.Tensor) -> bool:
         Xt = X.mH if dtype.is_complex else X.transpose(-2, -1)
         I = torch.eye(X.shape[-1], dtype=X.dtype, device=X.device)
-        return torch.allclose(Xt @ X, I, atol=ATOL, rtol=RTOL) and torch.allclose(
-            X @ Xt, I, atol=ATOL, rtol=RTOL
-        )
+        return torch.allclose(
+            Xt @ X, I, atol=_get_ATOL(R), rtol=_get_RTOL(R)
+        ) and torch.allclose(X @ Xt, I, atol=_get_ATOL(R), rtol=_get_RTOL(R))
 
     if N == 1:
         assert _is_unitary(R), f"{name}: base frame not unitary at N=1 (R7)."
         assert torch.allclose(
-            R[:, 0], b, atol=ATOL, rtol=RTOL
+            R[:, 0], b, atol=_get_ATOL(R), rtol=_get_RTOL(R)
         ), f"{name}: first column changed at N=1 (R7)."
         return
 
@@ -482,7 +510,7 @@ def test_R7_extended_frame_unitary(name, R_fn, dtype, N):
 
         assert _is_unitary(R_ext), f"{name}: extended frame not unitary (R7)."
         assert torch.allclose(
-            R_ext[:, 0], b, atol=ATOL, rtol=RTOL
+            R_ext[:, 0], b, atol=_get_ATOL(R), rtol=_get_RTOL(R)
         ), f"{name}: first column changed under extension (R7)."
 
         Qext = R_ext[:, 1:]
@@ -492,13 +520,13 @@ def test_R7_extended_frame_unitary(name, R_fn, dtype, N):
             else b.unsqueeze(0) @ Qext
         )
         assert torch.allclose(
-            inner, torch.zeros_like(inner), atol=ATOL, rtol=RTOL
+            inner, torch.zeros_like(inner), atol=_get_ATOL(R), rtol=_get_RTOL(R)
         ), f"{name}: complement not orthogonal to b after extension (R7)."
 
         G = Qext.mH @ Qext if dtype.is_complex else Qext.transpose(-2, -1) @ Qext
         I_nm1 = torch.eye(N - 1, dtype=G.dtype, device=G.device)
         assert torch.allclose(
-            G, I_nm1, atol=ATOL, rtol=RTOL
+            G, I_nm1, atol=_get_ATOL(R), rtol=_get_RTOL(R)
         ), f"{name}: complement columns not orthonormal after extension (R7)."
 
 
