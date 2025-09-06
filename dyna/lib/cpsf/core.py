@@ -1,9 +1,13 @@
 import torch
+import math
 
 from typing import Optional
 
 from dyna.lib.cpsf.errors import NumericalError
 from dyna.lib.cpsf.context import CPSFContext
+from dyna.lib.cpsf.functional.core_math import (
+    R,
+)
 
 
 class CPSFCore:
@@ -66,178 +70,11 @@ class CPSFCore:
             except RuntimeError as e2:
                 raise NumericalError(f"Cholesky failed even with jitter: {e2}") from e2
 
-    def _tri_solve_norm_sq(
-        self,
-        L: torch.Tensor,
-        w: torch.Tensor,
-    ) -> torch.Tensor:
-        if L.dim() < 2 or L.shape[-1] != L.shape[-2]:
-            raise NumericalError(
-                f"_tri_solve_norm_sq: expected L as [..., n, n], got {tuple(L.shape)}"
-            )
-
-        rhs = w.unsqueeze(-1) if w.dim() == L.dim() - 1 else w
-        rhs = rhs.to(dtype=L.dtype)
-        n = L.shape[-1]
-
-        if not (torch.isfinite(L).all() and torch.isfinite(rhs).all()):
-            raise NumericalError("non-finite in inputs")
-
-        if rhs.shape[-2] != n:
-            raise NumericalError(
-                f"_tri_solve_norm_sq: mismatched shapes: L:[...,{n},{n}] vs w:[...,{rhs.shape[-2]},*]"
-            )
-
-        if hasattr(torch.linalg, "solve_triangular"):
-            y = torch.linalg.solve_triangular(L, rhs, upper=False, left=True)
-        else:
-            y = torch.triangular_solve(rhs, L, upper=False).solution
-
-        if torch.is_complex(y):
-            norm_sq = (y.conj() * y).real.sum(dim=-2)
-        else:
-            norm_sq = (y * y).sum(dim=-2)
-
-        norm_sq = torch.clamp(norm_sq, min=0)
-
-        return norm_sq.squeeze(-1) if w.dim() == L.dim() - 1 else norm_sq
-
-    def R_a(
+    def R(
         self,
         d: torch.Tensor,
-        eps: float = 1.0e-3,
-        beta: float = 8.0,
     ) -> torch.Tensor:
-        if d.dim() < 1:
-            raise ValueError(f"R(d): expected [. N], got {tuple(d.shape)}")
-        *B, N = d.shape
-        dtype, device = d.dtype, d.device
-
-        finfo = (
-            torch.finfo(d.real.dtype) if torch.is_complex(d) else torch.finfo(d.dtype)
-        )
-        dn = torch.linalg.vector_norm(d, dim=-1, keepdim=True)
-        c_min = torch.tensor(finfo.eps, dtype=dtype, device=device)
-        d_unit = d / (dn + c_min)
-
-        I = torch.eye(N, dtype=dtype, device=device).expand(*B, N, N)
-
-        P_perp = I - d_unit.unsqueeze(-1) @ (
-            d_unit.conj().unsqueeze(-2)
-            if torch.is_complex(d_unit)
-            else d_unit.unsqueeze(-2)
-        )
-
-        magsq = (
-            (d_unit.conj() * d_unit).real
-            if torch.is_complex(d_unit)
-            else d_unit * d_unit
-        )
-        w = torch.softmax(beta * magsq, dim=-1)
-
-        Bmat = torch.zeros(*B, N, N - 1, dtype=dtype, device=device)
-        ar = torch.arange(N, device=device)
-        for k in range(N):
-            cols = torch.cat([ar[:k], ar[k + 1 :]])
-            Ek = I.index_select(-1, cols)
-            wk = w[..., k].unsqueeze(-1).unsqueeze(-1)
-            Bmat = Bmat + wk * Ek
-
-        Z = P_perp @ Bmat
-        H = (Z.mH @ Z) if torch.is_complex(Z) else (Z.transpose(-2, -1) @ Z)
-        evals, Q = torch.linalg.eigh(H)
-        inv_sqrt = ((evals + c_min) ** -0.5).diag_embed()
-        H_inv_sqrt = (
-            Q @ inv_sqrt @ (Q.mH if torch.is_complex(Q) else Q.transpose(-2, -1))
-        )
-        Q_perp = Z @ H_inv_sqrt
-
-        M = torch.cat([d_unit.unsqueeze(-1), (1.0 + eps) * Q_perp], dim=-1)
-        H2 = (M.mH @ M) if torch.is_complex(M) else (M.transpose(-2, -1) @ M)
-        evals2, Q2 = torch.linalg.eigh(H2)
-        inv_sqrt2 = ((evals2 + c_min) ** -0.5).diag_embed()
-        H2_inv_sqrt = (
-            Q2 @ inv_sqrt2 @ (Q2.mH if torch.is_complex(Q2) else Q2.transpose(-2, -1))
-        )
-        R_out = M @ H2_inv_sqrt
-
-        return R_out
-
-    def R_b(
-        self,
-        d: torch.Tensor,
-        eps: float = 1.0e-3,
-    ) -> torch.Tensor:
-        if d.dim() < 1:
-            raise ValueError(f"R(d): expected [..., N], got {tuple(d.shape)}")
-        *B, N = d.shape
-        dtype, device = d.dtype, d.device
-
-        finfo = (
-            torch.finfo(d.real.dtype) if torch.is_complex(d) else torch.finfo(d.dtype)
-        )
-        min_norm = torch.tensor(finfo.eps, dtype=dtype, device=device)
-        dn = torch.linalg.vector_norm(d, dim=-1, keepdim=True)
-        d_unit = d / (dn + min_norm)
-
-        I = torch.eye(N, dtype=dtype, device=device).expand(*B, N, N)
-        M = (1.0 + eps) * I.clone()
-        M[..., :, 0] = d_unit
-        U, _, Vh = torch.linalg.svd(M, full_matrices=False)
-        R0 = U @ Vh
-
-        a = R0[..., :, 0]
-        b = d_unit
-
-        inner = torch.sum(torch.conj(b) * a, dim=-1, keepdim=True)
-        phase = inner / (inner.abs() + min_norm.abs())
-        v = a - phase * b
-        nv = torch.linalg.vector_norm(v, dim=-1, keepdim=True)
-        u = v / (nv + min_norm)
-        H = I - 2.0 * (u.unsqueeze(-1) @ u.conj().unsqueeze(-2))
-
-        P_b = b.unsqueeze(-1) @ b.conj().unsqueeze(-2)
-        S = I + (phase.conj() - 1.0) * P_b
-
-        G = S @ H
-        R_out = G @ R0
-
-        return R_out
-
-    def R_c(
-        self,
-        d: torch.Tensor,
-        eps: float = 1.0e-3,
-    ) -> torch.Tensor:
-        if d.dim() < 1:
-            raise ValueError(f"R(d): expected [..., N], got {tuple(d.shape)}")
-        *B, N = d.shape
-        dtype = d.dtype
-        device = d.device
-
-        dn = torch.linalg.vector_norm(d, dim=-1, keepdim=True)
-        finfo = (
-            torch.finfo(d.real.dtype) if torch.is_complex(d) else torch.finfo(d.dtype)
-        )
-        min_norm = torch.tensor(finfo.eps, dtype=dtype, device=device)
-        d_unit = d / (dn + min_norm)
-
-        I = torch.eye(N, dtype=dtype, device=device).expand(*B, N, N)
-        M = (1.0 + eps) * I.clone()
-        M[..., :, 0] = d_unit
-        U, _, Vh = torch.linalg.svd(M, full_matrices=False)
-        R0 = U @ Vh
-
-        P = I - d_unit.unsqueeze(-1) @ torch.conj(d_unit).unsqueeze(-2)
-        Bcomp = P @ R0[..., :, 1:]
-
-        if N > 1:
-            Qc, _ = torch.linalg.qr(Bcomp, mode="reduced")
-            R_out = torch.cat([d_unit.unsqueeze(-1), Qc], dim=-1)
-        else:
-            R_out = d_unit.unsqueeze(-1)
-
-        return R_out
+        return R(d)
 
     def R_ext(
         self,
