@@ -106,6 +106,66 @@ class CPSFCore:
         self,
         d: torch.Tensor,
         eps: float = 1.0e-3,
+        beta: float = 8.0,
+    ) -> torch.Tensor:
+        if d.dim() < 1:
+            raise ValueError(f"R(d): expected [. N], got {tuple(d.shape)}")
+        *B, N = d.shape
+        dtype, device = d.dtype, d.device
+
+        finfo = (
+            torch.finfo(d.real.dtype) if torch.is_complex(d) else torch.finfo(d.dtype)
+        )
+        dn = torch.linalg.vector_norm(d, dim=-1, keepdim=True)
+        d_unit = d / torch.clamp(dn, min=torch.sqrt(finfo.eps))
+
+        I = torch.eye(N, dtype=dtype, device=device).expand(*B, N, N)
+
+        P_perp = I - d_unit.unsqueeze(-1) @ (
+            d_unit.conj().unsqueeze(-2)
+            if torch.is_complex(d_unit)
+            else d_unit.unsqueeze(-2)
+        )
+
+        magsq = (
+            (d_unit.conj() * d_unit).real
+            if torch.is_complex(d_unit)
+            else d_unit * d_unit
+        )
+        w = torch.softmax(beta * magsq, dim=-1)
+
+        Bmat = torch.zeros(*B, N, N - 1, dtype=dtype, device=device)
+        ar = torch.arange(N, device=device)
+        for k in range(N):
+            cols = torch.cat([ar[:k], ar[k + 1 :]])
+            Ek = I.index_select(-1, cols)
+            wk = w[..., k].unsqueeze(-1).unsqueeze(-1)
+            Bmat = Bmat + wk * Ek
+
+        Z = P_perp @ Bmat
+        H = (Z.mH @ Z) if torch.is_complex(Z) else (Z.transpose(-2, -1) @ Z)
+        evals, Q = torch.linalg.eigh(H)
+        inv_sqrt = (evals.clamp(min=torch.sqrt(finfo.eps)) ** -0.5).diag_embed()
+        H_inv_sqrt = (
+            Q @ inv_sqrt @ (Q.mH if torch.is_complex(Q) else Q.transpose(-2, -1))
+        )
+        Q_perp = Z @ H_inv_sqrt
+
+        M = torch.cat([d_unit.unsqueeze(-1), (1.0 + eps) * Q_perp], dim=-1)
+        H2 = (M.mH @ M) if torch.is_complex(M) else (M.transpose(-2, -1) @ M)
+        evals2, Q2 = torch.linalg.eigh(H2)
+        inv_sqrt2 = (evals2.clamp(min=torch.sqrt(finfo.eps)) ** -0.5).diag_embed()
+        H2_inv_sqrt = (
+            Q2 @ inv_sqrt2 @ (Q2.mH if torch.is_complex(Q2) else Q2.transpose(-2, -1))
+        )
+        R_out = M @ H2_inv_sqrt
+
+        return R_out
+
+    def R_fast(
+        self,
+        d: torch.Tensor,
+        eps: float = 1.0e-3,
     ) -> torch.Tensor:
         if d.dim() < 1:
             raise ValueError(f"R(d): expected [..., N], got {tuple(d.shape)}")
@@ -117,7 +177,8 @@ class CPSFCore:
         finfo = (
             torch.finfo(d.real.dtype) if torch.is_complex(d) else torch.finfo(d.dtype)
         )
-        d_unit = d / torch.clamp(dn, min=torch.sqrt(finfo.eps))
+        min_norm = torch.sqrt(finfo.eps)
+        d_unit = d / torch.clamp(dn, min=min_norm)
 
         I = torch.eye(N, dtype=dtype, device=device).expand(*B, N, N)
         M = (1.0 + eps) * I.clone()
