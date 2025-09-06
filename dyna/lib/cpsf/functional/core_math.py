@@ -3,6 +3,9 @@ import torch
 
 def R(
     d: torch.Tensor,
+    kappa: float = 1.0e-3,
+    sigma: float = 1.0e-3,
+    jitter: float = 1.0e-6,
 ) -> torch.Tensor:
     if d.dim() < 1:
         raise ValueError(f"R(d): expected [..., N], got {tuple(d.shape)}")
@@ -29,7 +32,7 @@ def R(
 
     E = I[..., :, 1:]
     absb2 = (b.conj() * b).real if is_c else (b * b)
-    kappa = torch.tensor(1.0e-3, dtype=absb2.dtype, device=device)
+    kappa = torch.tensor(kappa, dtype=absb2.dtype, device=device)
     p = 2.0
     wE_real = (1.0 - absb2[..., 1:] + kappa) ** p
     wE = wE_real.to(dtype)
@@ -66,7 +69,7 @@ def R(
     s1 = frob2(Z1)
     s2 = frob2(Z2)
     s3 = frob2(Z3)
-    sigma = torch.tensor(1.0e-3, dtype=s1.dtype, device=device)
+    sigma = torch.tensor(sigma, dtype=s1.dtype, device=device)
     qmix = 2.0
     a1 = (s1 + sigma) ** qmix
     a2 = (s2 + sigma) ** qmix
@@ -82,7 +85,7 @@ def R(
     I_nm1 = torch.eye(N - 1, dtype=H.dtype, device=device)
     tr = H.diagonal(dim1=-2, dim2=-1).real.sum(dim=-1, keepdim=True).unsqueeze(-1)
     scale = (tr / float(N - 1)) + 0.0
-    jitter = ((1.0e-6 + float(tiny)) * (scale + 1.0)).to(H.dtype)
+    jitter = ((jitter + float(tiny)) * (scale + 1.0)).to(H.dtype)
     H_spd = H + jitter * I_nm1
 
     evals, U = torch.linalg.eigh(H_spd)
