@@ -102,7 +102,7 @@ class CPSFCore:
 
         return norm_sq.squeeze(-1) if w.dim() == L.dim() - 1 else norm_sq
 
-    def R(
+    def R_a(
         self,
         d: torch.Tensor,
         eps: float = 1.0e-3,
@@ -117,7 +117,8 @@ class CPSFCore:
             torch.finfo(d.real.dtype) if torch.is_complex(d) else torch.finfo(d.dtype)
         )
         dn = torch.linalg.vector_norm(d, dim=-1, keepdim=True)
-        d_unit = d / torch.clamp(dn, min=torch.sqrt(finfo.eps))
+        c_min = torch.tensor(finfo.eps, dtype=dtype, device=device)
+        d_unit = d / (dn + c_min)
 
         I = torch.eye(N, dtype=dtype, device=device).expand(*B, N, N)
 
@@ -145,7 +146,7 @@ class CPSFCore:
         Z = P_perp @ Bmat
         H = (Z.mH @ Z) if torch.is_complex(Z) else (Z.transpose(-2, -1) @ Z)
         evals, Q = torch.linalg.eigh(H)
-        inv_sqrt = (evals.clamp(min=torch.sqrt(finfo.eps)) ** -0.5).diag_embed()
+        inv_sqrt = ((evals + c_min) ** -0.5).diag_embed()
         H_inv_sqrt = (
             Q @ inv_sqrt @ (Q.mH if torch.is_complex(Q) else Q.transpose(-2, -1))
         )
@@ -154,7 +155,7 @@ class CPSFCore:
         M = torch.cat([d_unit.unsqueeze(-1), (1.0 + eps) * Q_perp], dim=-1)
         H2 = (M.mH @ M) if torch.is_complex(M) else (M.transpose(-2, -1) @ M)
         evals2, Q2 = torch.linalg.eigh(H2)
-        inv_sqrt2 = (evals2.clamp(min=torch.sqrt(finfo.eps)) ** -0.5).diag_embed()
+        inv_sqrt2 = ((evals2 + c_min) ** -0.5).diag_embed()
         H2_inv_sqrt = (
             Q2 @ inv_sqrt2 @ (Q2.mH if torch.is_complex(Q2) else Q2.transpose(-2, -1))
         )
@@ -162,7 +163,48 @@ class CPSFCore:
 
         return R_out
 
-    def R_fast(
+    def R_b(
+        self,
+        d: torch.Tensor,
+        eps: float = 1.0e-3,
+    ) -> torch.Tensor:
+        if d.dim() < 1:
+            raise ValueError(f"R(d): expected [..., N], got {tuple(d.shape)}")
+        *B, N = d.shape
+        dtype, device = d.dtype, d.device
+
+        finfo = (
+            torch.finfo(d.real.dtype) if torch.is_complex(d) else torch.finfo(d.dtype)
+        )
+        min_norm = torch.tensor(finfo.eps, dtype=dtype, device=device)
+        dn = torch.linalg.vector_norm(d, dim=-1, keepdim=True)
+        d_unit = d / (dn + min_norm)
+
+        I = torch.eye(N, dtype=dtype, device=device).expand(*B, N, N)
+        M = (1.0 + eps) * I.clone()
+        M[..., :, 0] = d_unit
+        U, _, Vh = torch.linalg.svd(M, full_matrices=False)
+        R0 = U @ Vh
+
+        a = R0[..., :, 0]
+        b = d_unit
+
+        inner = torch.sum(torch.conj(b) * a, dim=-1, keepdim=True)
+        phase = inner / (inner.abs() + min_norm.abs())
+        v = a - phase * b
+        nv = torch.linalg.vector_norm(v, dim=-1, keepdim=True)
+        u = v / (nv + min_norm)
+        H = I - 2.0 * (u.unsqueeze(-1) @ u.conj().unsqueeze(-2))
+
+        P_b = b.unsqueeze(-1) @ b.conj().unsqueeze(-2)
+        S = I + (phase.conj() - 1.0) * P_b
+
+        G = S @ H
+        R_out = G @ R0
+
+        return R_out
+
+    def R_c(
         self,
         d: torch.Tensor,
         eps: float = 1.0e-3,
@@ -177,8 +219,8 @@ class CPSFCore:
         finfo = (
             torch.finfo(d.real.dtype) if torch.is_complex(d) else torch.finfo(d.dtype)
         )
-        min_norm = torch.sqrt(finfo.eps)
-        d_unit = d / torch.clamp(dn, min=min_norm)
+        min_norm = torch.tensor(finfo.eps, dtype=dtype, device=device)
+        d_unit = d / (dn + min_norm)
 
         I = torch.eye(N, dtype=dtype, device=device).expand(*B, N, N)
         M = (1.0 + eps) * I.clone()
