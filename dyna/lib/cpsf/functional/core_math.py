@@ -1,13 +1,12 @@
 import torch
 
-from dyna.lib.cpsf.errors import NumericalError
-
 
 def R(
     d: torch.Tensor,
 ) -> torch.Tensor:
     if d.dim() < 1:
         raise ValueError(f"R(d): expected [..., N], got {tuple(d.shape)}")
+
     *Bsz, N = d.shape
     dtype, device = d.dtype, d.device
     is_c = torch.is_complex(d)
