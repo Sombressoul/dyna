@@ -129,7 +129,9 @@ def R(
     E = I[..., :, 1:]
     absb2 = (b.conj() * b).real
     wE_real = (
-        1.0 - absb2[..., 1:] + torch.tensor(kappa, dtype=vec_d.real.dtype, device=device)
+        1.0
+        - absb2[..., 1:]
+        + torch.tensor(kappa, dtype=vec_d.real.dtype, device=device)
     ) ** p
     DE = torch.diag_embed(wE_real.to(dtype))
     J_E = E @ DE
@@ -198,6 +200,60 @@ def R(
 def R_ext(
     R: torch.Tensor,
 ) -> torch.Tensor:
+    """
+    Construct the extended CPSF frame R_ext(R) in U(2N) over C^{2N}.
+
+    Given a unitary CPSF frame R in C^{..., N, N} (typically produced by R(d)),
+    this routine returns the canonical block-diagonal extension
+        R_ext(R) = block_diag(R, R)  in C^{..., 2N, 2N}.
+    It applies the same frame R to both subspaces (position and direction) with no cross-coupling.
+
+    Properties
+    ----------
+    - Unitarity:           R_ext^H R_ext = R_ext R_ext^H = I_{2N}  (inherited from R; CPSF-R1,R2).
+    - Block structure:     Off-diagonal blocks are exactly zero; the two diagonal blocks are identical.
+    - First-column align:  If R = R(d) with first column b(d) = d / ||d||, then the first column
+                        in each diagonal block equals b(d) (per-block CPSF-R3,R4).
+    - Right U(N-1) action: For any Q in U(N-1), replacing R by R * diag(1, Q) leaves downstream
+                        Sigma = R_ext D R_ext^H unchanged when D = diag(s_par, s_perp, ..., s_perp)
+                        in each N-block (CPSF construction of Sigma).
+    - Batched:             Leading batch dimensions are preserved.
+
+    Algorithm
+    ---------
+    1) Validate that the input has shape [..., N, N] with square last dimensions.
+    2) Allocate a zero block Z of shape [..., N, N] with the same dtype and device as R.
+    3) Form top = [R | Z], bottom = [Z | R], then stack rows:
+    R_ext = [[R, Z], [Z, R]].
+    4) Return R_ext.
+
+    Parameters
+    ----------
+    R : torch.Tensor, complex dtype (torch.complex64 or torch.complex128)
+        Input unitary frame(s) of shape [..., N, N]. Typically obtained from R(d).
+
+    Returns
+    -------
+    torch.Tensor
+        The extended unitary frame of shape [..., 2N, 2N], equal to block_diag(R, R).
+
+    CPSF Notes
+    ----------
+    - This extension is used to build Sigma via
+        Sigma(R_ext, s_par, s_perp) = R_ext D R_ext^H,
+    where D selects the "parallel" index (0 and N in the 2N diagonal) and fills the others
+    with the "perp" value in each block.
+    - Deterministic and differentiable with respect to R (pure tensor ops, no RNG).
+
+    Edge cases
+    ----------
+    - N == 1: returns a 2x2 diagonal matrix with the single 1x1 block repeated.
+
+    Complex-only
+    ------------
+    R is expected to have a complex dtype. Real dtypes are not part of the CPSF canon here.
+    """
+
     if R.dim() < 2 or R.shape[-1] != R.shape[-2]:
         raise ValueError(f"R_ext(R): expected [..., N, N], got {tuple(R.shape)}")
 
@@ -210,10 +266,11 @@ def R_ext(
 
     return R_ext
 
+
 def Sigma(
     R_ext: torch.Tensor,
     sigma_par: torch.Tensor,
-    sigma_perp: torch.Tensor,    
+    sigma_perp: torch.Tensor,
 ) -> torch.Tensor:
     if R_ext.dim() < 2 or R_ext.shape[-1] != R_ext.shape[-2]:
         raise ValueError(
