@@ -7,6 +7,7 @@ from dyna.lib.cpsf.context import CPSFContext
 from dyna.lib.cpsf.functional.core_math import (
     R,
     R_ext,
+    Sigma,
 )
 
 
@@ -74,58 +75,29 @@ class CPSFCore:
         self,
         vec_d: torch.Tensor,
     ) -> torch.Tensor:
-        return R(vec_d)
+        return R(
+            vec_d=vec_d,
+        )
 
     def R_ext(
         self,
         R: torch.Tensor,
     ) -> torch.Tensor:
-        return R_ext(R)
+        return R_ext(
+            R=R,
+        )
 
-    def build_sigma(
+    def Sigma(
         self,
         R_ext: torch.Tensor,
         sigma_par: torch.Tensor,
         sigma_perp: torch.Tensor,
     ) -> torch.Tensor:
-        if R_ext.dim() < 2 or R_ext.shape[-1] != R_ext.shape[-2]:
-            raise ValueError(
-                f"build_sigma: expected R_ext as [..., 2N, 2N], got {tuple(R_ext.shape)}"
-            )
-
-        *B, twoN, _ = R_ext.shape
-        if twoN % 2 != 0:
-            raise ValueError(f"build_sigma: last dims must be even, got {twoN}")
-        N = twoN // 2
-
-        device = R_ext.device
-        dt_real = R_ext.real.dtype
-
-        sigma_par = torch.as_tensor(sigma_par, device=device, dtype=dt_real)
-        sigma_perp = torch.as_tensor(sigma_perp, device=device, dtype=dt_real)
-        par = sigma_par.reshape(*sigma_par.shape, 1) + torch.zeros(
-            *B, 1, device=device, dtype=dt_real
+        return Sigma(
+            R_ext=R_ext,
+            sigma_par=sigma_par,
+            sigma_perp=sigma_perp,
         )
-        perp = sigma_perp.reshape(*sigma_perp.shape, 1) + torch.zeros(
-            *B, 1, device=device, dtype=dt_real
-        )
-
-        if not (torch.all(par > 0) and torch.all(perp > 0)):
-            raise ValueError("build_sigma: sigma_par and sigma_perp must be positive")
-
-        base_mask = torch.zeros(twoN, dtype=torch.bool, device=device)
-        base_mask[0] = True
-        base_mask[N] = True
-        mask = base_mask.view(*([1] * len(B)), twoN).expand(*B, twoN)
-
-        diag_vals = torch.where(mask, par, perp)
-
-        D = torch.diag_embed(diag_vals).type_as(R_ext)
-
-        R_h = R_ext.mH if torch.is_complex(R_ext) else R_ext.transpose(-2, -1)
-        Sigma = R_h @ (D @ R_ext)
-
-        return Sigma
 
     def delta_vec_d(
         self,
