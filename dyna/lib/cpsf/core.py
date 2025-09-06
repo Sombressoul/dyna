@@ -24,6 +24,7 @@ class CPSFCore:
     def _cholesky_spd(
         self,
         S: torch.Tensor,
+        eps: Optional[float],
     ) -> torch.Tensor:
         if S.dim() < 2 or S.shape[-1] != S.shape[-2]:
             raise NumericalError(
@@ -43,7 +44,7 @@ class CPSFCore:
                 if torch.is_complex(S_h)
                 else torch.finfo(S_h.dtype)
             )
-            eps = torch.sqrt(finfo.eps)
+            eps = torch.sqrt(finfo.eps) if eps is None else eps
             scale = (
                 S_h.diagonal(dim1=-2, dim2=-1)
                 .abs()
@@ -200,6 +201,7 @@ class CPSFCore:
         self,
         d_q: torch.Tensor,
         d_j: torch.Tensor,
+        eps: float = 1.0e-6,
     ) -> torch.Tensor:
         if d_q.shape != d_j.shape or d_q.dim() < 1:
             raise ValueError(
@@ -208,19 +210,14 @@ class CPSFCore:
 
         inner = torch.sum(torch.conj(d_j) * d_q, dim=-1)
         tangent = d_q - inner.unsqueeze(-1) * d_j
-
         sin_theta = torch.linalg.vector_norm(tangent, dim=-1)
-
         cos_theta = torch.clamp(torch.abs(inner), max=1.0)
-
         theta = torch.acos(cos_theta)
+        sin_sq = sin_theta * sin_theta
+        eps_t = torch.as_tensor(eps, dtype=sin_sq.dtype, device=sin_sq.device)
+        denom = torch.sqrt(sin_sq + eps_t * torch.exp(-sin_sq / eps_t))
 
-        finfo = torch.finfo(sin_theta.dtype)
-        eps = torch.sqrt(finfo.eps)
-        scale_safe = theta / torch.clamp(sin_theta, min=eps)
-        scale = torch.where(sin_theta < eps, torch.ones_like(scale_safe), scale_safe)
-
-        delta = scale.unsqueeze(-1) * tangent
+        delta = (theta / denom).unsqueeze(-1) * tangent
         return delta
 
     def lift(self, z: torch.Tensor) -> torch.Tensor:
@@ -251,6 +248,7 @@ class CPSFCore:
         alpha_j: torch.Tensor,
         v_j: torch.Tensor,
         A: Optional[torch.Tensor] = None,
+        eps: float = 1.0e-6,
     ) -> torch.Tensor:
         dtype = v_j.dtype
         device = v_j.device
@@ -263,13 +261,7 @@ class CPSFCore:
 
         if A is None:
             a = _unsqueeze_to(alpha_j, v_j.dim())
-            finfo = (
-                torch.finfo(v_j.real.dtype)
-                if torch.is_complex(v_j)
-                else torch.finfo(v_j.dtype)
-            )
-            eps = torch.sqrt(finfo.eps)
-            denom = torch.clamp(a, min=eps)
+            denom = a + eps
             return v_j / denom
 
         if A.dim() < 2 or A.shape[-1] != A.shape[-2]:
@@ -284,8 +276,8 @@ class CPSFCore:
 
         I = torch.eye(M, dtype=dtype, device=device).expand(*A.shape[:-2], M, M)
         a_mm = _unsqueeze_to(alpha_j, A.dim())
-        K = A.to(dtype=dtype, device=device) + a_mm * I
-
+        eps_t = torch.as_tensor(eps, dtype=dtype, device=device)
+        K = a_mm * I + eps_t * A.to(dtype=dtype, device=device)
         L = self._cholesky_spd(K)
 
         rhs = v_j.unsqueeze(-1)
