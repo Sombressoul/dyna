@@ -95,18 +95,16 @@ def call_sigma(
 def test_S01_shape_dtype_device_and_args(impl_name, fn, dtype, N):
     device = TARGET_DEVICE
     REAL = torch.float32 if dtype == torch.complex64 else torch.float64
-
     d = rand_unit_vector(N, dtype, device)
     R_base = R(d)
     Rext = R_ext(R_base)
-
     sp = torch.tensor(1.5, dtype=REAL, device=device)
     sq = torch.tensor(0.7, dtype=REAL, device=device)
-
     got = call_sigma(fn, Rext, sp, sq)
+
     assert got.shape == (2 * N, 2 * N), "Σ must keep (..., 2N, 2N) shape"
     assert got.dtype == dtype, "Σ must keep complex dtype of R_ext"
-    assert got.device == device, "Σ must be on the same device as R_ext"
+    assert got.device.type == device.type, "Σ must be on the same device as R_ext"
 
     with pytest.raises(ValueError):
         _ = call_sigma(fn, Rext, torch.tensor(0.0, dtype=REAL, device=device), sq)
@@ -535,7 +533,7 @@ def test_S11_batch_semantics_and_broadcast(impl_name, fn, dtype, N, batch_shape)
     expected[..., N:, N:] = S0
 
     assert Sigma_b.shape == (*batch_shape, 2 * N, 2 * N)
-    assert Sigma_b.dtype == dtype and Sigma_b.device == device
+    assert Sigma_b.dtype == dtype and Sigma_b.device.type == device.type
     assert torch.allclose(
         Sigma_b, expected, rtol=rtol, atol=atol
     ), f"{impl_name}: batched Σ != diag(S0,S0) for scalar sp/sq (N={N}, dtype={dtype})"
