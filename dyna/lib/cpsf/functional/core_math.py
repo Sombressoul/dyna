@@ -285,30 +285,22 @@ def Sigma(
     N = twoN // 2
 
     device = R_ext.device
+    dt_cplx = R_ext.dtype
     dt_real = R_ext.real.dtype
 
-    sigma_par = torch.as_tensor(sigma_par, device=device, dtype=dt_real)
-    sigma_perp = torch.as_tensor(sigma_perp, device=device, dtype=dt_real)
-    par = sigma_par.reshape(*sigma_par.shape, 1) + torch.zeros(
-        *B, 1, device=device, dtype=dt_real
-    )
-    perp = sigma_perp.reshape(*sigma_perp.shape, 1) + torch.zeros(
-        *B, 1, device=device, dtype=dt_real
-    )
-
-    if not (torch.all(par > 0) and torch.all(perp > 0)):
+    sp = torch.as_tensor(sigma_par, device=device, dtype=dt_real)
+    sq = torch.as_tensor(sigma_perp, device=device, dtype=dt_real)
+    if not (torch.all(sp > 0) and torch.all(sq > 0)):
         raise ValueError("Sigma: sigma_par and sigma_perp must be positive")
 
-    base_mask = torch.zeros(twoN, dtype=torch.bool, device=device)
-    base_mask[0] = True
-    base_mask[N] = True
-    mask = base_mask.view(*([1] * len(B)), twoN).expand(*B, twoN)
+    R = R_ext[..., :N, :N]
+    b = R[..., :, 0]
+    delta = (sp - sq).to(dtype=dt_cplx)[..., None, None]
+    S0 = (b.unsqueeze(-1) * b.conj().unsqueeze(-2)) * delta
+    S0.diagonal(dim1=-2, dim2=-1).add_(sq[..., None])
 
-    diag_vals = torch.where(mask, par, perp)
+    out = S0.new_zeros(*B, 2 * N, 2 * N)
+    out[..., :N, :N].copy_(S0)
+    out[..., N:, N:].copy_(S0)
 
-    D = torch.diag_embed(diag_vals).type_as(R_ext)
-
-    R_h = R_ext.mH if torch.is_complex(R_ext) else R_ext.transpose(-2, -1)
-    Sigma = R_ext @ (D @ R_h)
-
-    return Sigma
+    return out
