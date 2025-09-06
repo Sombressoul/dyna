@@ -1,5 +1,5 @@
 # Run as (example):
-# > pytest -q .\dyna\lib\cpsf\pytest\test_CPSF_R_etx.py
+# > pytest -q .\dyna\lib\cpsf\pytest\test_CPSF_R_ext.py
 
 import torch
 import pytest
