@@ -204,28 +204,33 @@ def R_ext(
     Construct the extended CPSF frame R_ext(R) in U(2N) over C^{2N}.
 
     Given a unitary CPSF frame R in C^{..., N, N} (typically produced by R(d)),
-    this routine returns the canonical block-diagonal extension
+    this routine returns the canonical block-diagonal extension:
         R_ext(R) = block_diag(R, R)  in C^{..., 2N, 2N}.
     It applies the same frame R to both subspaces (position and direction) with no cross-coupling.
 
+    This implementation is allocation-friendly: it preallocates the output once and
+    writes the two diagonal blocks via copy_(), avoiding temporary tensors and cat() chains.
+
     Properties
     ----------
-    - Unitarity:           R_ext^H R_ext = R_ext R_ext^H = I_{2N}  (inherited from R; CPSF-R1,R2).
+    - Unitarity:           R_ext^H R_ext = R_ext R_ext^H = I_{2N}  (inherited from R).
     - Block structure:     Off-diagonal blocks are exactly zero; the two diagonal blocks are identical.
     - First-column align:  If R = R(d) with first column b(d) = d / ||d||, then the first column
-                        in each diagonal block equals b(d) (per-block CPSF-R3,R4).
+                        in each diagonal block equals b(d).
     - Right U(N-1) action: For any Q in U(N-1), replacing R by R * diag(1, Q) leaves downstream
                         Sigma = R_ext D R_ext^H unchanged when D = diag(s_par, s_perp, ..., s_perp)
-                        in each N-block (CPSF construction of Sigma).
+                        within each N-block.
     - Batched:             Leading batch dimensions are preserved.
+    - Deterministic:       Pure tensor ops; no randomness. Fully differentiable w.r.t. R.
 
     Algorithm
     ---------
     1) Validate that the input has shape [..., N, N] with square last dimensions.
-    2) Allocate a zero block Z of shape [..., N, N] with the same dtype and device as R.
-    3) Form top = [R | Z], bottom = [Z | R], then stack rows:
-    R_ext = [[R, Z], [Z, R]].
-    4) Return R_ext.
+    2) Allocate the output: out = R.new_zeros(..., 2N, 2N).
+    3) Write diagonal blocks:
+        out[..., :N, :N].copy_(R)
+        out[..., N:, N:].copy_(R)
+    4) Return out.
 
     Parameters
     ----------
@@ -243,7 +248,6 @@ def R_ext(
         Sigma(R_ext, s_par, s_perp) = R_ext D R_ext^H,
     where D selects the "parallel" index (0 and N in the 2N diagonal) and fills the others
     with the "perp" value in each block.
-    - Deterministic and differentiable with respect to R (pure tensor ops, no RNG).
 
     Edge cases
     ----------
@@ -258,13 +262,11 @@ def R_ext(
         raise ValueError(f"R_ext(R): expected [..., N, N], got {tuple(R.shape)}")
 
     *B, N, _ = R.shape
-    Z = torch.zeros(*B, N, N, dtype=R.dtype, device=R.device)
+    out = R.new_zeros(*B, 2 * N, 2 * N)
+    out[..., :N, :N].copy_(R)
+    out[..., N:, N:].copy_(R)
 
-    top = torch.cat([R, Z], dim=-1)
-    bottom = torch.cat([Z, R], dim=-1)
-    R_ext = torch.cat([top, bottom], dim=-2)
-
-    return R_ext
+    return out
 
 
 def Sigma(
