@@ -23,18 +23,32 @@ class CPSFCore:
     ) -> torch.Tensor:
         if d.dim() < 1:
             raise ValueError(f"R(d): expected [..., N], got {tuple(d.shape)}")
-
         *B, N = d.shape
         dtype = d.dtype
         device = d.device
 
-        E = torch.eye(N, dtype=dtype, device=device).expand(*B, N, N).clone()
-        M = E * (1.0 + eps)
-        M[..., :, 0] = d
-        U, S, Vh = torch.linalg.svd(M, full_matrices=False)
-        R = U @ Vh
+        dn = torch.linalg.vector_norm(d, dim=-1, keepdim=True)
+        finfo = (
+            torch.finfo(d.real.dtype) if torch.is_complex(d) else torch.finfo(d.dtype)
+        )
+        d_unit = d / torch.clamp(dn, min=torch.sqrt(finfo.eps))
 
-        return R
+        I = torch.eye(N, dtype=dtype, device=device).expand(*B, N, N)
+        M = (1.0 + eps) * I.clone()
+        M[..., :, 0] = d_unit
+        U, _, Vh = torch.linalg.svd(M, full_matrices=False)
+        R0 = U @ Vh
+
+        P = I - d_unit.unsqueeze(-1) @ torch.conj(d_unit).unsqueeze(-2)
+        Bcomp = P @ R0[..., :, 1:]
+
+        if N > 1:
+            Qc, _ = torch.linalg.qr(Bcomp, mode="reduced")
+            R_out = torch.cat([d_unit.unsqueeze(-1), Qc], dim=-1)
+        else:
+            R_out = d_unit.unsqueeze(-1)
+
+        return R_out
 
     def R_ext(
         self,
@@ -131,34 +145,22 @@ class CPSFCore:
         delta = scale.unsqueeze(-1) * tangent
         return delta
 
-    def lift(
-        self,
-        z: torch.Tensor,
-    ) -> torch.Tensor:
-        if torch.is_complex(z):
-            return torch.cat([z.real, z.imag], dim=-1)
+    def lift(self, z: torch.Tensor) -> torch.Tensor:
+        if not torch.is_complex(z):
+            raise ValueError(
+                f"lift: expected complex [..., N], got {z.dtype} {tuple(z.shape)}"
+            )
+        return z
 
-        if z.dim() >= 1 and (z.shape[-1] % 2 == 0):
-            return z
-        raise ValueError(
-            f"lift: expected complex [..., N] or real [..., 2N], got shape={tuple(z.shape)}, dtype={z.dtype}"
-        )
-
-    def iota(
-        self,
-        dz: torch.Tensor,
-        delta_d: torch.Tensor,
-    ) -> torch.Tensor:
-        w_z = self.lift(dz)
-        w_d = self.lift(delta_d)
-
+    def iota(self, dz: torch.Tensor, delta_d: torch.Tensor) -> torch.Tensor:
+        u = self.lift(dz)
+        v = self.lift(delta_d)
         try:
-            w = w_z + w_d
+            return torch.cat([u, v], dim=-1)
         except RuntimeError as e:
             raise ValueError(
-                f"iota: broadcasting mismatch for shapes {tuple(w_z.shape)} and {tuple(w_d.shape)}"
+                f"iota: concat failed for shapes {tuple(u.shape)} and {tuple(v.shape)}"
             ) from e
-        return w
 
     def tri_solve_norm_sq(
         self,
