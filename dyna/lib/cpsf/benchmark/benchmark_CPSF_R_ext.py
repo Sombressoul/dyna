@@ -60,16 +60,15 @@ def main():
     )
 
     # Prepare inputs: vectors -> base frames -> benchmark R_ext(base_frames)
-    d = make_batch(B, N, dtype, dev)        # (B, N)
-    R_b = R(d)                               # (B, N, N)
+    d = make_batch(B, N, dtype, dev)  # (B, N)
+    R_b = R(d)  # (B, N, N)
     del d
 
     if args.verify_devices:
         out = R_ext(R_b)
         print(f"in.device={R_b.device}, out.device={out.device}")
-        assert (
-            (dev.type == "cpu" and (not R_b.is_cuda) and (not out.is_cuda))
-            or (dev.type == "cuda" and R_b.is_cuda and out.is_cuda)
+        assert (dev.type == "cpu" and (not R_b.is_cuda) and (not out.is_cuda)) or (
+            dev.type == "cuda" and R_b.is_cuda and out.is_cuda
         ), "Device mismatch!"
         del out
 
@@ -100,7 +99,9 @@ def main():
                 prof.step()
         print(
             prof.key_averages().table(
-                sort_by="self_cuda_time_total" if dev.type == "cuda" else "cpu_time_total",
+                sort_by=(
+                    "self_cuda_time_total" if dev.type == "cuda" else "cpu_time_total"
+                ),
                 row_limit=15,
             )
         )
