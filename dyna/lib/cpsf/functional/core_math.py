@@ -12,64 +12,94 @@ def R(
     qmix: float = 2.0,  # "temperature" of energy-based anchor mixing
 ) -> torch.Tensor:
     """
-    Construct a CPSF-orthonormal frame R(d) ∈ U(N) over C^N.
+    Construct a CPSF-orthonormal frame R(d) in U(N) over C^N.
 
-    Given a complex, nonzero vector d ∈ C^{..., N}, this routine returns a unitary
+    Given a complex, nonzero vector d in C^{..., N}, this routine returns a unitary
     frame
-        R(d) = [ b(d) | Q⊥(d) ]  ∈ C^{..., N, N},
+        R(d) = [ b(d) | Q_perp(d) ]  in C^{..., N, N},
     where
-        b(d) = d / ‖d‖                    (first column; exact alignment, CPSF-R3)
-        Q⊥(d) ∈ C^{..., N, N-1}           (orthonormal basis of b(d)⊥, CPSF-R4)
+        b(d) = d / ||d||                  (first column; exact alignment, CPSF-R3)
+        Q_perp(d) in C^{..., N, N-1}      (orthonormal basis of the orthogonal complement of b(d), CPSF-R4)
     and the whole matrix is unitary (CPSF-R1+R2). The construction is smooth in d,
     right-U(N-1) equivariant on the complement (CPSF-R6), and designed to satisfy
     the CPSF regularity criteria (local trivialization / continuity CPSF-R8 and
-    bounded derivative proxy CPSF-R9) in machine precision.
+    bounded-derivative proxy CPSF-R9) within machine precision.
+
+    Complex-only:
+    This implementation expects d to have a complex dtype (torch.complex64 or torch.complex128).
+    Real dtypes are not part of the CPSF canon and are not supported here.
 
     Algorithm (complex-only)
     ------------------------
-    1) Normalize b = d / max(‖d‖, √eps) and form the projector P⊥ = I - b bᴴ.
-    2) Build three N*(N-1) “anchors” in C^N:
-    • J_E  - coordinate anchor (standard basis without e₁) with smooth weights,
-    • J_F1 - complex Fourier-like anchor, phases 2π i k / N,
-    • J_F2 - complex Fourier-like anchor, phases 2π i (k+½) / N.
-    3) Project anchors to b⊥: Zᵢ = P⊥ Jᵢ, and mix them with smooth, energy-based
-    weights aᵢ ∝ (‖Zᵢ‖_F² + sigma)^{qmix} (sigma,qmix control switching smoothness).
-    4) Polar orthonormalization in the (N-1)-subspace: Q̃ = Z (ZᴴZ)^{-1/2} with a
-    scale-aware SPD jitter (jitter) to keep ZᴴZ well-conditioned.
-    5) Re-project and re-polarize once more: Q⊥ = proj_{b⊥}(Q̃) · (Q̃ᴴQ̃)^{-1/2}.
-    6) Concatenate R = [ b | Q⊥ ].
+    1) Normalize b = d / max(||d||, sqrt(eps)) and form the projector
+    P_perp = I - b b^H.
+    2) Build three N x (N-1) anchors in C^N:
+    - J_E  : coordinate anchor (standard basis without e1) with smooth weights,
+    - J_F1 : complex Fourier-like anchor, phases 2*pi*i*k/N,
+    - J_F2 : complex Fourier-like anchor, phases 2*pi*i*(k+0.5)/N.
+    3) Project anchors to b_perp: Z_i = P_perp J_i, and mix them with smooth,
+    energy-based weights a_i proportional to (||Z_i||_F^2 + sigma)^{qmix}
+    (sigma and qmix control switching smoothness).
+    4) Polar orthonormalization in the (N-1)-subspace:
+    Q_tilde = Z (Z^H Z)^(-1/2) with a scale-aware SPD jitter (jitter) to keep Z^H Z
+    well-conditioned.
+    5) Re-project and re-polarize once more:
+    Q_perp = proj_{b_perp}(Q_tilde) * (Q_tilde^H Q_tilde)^(-1/2).
+    6) Concatenate R = [ b | Q_perp ].
 
     Parameters
     ----------
     d : torch.Tensor, complex dtype (torch.complex64 or torch.complex128)
-        Input vectors of shape [..., N]. Real dtypes are not supported by the CPSF canon.
+        Input vectors of shape [..., N].
     kappa : float, default 1e-3
         Soft de-clumping for the J_E weights to avoid dominance by large |b_j|.
     sigma : float, default 1e-3
         Smoothing for anchor mixing (prevents hard switches between anchors).
     jitter : float, default 1e-6
-        Scale-aware SPD jitter added to ZᴴZ (and to the second polar) for numerical stability.
+        Scale-aware SPD jitter added to Z^H Z (and to the second polar step) for numerical stability.
     p : float, default 2.0
         Exponent in the J_E weighting (controls emphasis of less-aligned coordinates).
     qmix : float, default 2.0
-        “Temperature” of the energy-based anchor mixing; lower is sharper, higher is smoother.
+        "Temperature" of the energy-based anchor mixing; lower is sharper, higher is smoother.
 
     Returns
     -------
     torch.Tensor
         A unitary matrix R(d) of shape [..., N, N] with:
-        • first column exactly b(d) (R3),
-        • columns 2..N orthonormal and orthogonal to b(d) (R4),
-        • RᴴR = RRᴴ = I (R1-R2).
+        - first column exactly b(d) (R3),
+        - columns 2..N orthonormal and orthogonal to b(d) (R4),
+        - R^H R = R R^H = I (R1-R2).
         For N == 1, returns [..., 1, 1] with the single column b(d).
+
+    CPSF Requirements (R1-R9)
+    -------------------------
+    R1 (Left unitarity):    R(d)^H R(d) = I_N.
+    R2 (Right unitarity):   R(d) R(d)^H = I_N.
+    R3 (Alignment):         The first column equals b(d) = d / ||d|| exactly.
+    R4 (Complement):        Columns 2..N form an orthonormal basis of b(d)-perp:
+                            b(d)^H Q_perp(d) = 0 and Q_perp(d)^H Q_perp(d) = I_{N-1}.
+    R5 (Local smoothness):  R(d + delta) depends smoothly on d; for small tangential
+                            perturbations delta, ||R(d + delta) - R(d)|| = O(||delta||)
+                            and the columns vary continuously without sudden flips.
+    R6 (Right U(N-1) equivariance): For any U in U(N-1),
+                            R(d) * diag(1, U) is a valid frame with the same first column;
+                            the projector Q_perp Q_perp^H is invariant under this right action.
+    R7 (Extended-frame unitarity): Any frame obtained by the right block-diagonal action
+                            diag(1, U), U in U(N-1), remains unitary in chained compositions
+                            used by CPSF (unitarity is preserved under the extension).
+    R8 (Local trivialization along paths): Along a geodesic path between d0 and d1 in C^N,
+                            there exists a continuous right alignment in U(N-1) such that
+                            successive frames remain close (no discontinuous jumps).
+    R9 (Bounded derivative proxy): The finite-difference gradient of R with respect to
+                            tangential perturbations remains bounded as the step size goes
+                            to zero (no blow-up of ||R(d + h*xi) - R(d)|| / h as h -> 0).
 
     Notes
     -----
-    • Complex-only: raises TypeError if d is not complex.
-    • Fully batched and differentiable (uses Hermitian eigendecompositions on (N-1)*(N-1) SPD
-    matrices). Computational cost is O((N-1)³) per batch element.
-    • Small constants (√eps from real(d.dtype), sigma, jitter) are chosen to ensure smoothness and
-    numerical robustness consistent with CPSF R5/R8/R9 in float32/float64 precision.
+    - Fully batched and differentiable (uses Hermitian eigendecompositions on (N-1) x (N-1) SPD
+    matrices). Computational cost is O((N-1)^3) per batch element.
+    - Small constants (sqrt(eps) from real(d.dtype), sigma, jitter) are chosen to ensure smoothness and
+    numerical robustness consistent with CPSF R5/R8/R9 in complex64/complex128 precision.
     """
 
     if d.dim() < 1:
