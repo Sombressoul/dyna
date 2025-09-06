@@ -6,6 +6,8 @@ def R(
     kappa: float = 1.0e-3,
     sigma: float = 1.0e-3,
     jitter: float = 1.0e-6,
+    p: float = 2.0,
+    qmix: float = 2.0,
 ) -> torch.Tensor:
     if d.dim() < 1:
         raise ValueError(f"R(d): expected [..., N], got {tuple(d.shape)}")
@@ -33,7 +35,6 @@ def R(
     E = I[..., :, 1:]
     absb2 = (b.conj() * b).real if is_c else (b * b)
     kappa = torch.tensor(kappa, dtype=absb2.dtype, device=device)
-    p = 2.0
     wE_real = (1.0 - absb2[..., 1:] + kappa) ** p
     wE = wE_real.to(dtype)
     DE = torch.diag_embed(wE)
@@ -70,7 +71,6 @@ def R(
     s2 = frob2(Z2)
     s3 = frob2(Z3)
     sigma = torch.tensor(sigma, dtype=s1.dtype, device=device)
-    qmix = 2.0
     a1 = (s1 + sigma) ** qmix
     a2 = (s2 + sigma) ** qmix
     a3 = (s3 + sigma) ** qmix
