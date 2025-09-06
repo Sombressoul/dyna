@@ -90,7 +90,7 @@ def rand_unit_vector(
 
 
 def call_R(
-    R_fn: Callable[[torch.Tensor, float], torch.Tensor],
+    R_fn: Callable[[torch.Tensor], torch.Tensor],
     d: torch.Tensor,
 ) -> torch.Tensor:
     return R_fn(d)
