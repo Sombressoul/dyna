@@ -2,7 +2,7 @@ import torch
 
 
 def R(
-    d: torch.Tensor,
+    vec_d: torch.Tensor,
     # smoothing & stability
     kappa: float = 1.0e-3,  # soft de-clumping of J_E weights
     sigma: float = 1.0e-3,  # smoothing for anchor mixing
@@ -102,21 +102,21 @@ def R(
     numerical robustness consistent with CPSF R5/R8/R9 in complex64/complex128 precision.
     """
 
-    if d.dim() < 1:
-        raise ValueError(f"R(d): expected [..., N], got {tuple(d.shape)}")
-    if not torch.is_complex(d):
+    if vec_d.dim() < 1:
+        raise ValueError(f"R(d): expected [..., N], got {tuple(vec_d.shape)}")
+    if not torch.is_complex(vec_d):
         raise TypeError(
             "R(d): CPSF canon expects a complex input (torch.complex64/torch.complex128)."
         )
 
-    *B, N = d.shape
-    dtype, device = d.dtype, d.device
+    *B, N = vec_d.shape
+    dtype, device = vec_d.dtype, vec_d.device
 
-    finfo = torch.finfo(d.real.dtype)
-    tiny = torch.sqrt(torch.tensor(finfo.eps, dtype=d.real.dtype, device=device))
+    finfo = torch.finfo(vec_d.real.dtype)
+    tiny = torch.sqrt(torch.tensor(finfo.eps, dtype=vec_d.real.dtype, device=device))
 
-    dn = torch.linalg.vector_norm(d, dim=-1, keepdim=True)
-    b = d / torch.clamp(dn, min=tiny)
+    dn = torch.linalg.vector_norm(vec_d, dim=-1, keepdim=True)
+    b = vec_d / torch.clamp(dn, min=tiny)
 
     if N == 1:
         return b.unsqueeze(-1)
@@ -129,12 +129,12 @@ def R(
     E = I[..., :, 1:]
     absb2 = (b.conj() * b).real
     wE_real = (
-        1.0 - absb2[..., 1:] + torch.tensor(kappa, dtype=d.real.dtype, device=device)
+        1.0 - absb2[..., 1:] + torch.tensor(kappa, dtype=vec_d.real.dtype, device=device)
     ) ** p
     DE = torch.diag_embed(wE_real.to(dtype))
     J_E = E @ DE
 
-    reals = d.real.dtype
+    reals = vec_d.real.dtype
     i = torch.arange(N, device=device, dtype=reals).unsqueeze(-1)
     k = torch.arange(1, N, device=device, dtype=reals).unsqueeze(0)
     phase1 = 2.0 * torch.pi * i * k / float(N)
@@ -193,3 +193,19 @@ def R(
     R_out = torch.cat([b.unsqueeze(-1), Q_perp], dim=-1)
 
     return R_out
+
+
+def R_ext(
+    R: torch.Tensor,
+) -> torch.Tensor:
+    if R.dim() < 2 or R.shape[-1] != R.shape[-2]:
+        raise ValueError(f"R_ext(R): expected [..., N, N], got {tuple(R.shape)}")
+
+    *B, N, _ = R.shape
+    Z = torch.zeros(*B, N, N, dtype=R.dtype, device=R.device)
+
+    top = torch.cat([R, Z], dim=-1)
+    bottom = torch.cat([Z, R], dim=-1)
+    R_ext = torch.cat([top, bottom], dim=-2)
+
+    return R_ext

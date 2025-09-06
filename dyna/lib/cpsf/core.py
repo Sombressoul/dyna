@@ -6,6 +6,7 @@ from dyna.lib.cpsf.errors import NumericalError
 from dyna.lib.cpsf.context import CPSFContext
 from dyna.lib.cpsf.functional.core_math import (
     R,
+    R_ext,
 )
 
 
@@ -71,25 +72,15 @@ class CPSFCore:
 
     def R(
         self,
-        d: torch.Tensor,
+        vec_d: torch.Tensor,
     ) -> torch.Tensor:
-        return R(d)
+        return R(vec_d)
 
     def R_ext(
         self,
         R: torch.Tensor,
     ) -> torch.Tensor:
-        if R.dim() < 2 or R.shape[-1] != R.shape[-2]:
-            raise ValueError(f"R_ext(R): expected [..., N, N], got {tuple(R.shape)}")
-
-        *B, N, _ = R.shape
-        Z = torch.zeros(*B, N, N, dtype=R.dtype, device=R.device)
-
-        top = torch.cat([R, Z], dim=-1)
-        bottom = torch.cat([Z, R], dim=-1)
-        R_ext = torch.cat([top, bottom], dim=-2)
-
-        return R_ext
+        return R_ext(R)
 
     def build_sigma(
         self,
