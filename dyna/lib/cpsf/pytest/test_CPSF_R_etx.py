@@ -2,11 +2,14 @@
 # > pytest -q .\dyna\lib\cpsf\pytest\test_CPSF_R_etx.py
 
 import torch
-import math
 import pytest
 from typing import Callable, List, Tuple
 
-from dyna.lib.cpsf.functional.core_math import R_ext, R
+from dyna.lib.cpsf.functional.core_math import (
+    R,
+    R_ext,
+    Sigma,
+)
 
 TARGET_DEVICE = torch.device("cpu")
 FN_IMPLS: List[Tuple[str, Callable[[torch.Tensor], torch.Tensor]]] = [
@@ -255,7 +258,6 @@ def test_05_smoothness_finite_difference(impl_name, fn, dtype, N):
 @pytest.mark.parametrize("dtype", DTYPES)
 @pytest.mark.parametrize("N", NS)
 def test_06_right_action_U_Nm1_invariance_of_Sigma(impl_name, fn, dtype, N):
-    raise NotImplementedError("Sigma is not implemented yet.")
     if N < 2:
         pytest.skip("U(N-1) is trivial for N=1; invariance holds vacuously.")
 
@@ -268,11 +270,10 @@ def test_06_right_action_U_Nm1_invariance_of_Sigma(impl_name, fn, dtype, N):
     sq = torch.rand((), device=device, dtype=REAL) + 0.5
     D = torch.diag(torch.cat([sp.reshape(1), sq.repeat(N - 1)]))
     D = D.to(dtype)
-    D_ext = torch.block_diag(D, D)
 
     def Sigma_from(R_in: torch.Tensor) -> torch.Tensor:
         Rex = call_FN(fn, R_in)
-        return Rex.conj().transpose(-2, -1) @ D_ext @ Rex
+        return Sigma(R_ext=Rex, sigma_par=sp, sigma_perp=sq)
 
     Sigma_base = Sigma_from(R_base)
 
