@@ -274,6 +274,78 @@ def Sigma(
     sigma_par: torch.Tensor,
     sigma_perp: torch.Tensor,
 ) -> torch.Tensor:
+    """
+    Construct the CPSF covariance Sigma from an extended frame R_ext and (sigma_par, sigma_perp).
+
+    Canonical definition
+    --------------------
+    Given an extended CPSF frame
+        R_ext = block_diag(R, R) in C^{..., 2N, 2N}
+    and the diagonal weight operator
+        D = diag(sigma_par, sigma_perp, ..., sigma_perp,  sigma_par, sigma_perp, ..., sigma_perp),
+    the covariance is
+        Sigma = R_ext * D * R_ext^H,
+    where ^H denotes the conjugate transpose.
+
+    Implementation (allocation-friendly)
+    ------------------------------------
+    This implementation avoids materializing D and 2Nx2N GEMMs. It extracts R = R_ext[..., :N, :N],
+    lets b = R[:, 0] (the first column), forms
+        S0 = sigma_perp * I_N + (sigma_par - sigma_perp) * (b b^H),
+    and assembles
+        Sigma = diag(S0, S0)
+    by preallocating the 2Nx2N output and writing the two diagonal blocks via copy_().
+
+    Properties
+    ----------
+    - Hermitian SPD:      Sigma == Sigma^H and Sigma is positive definite for sigma_par > 0 and sigma_perp > 0.
+    - Block structure:    Sigma = diag(S0, S0) with S0 = R * diag(sigma_par, sigma_perp, ..., sigma_perp) * R^H.
+    - Spectrum:           eig(Sigma) = {sigma_par (mult 2), sigma_perp (mult 2*(N-1))}.
+    - Isotropy:           if sigma_par == sigma_perp == s, then Sigma = s * I(2N).
+    - Inverse (closed form):
+                        Sigma^{-1} = R_ext * diag(1/sigma_par, 1/sigma_perp, ..., 1/sigma_perp,
+                                                1/sigma_par, 1/sigma_perp, ..., 1/sigma_perp) * R_ext^H.
+    - Invariances:        right action R -> R * diag(1, Q), Q in U(N-1), and the first-column phase
+                        R -> R * diag(exp(i*phi), I) leave Sigma unchanged.
+    - Linearity in D:     Sigma is linear w.r.t. (sigma_par, sigma_perp) and scales as
+                        Sigma(alpha*sigma_par, alpha*sigma_perp) = alpha * Sigma(sigma_par, sigma_perp).
+    - Batched:            leading batch dimensions are preserved; sigma_par/sigma_perp broadcast across them.
+    - Differentiable:     pure tensor ops; gradients flow through R_ext and sigma parameters.
+
+    Algorithm
+    ---------
+    1) Validate input shape [..., 2N, 2N] and positivity of sigma_par, sigma_perp.
+    2) Extract R = R_ext[..., :N, :N] and its first column b.
+    3) Build S0 = sigma_perp*I_N + (sigma_par - sigma_perp)*(b b^H).
+    4) Preallocate out[..., 2N, 2N]; write S0 into TL and BR blocks; return out.
+
+    Parameters
+    ----------
+    R_ext : torch.Tensor (complex64 or complex128), shape [..., 2N, 2N]
+        Extended CPSF frame, typically obtained as block_diag(R, R) with R = R(d).
+    sigma_par : torch.Tensor (real), broadcastable to leading batch dims
+        Positive scalar/tensor for the "parallel" direction (index 0 in each N-block).
+    sigma_perp : torch.Tensor (real), broadcastable to leading batch dims
+        Positive scalar/tensor for the orthogonal complement (indices 1..N-1 in each N-block).
+
+    Returns
+    -------
+    torch.Tensor (complex, same dtype/device as R_ext), shape [..., 2N, 2N]
+        The CPSF covariance matrix Sigma.
+
+    CPSF notes
+    ----------
+    - Matrix-free application: Sigma * [u; v] = [S0*u; S0*v] with S0 as above, which can be computed
+    without materializing Sigma.
+    - logdet(Sigma) = 2*log(sigma_par) + 2*(N-1)*log(sigma_perp). Sigma^{+/-1/2} follow by replacing
+    sigma with sigma^{+/-1/2}.
+
+    Edge cases
+    ----------
+    - CPSF typically assumes N >= 2. For completeness, at N == 1 the formula degenerates to
+    Sigma = diag(sigma_par, sigma_par). No randomness is used.
+    """
+
     if R_ext.dim() < 2 or R_ext.shape[-1] != R_ext.shape[-2]:
         raise ValueError(
             f"Sigma: expected R_ext as [..., 2N, 2N], got {tuple(R_ext.shape)}"
