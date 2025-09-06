@@ -2,10 +2,7 @@ import torch
 
 from typing import Optional
 
-from dyna.lib.cpsf.functional.numerics import (
-    cholesky_spd,
-    tri_solve_norm_sq,
-)
+from dyna.lib.cpsf.errors import NumericalError
 from dyna.lib.cpsf.context import CPSFContext
 
 
@@ -15,6 +12,94 @@ class CPSFCore:
         context: CPSFContext,
     ):
         self.ctx = context
+
+    def _hermitianize(
+        self,
+        S: torch.Tensor,
+    ) -> torch.Tensor:
+        return (
+            0.5 * (S + S.mH) if torch.is_complex(S) else 0.5 * (S + S.transpose(-2, -1))
+        )
+
+    def _cholesky_spd(
+        self,
+        S: torch.Tensor,
+    ) -> torch.Tensor:
+        if S.dim() < 2 or S.shape[-1] != S.shape[-2]:
+            raise NumericalError(
+                f"_cholesky_spd: expected [..., n, n], got {tuple(S.shape)}"
+            )
+
+        S_h = self._hermitianize(S)
+
+        if not torch.isfinite(S_h).all():
+            raise NumericalError("Cholesky: non-finite entries in input")
+
+        try:
+            return torch.linalg.cholesky(S_h)
+        except RuntimeError as e:
+            finfo = (
+                torch.finfo(S_h.real.dtype)
+                if torch.is_complex(S_h)
+                else torch.finfo(S_h.dtype)
+            )
+            eps = torch.sqrt(finfo.eps)
+            scale = (
+                S_h.diagonal(dim1=-2, dim2=-1)
+                .abs()
+                .mean(dim=-1, keepdim=True)
+                .clamp(min=1.0)
+            )
+            eye = torch.eye(
+                S_h.shape[-1],
+                device=S_h.device,
+                dtype=S_h.real.dtype if torch.is_complex(S_h) else S_h.dtype,
+            )
+            S_h_jittered = S_h + (
+                eps
+                * scale[..., None]
+                * (eye if not torch.is_complex(S_h) else eye.type_as(S_h))
+            )
+            try:
+                return torch.linalg.cholesky(S_h_jittered)
+            except RuntimeError as e2:
+                raise NumericalError(f"Cholesky failed even with jitter: {e2}") from e2
+
+    def _tri_solve_norm_sq(
+        self,
+        L: torch.Tensor,
+        w: torch.Tensor,
+    ) -> torch.Tensor:
+        if L.dim() < 2 or L.shape[-1] != L.shape[-2]:
+            raise NumericalError(
+                f"_tri_solve_norm_sq: expected L as [..., n, n], got {tuple(L.shape)}"
+            )
+
+        rhs = w.unsqueeze(-1) if w.dim() == L.dim() - 1 else w
+        rhs = rhs.to(dtype=L.dtype)
+        n = L.shape[-1]
+
+        if not (torch.isfinite(L).all() and torch.isfinite(rhs).all()):
+            raise NumericalError("non-finite in inputs")
+
+        if rhs.shape[-2] != n:
+            raise NumericalError(
+                f"_tri_solve_norm_sq: mismatched shapes: L:[...,{n},{n}] vs w:[...,{rhs.shape[-2]},*]"
+            )
+
+        if hasattr(torch.linalg, "solve_triangular"):
+            y = torch.linalg.solve_triangular(L, rhs, upper=False, left=True)
+        else:
+            y = torch.triangular_solve(rhs, L, upper=False).solution
+
+        if torch.is_complex(y):
+            norm_sq = (y.conj() * y).real.sum(dim=-2)
+        else:
+            norm_sq = (y * y).sum(dim=-2)
+
+        norm_sq = torch.clamp(norm_sq, min=0)
+
+        return norm_sq.squeeze(-1) if w.dim() == L.dim() - 1 else norm_sq
 
     def R(
         self,
@@ -58,12 +143,11 @@ class CPSFCore:
             raise ValueError(f"R_ext(R): expected [..., N, N], got {tuple(R.shape)}")
 
         *B, N, _ = R.shape
-        twoN = 2 * N
+        Z = torch.zeros(*B, N, N, dtype=R.dtype, device=R.device)
 
-        R_ext = torch.zeros(*B, twoN, twoN, dtype=R.dtype, device=R.device)
-
-        R_ext[..., :N, :N] = R
-        R_ext[..., N:, N:] = R
+        top = torch.cat([R, Z], dim=-1)
+        bottom = torch.cat([Z, R], dim=-1)
+        R_ext = torch.cat([top, bottom], dim=-2)
 
         return R_ext
 
@@ -112,12 +196,6 @@ class CPSFCore:
 
         return Sigma
 
-    def cholesky_L(
-        self,
-        Sigma: torch.Tensor,
-    ) -> torch.Tensor:
-        return cholesky_spd(Sigma)
-
     def delta_vec_d(
         self,
         d_q: torch.Tensor,
@@ -162,13 +240,6 @@ class CPSFCore:
                 f"iota: concat failed for shapes {tuple(u.shape)} and {tuple(v.shape)}"
             ) from e
 
-    def tri_solve_norm_sq(
-        self,
-        L: torch.Tensor,
-        w: torch.Tensor,
-    ) -> torch.Tensor:
-        return tri_solve_norm_sq(L, w)
-
     def rho_q(
         self,
         q: torch.Tensor,
@@ -181,4 +252,50 @@ class CPSFCore:
         v_j: torch.Tensor,
         A: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
-        raise NotImplementedError
+        dtype = v_j.dtype
+        device = v_j.device
+
+        def _unsqueeze_to(alpha: torch.Tensor, target_ndim: int) -> torch.Tensor:
+            a = torch.as_tensor(alpha, dtype=dtype, device=device)
+            while a.dim() < target_ndim:
+                a = a.unsqueeze(-1)
+            return a
+
+        if A is None:
+            a = _unsqueeze_to(alpha_j, v_j.dim())
+            finfo = (
+                torch.finfo(v_j.real.dtype)
+                if torch.is_complex(v_j)
+                else torch.finfo(v_j.dtype)
+            )
+            eps = torch.sqrt(finfo.eps)
+            denom = torch.clamp(a, min=eps)
+            return v_j / denom
+
+        if A.dim() < 2 or A.shape[-1] != A.shape[-2]:
+            raise ValueError(
+                f"resolvent_delta_T_hat: A must be [..., M, M], got {tuple(A.shape)}"
+            )
+        M = A.shape[-1]
+        if v_j.shape[-1] != M:
+            raise ValueError(
+                f"resolvent_delta_T_hat: trailing dim mismatch: v_j:[..., {v_j.shape[-1]}] vs A:[..., {M}, {M}]"
+            )
+
+        I = torch.eye(M, dtype=dtype, device=device).expand(*A.shape[:-2], M, M)
+        a_mm = _unsqueeze_to(alpha_j, A.dim())
+        K = A.to(dtype=dtype, device=device) + a_mm * I
+
+        L = self._cholesky_spd(K)
+
+        rhs = v_j.unsqueeze(-1)
+        if hasattr(torch.linalg, "solve_triangular"):
+            y = torch.linalg.solve_triangular(L, rhs, upper=False, left=True)
+            Lt = L.mH if torch.is_complex(L) else L.transpose(-2, -1)
+            x = torch.linalg.solve_triangular(Lt, y, upper=True, left=True)
+        else:
+            y = torch.triangular_solve(rhs, L, upper=False).solution
+            Lt = L.mH if torch.is_complex(L) else L.transpose(-2, -1)
+            x = torch.triangular_solve(y, Lt, upper=True).solution
+
+        return x.squeeze(-1)
