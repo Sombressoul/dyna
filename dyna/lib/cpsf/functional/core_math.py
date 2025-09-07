@@ -353,6 +353,8 @@ def Sigma(
     Sigma = diag(sigma_par, sigma_par). No randomness is used.
     """
 
+    if torch.is_complex(sigma_par) or torch.is_complex(sigma_perp):
+        raise ValueError("Sigma: sigma_par and sigma_perp must be real-valued")
     if R_ext.dim() < 2 or R_ext.shape[-1] != R_ext.shape[-2]:
         raise ValueError(
             f"Sigma: expected R_ext as [..., 2N, 2N], got {tuple(R_ext.shape)}"
@@ -383,6 +385,74 @@ def Sigma(
     out[..., N:, N:].copy_(S0)
 
     return out
+
+
+def Sigma_inverse_quadratic(
+    w: torch.Tensor,
+    R_ext: torch.Tensor,
+    sigma_par: torch.Tensor,
+    sigma_perp: torch.Tensor,
+) -> torch.Tensor:
+    if torch.is_complex(sigma_par) or torch.is_complex(sigma_perp):
+        raise ValueError(
+            "Sigma_inverse_quadratic: sigma_par and sigma_perp must be real-valued"
+        )
+    if w.dtype != R_ext.dtype:
+        raise ValueError(
+            f"Sigma_inverse_quadratic: dtype mismatch: w.dtype={w.dtype}, R_ext.dtype={R_ext.dtype}"
+        )
+    if w.device != R_ext.device:
+        raise ValueError(
+            f"Sigma_inverse_quadratic: device mismatch: w.device={w.device}, R_ext.device={R_ext.device}"
+        )
+    if not torch.is_complex(w) or not torch.is_complex(R_ext):
+        raise ValueError(
+            f"Sigma_inverse_quadratic: expected complex inputs, got w:{w.dtype}, R_ext:{R_ext.dtype}"
+        )
+    if R_ext.dim() < 2 or R_ext.shape[-1] != R_ext.shape[-2]:
+        raise ValueError(
+            f"Sigma_inverse_quadratic: R_ext must be [..., 2N, 2N], got {tuple(R_ext.shape)}"
+        )
+    if w.shape[-1] != R_ext.shape[-1]:
+        raise ValueError(
+            f"Sigma_inverse_quadratic: trailing dim mismatch, w:[..., {w.shape[-1]}] vs R_ext:[..., {R_ext.shape[-1]}, {R_ext.shape[-1]}]"
+        )
+
+    twoN = w.shape[-1]
+
+    if twoN % 2 != 0:
+        raise ValueError("Sigma_inverse_quadratic: expected even last dim 2N")
+
+    N = twoN // 2
+    u = w[..., :N]
+    v = w[..., N:]
+    R = R_ext[..., :N, :N]
+    y = (R.mH @ u.unsqueeze(-1)).squeeze(-1)
+    z = (R.mH @ v.unsqueeze(-1)).squeeze(-1)
+    dt_real = w.real.dtype
+    device = w.device
+    sp = torch.as_tensor(sigma_par, dtype=dt_real, device=device)
+    sq = torch.as_tensor(sigma_perp, dtype=dt_real, device=device)
+
+    if not (torch.all(sp > 0) and torch.all(sq > 0)):
+        raise ValueError(
+            "Sigma_inverse_quadratic: sigma_par and sigma_perp must be positive"
+        )
+
+    inv_par = 1.0 / sp
+    inv_perp = 1.0 / sq
+    q0 = (y[..., 0].abs().pow(2) + z[..., 0].abs().pow(2)) * inv_par
+
+    if N > 1:
+        q_perp = (
+            y[..., 1:].abs().pow(2).sum(dim=-1) + z[..., 1:].abs().pow(2).sum(dim=-1)
+        ) * inv_perp
+    else:
+        q_perp = torch.zeros_like(q0)
+
+    q = (q0 + q_perp).to(dtype=dt_real)
+
+    return q
 
 
 def delta_vec_d(
@@ -484,14 +554,6 @@ def delta_vec_d(
     delta = tangent * scale
 
     return delta
-
-
-def Sigma_inverse_quadratic(
-    w: torch.Tensor,
-    R_ext: torch.Tensor,
-    sigma_par: torch.Tensor,
-    sigma_perp: torch.Tensor,
-) -> torch.Tensor: ...
 
 
 def iota(
