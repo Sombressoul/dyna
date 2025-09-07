@@ -163,9 +163,14 @@ def test_Q01_shape_dtype_device_and_args(impl_name, fn_q, dtype, N):
         _ = fn_q(w_good, Rext_wrong_dtype, sp, sq)
 
     if torch.cuda.is_available():
-        Rext_cuda = Rext_good.to("cuda")
-        with pytest.raises(ValueError):
-            _ = fn_q(w_good, Rext_cuda, sp, sq)
+        if TARGET_DEVICE.type == torch.device("cuda").type:
+            Rext_cpu = Rext_good.to("cpu")
+            with pytest.raises(ValueError):
+                _ = fn_q(w_good, Rext_cpu, sp, sq)
+        else:
+            Rext_cuda = Rext_good.to("cuda")
+            with pytest.raises(ValueError):
+                _ = fn_q(w_good, Rext_cuda, sp, sq)
 
     sp_bad = torch.tensor(0.0, device=device)
     with pytest.raises(ValueError):
@@ -303,7 +308,7 @@ def test_Q05_batch_semantics_and_broadcast(impl_name, fn_q, dtype, N, b_shape, b
 
     assert q.shape == torch.empty(*b_shape, dtype=REAL, device=device).shape
     assert q.dtype == REAL
-    assert q.device == device
+    assert q.device.type == device.type
     assert torch.allclose(q, q_ref, rtol=rtol, atol=atol), (
         f"{impl_name}: broadcast mismatch "
         f"(dtype={dtype}, N={N}, b_shape={b_shape}, case={bcast})"
