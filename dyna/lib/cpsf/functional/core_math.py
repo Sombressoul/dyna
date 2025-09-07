@@ -490,6 +490,33 @@ def iota(
     delta_z: torch.Tensor,
     delta_vec_d: torch.Tensor,
 ) -> torch.Tensor:
+    """
+    Embed a pair of complex N-vectors as a single 2N-vector via concatenation.
+
+    Canonical map: iota(u, v) = [u; v], used by CPSF to couple spatial and directional
+    components.
+
+    Shapes
+    ------
+    delta_z:     [..., N] complex
+    delta_vec_d: [..., N] complex
+    Returns:     [..., 2N] complex
+
+    Args
+    ----
+    delta_z: Complex displacement (e.g., z - z_j + n) in C^N.
+    delta_vec_d: Complex directional offset delta_vec_d(d, d_j) in C^N.
+
+    Returns
+    -------
+    Concatenated tensor with the last dimension formed as [delta_z, delta_vec_d].
+
+    Raises
+    ------
+    ValueError if inputs are not complex or if shapes/dtypes/devices mismatch,
+    or if concatenation fails.
+    """
+
     if not torch.is_complex(delta_z) or not torch.is_complex(delta_vec_d):
         raise ValueError(
             "\n".join(
