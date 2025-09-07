@@ -480,3 +480,26 @@ def delta_vec_d(
     delta = tangent * scale
 
     return delta
+
+
+def iota(
+    delta_z: torch.Tensor,
+    delta_vec_d: torch.Tensor,
+) -> torch.Tensor:
+    if not torch.is_complex(delta_z) or not torch.is_complex(delta_vec_d):
+        raise ValueError(
+            "\n".join(
+                [
+                    f"iota: expected complex [..., N], got:",
+                    f"delta_z: {delta_z.dtype} {tuple(delta_z.shape)}",
+                    f"delta_vec_d: {delta_vec_d.dtype} {tuple(delta_vec_d.shape)}",
+                ]
+            )
+        )
+
+    try:
+        return torch.cat([delta_z, delta_vec_d], dim=-1)
+    except RuntimeError as e:
+        raise ValueError(
+            f"iota: concat failed for shapes {tuple(delta_z.shape)} and {tuple(delta_vec_d.shape)}"
+        ) from e

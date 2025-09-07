@@ -6,6 +6,7 @@ from dyna.lib.cpsf.errors import NumericalError
 from dyna.lib.cpsf.context import CPSFContext
 from dyna.lib.cpsf.functional.core_math import (
     delta_vec_d,
+    iota,
     R,
     R_ext,
     Sigma,
@@ -112,22 +113,22 @@ class CPSFCore:
             eps=eps,
         )
 
+    def iota(
+        self,
+        delta_z: torch.Tensor,
+        delta_vec_d: torch.Tensor,
+    ) -> torch.Tensor:
+        return iota(
+            delta_z=delta_z,
+            delta_vec_d=delta_vec_d,
+        )
+
     def lift(self, z: torch.Tensor) -> torch.Tensor:
         if not torch.is_complex(z):
             raise ValueError(
                 f"lift: expected complex [..., N], got {z.dtype} {tuple(z.shape)}"
             )
         return z
-
-    def iota(self, dz: torch.Tensor, delta_d: torch.Tensor) -> torch.Tensor:
-        u = self.lift(dz)
-        v = self.lift(delta_d)
-        try:
-            return torch.cat([u, v], dim=-1)
-        except RuntimeError as e:
-            raise ValueError(
-                f"iota: concat failed for shapes {tuple(u.shape)} and {tuple(v.shape)}"
-            ) from e
 
     def rho_q(
         self,
