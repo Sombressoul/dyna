@@ -419,11 +419,15 @@ def Sigma_inverse_quadratic(
         )
 
     twoN = w.shape[-1]
+    N = twoN // 2
 
     if twoN % 2 != 0:
         raise ValueError("Sigma_inverse_quadratic: expected even last dim 2N")
+    if N < 2:
+        raise ValueError(
+            f"Sigma_inverse_quadratic: N must be >= 2 per CPSF (got N={N})"
+        )
 
-    N = twoN // 2
     u = w[..., :N]
     v = w[..., N:]
     R = R_ext[..., :N, :N]
