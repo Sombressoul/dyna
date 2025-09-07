@@ -431,8 +431,10 @@ def Sigma_inverse_quadratic(
     u = w[..., :N]
     v = w[..., N:]
     R = R_ext[..., :N, :N]
-    y = (R.mH @ u.unsqueeze(-1)).squeeze(-1)
-    z = (R.mH @ v.unsqueeze(-1)).squeeze(-1)
+    UV = torch.stack((u, v), dim=-1)
+    YZ = R.mH @ UV
+    y = YZ[..., :, 0]
+    z = YZ[..., :, 1]
     dt_real = w.real.dtype
     device = w.device
     sp = torch.as_tensor(sigma_par, dtype=dt_real, device=device)
@@ -445,12 +447,12 @@ def Sigma_inverse_quadratic(
 
     inv_par = 1.0 / sp
     inv_perp = 1.0 / sq
-    q0 = (y[..., 0].abs().pow(2) + z[..., 0].abs().pow(2)) * inv_par
 
+    y_sq = (y.conj() * y).real
+    z_sq = (z.conj() * z).real
+    q0 = (y_sq[..., 0] + z_sq[..., 0]) * inv_par
     if N > 1:
-        q_perp = (
-            y[..., 1:].abs().pow(2).sum(dim=-1) + z[..., 1:].abs().pow(2).sum(dim=-1)
-        ) * inv_perp
+        q_perp = (y_sq[..., 1:].sum(dim=-1) + z_sq[..., 1:].sum(dim=-1)) * inv_perp
     else:
         q_perp = torch.zeros_like(q0)
 
