@@ -5,6 +5,7 @@ from typing import Optional
 from dyna.lib.cpsf.errors import NumericalError
 from dyna.lib.cpsf.context import CPSFContext
 from dyna.lib.cpsf.functional.core_math import (
+    delta_vec_d,
     R,
     R_ext,
     Sigma,
@@ -101,26 +102,15 @@ class CPSFCore:
 
     def delta_vec_d(
         self,
-        d_q: torch.Tensor,
-        d_j: torch.Tensor,
+        vec_d: torch.Tensor,
+        vec_d_j: torch.Tensor,
         eps: float = 1.0e-6,
     ) -> torch.Tensor:
-        if d_q.shape != d_j.shape or d_q.dim() < 1:
-            raise ValueError(
-                f"delta_vec_d: expected matching [..., N], got {tuple(d_q.shape)} vs {tuple(d_j.shape)}"
-            )
-
-        inner = torch.sum(torch.conj(d_j) * d_q, dim=-1)
-        tangent = d_q - inner.unsqueeze(-1) * d_j
-        sin_theta = torch.linalg.vector_norm(tangent, dim=-1)
-        cos_theta = torch.clamp(torch.abs(inner), max=1.0)
-        theta = torch.acos(cos_theta)
-        sin_sq = sin_theta * sin_theta
-        eps_t = torch.as_tensor(eps, dtype=sin_sq.dtype, device=sin_sq.device)
-        denom = torch.sqrt(sin_sq + eps_t * torch.exp(-sin_sq / eps_t))
-
-        delta = (theta / denom).unsqueeze(-1) * tangent
-        return delta
+        return delta_vec_d(
+            vec_d=vec_d,
+            vec_d_j=vec_d_j,
+            eps=eps,
+        )
 
     def lift(self, z: torch.Tensor) -> torch.Tensor:
         if not torch.is_complex(z):

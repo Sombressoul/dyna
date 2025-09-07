@@ -376,3 +376,37 @@ def Sigma(
     out[..., N:, N:].copy_(S0)
 
     return out
+
+
+def delta_vec_d(
+    vec_d: torch.Tensor,
+    vec_d_j: torch.Tensor,
+    eps: float = 1.0e-6,
+) -> torch.Tensor:
+    if vec_d.shape != vec_d_j.shape:
+        raise ValueError(
+            f"delta_vec_d: expected matching shapes [..., N], got {tuple(vec_d.shape)} vs {tuple(vec_d_j.shape)}"
+        )
+    if vec_d.dtype != vec_d_j.dtype:
+        raise ValueError("delta_vec_d: dtype mismatch between vec_d and vec_d_j")
+    if vec_d.device != vec_d_j.device:
+        raise ValueError("delta_vec_d: device mismatch between vec_d and vec_d_j")
+    if vec_d.dim() < 1 or vec_d.shape[-1] < 2:
+        raise ValueError(
+            f"delta_vec_d: expected last dim N>=2, got N={vec_d.shape[-1]}"
+        )
+    if eps <= 0:
+        raise ValueError("delta_vec_d: eps must be positive")
+
+    inner = torch.sum(vec_d_j.conj() * vec_d, dim=-1)
+    tangent = vec_d - inner.unsqueeze(-1) * vec_d_j
+    real_dtype = vec_d.real.dtype
+    c = inner.abs().to(real_dtype).clamp(0.0, 1.0)
+    theta = torch.acos(c)
+    sin2 = (1.0 - c * c).clamp_min(0.0)
+    eps_t = torch.as_tensor(eps, dtype=real_dtype, device=vec_d.device)
+    denom = torch.sqrt(sin2 + eps_t * torch.exp(-sin2 / eps_t))
+    scale = (theta / denom).unsqueeze(-1)
+    delta = tangent * scale
+
+    return delta
