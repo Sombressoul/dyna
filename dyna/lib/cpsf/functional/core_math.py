@@ -458,9 +458,13 @@ def delta_vec_d(
             f"delta_vec_d: expected matching shapes [..., N], got {tuple(vec_d.shape)} vs {tuple(vec_d_j.shape)}"
         )
     if vec_d.dtype != vec_d_j.dtype:
-        raise ValueError("delta_vec_d: dtype mismatch between vec_d and vec_d_j")
+        raise ValueError(
+            f"delta_vec_d: dtype mismatch between vec_d and vec_d_j, got {vec_d.dtype} vs {vec_d_j.dtype}"
+        )
     if vec_d.device != vec_d_j.device:
-        raise ValueError("delta_vec_d: device mismatch between vec_d and vec_d_j")
+        raise ValueError(
+            f"delta_vec_d: device mismatch between vec_d and vec_d_j, got {vec_d.device} vs {vec_d_j.device}"
+        )
     if vec_d.dim() < 1 or vec_d.shape[-1] < 2:
         raise ValueError(
             f"delta_vec_d: expected last dim N>=2, got N={vec_d.shape[-1]}"
@@ -495,6 +499,18 @@ def iota(
                     f"delta_vec_d: {delta_vec_d.dtype} {tuple(delta_vec_d.shape)}",
                 ]
             )
+        )
+    if delta_z.shape != delta_vec_d.shape:
+        raise ValueError(
+            f"iota: expected matching shapes [..., N], got {tuple(delta_z.shape)} vs {tuple(delta_vec_d.shape)}"
+        )
+    if delta_z.dtype != delta_vec_d.dtype:
+        raise ValueError(
+            f"iota: dtype mismatch between delta_z and delta_vec_d, got {delta_z.dtype} vs {delta_vec_d.dtype}"
+        )
+    if delta_z.device != delta_vec_d.device:
+        raise ValueError(
+            f"iota: device mismatch between delta_z and delta_vec_d, got {delta_z.device} vs {delta_vec_d.device}"
         )
 
     try:
