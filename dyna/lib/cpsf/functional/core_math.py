@@ -486,6 +486,14 @@ def delta_vec_d(
     return delta
 
 
+def Sigma_inverse_quadratic(
+    w: torch.Tensor,
+    R_ext: torch.Tensor,
+    sigma_par: torch.Tensor,
+    sigma_perp: torch.Tensor,
+) -> torch.Tensor: ...
+
+
 def iota(
     delta_z: torch.Tensor,
     delta_vec_d: torch.Tensor,

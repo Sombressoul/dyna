@@ -8,6 +8,7 @@ from dyna.lib.cpsf.functional.core_math import (
     R,
     R_ext,
     Sigma,
+    Sigma_inverse_quadratic,
 )
 
 __all__ = [

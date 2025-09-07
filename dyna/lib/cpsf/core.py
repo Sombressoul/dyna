@@ -10,6 +10,7 @@ from dyna.lib.cpsf.functional.core_math import (
     R,
     R_ext,
     Sigma,
+    Sigma_inverse_quadratic,
 )
 
 
@@ -96,6 +97,20 @@ class CPSFCore:
         sigma_perp: torch.Tensor,
     ) -> torch.Tensor:
         return Sigma(
+            R_ext=R_ext,
+            sigma_par=sigma_par,
+            sigma_perp=sigma_perp,
+        )
+    
+    def Sigma_inverse_quadratic(
+        self,
+        w: torch.Tensor,
+        R_ext: torch.Tensor,
+        sigma_par: torch.Tensor,
+        sigma_perp: torch.Tensor,
+    ) -> torch.Tensor:
+        return Sigma_inverse_quadratic(
+            w=w,
             R_ext=R_ext,
             sigma_par=sigma_par,
             sigma_perp=sigma_perp,
