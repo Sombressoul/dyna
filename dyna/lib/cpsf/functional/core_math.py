@@ -15,9 +15,11 @@ def R(
     Construct a CPSF-orthonormal frame R(d) in U(N) over C^N.
 
     Given a complex, nonzero vector d in C^{..., N}, this routine returns a unitary
-    frame
+    frame:
+
         R(d) = [ b(d) | Q_perp(d) ]  in C^{..., N, N},
-    where
+    where:
+
         b(d) = d / ||d||                  (first column; exact alignment, CPSF-R3)
         Q_perp(d) in C^{..., N, N-1}      (orthonormal basis of the orthogonal complement of b(d), CPSF-R4)
     and the whole matrix is unitary (CPSF-R1+R2). The construction is smooth in d,
@@ -26,6 +28,7 @@ def R(
     bounded-derivative proxy CPSF-R9) within machine precision.
 
     Complex-only:
+
     This implementation expects d to have a complex dtype (torch.complex64 or torch.complex128).
     Real dtypes are not part of the CPSF canon and are not supported here.
 
@@ -73,24 +76,24 @@ def R(
 
     CPSF Requirements (R1-R9)
     -------------------------
-    R1 (Left unitarity):    R(d)^H R(d) = I_N.
-    R2 (Right unitarity):   R(d) R(d)^H = I_N.
-    R3 (Alignment):         The first column equals b(d) = d / ||d|| exactly.
-    R4 (Complement):        Columns 2..N form an orthonormal basis of b(d)-perp:
+    R1 (Left unitarity) :   R(d)^H R(d) = I_N.
+    R2 (Right unitarity) :  R(d) R(d)^H = I_N.
+    R3 (Alignment) :        The first column equals b(d) = d / ||d|| exactly.
+    R4 (Complement) :       Columns 2..N form an orthonormal basis of b(d)-perp:
                             b(d)^H Q_perp(d) = 0 and Q_perp(d)^H Q_perp(d) = I_{N-1}.
-    R5 (Local smoothness):  R(d + delta) depends smoothly on d; for small tangential
+    R5 (Local smoothness) : R(d + delta) depends smoothly on d; for small tangential
                             perturbations delta, ||R(d + delta) - R(d)|| = O(||delta||)
                             and the columns vary continuously without sudden flips.
-    R6 (Right U(N-1) equivariance): For any U in U(N-1),
+    R6 (Right U(N-1) equivariance) : For any U in U(N-1),
                             R(d) * diag(1, U) is a valid frame with the same first column;
                             the projector Q_perp Q_perp^H is invariant under this right action.
-    R7 (Extended-frame unitarity): Any frame obtained by the right block-diagonal action
+    R7 (Extended-frame unitarity) : Any frame obtained by the right block-diagonal action
                             diag(1, U), U in U(N-1), remains unitary in chained compositions
                             used by CPSF (unitarity is preserved under the extension).
-    R8 (Local trivialization along paths): Along a geodesic path between d0 and d1 in C^N,
+    R8 (Local trivialization along paths) : Along a geodesic path between d0 and d1 in C^N,
                             there exists a continuous right alignment in U(N-1) such that
                             successive frames remain close (no discontinuous jumps).
-    R9 (Bounded derivative proxy): The finite-difference gradient of R with respect to
+    R9 (Bounded derivative proxy) : The finite-difference gradient of R with respect to
                             tangential perturbations remains bounded as the step size goes
                             to zero (no blow-up of ||R(d + h*xi) - R(d)|| / h as h -> 0).
 
@@ -205,7 +208,9 @@ def R_ext(
 
     Given a unitary CPSF frame R in C^{..., N, N} (typically produced by R(d)),
     this routine returns the canonical block-diagonal extension:
+
         R_ext(R) = block_diag(R, R)  in C^{..., 2N, 2N}.
+
     It applies the same frame R to both subspaces (position and direction) with no cross-coupling.
 
     This implementation is allocation-friendly: it preallocates the output once and
@@ -290,9 +295,11 @@ def Sigma(
     Implementation (allocation-friendly)
     ------------------------------------
     This implementation avoids materializing D and 2Nx2N GEMMs. It extracts R = R_ext[..., :N, :N],
-    lets b = R[:, 0] (the first column), forms
+    lets b = R[:, 0] (the first column), forms:
+
         S0 = sigma_perp * I_N + (sigma_par - sigma_perp) * (b b^H),
-    and assembles
+    and assembles:
+
         Sigma = diag(S0, S0)
     by preallocating the 2Nx2N output and writing the two diagonal blocks via copy_().
 
@@ -383,6 +390,69 @@ def delta_vec_d(
     vec_d_j: torch.Tensor,
     eps: float = 1.0e-6,
 ) -> torch.Tensor:
+    """
+    Compute the CPSF directional tangent offset delta_vec_d(vec_d, vec_d_j; eps).
+
+    Canonical definition
+    --------------------
+    Let <u,v> = sum(conj(u_k) * v_k) be the Hermitian inner product. For unit directions
+    vec_d, vec_d_j in C^N, define:
+
+        inner = <vec_d_j, vec_d>                  # complex
+        c     = |inner|                           # real in [0, 1]
+        theta = arccos(c)                         # geodesic angle
+        t     = vec_d - inner * vec_d_j           # tangent at vec_d_j (orthogonal to vec_d_j)
+    and the smoothed sine:
+
+        N_eps(c) = sqrt( 1 - c^2 + eps * exp( -(1 - c^2)/eps ) ),  eps > 0.
+
+    Then:
+
+        delta_vec_d(vec_d, vec_d_j; eps) = (theta / N_eps(c)) * t.
+
+    Properties
+    ----------
+    - Tangency:        <vec_d_j, delta_vec_d> == 0 (numerically ~ 0).
+    - Phase equiv.:    For any real phi, delta(e^{i*phi}*vec_d, vec_d_j) = e^{i*phi} * delta(vec_d, vec_d_j).
+    - Joint phase eq.: For any real psi, delta(e^{i*psi}*vec_d, e^{i*psi}*vec_d_j) = e^{i*psi} * delta(vec_d, vec_d_j).
+    - Zero at collin.: If vec_d is collinear with vec_d_j (c = 1), then delta_vec_d == 0.
+    - Smoothness:      N_eps prevents division by zero at c -> 1; function is differentiable in all inputs for eps > 0.
+    - Norm bound:      ||delta_vec_d|| <= theta; away from the smoothing region (1 - c^2 >> eps), ||delta_vec_d|| ~ theta.
+    - Batched:         Leading batch dimensions are preserved; no RNG; deterministic for fixed inputs.
+
+    Algorithm
+    ---------
+    1) Validate shapes [..., N], N >= 2; same dtype/device; eps > 0.
+    2) inner = sum(conj(vec_d_j) * vec_d), c = clamp(|inner|, 0, 1), theta = arccos(c).
+    3) t = vec_d - inner * vec_d_j (automatically orthogonal to vec_d_j).
+    4) denom = sqrt( (1 - c^2) + eps * exp(-(1 - c^2)/eps) ).
+    5) Return delta = (theta / denom) * t.
+
+    Parameters
+    ----------
+    vec_d : torch.Tensor (complex64 or complex128), shape [..., N]
+        Query direction (assumed unit-norm by the caller).
+    vec_d_j : torch.Tensor (complex, same dtype/device), shape [..., N]
+        Anchor direction (assumed unit-norm by the caller).
+    eps : float
+        Positive smoothing parameter; must be > 0.
+
+    Returns
+    -------
+    torch.Tensor (complex, same dtype/device), shape [..., N]
+        Tangent displacement at vec_d_j toward vec_d.
+
+    Notes
+    -----
+    - CPSF assumes N >= 2 and unit-norm inputs; this function does not renormalize them.
+    - All operations are elementwise or reductions; fully batched; gradient-safe.
+
+    Edge cases
+    ----------
+    - If vec_d == vec_d_j (or vec_d = e^{i*phi} * vec_d_j), then t == 0 and delta_vec_d == 0.
+    - If 1 - c^2 is very small, denom ~ sqrt(eps), ensuring finite and smooth output.
+    """
+
     if vec_d.shape != vec_d_j.shape:
         raise ValueError(
             f"delta_vec_d: expected matching shapes [..., N], got {tuple(vec_d.shape)} vs {tuple(vec_d_j.shape)}"
