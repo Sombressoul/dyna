@@ -101,7 +101,7 @@ class CPSFCore:
             sigma_par=sigma_par,
             sigma_perp=sigma_perp,
         )
-    
+
     def q(
         self,
         w: torch.Tensor,
