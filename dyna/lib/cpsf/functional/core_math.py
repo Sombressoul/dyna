@@ -437,10 +437,27 @@ def Sigma_inverse_quadratic(
     sp = torch.as_tensor(sigma_par, dtype=dt_real, device=device)
     sq = torch.as_tensor(sigma_perp, dtype=dt_real, device=device)
 
-    if not (torch.all(sp > 0) and torch.all(sq > 0)):
-        raise ValueError(
-            "Sigma_inverse_quadratic: sigma_par and sigma_perp must be positive"
-        )
+    # --- Positivity guard for sigmas (avoid CUDA sync in the hot path) ---
+    if sp.is_cuda or sq.is_cuda:
+        if hasattr(torch, "_assert_async"):
+            cond = (sp > 0).all() & (sq > 0).all()
+            torch._assert_async(
+                cond,
+                "Sigma_inverse_quadratic: sigma_par and sigma_perp must be positive",
+            )
+        else:
+            if not isinstance(sigma_par, torch.Tensor) and not isinstance(
+                sigma_perp, torch.Tensor
+            ):
+                if not (sigma_par > 0 and sigma_perp > 0):
+                    raise ValueError(
+                        "Sigma_inverse_quadratic: sigma_par and sigma_perp must be positive"
+                    )
+    else:
+        if not ((sp > 0).all().item() and (sq > 0).all().item()):
+            raise ValueError(
+                "Sigma_inverse_quadratic: sigma_par and sigma_perp must be positive"
+            )
 
     inv_par = torch.reciprocal(sp)
     inv_perp = torch.reciprocal(sq)
