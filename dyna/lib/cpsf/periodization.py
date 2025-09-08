@@ -21,11 +21,11 @@ class CPSFPeriodization:
         # Enum guards
         if not isinstance(kind, CPSFPeriodizationKind):
             raise TypeError(
-                f"CPSFPeriodizationPolicy: 'kind' must be CPSFPeriodizationPolicyKind, got {type(kind)}"
+                f"CPSFPeriodization: 'kind' must be CPSFPeriodizationKind, got {type(kind)}"
             )
         if not isinstance(backend, CPSFPeriodizationBackend):
             raise TypeError(
-                f"CPSFPeriodizationPolicy: 'backend' must be CPSFPeriodizationPolicyBackend, got {type(backend)}"
+                f"CPSFPeriodization: 'backend' must be CPSFPeriodizationBackend, got {type(backend)}"
             )
 
         # Helpers
@@ -37,7 +37,7 @@ class CPSFPeriodization:
             raise TypeError(
                 "\n".join(
                     [
-                        f"CPSFPeriodizationPolicy: '{name}' must be '{target_type}' scalar.",
+                        f"CPSFPeriodization: '{name}' must be '{target_type}' scalar.",
                         f"Got: {tinfo}",
                     ]
                 )
@@ -80,43 +80,33 @@ class CPSFPeriodization:
 
         # Ensure finite tolerance if provided
         if normal_tolerance is not None and not math.isfinite(normal_tolerance):
-            raise ValueError("CPSFPeriodizationPolicy: 'tolerance' must be finite")
-        
+            raise ValueError("CPSFPeriodization: 'tolerance' must be finite")
+
         # Per-kind validation
         if kind == CPSFPeriodizationKind.WINDOW:
             if normal_window is None:
-                raise ValueError(
-                    "CPSFPeriodizationPolicy(WINDOW): 'window' is required"
-                )
+                raise ValueError("CPSFPeriodization(WINDOW): 'window' is required")
             if normal_window < 1:
-                raise ValueError(
-                    "CPSFPeriodizationPolicy(WINDOW): 'window' must be >= 1"
-                )
+                raise ValueError("CPSFPeriodization(WINDOW): 'window' must be >= 1")
             if normal_tolerance is not None or normal_max_radius is not None:
                 raise ValueError(
-                    "CPSFPeriodizationPolicy(WINDOW): 'tolerance' and 'max_radius' must be None"
+                    "CPSFPeriodization(WINDOW): 'tolerance' and 'max_radius' must be None"
                 )
             if backend != CPSFPeriodizationBackend.AUTO:
-                raise ValueError(
-                    "CPSFPeriodizationPolicy(WINDOW): 'backend' must be AUTO"
-                )
+                raise ValueError("CPSFPeriodization(WINDOW): 'backend' must be AUTO")
         elif kind == CPSFPeriodizationKind.FULL:
             if normal_window is not None:
-                raise ValueError("CPSFPeriodizationPolicy(FULL): 'window' must be None")
+                raise ValueError("CPSFPeriodization(FULL): 'window' must be None")
             if normal_tolerance is None and normal_max_radius is None:
                 raise ValueError(
-                    "CPSFPeriodizationPolicy(FULL): either 'tolerance' or 'max_radius' must be provided"
+                    "CPSFPeriodization(FULL): either 'tolerance' or 'max_radius' must be provided"
                 )
             if normal_tolerance is not None and not (normal_tolerance > 0.0):
-                raise ValueError(
-                    "CPSFPeriodizationPolicy(FULL): 'tolerance' must be > 0"
-                )
+                raise ValueError("CPSFPeriodization(FULL): 'tolerance' must be > 0")
             if normal_max_radius is not None and normal_max_radius < 1:
-                raise ValueError(
-                    "CPSFPeriodizationPolicy(FULL): 'max_radius' must be >= 1"
-                )
+                raise ValueError("CPSFPeriodization(FULL): 'max_radius' must be >= 1")
         else:
-            raise ValueError(f"CPSFPeriodizationPolicy: unsupported kind={kind}")
+            raise ValueError(f"CPSFPeriodization: unsupported kind={kind}")
 
         # Assign values
         self.window = normal_window
@@ -124,3 +114,74 @@ class CPSFPeriodization:
         self.max_radius = normal_max_radius
         self.kind = kind
         self.backend = backend
+
+    def _cartesian_window_points(
+        self,
+        N: int,
+        W: int,
+        device: torch.device,
+    ) -> torch.Tensor:
+        if W < 0:
+            raise ValueError(f"_cartesian_window_points: W must be >= 0, got {W}")
+        if N < 2:
+            raise ValueError(f"_cartesian_window_points: N must be >= 2, got {N}")
+        if W == 0:
+            return torch.zeros(1, N, dtype=torch.long, device=device)
+
+        axes = [
+            torch.arange(-W, W + 1, device=device, dtype=torch.long) for _ in range(N)
+        ]
+
+        return torch.cartesian_prod(*axes)
+
+    def _shell_points(
+        self,
+        N: int,
+        W: int,
+        device: torch.device,
+    ) -> torch.Tensor:
+        if W < 0:
+            raise ValueError(f"_shell_points: W must be >= 0, got {W}")
+        if N < 2:
+            raise ValueError(f"_shell_points: N must be >= 2, got {N}")
+        if W == 0:
+            return torch.zeros(1, N, dtype=torch.long, device=device)
+
+        axes = [
+            torch.arange(-W, W + 1, device=device, dtype=torch.long) for _ in range(N)
+        ]
+
+        grid = torch.cartesian_prod(*axes)
+        mask = grid.abs().amax(dim=-1) == W
+
+        return grid[mask]
+
+    def iter_offsets(
+        self,
+        N: int,
+        device: torch.device,
+    ):
+        if N < 2:
+            raise ValueError(f"CPSFPeriodization.iter_offsets: N must be >= 2, got {N}")
+
+        if self.kind.name == "WINDOW":
+            yield self._cartesian_window_points(N, self.window, device=device)
+            return
+
+        if self.kind.name == "FULL":
+            if self.backend == CPSFPeriodizationBackend.DUAL:
+                raise NotImplementedError(
+                    "FULL with backend=DUAL is not implemented yet"
+                )
+
+            W = 0
+            while True:
+                yield self._shell_points(N, W, device=device)
+                W += 1
+                if self.max_radius is not None and W > self.max_radius:
+                    break
+            return
+
+        raise ValueError(
+            f"CPSFPeriodization.iter_offsets: unsupported kind={self.kind}"
+        )

@@ -3,6 +3,8 @@ import math
 
 from typing import Optional, Union
 
+from dyna.lib.cpsf.periodization import CPSFPeriodization
+
 
 def R(
     vec_d: torch.Tensor,
@@ -879,3 +881,72 @@ def cholesky_spd(
             return torch.linalg.cholesky(A_h_jittered)
         except RuntimeError as e2:
             raise ValueError(f"cholesky_spd: failed even with jitter: {e2}") from e2
+
+
+def psi_periodized(
+    z: torch.Tensor,  # [..., N] complex
+    z_j: torch.Tensor,  # [..., N] complex
+    vec_d: torch.Tensor,  # [..., N] complex
+    vec_d_j: torch.Tensor,  # [..., N] complex
+    sigma_par: torch.Tensor,  # real, broadcastable
+    sigma_perp: torch.Tensor,  # real, broadcastable
+    periodization: CPSFPeriodization,  # CPSFPeriodization
+    R_j: Optional[torch.Tensor] = None,  # optional [..., N, N] complex
+    q_max: Optional[float] = None,
+) -> torch.Tensor:
+    """
+    Periodized Gaussian envelope:
+      psi^T_j(z, d) = sum_{n} rho( q( iota( (lift(z)-lift(z_j)) + n , delta_vec_d ) ) )
+
+    Single clean path:
+      - Offsets are produced by policy.iter_offsets(N, device).
+      - Accumulation is uniform for WINDOW and FULL.
+      - For FULL the tolerance (if provided) is checked by the consumer here,
+        after evaluating the current shell's contribution.
+    """
+    # validation
+    for name, t in (("z", z), ("z_j", z_j), ("vec_d", vec_d), ("vec_d_j", vec_d_j)):
+        if not torch.is_complex(t):
+            raise ValueError(
+                f"psi_periodized: {name} must be complex [..., N], got {t.dtype} {tuple(t.shape)}"
+            )
+    if not (z.shape == z_j.shape == vec_d.shape == vec_d_j.shape):
+        raise ValueError(
+            "psi_periodized: shape mismatch among inputs: "
+            f"z={tuple(z.shape)}, z_j={tuple(z_j.shape)}, vec_d={tuple(vec_d.shape)}, vec_d_j={tuple(vec_d_j.shape)}"
+        )
+    N = z.shape[-1]
+    if N < 2:
+        raise ValueError(f"psi_periodized: N must be >= 2 per CPSF (got N={N})")
+
+    device = z.device
+    c_dtype = z.dtype
+    r_dtype = z.real.dtype
+
+    # geometry
+    dz = lift(z) - lift(z_j)  # [..., N] complex
+    dd = delta_vec_d(vec_d, vec_d_j)  # [..., N] complex
+    Rmat = R(vec_d_j) if R_j is None else R_j
+    Rext = R_ext(Rmat)  # [..., 2N, 2N]
+
+    acc = torch.zeros(z.shape[:-1], dtype=r_dtype, device=device)
+
+    # single path over offset batches
+    for offsets in periodization.iter_offsets(N=N, device=device):
+        # Long -> complex, broadcast to batch
+        n_c = offsets.to(dtype=c_dtype, device=device)  # [K, N] complex
+        dzb = dz.unsqueeze(-2) + n_c  # [..., K, N]
+        w = iota(dzb, dd.unsqueeze(-2))  # [..., K, 2N]
+        qv = q(w, Rext.unsqueeze(-3), sigma_par, sigma_perp)  # [..., K]
+        rv = rho(qv, q_max=q_max)  # [..., K]
+        shell_sum = rv.sum(dim=-1)  # [...]
+
+        acc = acc + shell_sum
+
+        # FULL: tolerance-based early stop (checked by the consumer)
+        if periodization.kind.name == "FULL" and periodization.tolerance is not None:
+            # sync per shell is acceptable; few shells expected
+            if shell_sum.max().item() < periodization.tolerance:
+                break
+
+    return acc
