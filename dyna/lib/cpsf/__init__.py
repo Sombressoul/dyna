@@ -27,7 +27,6 @@ from dyna.lib.cpsf.structures import (
     CPSFDTypes,
     CPSFIndexLike,
     CPSFIntegrationPolicy,
-    CPSFPeriodizationBackend,
     CPSFPeriodizationKind,
 )
 
@@ -52,7 +51,6 @@ __all__ = [
     "CPSFDTypes",
     "CPSFIndexLike",
     "CPSFIntegrationPolicy",
-    "CPSFPeriodizationBackend",
     "CPSFPeriodizationKind",
 
     # Subcomponents.

@@ -66,12 +66,6 @@ class CPSFChunkPolicy:
     S_tile: Optional[int] = None
 
 
-class CPSFPeriodizationBackend(Enum):
-    AUTO = enum_auto()
-    PRIMAL = enum_auto()
-    DUAL = enum_auto()
-
-
 class CPSFPeriodizationKind(Enum):
     FULL = enum_auto()
     WINDOW = enum_auto()
