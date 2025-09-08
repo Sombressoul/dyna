@@ -6,6 +6,7 @@
 import argparse, time, math, torch
 from ..functional.core_math import R, R_ext, q
 
+
 def _fmt_bytes(x: int) -> str:
     u = ["B", "KB", "MB", "GB", "TB"]
     i = 0
@@ -15,7 +16,10 @@ def _fmt_bytes(x: int) -> str:
         i += 1
     return f"{v:.2f} {u[i]}"
 
-def make_unit_batch(B: int, N: int, dtype: torch.dtype, device: torch.device, seed: int = 42) -> torch.Tensor:
+
+def make_unit_batch(
+    B: int, N: int, dtype: torch.dtype, device: torch.device, seed: int = 42
+) -> torch.Tensor:
     """Complex gaussian -> normalize to unit vectors, shape (B, N)."""
     g = torch.Generator(device=device).manual_seed(seed)
     REAL = torch.float32 if dtype == torch.complex64 else torch.float64
@@ -26,13 +30,17 @@ def make_unit_batch(B: int, N: int, dtype: torch.dtype, device: torch.device, se
     n = torch.where(n.real == 0, torch.ones_like(n), n)
     return v / n
 
-def make_w_batch(B: int, twoN: int, dtype: torch.dtype, device: torch.device, seed: int = 777) -> torch.Tensor:
+
+def make_w_batch(
+    B: int, twoN: int, dtype: torch.dtype, device: torch.device, seed: int = 777
+) -> torch.Tensor:
     """Unnormalized complex gaussian, shape (B, 2N)."""
     g = torch.Generator(device=device).manual_seed(seed)
     REAL = torch.float32 if dtype == torch.complex64 else torch.float64
     xr = torch.randn(B, twoN, generator=g, device=device, dtype=REAL)
     xi = torch.randn(B, twoN, generator=g, device=device, dtype=REAL)
     return (xr + 1j * xi).to(dtype)
+
 
 @torch.no_grad()
 def main():
@@ -79,20 +87,26 @@ def main():
         raise SystemExit("CPSF requires N >= 2.")
 
     # Prepare inputs outside the timed loop: directions -> R -> R_ext, and w
-    d  = make_unit_batch(B, N, dtype, dev)         # (B, N)
-    R_b = R(d)                                     # (B, N, N)
-    Rext_b = R_ext(R_b)                            # (B, 2N, 2N)
-    w_b = make_w_batch(B, twoN, dtype, dev)        # (B, 2N)
+    d = make_unit_batch(B, N, dtype, dev)  # (B, N)
+    R_b = R(d)  # (B, N, N)
+    Rext_b = R_ext(R_b)  # (B, 2N, 2N)
+    w_b = make_w_batch(B, twoN, dtype, dev)  # (B, 2N)
 
     sp = torch.tensor(args.sigma_par, dtype=REAL, device=dev)
     sq = torch.tensor(args.sigma_perp, dtype=REAL, device=dev)
 
     if args.verify_devices:
         out = q(w_b, Rext_b, sp, sq)  # (B,)
-        print(f"in.device(w)={w_b.device}, in.device(R_ext)={Rext_b.device}, out.device={out.device}")
+        print(
+            f"in.device(w)={w_b.device}, in.device(R_ext)={Rext_b.device}, out.device={out.device}"
+        )
         assert (
-            (dev.type == "cpu" and (not w_b.is_cuda) and (not Rext_b.is_cuda) and (not out.is_cuda))
-            or (dev.type == "cuda" and w_b.is_cuda and Rext_b.is_cuda and out.is_cuda)
+            dev.type == "cpu"
+            and (not w_b.is_cuda)
+            and (not Rext_b.is_cuda)
+            and (not out.is_cuda)
+        ) or (
+            dev.type == "cuda" and w_b.is_cuda and Rext_b.is_cuda and out.is_cuda
         ), "Device mismatch!"
         # quick non-negativity sanity
         nn = (out >= 0).all().item()
@@ -110,17 +124,25 @@ def main():
     # Optional profiling (short)
     if args.profile:
         from torch.profiler import profile, ProfilerActivity, schedule
-        activities = [ProfilerActivity.CPU] + ([ProfilerActivity.CUDA] if dev.type == "cuda" else [])
+
+        activities = [ProfilerActivity.CPU] + (
+            [ProfilerActivity.CUDA] if dev.type == "cuda" else []
+        )
         sch = schedule(wait=1, warmup=1, active=4, repeat=1)
         with profile(
-            activities=activities, schedule=sch, record_shapes=False, profile_memory=True
+            activities=activities,
+            schedule=sch,
+            record_shapes=False,
+            profile_memory=True,
         ) as prof:
             for _ in range(6):
                 _ = q(w_b, Rext_b, sp, sq)
                 prof.step()
         print(
             prof.key_averages().table(
-                sort_by="self_cuda_time_total" if dev.type == "cuda" else "cpu_time_total",
+                sort_by=(
+                    "self_cuda_time_total" if dev.type == "cuda" else "cpu_time_total"
+                ),
                 row_limit=15,
             )
         )
@@ -170,10 +192,12 @@ def main():
     else:
         try:
             import psutil, os
+
             rss = psutil.Process(os.getpid()).memory_info().rss
             print(f"Process RSS:   {_fmt_bytes(rss)}")
         except Exception:
             pass
+
 
 if __name__ == "__main__":
     main()

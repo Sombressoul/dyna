@@ -398,12 +398,12 @@ def q(
 
     Canon
     -----
-    Sigma^{-1} = R_ext * D^{-1} * R_ext^H, with 
-        R_ext = block_diag(R, R), R ∈ U(N), 
+    Sigma^{-1} = R_ext * D^{-1} * R_ext^H, with
+        R_ext = block_diag(R, R), R ∈ U(N),
         D^{-1} = diag(1/sp, 1/sq, ..., 1/sq, 1/sp, 1/sq, ..., 1/sq).
 
-    Let w = [u; v] ∈ C^{2N}. 
-    
+    Let w = [u; v] ∈ C^{2N}.
+
     The implementation evaluates q without forming Sigma^{-1} explicitly via y = R^H u, z = R^H v.
 
     Shapes
@@ -436,9 +436,7 @@ def q(
     """
 
     if torch.is_complex(sigma_par) or torch.is_complex(sigma_perp):
-        raise ValueError(
-            "q: sigma_par and sigma_perp must be real-valued"
-        )
+        raise ValueError("q: sigma_par and sigma_perp must be real-valued")
     if w.dtype != R_ext.dtype:
         raise ValueError(
             f"q: dtype mismatch: w.dtype={w.dtype}, R_ext.dtype={R_ext.dtype}"
@@ -452,9 +450,7 @@ def q(
             f"q: expected complex inputs, got w:{w.dtype}, R_ext:{R_ext.dtype}"
         )
     if R_ext.dim() < 2 or R_ext.shape[-1] != R_ext.shape[-2]:
-        raise ValueError(
-            f"q: R_ext must be [..., 2N, 2N], got {tuple(R_ext.shape)}"
-        )
+        raise ValueError(f"q: R_ext must be [..., 2N, 2N], got {tuple(R_ext.shape)}")
     if w.shape[-1] != R_ext.shape[-1]:
         raise ValueError(
             f"q: trailing dim mismatch, w:[..., {w.shape[-1]}] vs R_ext:[..., {R_ext.shape[-1]}, {R_ext.shape[-1]}]"
@@ -466,9 +462,7 @@ def q(
     if twoN % 2 != 0:
         raise ValueError("q: expected even last dim 2N")
     if N < 2:
-        raise ValueError(
-            f"q: N must be >= 2 per CPSF (got N={N})"
-        )
+        raise ValueError(f"q: N must be >= 2 per CPSF (got N={N})")
 
     WV = w.reshape(*w.shape[:-1], 2, N).transpose(-2, -1)
     R = R_ext[..., :N, :N]
@@ -492,14 +486,10 @@ def q(
                 sigma_perp, torch.Tensor
             ):
                 if not (sigma_par > 0 and sigma_perp > 0):
-                    raise ValueError(
-                        "q: sigma_par and sigma_perp must be positive"
-                    )
+                    raise ValueError("q: sigma_par and sigma_perp must be positive")
     else:
         if not ((sp > 0).all().item() and (sq > 0).all().item()):
-            raise ValueError(
-                "q: sigma_par and sigma_perp must be positive"
-            )
+            raise ValueError("q: sigma_par and sigma_perp must be positive")
 
     inv_par = torch.reciprocal(sp)
     inv_perp = torch.reciprocal(sq)

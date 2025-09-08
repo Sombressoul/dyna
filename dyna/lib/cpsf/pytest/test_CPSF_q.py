@@ -20,9 +20,7 @@ TARGET_DEVICE = torch.device("cpu")
 Q_IMPLS: List[Tuple[str, Callable[..., torch.Tensor]]] = [
     (
         "q",
-        lambda w, Rext, sp, sq: q(
-            w=w, R_ext=Rext, sigma_par=sp, sigma_perp=sq
-        ),
+        lambda w, Rext, sp, sq: q(w=w, R_ext=Rext, sigma_par=sp, sigma_perp=sq),
     ),
 ]
 
