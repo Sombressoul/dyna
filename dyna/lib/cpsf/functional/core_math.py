@@ -1,5 +1,7 @@
 import torch
 
+from typing import Optional, Union
+
 
 def R(
     vec_d: torch.Tensor,
@@ -38,8 +40,8 @@ def R(
     P_perp = I - b b^H.
     2) Build three N x (N-1) anchors in C^N:
     - J_E  : coordinate anchor (standard basis without e1) with smooth weights,
-    - J_F1 : complex Fourier-like anchor, phases 2*pi*i*k/N,
-    - J_F2 : complex Fourier-like anchor, phases 2*pi*i*(k+0.5)/N.
+    - J_F1 : complex Fourier-like anchor, phases 2 * pi * i * k/N,
+    - J_F2 : complex Fourier-like anchor, phases 2 * pi * i * (k+0.5)/N.
     3) Project anchors to b_perp: Z_i = P_perp J_i, and mix them with smooth,
     energy-based weights a_i proportional to (||Z_i||_F^2 + sigma)^{qmix}
     (sigma and qmix control switching smoothness).
@@ -76,26 +78,26 @@ def R(
 
     CPSF Requirements (R1-R9)
     -------------------------
-    R1 (Left unitarity) :   R(d)^H R(d) = I_N.
-    R2 (Right unitarity) :  R(d) R(d)^H = I_N.
-    R3 (Alignment) :        The first column equals b(d) = d / ||d|| exactly.
-    R4 (Complement) :       Columns 2..N form an orthonormal basis of b(d)-perp:
-                            b(d)^H Q_perp(d) = 0 and Q_perp(d)^H Q_perp(d) = I_{N-1}.
-    R5 (Local smoothness) : R(d + delta) depends smoothly on d; for small tangential
-                            perturbations delta, ||R(d + delta) - R(d)|| = O(||delta||)
-                            and the columns vary continuously without sudden flips.
-    R6 (Right U(N-1) equivariance) : For any U in U(N-1),
-                            R(d) * diag(1, U) is a valid frame with the same first column;
-                            the projector Q_perp Q_perp^H is invariant under this right action.
-    R7 (Extended-frame unitarity) : Any frame obtained by the right block-diagonal action
-                            diag(1, U), U in U(N-1), remains unitary in chained compositions
-                            used by CPSF (unitarity is preserved under the extension).
-    R8 (Local trivialization along paths) : Along a geodesic path between d0 and d1 in C^N,
-                            there exists a continuous right alignment in U(N-1) such that
-                            successive frames remain close (no discontinuous jumps).
-    R9 (Bounded derivative proxy) : The finite-difference gradient of R with respect to
-                            tangential perturbations remains bounded as the step size goes
-                            to zero (no blow-up of ||R(d + h*xi) - R(d)|| / h as h -> 0).
+    R1 (Left unitarity)             : R(d)^H R(d) = I_N.
+    R2 (Right unitarity)            : R(d) R(d)^H = I_N.
+    R3 (Alignment)                  : The first column equals b(d) = d / ||d|| exactly.
+    R4 (Complement)                 : Columns 2..N form an orthonormal basis of b(d)-perp:
+                                        b(d)^H Q_perp(d) = 0 and Q_perp(d)^H Q_perp(d) = I_{N-1}.
+    R5 (Local smoothness)           : R(d + delta) depends smoothly on d; for small tangential
+                                        perturbations delta, ||R(d + delta) - R(d)|| = O(||delta||)
+                                        and the columns vary continuously without sudden flips.
+    R6 (Right U(N-1) equivariance)  : For any U in U(N-1),
+                                        R(d) * diag(1, U) is a valid frame with the same first column;
+                                        the projector Q_perp Q_perp^H is invariant under this right action.
+    R7 (Extended-frame unitarity)   : Any frame obtained by the right block-diagonal action
+                                        diag(1, U), U in U(N-1), remains unitary in chained compositions
+                                        used by CPSF (unitarity is preserved under the extension).
+    R8 (Local trivialization)       : Along a geodesic path between d0 and d1 in C^N,
+                                        there exists a continuous right alignment in U(N-1) such that
+                                        successive frames remain close (no discontinuous jumps).
+    R9 (Bounded derivative proxy)   : The finite-difference gradient of R with respect to
+                                        tangential perturbations remains bounded as the step size goes
+                                        to zero (no blow-up of ||R(d + h * xi) - R(d)|| / h as h -> 0).
 
     Notes
     -----
@@ -218,15 +220,15 @@ def R_ext(
 
     Properties
     ----------
-    - Unitarity:           R_ext^H R_ext = R_ext R_ext^H = I_{2N}  (inherited from R).
-    - Block structure:     Off-diagonal blocks are exactly zero; the two diagonal blocks are identical.
-    - First-column align:  If R = R(d) with first column b(d) = d / ||d||, then the first column
-                        in each diagonal block equals b(d).
-    - Right U(N-1) action: For any Q in U(N-1), replacing R by R * diag(1, Q) leaves downstream
-                        Sigma = R_ext D R_ext^H unchanged when D = diag(s_par, s_perp, ..., s_perp)
-                        within each N-block.
-    - Batched:             Leading batch dimensions are preserved.
-    - Deterministic:       Pure tensor ops; no randomness. Fully differentiable w.r.t. R.
+    - Unitarity             : R_ext^H R_ext = R_ext R_ext^H = I_{2N}  (inherited from R).
+    - Block structure       : Off-diagonal blocks are exactly zero; the two diagonal blocks are identical.
+    - First-column align    : If R = R(d) with first column b(d) = d / ||d||, then the first column
+                                in each diagonal block equals b(d).
+    - Right U(N-1) action   : For any Q in U(N-1), replacing R by R * diag(1, Q) leaves downstream
+                                Sigma = R_ext D R_ext^H unchanged when D = diag(s_par, s_perp, ..., s_perp)
+                                within each N-block.
+    - Batched               : Leading batch dimensions are preserved.
+    - Deterministic         : Pure tensor ops; no randomness. Fully differentiable w.r.t. R.
 
     Algorithm
     ---------
@@ -305,34 +307,33 @@ def Sigma(
 
     Properties
     ----------
-    - Hermitian SPD:      Sigma == Sigma^H and Sigma is positive definite for sigma_par > 0 and sigma_perp > 0.
-    - Block structure:    Sigma = diag(S0, S0) with S0 = R * diag(sigma_par, sigma_perp, ..., sigma_perp) * R^H.
-    - Spectrum:           eig(Sigma) = {sigma_par (mult 2), sigma_perp (mult 2*(N-1))}.
-    - Isotropy:           if sigma_par == sigma_perp == s, then Sigma = s * I(2N).
-    - Inverse (closed form):
-                        Sigma^{-1} = R_ext * diag(1/sigma_par, 1/sigma_perp, ..., 1/sigma_perp,
-                                                1/sigma_par, 1/sigma_perp, ..., 1/sigma_perp) * R_ext^H.
-    - Invariances:        right action R -> R * diag(1, Q), Q in U(N-1), and the first-column phase
-                        R -> R * diag(exp(i*phi), I) leave Sigma unchanged.
-    - Linearity in D:     Sigma is linear w.r.t. (sigma_par, sigma_perp) and scales as
-                        Sigma(alpha*sigma_par, alpha*sigma_perp) = alpha * Sigma(sigma_par, sigma_perp).
-    - Batched:            leading batch dimensions are preserved; sigma_par/sigma_perp broadcast across them.
-    - Differentiable:     pure tensor ops; gradients flow through R_ext and sigma parameters.
+    - Hermitian SPD         : Sigma == Sigma^H and Sigma is positive definite for sigma_par > 0 and sigma_perp > 0.
+    - Block structure       : Sigma = diag(S0, S0) with S0 = R * diag(sigma_par, sigma_perp, ..., sigma_perp) * R^H.
+    - Spectrum              : eig(Sigma) = {sigma_par (mult 2), sigma_perp (mult 2*(N-1))}.
+    - Isotropy              : if sigma_par == sigma_perp == s, then Sigma = s * I(2N).
+    - Inverse (closed form) : Sigma^{-1} = R_ext * diag(1/sigma_par, 1/sigma_perp, ..., 1/sigma_perp, 
+                                1/sigma_par, 1/sigma_perp, ..., 1/sigma_perp) * R_ext^H.
+    - Invariances           : right action R -> R * diag(1, Q), Q in U(N-1), and the first-column phase
+                                R -> R * diag(exp(i*phi), I) leave Sigma unchanged.
+    - Linearity in D        : Sigma is linear w.r.t. (sigma_par, sigma_perp) and scales as
+                                Sigma(alpha * sigma_par, alpha * sigma_perp) = alpha * Sigma(sigma_par, sigma_perp).
+    - Batched               : leading batch dimensions are preserved; sigma_par/sigma_perp broadcast across them.
+    - Differentiable        : pure tensor ops; gradients flow through R_ext and sigma parameters.
 
     Algorithm
     ---------
     1) Validate input shape [..., 2N, 2N] and positivity of sigma_par, sigma_perp.
     2) Extract R = R_ext[..., :N, :N] and its first column b.
-    3) Build S0 = sigma_perp*I_N + (sigma_par - sigma_perp)*(b b^H).
+    3) Build S0 = sigma_perp * I_N + (sigma_par - sigma_perp) * (b b^H).
     4) Preallocate out[..., 2N, 2N]; write S0 into TL and BR blocks; return out.
 
     Parameters
     ----------
-    R_ext : torch.Tensor (complex64 or complex128), shape [..., 2N, 2N]
+    R_ext       : torch.Tensor (complex64 or complex128), shape [..., 2N, 2N]
         Extended CPSF frame, typically obtained as block_diag(R, R) with R = R(d).
-    sigma_par : torch.Tensor (real), broadcastable to leading batch dims
+    sigma_par   : torch.Tensor (real), broadcastable to leading batch dims
         Positive scalar/tensor for the "parallel" direction (index 0 in each N-block).
-    sigma_perp : torch.Tensor (real), broadcastable to leading batch dims
+    sigma_perp  : torch.Tensor (real), broadcastable to leading batch dims
         Positive scalar/tensor for the orthogonal complement (indices 1..N-1 in each N-block).
 
     Returns
@@ -342,9 +343,9 @@ def Sigma(
 
     CPSF notes
     ----------
-    - Matrix-free application: Sigma * [u; v] = [S0*u; S0*v] with S0 as above, which can be computed
+    - Matrix-free application: Sigma * [u; v] = [S0 * u; S0 * v] with S0 as above, which can be computed
     without materializing Sigma.
-    - logdet(Sigma) = 2*log(sigma_par) + 2*(N-1)*log(sigma_perp). Sigma^{+/-1/2} follow by replacing
+    - logdet(Sigma) = 2 * log(sigma_par) + 2 * (N-1) * log(sigma_perp). Sigma^{+/-1/2} follow by replacing
     sigma with sigma^{+/-1/2}.
 
     Edge cases
@@ -408,17 +409,17 @@ def q(
 
     Shapes
     ------
-    w        : [..., 2N] complex
-    R_ext    : [..., 2N, 2N] complex
-    sigma_par: real, broadcastable to leading batch dims
-    sigma_perp: real, broadcastable to leading batch dims
-    Returns  : [...,] real (non-negative)
+    w           : [..., 2N] complex
+    R_ext       : [..., 2N, 2N] complex
+    sigma_par   : real, broadcastable to leading batch dims
+    sigma_perp  : real, broadcastable to leading batch dims
+    Returns     : [...,] real (non-negative)
 
     Args
     ----
-    w : Complex 2N-vector (concatenation of u and v).
-    R_ext : Block-diagonal extension block_diag(R, R), consistent with w.
-    sigma_par (sp) : Parallel variance (>0).
+    w               : Complex 2N-vector (concatenation of u and v).
+    R_ext           : Block-diagonal extension block_diag(R, R), consistent with w.
+    sigma_par (sp)  : Parallel variance (>0).
     sigma_perp (sq) : Perpendicular variance (>0).
 
     Raises
@@ -532,13 +533,13 @@ def delta_vec_d(
 
     Properties
     ----------
-    - Tangency:        <vec_d_j, delta_vec_d> == 0 (numerically ~ 0).
-    - Phase equiv.:    For any real phi, delta(e^{i*phi}*vec_d, vec_d_j) = e^{i*phi} * delta(vec_d, vec_d_j).
-    - Joint phase eq.: For any real psi, delta(e^{i*psi}*vec_d, e^{i*psi}*vec_d_j) = e^{i*psi} * delta(vec_d, vec_d_j).
-    - Zero at collin.: If vec_d is collinear with vec_d_j (c = 1), then delta_vec_d == 0.
-    - Smoothness:      N_eps prevents division by zero at c -> 1; function is differentiable in all inputs for eps > 0.
-    - Norm bound:      ||delta_vec_d|| <= theta; away from the smoothing region (1 - c^2 >> eps), ||delta_vec_d|| ~ theta.
-    - Batched:         Leading batch dimensions are preserved; no RNG; deterministic for fixed inputs.
+    - Tangency          : <vec_d_j, delta_vec_d> == 0 (numerically ~ 0).
+    - Phase equiv.      : For any real phi, delta(e^{i * phi} * vec_d, vec_d_j) = e^{i * phi} * delta(vec_d, vec_d_j).
+    - Joint phase eq.   : For any real psi, delta(e^{i * psi} * vec_d, e^{i * psi} * vec_d_j) = e^{i * psi} * delta(vec_d, vec_d_j).
+    - Zero at collin.   : If vec_d is collinear with vec_d_j (c = 1), then delta_vec_d == 0.
+    - Smoothness        : N_eps prevents division by zero at c -> 1; function is differentiable in all inputs for eps > 0.
+    - Norm bound        : ||delta_vec_d|| <= theta; away from the smoothing region (1 - c^2 >> eps), ||delta_vec_d|| ~ theta.
+    - Batched           : Leading batch dimensions are preserved; no RNG; deterministic for fixed inputs.
 
     Algorithm
     ---------
@@ -569,7 +570,7 @@ def delta_vec_d(
 
     Edge cases
     ----------
-    - If vec_d == vec_d_j (or vec_d = e^{i*phi} * vec_d_j), then t == 0 and delta_vec_d == 0.
+    - If vec_d == vec_d_j (or vec_d = e^{i * phi} * vec_d_j), then t == 0 and delta_vec_d == 0.
     - If 1 - c^2 is very small, denom ~ sqrt(eps), ensuring finite and smooth output.
     """
 
@@ -618,14 +619,14 @@ def iota(
 
     Shapes
     ------
-    delta_z:     [..., N] complex
-    delta_vec_d: [..., N] complex
-    Returns:     [..., 2N] complex
+    delta_z     : [..., N] complex
+    delta_vec_d : [..., N] complex
+    Returns     : [..., 2N] complex
 
     Args
     ----
-    delta_z: Complex displacement (e.g., z - z_j + n) in C^N.
-    delta_vec_d: Complex directional offset delta_vec_d(d, d_j) in C^N.
+    delta_z     : Complex displacement (e.g., z - z_j + n) in C^N.
+    delta_vec_d : Complex directional offset delta_vec_d(d, d_j) in C^N.
 
     Returns
     -------
@@ -666,3 +667,59 @@ def iota(
         raise ValueError(
             f"iota: concat failed for shapes {tuple(delta_z.shape)} and {tuple(delta_vec_d.shape)}"
         ) from e
+
+
+def rho(
+    q: torch.Tensor,
+    q_max: Optional[Union[int, float, torch.Tensor]] = None,
+) -> torch.Tensor:
+    """
+    Gaussian envelope rho(q) = exp(-pi * q).
+
+    Canon
+    -----
+    Used inside psi^T_j(z, d) via rho(q(w)), where q(w) = <Sigma^{-1} w, w>.
+    Optional clamping of q by q_max is applied before the exponent to
+    improve numerical stability for large q.
+
+    Shapes
+    ------
+    q       : [...,] real
+    q_max   : None or broadcastable real scalar/tensor
+    returns : [...,] real (in (0, 1] when q >= 0)
+
+    Args
+    ----
+    q       : Real-valued quadratic form (e.g., from q(w)).
+    q_max   : Optional upper bound applied elementwise to q before exp.
+
+    Returns
+    -------
+    Tensor of the same leading shape as q with values exp(-pi * clamp(q, max=q_max)).
+
+    Raises
+    ------
+    ValueError if q is complex or q_max is complex.
+
+    Notes
+    -----
+    - dtype/device follow q (and q_max is cast to q.dtype/q.device if provided).
+    - The function does not enforce q >= 0; if q < 0, the output may exceed 1.
+    - Typical integration in CPSF: q_max is provided from context (e.g., ctx.exp_clip_q_max).
+    """
+
+    if torch.is_complex(q):
+        raise ValueError(f"rho: expected real q, got dtype={q.dtype}")
+
+    if q_max is not None:
+        if isinstance(q_max, torch.Tensor):
+            if torch.is_complex(q_max):
+                raise ValueError("rho: q_max must be real-valued")
+            q_cap = q_max.to(dtype=q.dtype, device=q.device)
+        else:
+            q_cap = torch.as_tensor(q_max, dtype=q.dtype, device=q.device)
+        q_ = torch.clamp(q, max=q_cap)
+    else:
+        q_ = q
+
+    return torch.exp(-torch.pi * q_)

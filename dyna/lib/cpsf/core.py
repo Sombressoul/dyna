@@ -8,6 +8,7 @@ from dyna.lib.cpsf.functional.core_math import (
     delta_vec_d,
     iota,
     q,
+    rho,
     R,
     R_ext,
     Sigma,
@@ -145,11 +146,14 @@ class CPSFCore:
             )
         return z
 
-    def rho_q(
+    def rho(
         self,
         q: torch.Tensor,
     ) -> torch.Tensor:
-        return torch.exp(-torch.pi * torch.clamp(q, max=self.ctx.exp_clip_q_max))
+        return rho(
+            q=q,
+            q_max=self.ctx.exp_clip_q_max,
+        )
 
     def resolvent_delta_T_hat(
         self,
