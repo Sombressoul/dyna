@@ -3,6 +3,7 @@ from dyna.lib.cpsf.functional.sv_transform import (
     vector_to_spectrum,
 )
 from dyna.lib.cpsf.functional.core_math import (
+    # CPSF core math
     delta_vec_d,
     iota,
     lift,
@@ -11,10 +12,12 @@ from dyna.lib.cpsf.functional.core_math import (
     R,
     R_ext,
     Sigma,
+    # Math helpers
+    hermitianize,
 )
 
 __all__ = [
-    # Core math
+    # CPSF core math
     "delta_vec_d",
     "iota",
     "lift",
@@ -23,6 +26,8 @@ __all__ = [
     "R",
     "R_ext",
     "Sigma",
+    # Math helpers
+    "hermitianize",
     # Other
     "spectrum_to_vector",
     "vector_to_spectrum",

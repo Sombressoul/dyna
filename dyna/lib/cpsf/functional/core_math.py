@@ -778,3 +778,15 @@ def lift(
         raise ValueError(f"lift: N must be >= 2 per CPSF (got N={z.shape[-1]})")
 
     return z
+
+
+def hermitianize(
+    A: torch.Tensor,
+) -> torch.Tensor:
+    """
+    Hermitian (symmetric) part: (A + A^H) / 2.
+    """
+    if torch.is_complex(A):
+        return 0.5 * (A + A.mH)
+    else:
+        return 0.5 * (A + A.transpose(-2, -1))

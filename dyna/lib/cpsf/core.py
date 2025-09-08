@@ -5,6 +5,7 @@ from typing import Optional
 from dyna.lib.cpsf.errors import NumericalError
 from dyna.lib.cpsf.context import CPSFContext
 from dyna.lib.cpsf.functional.core_math import (
+    # CPSF core math
     delta_vec_d,
     iota,
     lift,
@@ -13,6 +14,8 @@ from dyna.lib.cpsf.functional.core_math import (
     R,
     R_ext,
     Sigma,
+    # Math helpers
+    hermitianize,
 )
 
 
@@ -22,14 +25,6 @@ class CPSFCore:
         context: CPSFContext,
     ):
         self.ctx = context
-
-    def _hermitianize(
-        self,
-        S: torch.Tensor,
-    ) -> torch.Tensor:
-        return (
-            0.5 * (S + S.mH) if torch.is_complex(S) else 0.5 * (S + S.transpose(-2, -1))
-        )
 
     def _cholesky_spd(
         self,
@@ -41,7 +36,7 @@ class CPSFCore:
                 f"_cholesky_spd: expected [..., n, n], got {tuple(S.shape)}"
             )
 
-        S_h = self._hermitianize(S)
+        S_h = hermitianize(A=S)
 
         if not torch.isfinite(S_h).all():
             raise NumericalError("Cholesky: non-finite entries in input")
