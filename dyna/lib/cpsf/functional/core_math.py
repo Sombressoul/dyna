@@ -311,7 +311,7 @@ def Sigma(
     - Block structure       : Sigma = diag(S0, S0) with S0 = R * diag(sigma_par, sigma_perp, ..., sigma_perp) * R^H.
     - Spectrum              : eig(Sigma) = {sigma_par (mult 2), sigma_perp (mult 2*(N-1))}.
     - Isotropy              : if sigma_par == sigma_perp == s, then Sigma = s * I(2N).
-    - Inverse (closed form) : Sigma^{-1} = R_ext * diag(1/sigma_par, 1/sigma_perp, ..., 1/sigma_perp, 
+    - Inverse (closed form) : Sigma^{-1} = R_ext * diag(1/sigma_par, 1/sigma_perp, ..., 1/sigma_perp,
                                 1/sigma_par, 1/sigma_perp, ..., 1/sigma_perp) * R_ext^H.
     - Invariances           : right action R -> R * diag(1, Q), Q in U(N-1), and the first-column phase
                                 R -> R * diag(exp(i*phi), I) leave Sigma unchanged.
@@ -723,3 +723,58 @@ def rho(
         q_ = q
 
     return torch.exp(-torch.pi * q_)
+
+
+def lift(
+    z: torch.Tensor,
+) -> torch.Tensor:
+    """
+    Lift map: return lifted coordinates of z.
+
+    Canon
+    -----
+    CPSF uses a "lifted" spatial coordinate tilde{z} when forming iota(...).
+    In the canonical parameterization currently adopted, the lift is identity:
+    tilde{z} == z. This function exists to keep the pipeline explicit and
+    centralized, so all callers uniformly apply lift(z) even when it is a no-op.
+
+    Behavior
+    --------
+    - Validates that z is complex and shaped as [..., N].
+    - Returns z unchanged (no reparameterization, no scaling).
+    - Preserves shape, dtype, and device; does not allocate a new tensor.
+
+    Shapes
+    ------
+    z       : [..., N] complex
+    returns : [..., N] complex (same object)
+
+    Args
+    ----
+    z: Complex spatial coordinate.
+
+    Returns
+    -------
+    The same tensor z (identity lift).
+
+    Raises
+    ------
+    ValueError if z is not complex, if it has no trailing dimension, or if N < 2.
+
+    Notes
+    -----
+    Keeping lift as a dedicated function improves readability (matching the CPSF
+    notation) and future-proofs the code should a non-trivial lifting be introduced
+    (e.g., alternative coordinate embeddings or normalizations).
+    """
+
+    if not torch.is_complex(z):
+        raise ValueError(
+            f"lift: expected complex [..., N], got {z.dtype} {tuple(z.shape)}"
+        )
+    if z.dim() == 0:
+        raise ValueError("lift: expected [..., N], got a 0-dim scalar tensor")
+    if z.shape[-1] < 2:
+        raise ValueError(f"lift: N must be >= 2 per CPSF (got N={z.shape[-1]})")
+
+    return z

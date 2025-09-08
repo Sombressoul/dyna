@@ -7,6 +7,7 @@ from dyna.lib.cpsf.context import CPSFContext
 from dyna.lib.cpsf.functional.core_math import (
     delta_vec_d,
     iota,
+    lift,
     q,
     rho,
     R,
@@ -140,11 +141,9 @@ class CPSFCore:
         )
 
     def lift(self, z: torch.Tensor) -> torch.Tensor:
-        if not torch.is_complex(z):
-            raise ValueError(
-                f"lift: expected complex [..., N], got {z.dtype} {tuple(z.shape)}"
-            )
-        return z
+        return lift(
+            z=z,
+        )
 
     def rho(
         self,

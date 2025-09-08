@@ -5,6 +5,7 @@ from dyna.lib.cpsf.functional.sv_transform import (
 from dyna.lib.cpsf.functional.core_math import (
     delta_vec_d,
     iota,
+    lift,
     q,
     rho,
     R,
@@ -16,6 +17,7 @@ __all__ = [
     # Core math
     "delta_vec_d",
     "iota",
+    "lift",
     "q",
     "rho",
     "R",
