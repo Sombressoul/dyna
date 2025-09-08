@@ -883,7 +883,7 @@ def cholesky_spd(
             raise ValueError(f"cholesky_spd: failed even with jitter: {e2}") from e2
 
 
-def psi_periodized(
+def psi(
     z: torch.Tensor,  # [..., N] complex
     z_j: torch.Tensor,  # [..., N] complex
     vec_d: torch.Tensor,  # [..., N] complex
