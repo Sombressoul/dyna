@@ -387,7 +387,7 @@ def Sigma(
     return out
 
 
-def Sigma_inverse_quadratic(
+def q(
     w: torch.Tensor,
     R_ext: torch.Tensor,
     sigma_par: torch.Tensor,
@@ -437,37 +437,37 @@ def Sigma_inverse_quadratic(
 
     if torch.is_complex(sigma_par) or torch.is_complex(sigma_perp):
         raise ValueError(
-            "Sigma_inverse_quadratic: sigma_par and sigma_perp must be real-valued"
+            "q: sigma_par and sigma_perp must be real-valued"
         )
     if w.dtype != R_ext.dtype:
         raise ValueError(
-            f"Sigma_inverse_quadratic: dtype mismatch: w.dtype={w.dtype}, R_ext.dtype={R_ext.dtype}"
+            f"q: dtype mismatch: w.dtype={w.dtype}, R_ext.dtype={R_ext.dtype}"
         )
     if w.device != R_ext.device:
         raise ValueError(
-            f"Sigma_inverse_quadratic: device mismatch: w.device={w.device}, R_ext.device={R_ext.device}"
+            f"q: device mismatch: w.device={w.device}, R_ext.device={R_ext.device}"
         )
     if not torch.is_complex(w) or not torch.is_complex(R_ext):
         raise ValueError(
-            f"Sigma_inverse_quadratic: expected complex inputs, got w:{w.dtype}, R_ext:{R_ext.dtype}"
+            f"q: expected complex inputs, got w:{w.dtype}, R_ext:{R_ext.dtype}"
         )
     if R_ext.dim() < 2 or R_ext.shape[-1] != R_ext.shape[-2]:
         raise ValueError(
-            f"Sigma_inverse_quadratic: R_ext must be [..., 2N, 2N], got {tuple(R_ext.shape)}"
+            f"q: R_ext must be [..., 2N, 2N], got {tuple(R_ext.shape)}"
         )
     if w.shape[-1] != R_ext.shape[-1]:
         raise ValueError(
-            f"Sigma_inverse_quadratic: trailing dim mismatch, w:[..., {w.shape[-1]}] vs R_ext:[..., {R_ext.shape[-1]}, {R_ext.shape[-1]}]"
+            f"q: trailing dim mismatch, w:[..., {w.shape[-1]}] vs R_ext:[..., {R_ext.shape[-1]}, {R_ext.shape[-1]}]"
         )
 
     twoN = w.shape[-1]
     N = twoN // 2
 
     if twoN % 2 != 0:
-        raise ValueError("Sigma_inverse_quadratic: expected even last dim 2N")
+        raise ValueError("q: expected even last dim 2N")
     if N < 2:
         raise ValueError(
-            f"Sigma_inverse_quadratic: N must be >= 2 per CPSF (got N={N})"
+            f"q: N must be >= 2 per CPSF (got N={N})"
         )
 
     WV = w.reshape(*w.shape[:-1], 2, N).transpose(-2, -1)
@@ -485,7 +485,7 @@ def Sigma_inverse_quadratic(
             cond = (sp > 0).all() & (sq > 0).all()
             torch._assert_async(
                 cond,
-                "Sigma_inverse_quadratic: sigma_par and sigma_perp must be positive",
+                "q: sigma_par and sigma_perp must be positive",
             )
         else:
             if not isinstance(sigma_par, torch.Tensor) and not isinstance(
@@ -493,12 +493,12 @@ def Sigma_inverse_quadratic(
             ):
                 if not (sigma_par > 0 and sigma_perp > 0):
                     raise ValueError(
-                        "Sigma_inverse_quadratic: sigma_par and sigma_perp must be positive"
+                        "q: sigma_par and sigma_perp must be positive"
                     )
     else:
         if not ((sp > 0).all().item() and (sq > 0).all().item()):
             raise ValueError(
-                "Sigma_inverse_quadratic: sigma_par and sigma_perp must be positive"
+                "q: sigma_par and sigma_perp must be positive"
             )
 
     inv_par = torch.reciprocal(sp)
@@ -506,9 +506,9 @@ def Sigma_inverse_quadratic(
     sq_mag = (YZ.conj() * YZ).real.sum(dim=-1)
     q0 = sq_mag[..., 0] * inv_par
     qperp = sq_mag[..., 1:].sum(dim=-1) * inv_perp
-    q = (q0 + qperp).to(dtype=dt_real)
+    out = (q0 + qperp).to(dtype=dt_real)
 
-    return q
+    return out
 
 
 def delta_vec_d(

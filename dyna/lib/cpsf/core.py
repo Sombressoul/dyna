@@ -7,10 +7,10 @@ from dyna.lib.cpsf.context import CPSFContext
 from dyna.lib.cpsf.functional.core_math import (
     delta_vec_d,
     iota,
+    q,
     R,
     R_ext,
     Sigma,
-    Sigma_inverse_quadratic,
 )
 
 
@@ -102,14 +102,14 @@ class CPSFCore:
             sigma_perp=sigma_perp,
         )
     
-    def Sigma_inverse_quadratic(
+    def q(
         self,
         w: torch.Tensor,
         R_ext: torch.Tensor,
         sigma_par: torch.Tensor,
         sigma_perp: torch.Tensor,
     ) -> torch.Tensor:
-        return Sigma_inverse_quadratic(
+        return q(
             w=w,
             R_ext=R_ext,
             sigma_par=sigma_par,

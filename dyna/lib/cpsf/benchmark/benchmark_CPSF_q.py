@@ -1,10 +1,10 @@
 # Run as (example):
-# > python -m dyna.lib.cpsf.benchmark.benchmark_CPSF_Sigma_inverse_quadratic --N 16 --batch 65536 --dtype c64 --device cuda --iters 100 --warmup 10
+# > python -m dyna.lib.cpsf.benchmark.benchmark_CPSF_q --N 16 --batch 65536 --dtype c64 --device cuda --iters 100 --warmup 10
 # For full stats:
-# > python -m dyna.lib.cpsf.benchmark.benchmark_CPSF_Sigma_inverse_quadratic --N 16 --batch 65536 --dtype c64 --device cuda --iters 100 --warmup 10 --profile --verify_devices
+# > python -m dyna.lib.cpsf.benchmark.benchmark_CPSF_q --N 16 --batch 65536 --dtype c64 --device cuda --iters 100 --warmup 10 --profile --verify_devices
 
 import argparse, time, math, torch
-from ..functional.core_math import R, R_ext, Sigma_inverse_quadratic
+from ..functional.core_math import R, R_ext, q
 
 def _fmt_bytes(x: int) -> str:
     u = ["B", "KB", "MB", "GB", "TB"]
@@ -88,7 +88,7 @@ def main():
     sq = torch.tensor(args.sigma_perp, dtype=REAL, device=dev)
 
     if args.verify_devices:
-        out = Sigma_inverse_quadratic(w_b, Rext_b, sp, sq)  # (B,)
+        out = q(w_b, Rext_b, sp, sq)  # (B,)
         print(f"in.device(w)={w_b.device}, in.device(R_ext)={Rext_b.device}, out.device={out.device}")
         assert (
             (dev.type == "cpu" and (not w_b.is_cuda) and (not Rext_b.is_cuda) and (not out.is_cuda))
@@ -103,7 +103,7 @@ def main():
     if dev.type == "cuda":
         torch.cuda.synchronize()
     for _ in range(args.warmup):
-        _ = Sigma_inverse_quadratic(w_b, Rext_b, sp, sq)
+        _ = q(w_b, Rext_b, sp, sq)
     if dev.type == "cuda":
         torch.cuda.synchronize()
 
@@ -116,7 +116,7 @@ def main():
             activities=activities, schedule=sch, record_shapes=False, profile_memory=True
         ) as prof:
             for _ in range(6):
-                _ = Sigma_inverse_quadratic(w_b, Rext_b, sp, sq)
+                _ = q(w_b, Rext_b, sp, sq)
                 prof.step()
         print(
             prof.key_averages().table(
@@ -140,7 +140,7 @@ def main():
             start = torch.cuda.Event(enable_timing=True)
             end = torch.cuda.Event(enable_timing=True)
             start.record()
-            out = Sigma_inverse_quadratic(w_b, Rext_b, sp, sq)  # (B,)
+            out = q(w_b, Rext_b, sp, sq)  # (B,)
             # keep the work; avoid full DCE; .item() syncs
             _ = out.real.sum().item()
             end.record()
@@ -152,7 +152,7 @@ def main():
             alloc_delta_max = max(alloc_delta_max, max(0, mem1 - mem0))
         else:
             t0 = time.perf_counter()
-            out = Sigma_inverse_quadratic(w_b, Rext_b, sp, sq)
+            out = q(w_b, Rext_b, sp, sq)
             _ = out.real.sum().item()
             dt = (time.perf_counter() - t0) * 1e3
         times.append(dt)
@@ -161,7 +161,7 @@ def main():
     std = (sum((t - avg) ** 2 for t in times) / max(1, len(times) - 1)) ** 0.5
     thr = B / (avg / 1e3)  # q-values/s
 
-    print("\n=== Sigma_inverse_quadratic Benchmark ===")
+    print("\n=== q Benchmark ===")
     print(f"Avg time/iter: {avg:.3f} ms  (± {std:.3f} ms)")
     print(f"Throughput:    {thr:,.0f} q-values/s")
     if dev.type == "cuda":

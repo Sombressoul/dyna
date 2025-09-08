@@ -1,5 +1,5 @@
 # Run as (example):
-# > pytest -q .\dyna\lib\cpsf\pytest\test_CPSF_Sigma_inverse_quadratic.py
+# > pytest -q .\dyna\lib\cpsf\pytest\test_CPSF_q.py
 
 import torch
 import pytest
@@ -9,7 +9,7 @@ from dyna.lib.cpsf.functional.core_math import (
     R,
     R_ext,
     Sigma,
-    Sigma_inverse_quadratic,
+    q,
 )
 
 # =========================
@@ -19,8 +19,8 @@ TARGET_DEVICE = torch.device("cpu")
 
 Q_IMPLS: List[Tuple[str, Callable[..., torch.Tensor]]] = [
     (
-        "Sigma_inverse_quadratic",
-        lambda w, Rext, sp, sq: Sigma_inverse_quadratic(
+        "q",
+        lambda w, Rext, sp, sq: q(
             w=w, R_ext=Rext, sigma_par=sp, sigma_perp=sq
         ),
     ),
@@ -581,4 +581,4 @@ def test_Q14_special_case_R_eq_I(impl_name, fn_q, dtype, N):
 # =========================
 if __name__ == "__main__":
     print("\nUse pytest to run:")
-    print("\tpytest -q ./test_CPSF_Sigma_inverse_quadratic.py\n")
+    print("\tpytest -q ./test_CPSF_q.py\n")
