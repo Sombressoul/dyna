@@ -1,14 +1,21 @@
 import torch
-import math
 
 from collections import OrderedDict
-from typing import Iterator, Optional, Sequence, Tuple, Union
+from typing import (
+    Iterator,
+    Optional,
+    Sequence,
+    Tuple,
+    Union,
+    MutableMapping,
+    OrderedDict as TypingOrderedDict,
+)
 
 from dyna.lib.cpsf.structures import CPSFPeriodizationKind
 
 TypeLRUCacheKey = Tuple[int, int, torch.device]
 TypeLRUCacheValue = torch.Tensor
-TypeLRUCache = OrderedDict[TypeLRUCacheKey, TypeLRUCacheValue]
+TypeLRUCache = TypingOrderedDict[TypeLRUCacheKey, TypeLRUCacheValue]
 
 
 class CPSFPeriodization:
@@ -16,19 +23,16 @@ class CPSFPeriodization:
         self,
         kind: CPSFPeriodizationKind,
         window: Optional[Union[int, torch.LongTensor]] = None,
-        tolerance: Optional[Union[float, torch.FloatTensor]] = None,
         max_radius: Optional[Union[int, torch.LongTensor]] = None,
         cache_active: bool = True,
         cache_limit: int = 32,
-        cache_soft_limit_bytes: int = 128 * 1024 * 1024,  # 128 MB soft cap per entry
+        cache_soft_limit_bytes: int = 128 * 1024 * 1024,
     ):
-        # Enum guards
         if not isinstance(kind, CPSFPeriodizationKind):
             raise TypeError(
                 f"CPSFPeriodization: 'kind' must be CPSFPeriodizationKind, got {type(kind)}"
             )
 
-        # Helpers
         def _raise_tinfo(x, name: str, target_type: str):
             if isinstance(x, torch.Tensor):
                 tinfo = f"type={type(x)}, dtype={x.dtype}, shape={tuple(x.shape)}, numel={x.numel()}"
@@ -58,60 +62,27 @@ class CPSFPeriodization:
                 return int(x.item())
             _raise_tinfo(x, name, "int")
 
-        def _to_float_scalar(x, name: str):
-            if x is None:
-                return None
-            if isinstance(x, (float, int)) and not isinstance(x, bool):
-                return float(x)
-            if (
-                isinstance(x, torch.Tensor)
-                and x.dtype != torch.bool
-                and x.numel() == 1
-                and torch.is_floating_point(x)
-                and not torch.is_complex(x)
-            ):
-                return float(x.item())
-            _raise_tinfo(x, name, "float")
-
-        # Normalize inputs
         normal_window = _to_int_scalar(window, "window")
-        normal_tolerance = _to_float_scalar(tolerance, "tolerance")
         normal_max_radius = _to_int_scalar(max_radius, "max_radius")
 
-        if normal_tolerance is not None and not math.isfinite(normal_tolerance):
-            raise ValueError("CPSFPeriodization: 'tolerance' must be finite")
-
-        # Per-kind validation
         if kind is CPSFPeriodizationKind.WINDOW:
             if normal_window is None:
                 raise ValueError("CPSFPeriodization(WINDOW): 'window' is required")
             if normal_window < 1:
                 raise ValueError("CPSFPeriodization(WINDOW): 'window' must be >= 1")
-            if normal_tolerance is not None or normal_max_radius is not None:
-                raise ValueError(
-                    "CPSFPeriodization(WINDOW): 'tolerance' and 'max_radius' must be None"
-                )
+            if normal_max_radius is not None:
+                raise ValueError("CPSFPeriodization(WINDOW): 'max_radius' must be None")
         elif kind is CPSFPeriodizationKind.FULL:
             if normal_window is not None:
                 raise ValueError("CPSFPeriodization(FULL): 'window' must be None")
-            if normal_tolerance is None and normal_max_radius is None:
-                raise ValueError(
-                    "CPSFPeriodization(FULL): either 'tolerance' or 'max_radius' must be provided"
-                )
-            if normal_tolerance is not None and not (normal_tolerance > 0.0):
-                raise ValueError("CPSFPeriodization(FULL): 'tolerance' must be > 0")
             if normal_max_radius is not None and normal_max_radius < 1:
                 raise ValueError("CPSFPeriodization(FULL): 'max_radius' must be >= 1")
         else:
             raise ValueError(f"CPSFPeriodization: unsupported kind={kind}")
 
-        # Assign
         self.kind: CPSFPeriodizationKind = kind
         self.window: Union[int, None] = normal_window
-        self.tolerance: Union[float, None] = normal_tolerance
         self.max_radius: Union[int, None] = normal_max_radius
-
-        # LRU cache
         self._cache_active: bool = bool(cache_active)
         self._cache_limit: int = int(cache_limit)
         self._cache_soft_limit_bytes: int = int(cache_soft_limit_bytes)
@@ -135,21 +106,21 @@ class CPSFPeriodization:
 
     def _lru_get(
         self,
-        cache: OrderedDict,
+        cache: MutableMapping[TypeLRUCacheKey, TypeLRUCacheValue],
         key: TypeLRUCacheKey,
     ) -> TypeLRUCacheValue:
         if not self._cache_active:
             return None
 
         t = cache.get(key)
-        if t is not None:
+        if t is not None and isinstance(cache, OrderedDict):
             cache.move_to_end(key)
 
         return t
 
     def _lru_put(
         self,
-        cache: OrderedDict,
+        cache: MutableMapping[TypeLRUCacheKey, TypeLRUCacheValue],
         key: TypeLRUCacheKey,
         value: TypeLRUCacheValue,
     ) -> None:
@@ -157,9 +128,10 @@ class CPSFPeriodization:
             return None
 
         cache[key] = value
-        cache.move_to_end(key)
-        while len(cache) > self._cache_limit:
-            cache.popitem(last=False)
+        if isinstance(cache, OrderedDict):
+            cache.move_to_end(key)
+            while len(cache) > self._cache_limit:
+                cache.popitem(last=False)
 
     def _should_cache(
         self,
@@ -349,7 +321,6 @@ class CPSFPeriodization:
 
         device_c = self._canon_device(device)
         W = start_radius
-
         while True:
             if self.max_radius is not None and W > self.max_radius:
                 break
@@ -366,7 +337,6 @@ class CPSFPeriodization:
                 break
 
             offsets, lengths = self.pack_offsets(N, device_c, radii)
-
             yield offsets, lengths, radii[0]
 
             if self.max_radius is not None and W > self.max_radius:
