@@ -393,6 +393,48 @@ def Sigma_inverse_quadratic(
     sigma_par: torch.Tensor,
     sigma_perp: torch.Tensor,
 ) -> torch.Tensor:
+    """
+    Compute the CPSF quadratic form q = <Sigma^{-1} w, w>.
+
+    Canon
+    -----
+    Sigma^{-1} = R_ext * D^{-1} * R_ext^H, with 
+        R_ext = block_diag(R, R), R ∈ U(N), 
+        D^{-1} = diag(1/sp, 1/sq, ..., 1/sq, 1/sp, 1/sq, ..., 1/sq).
+
+    Let w = [u; v] ∈ C^{2N}. 
+    
+    The implementation evaluates q without forming Sigma^{-1} explicitly via y = R^H u, z = R^H v.
+
+    Shapes
+    ------
+    w        : [..., 2N] complex
+    R_ext    : [..., 2N, 2N] complex
+    sigma_par: real, broadcastable to leading batch dims
+    sigma_perp: real, broadcastable to leading batch dims
+    Returns  : [...,] real (non-negative)
+
+    Args
+    ----
+    w : Complex 2N-vector (concatenation of u and v).
+    R_ext : Block-diagonal extension block_diag(R, R), consistent with w.
+    sigma_par (sp) : Parallel variance (>0).
+    sigma_perp (sq) : Perpendicular variance (>0).
+
+    Raises
+    ------
+    ValueError if:
+    - inputs are not complex or have mismatched dtype/device;
+    - R_ext is not square [..., 2N, 2N] or trailing dims mismatch;
+    - last dim of w is not even (2N) or N < 2;
+    - sigma_par / sigma_perp are non-real or non-positive.
+
+    Notes
+    -----
+    On CUDA, positivity of sigmas is enforced without host synchronization
+    (via torch._assert_async when available).
+    """
+
     if torch.is_complex(sigma_par) or torch.is_complex(sigma_perp):
         raise ValueError(
             "Sigma_inverse_quadratic: sigma_par and sigma_perp must be real-valued"
