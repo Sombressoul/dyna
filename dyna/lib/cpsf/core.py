@@ -2,7 +2,6 @@ import torch
 
 from typing import Optional
 
-from dyna.lib.cpsf.errors import NumericalError
 from dyna.lib.cpsf.context import CPSFContext
 from dyna.lib.cpsf.functional.core_math import (
     # CPSF core math
@@ -15,7 +14,7 @@ from dyna.lib.cpsf.functional.core_math import (
     R_ext,
     Sigma,
     # Math helpers
-    hermitianize,
+    cholesky_spd,
 )
 
 
@@ -25,51 +24,6 @@ class CPSFCore:
         context: CPSFContext,
     ):
         self.ctx = context
-
-    def _cholesky_spd(
-        self,
-        S: torch.Tensor,
-        eps: Optional[float],
-    ) -> torch.Tensor:
-        if S.dim() < 2 or S.shape[-1] != S.shape[-2]:
-            raise NumericalError(
-                f"_cholesky_spd: expected [..., n, n], got {tuple(S.shape)}"
-            )
-
-        S_h = hermitianize(A=S)
-
-        if not torch.isfinite(S_h).all():
-            raise NumericalError("Cholesky: non-finite entries in input")
-
-        try:
-            return torch.linalg.cholesky(S_h)
-        except RuntimeError as e:
-            finfo = (
-                torch.finfo(S_h.real.dtype)
-                if torch.is_complex(S_h)
-                else torch.finfo(S_h.dtype)
-            )
-            eps = torch.sqrt(finfo.eps) if eps is None else eps
-            scale = (
-                S_h.diagonal(dim1=-2, dim2=-1)
-                .abs()
-                .mean(dim=-1, keepdim=True)
-                .clamp(min=1.0)
-            )
-            eye = torch.eye(
-                S_h.shape[-1],
-                device=S_h.device,
-                dtype=S_h.real.dtype if torch.is_complex(S_h) else S_h.dtype,
-            )
-            S_h_jittered = S_h + (
-                eps
-                * scale[..., None]
-                * (eye if not torch.is_complex(S_h) else eye.type_as(S_h))
-            )
-            try:
-                return torch.linalg.cholesky(S_h_jittered)
-            except RuntimeError as e2:
-                raise NumericalError(f"Cholesky failed even with jitter: {e2}") from e2
 
     def R(
         self,
@@ -184,7 +138,7 @@ class CPSFCore:
         a_mm = _unsqueeze_to(alpha_j, A.dim())
         eps_t = torch.as_tensor(eps, dtype=dtype, device=device)
         K = a_mm * I + eps_t * A.to(dtype=dtype, device=device)
-        L = self._cholesky_spd(K)
+        L = cholesky_spd(K, use_jitter=True)
 
         rhs = v_j.unsqueeze(-1)
         if hasattr(torch.linalg, "solve_triangular"):

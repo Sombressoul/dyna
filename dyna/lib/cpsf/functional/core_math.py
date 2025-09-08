@@ -1,4 +1,5 @@
 import torch
+import math
 
 from typing import Optional, Union
 
@@ -786,7 +787,95 @@ def hermitianize(
     """
     Hermitian (symmetric) part: (A + A^H) / 2.
     """
+
     if torch.is_complex(A):
         return 0.5 * (A + A.mH)
     else:
         return 0.5 * (A + A.transpose(-2, -1))
+
+
+def cholesky_spd(
+    A: torch.Tensor,
+    eps: Optional[Union[float, torch.Tensor]] = None,
+    use_jitter: bool = False,
+) -> torch.Tensor:
+    """
+    Cholesky factor L for Hermitian/Symmetric positive-definite A.
+    Hermitianizes input and, if requested, retries with a small real diagonal jitter.
+
+    A       : [..., n, n] real/complex
+    returns : [..., n, n] real/complex (lower-triangular)
+
+    Notes:
+    ------
+    On CUDA, finiteness and eps positivity are asserted without host sync via
+    torch._assert_async when available.
+    """
+
+    if A.dim() < 2 or A.shape[-1] != A.shape[-2]:
+        raise ValueError(f"cholesky_spd: expected [..., n, n], got {tuple(A.shape)}")
+    if not (torch.is_complex(A) or torch.is_floating_point(A)):
+        raise ValueError(
+            f"cholesky_spd: expected real/complex floating dtype, got {A.dtype}"
+        )
+
+    A_h = hermitianize(A=A)
+
+    # --- Finiteness guard for A_h (avoid CUDA sync in the hot path) ---
+    e_str = "cholesky_spd: non-finite entries in input"
+    if A_h.is_cuda:
+        if hasattr(torch, "_assert_async"):
+            torch._assert_async(torch.isfinite(A_h).all(), e_str)
+    else:
+        if not torch.isfinite(A_h).all().item():
+            raise ValueError(e_str)
+
+    try:
+        return torch.linalg.cholesky(A_h)
+    except RuntimeError as e:
+        if not use_jitter:
+            raise e
+
+        dt_real = A_h.real.dtype if torch.is_complex(A_h) else A_h.dtype
+        device = A_h.device
+
+        # --- Positivity guard for eps (avoid CUDA sync) ---
+        e_str = "cholesky_spd: eps must be positive when provided"
+        if eps is not None:
+            if isinstance(eps, torch.Tensor):
+                if eps.is_cuda:
+                    if hasattr(torch, "_assert_async"):
+                        torch._assert_async((eps > 0).all(), e_str)
+                    # else: skip strict CUDA check to avoid sync; rely on jitter path to fail if wrong
+                else:
+                    if not (eps > 0).all().item():
+                        raise ValueError(e_str)
+            else:
+                if float(eps) <= 0.0:
+                    raise ValueError(e_str)
+
+        if eps is None:
+            eps_t = torch.tensor(
+                math.sqrt(torch.finfo(dt_real).eps), dtype=dt_real, device=device
+            )
+        else:
+            eps_t = (
+                eps.to(dtype=dt_real, device=device)
+                if isinstance(eps, torch.Tensor)
+                else torch.tensor(float(eps), dtype=dt_real, device=device)
+            )
+
+        diag_abs_mean = (
+            A_h.diagonal(dim1=-2, dim2=-1).abs().mean(dim=-1, keepdim=True).to(dt_real)
+        ).clamp(min=1.0)
+        n = A_h.shape[-1]
+        I = torch.eye(n, device=device, dtype=dt_real)
+        jitter = (eps_t * diag_abs_mean)[..., None] * I
+        A_h_jittered = A_h + (
+            jitter if not torch.is_complex(A_h) else jitter.type_as(A_h)
+        )
+
+        try:
+            return torch.linalg.cholesky(A_h_jittered)
+        except RuntimeError as e2:
+            raise ValueError(f"cholesky_spd: failed even with jitter: {e2}") from e2

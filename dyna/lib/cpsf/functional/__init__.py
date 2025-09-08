@@ -14,6 +14,7 @@ from dyna.lib.cpsf.functional.core_math import (
     Sigma,
     # Math helpers
     hermitianize,
+    cholesky_spd,
 )
 
 __all__ = [
@@ -28,6 +29,7 @@ __all__ = [
     "Sigma",
     # Math helpers
     "hermitianize",
+    "cholesky_spd",
     # Other
     "spectrum_to_vector",
     "vector_to_spectrum",
