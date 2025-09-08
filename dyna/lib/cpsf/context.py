@@ -6,7 +6,7 @@ from dyna.lib.cpsf.structures import (
     CPSFIntegrationPolicy,
     CPSFDTypes,
 )
-from dyna.lib.cpsf.periodization_policy import CPSFPeriodizationPolicy
+from dyna.lib.cpsf.periodization import CPSFPeriodization
 
 
 class CPSFGeometryCache:
@@ -25,7 +25,7 @@ class CPSFContext:
     def __init__(
         self,
         chunk: CPSFChunkPolicy,
-        periodization: CPSFPeriodizationPolicy,
+        periodization: CPSFPeriodization,
         integration: CPSFIntegrationPolicy,
         dtypes: CPSFDTypes,
         exp_clip_q_max: float = 60.0,

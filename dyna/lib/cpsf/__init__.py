@@ -14,7 +14,7 @@ from dyna.lib.cpsf.errors import (
     ZeroMaterializationError,
     SnapshotViolationError,
 )
-from dyna.lib.cpsf.periodization_policy import CPSFPeriodizationPolicy
+from dyna.lib.cpsf.periodization import CPSFPeriodization
 from dyna.lib.cpsf.module import CPSFModule
 from dyna.lib.cpsf.contribution_store import CPSFContributionStore
 from dyna.lib.cpsf.structures import (
@@ -27,8 +27,8 @@ from dyna.lib.cpsf.structures import (
     CPSFDTypes,
     CPSFIndexLike,
     CPSFIntegrationPolicy,
-    CPSFPeriodizationPolicyBackend,
-    CPSFPeriodizationPolicyKind,
+    CPSFPeriodizationBackend,
+    CPSFPeriodizationKind,
 )
 
 __all__ = [
@@ -39,7 +39,7 @@ __all__ = [
     "CPSFCore",
     "CPSFDerivedCache",
     "CPSFGeometryCache",
-    "CPSFPeriodizationPolicy",
+    "CPSFPeriodization",
     "CPSFModule",
 
     # Structures.
@@ -52,8 +52,8 @@ __all__ = [
     "CPSFDTypes",
     "CPSFIndexLike",
     "CPSFIntegrationPolicy",
-    "CPSFPeriodizationPolicyBackend",
-    "CPSFPeriodizationPolicyKind",
+    "CPSFPeriodizationBackend",
+    "CPSFPeriodizationKind",
 
     # Subcomponents.
     "functional",
