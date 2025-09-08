@@ -482,8 +482,12 @@ def q(
                 "q: sigma_par and sigma_perp must be positive",
             )
         else:
-            if not isinstance(sigma_par, torch.Tensor) and not isinstance(
-                sigma_perp, torch.Tensor
+            if not isinstance(
+                sigma_par,
+                torch.Tensor,
+            ) and not isinstance(
+                sigma_perp,
+                torch.Tensor,
             ):
                 if not (sigma_par > 0 and sigma_perp > 0):
                     raise ValueError("q: sigma_par and sigma_perp must be positive")
