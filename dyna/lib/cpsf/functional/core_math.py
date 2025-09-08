@@ -894,4 +894,4 @@ def psi(
     R_j: Optional[torch.Tensor] = None,
     q_max: Optional[float] = None,
 ) -> torch.Tensor:
-    raise NotImplementedError("TODO: psi_periodized")
+    raise NotImplementedError("TODO: psi")
