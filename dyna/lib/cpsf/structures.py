@@ -66,7 +66,13 @@ class CPSFChunkPolicy:
     S_tile: Optional[int] = None
 
 
-class CPSFLatticeSumPolicyKind(Enum):
+class CPSFPeriodizationPolicyBackend(Enum):
+    AUTO = enum_auto()
+    PRIMAL = enum_auto()
+    DUAL = enum_auto()
+
+
+class CPSFPeriodizationPolicyKind(Enum):
     FULL = enum_auto()
     WINDOW = enum_auto()
 

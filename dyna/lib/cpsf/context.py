@@ -6,7 +6,7 @@ from dyna.lib.cpsf.structures import (
     CPSFIntegrationPolicy,
     CPSFDTypes,
 )
-from dyna.lib.cpsf.lattice import CPSFLattice
+from dyna.lib.cpsf.periodization_policy import CPSFPeriodizationPolicy
 
 
 class CPSFGeometryCache:
@@ -25,13 +25,13 @@ class CPSFContext:
     def __init__(
         self,
         chunk: CPSFChunkPolicy,
-        lattice: CPSFLattice,
+        periodization: CPSFPeriodizationPolicy,
         integration: CPSFIntegrationPolicy,
         dtypes: CPSFDTypes,
         exp_clip_q_max: float = 60.0,
     ):
         self.chunk = chunk
-        self.lattice = lattice
+        self.lattice = periodization
         self.integration = integration
         self.dtypes = dtypes
         self.exp_clip_q_max = exp_clip_q_max
