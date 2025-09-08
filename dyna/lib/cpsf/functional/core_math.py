@@ -428,13 +428,10 @@ def Sigma_inverse_quadratic(
             f"Sigma_inverse_quadratic: N must be >= 2 per CPSF (got N={N})"
         )
 
-    u = w[..., :N]
-    v = w[..., N:]
+    WV = w.reshape(*w.shape[:-1], 2, N).transpose(-2, -1)
     R = R_ext[..., :N, :N]
-    UV = torch.stack((u, v), dim=-1)
-    YZ = R.mH @ UV
-    y = YZ[..., :, 0]
-    z = YZ[..., :, 1]
+    YZ = R.mH @ WV
+
     dt_real = w.real.dtype
     device = w.device
     sp = torch.as_tensor(sigma_par, dtype=dt_real, device=device)
@@ -445,18 +442,12 @@ def Sigma_inverse_quadratic(
             "Sigma_inverse_quadratic: sigma_par and sigma_perp must be positive"
         )
 
-    inv_par = 1.0 / sp
-    inv_perp = 1.0 / sq
-
-    y_sq = (y.conj() * y).real
-    z_sq = (z.conj() * z).real
-    q0 = (y_sq[..., 0] + z_sq[..., 0]) * inv_par
-    if N > 1:
-        q_perp = (y_sq[..., 1:].sum(dim=-1) + z_sq[..., 1:].sum(dim=-1)) * inv_perp
-    else:
-        q_perp = torch.zeros_like(q0)
-
-    q = (q0 + q_perp).to(dtype=dt_real)
+    inv_par = torch.reciprocal(sp)
+    inv_perp = torch.reciprocal(sq)
+    sq_mag = (YZ.conj() * YZ).real.sum(dim=-1)
+    q0 = sq_mag[..., 0] * inv_par
+    qperp = sq_mag[..., 1:].sum(dim=-1) * inv_perp
+    q = (q0 + qperp).to(dtype=dt_real)
 
     return q
 
