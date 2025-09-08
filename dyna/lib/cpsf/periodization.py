@@ -108,7 +108,7 @@ class CPSFPeriodization:
         self,
         cache: MutableMapping[TypeLRUCacheKey, TypeLRUCacheValue],
         key: TypeLRUCacheKey,
-    ) -> TypeLRUCacheValue:
+    ) -> Optional[TypeLRUCacheValue]:
         if not self._cache_active:
             return None
 
