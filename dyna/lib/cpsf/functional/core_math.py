@@ -883,14 +883,101 @@ def cholesky_spd(
             raise ValueError(f"cholesky_spd: failed even with jitter: {e2}") from e2
 
 
+def Tau_nearest(
+    z: torch.Tensor,
+    z_j: torch.Tensor,
+    vec_d: torch.Tensor,
+    vec_d_j: torch.Tensor,
+    T_hat_j: torch.Tensor,
+    alpha_j: torch.Tensor,
+    sigma_par: torch.Tensor,
+    sigma_perp: torch.Tensor,
+    R_j: Optional[torch.Tensor] = None,
+    q_max: Optional[float] = None,
+) -> torch.Tensor:
+    if not (torch.is_complex(z) and torch.is_complex(vec_d)):
+        raise ValueError("Tau_nearest: z, vec_d must be complex")
+    if z.dim() == 0 or z.shape[-1] < 2:
+        raise ValueError(f"Tau_nearest: N must be >= 2, got {tuple(z.shape)}")
+
+    r_dtype = z.real.dtype
+    dz = lift(z) - lift(z_j)
+    dz_wrapped_re = torch.remainder(dz.real + 0.5, 1.0) - 0.5
+    dz_T = torch.complex(dz_wrapped_re.to(r_dtype), dz.imag.to(r_dtype))
+    dd = delta_vec_d(vec_d, vec_d_j)
+    Rmat = R(vec_d_j) if R_j is None else R_j
+    Rext = R_ext(Rmat)
+    w = iota(dz_T, dd)
+    qv = q(w, Rext, sigma_par, sigma_perp)
+    eta = rho(qv, q_max=q_max)
+    weight = (alpha_j * eta.to(alpha_j.dtype)).unsqueeze(-1)
+    T = (weight * T_hat_j).sum(dim=-2)
+
+    return T
+
+
+def Tau_dual(
+    z: torch.Tensor,
+    z_j: torch.Tensor,
+    vec_d: torch.Tensor,
+    vec_d_j: torch.Tensor,
+    T_hat_j: torch.Tensor,
+    alpha_j: torch.Tensor,
+    sigma_par: torch.Tensor,
+    sigma_perp: torch.Tensor,
+    k: torch.Tensor,
+    R_j: Optional[torch.Tensor] = None,
+) -> torch.Tensor:
+    if not (torch.is_complex(z) and torch.is_complex(vec_d)):
+        raise ValueError("Tau_dual: z, vec_d must be complex")
+    if z.dim() == 0 or z.shape[-1] < 2:
+        raise ValueError(f"Tau_dual: N must be >= 2, got {tuple(z.shape)}")
+    if k.dim() != 2 or k.shape[-1] != z.shape[-1]:
+        raise ValueError(f"Tau_dual: expected k as [K, N], got {tuple(k.shape)}")
+
+    device = z.device
+    c_dtype = z.dtype
+    r_dtype = z.real.dtype
+    N = z.shape[-1]
+    dz = lift(z) - lift(z_j)
+    dd = delta_vec_d(vec_d, vec_d_j)
+    Rmat = R(vec_d_j) if R_j is None else R_j
+    b = Rmat[..., :, 0]
+    sp = torch.as_tensor(sigma_par, device=device, dtype=r_dtype)
+    sq = torch.as_tensor(sigma_perp, device=device, dtype=r_dtype)
+    a = 1.0 / sq
+    c = (sp - sq) / (sp * sq + 0.0)
+    dd_norm2 = (dd.abs() ** 2).sum(dim=-1)
+    bh_dd = (torch.conj(b) * dd).sum(dim=-1)
+    q_ang = a * dd_norm2 - c * (bh_dd.abs() ** 2)
+    ang = torch.exp(-math.pi * q_ang)
+    k_r = k.to(device=device, dtype=r_dtype)
+    k_norm2 = (k_r**2).sum(dim=-1)
+    k_c = torch.complex(k_r, torch.zeros_like(k_r))
+    bh_k = (torch.conj(b)[..., None, :] * k_c.unsqueeze(0)).sum(dim=-1)
+    q_k_a = sq[..., None] * k_norm2[None, :]
+    q_k_b = (sp - sq)[..., None] * (bh_k.abs() ** 2)
+    q_k = q_k_a + q_k_b
+    w_k = torch.exp(-math.pi * q_k)
+    phase_arg = torch.einsum("...jn,kn->...jk", dz, k_r)
+    phase = torch.exp((2j * math.pi) * phase_arg.to(c_dtype))
+    dual_sum = (w_k.to(c_dtype) * phase).sum(dim=-1)
+    det_sqrt = torch.sqrt((sq ** (N - 1)) * sp)
+    eta = ang.to(c_dtype) * det_sqrt.to(c_dtype) * dual_sum
+    weight = (alpha_j.to(r_dtype)).unsqueeze(-1).to(c_dtype)
+    T = (weight * eta.unsqueeze(-1) * T_hat_j).sum(dim=-2)
+
+    return T
+
+
 def psi(
-    z: torch.Tensor,  # [..., N] complex
-    z_j: torch.Tensor,  # [..., N] complex
-    vec_d: torch.Tensor,  # [..., N] complex
-    vec_d_j: torch.Tensor,  # [..., N] complex
-    sigma_par: torch.Tensor,  # real, broadcastable
-    sigma_perp: torch.Tensor,  # real, broadcastable
-    periodization: CPSFPeriodization,  # CPSFPeriodization
+    z: torch.Tensor,
+    z_j: torch.Tensor,
+    vec_d: torch.Tensor,
+    vec_d_j: torch.Tensor,
+    sigma_par: torch.Tensor,
+    sigma_perp: torch.Tensor,
+    periodization: CPSFPeriodization,
     R_j: Optional[torch.Tensor] = None,
     q_max: Optional[float] = None,
 ) -> torch.Tensor:
