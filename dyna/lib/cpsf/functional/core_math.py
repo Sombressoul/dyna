@@ -895,6 +895,39 @@ def Tau_nearest(
     R_j: Optional[torch.Tensor] = None,
     q_max: Optional[float] = None,
 ) -> torch.Tensor:
+    """
+    Tau backend: nearest-image approximation.
+
+    What it does
+    ------------
+    - Computes CPSF contribution using only the nearest torus image.
+    - Wraps Re(dz) into [-0.5, 0.5) while leaving Im(dz) unchanged.
+    - Evaluates eta = rho(q(iota(dz_wrapped, dd))) and returns
+    T(z, vec_d) = sum_j (alpha_j * eta_j) * T_hat_j.
+
+    Where it is used
+    ----------------
+    - Narrow kernels (small sigma_*), far from fundamental-domain boundaries.
+    - Large N where enumerating many lattice images is infeasible.
+    - Router should select this when predicted tail beyond the nearest image
+    is negligible.
+
+    Why no runtime checks here
+    --------------------------
+    - All validations (shapes, dtypes, parameter sanity) are performed by the router.
+    - This function assumes canonical inputs.
+
+    Strengths
+    ---------
+    - O(M) cost; minimal memory; excellent throughput.
+    - Scales well to high N; zero tuning (no window or frequency set).
+
+    Weaknesses
+    ----------
+    - Approximate: ignores all non-nearest images; near boundaries or with
+    fat kernels this can bias the result.
+    - No intrinsic tail control (decision belongs to the router).
+    """
 
     r_dtype = z.real.dtype
     dz = lift(z) - lift(z_j)
@@ -924,6 +957,40 @@ def Tau_dual(
     k: torch.Tensor,
     R_j: Optional[torch.Tensor] = None,
 ) -> torch.Tensor:
+    """
+    Tau backend: dual (Poisson) summation over integer frequencies.
+
+    What it does
+    ------------
+    - Evaluates CPSF contribution in the reciprocal lattice.
+    - Uses frequencies k in Z^N (router supplies symmetric set, e.g. {0} U {+-k}).
+    - Computes angular factor exp(-pi * delta^H S0^{-1} delta), spectral weights
+    exp(-pi * k^H S0 k), and complex phase from dz.
+    - Takes real part of the spectral sum to obtain a real envelope eta.
+    - Returns T(z, vec_d) = sum_j (alpha_j * eta_j) * T_hat_j with real weight.
+
+    Where it is used
+    ----------------
+    - Fat kernels (large sigma_*): only a small number of harmonics matter.
+    - High-dimensional regimes: K stays small (often K ~ 1 or 1+2N for R=1).
+
+    Why no runtime checks here
+    --------------------------
+    - The router enforces k-shape [K, N], symmetry, truncation policy, and dtypes.
+    - This function focuses on fast vectorized evaluation.
+
+    Strengths
+    ---------
+    - Good scaling in N when sigma_* is large; compute and memory ~ O(M * K).
+    - No spatial combinatorial explosion; numerically stable.
+
+    Weaknesses
+    ----------
+    - Requires a frequency-set builder and truncation tolerance.
+    - For very narrow kernels K grows and this backend becomes inefficient
+    compared to nearest/classic.
+    - Non-symmetric k may produce tiny imaginary residue (we drop via .real).
+    """
 
     device = z.device
     c_dtype = z.dtype
@@ -971,6 +1038,54 @@ def psi_over_offsets(
     R_j: Optional[torch.Tensor] = None,
     q_max: Optional[float] = None,
 ) -> torch.Tensor:
+    """
+    Classic CPSF kernel over explicit lattice offsets.
+
+    What it does
+    ------------
+    - Computes the torus-periodized envelope per contributor j by summing
+    eta = rho(q(iota(dz + n, dd))) over the provided integer offsets n.
+    - Offsets are applied to the REAL part of dz only; Im(dz) is left unchanged.
+    - Broadcasts over contributors and offsets, returns the sum over offsets:
+    eta_sum_j with shape [..., M].
+
+    Where it is used
+    ----------------
+    - Core building block for the two classic backends:
+    T_classic_window (one-shot window) and T_classic_full (streaming shells).
+    - Neutral to the periodization policy: accepts any [O, N] batch of offsets.
+
+    Why no runtime checks here
+    --------------------------
+    - All shape/dtype/iterator validations are delegated to the router.
+    - This function assumes canonical inputs and focuses on fast vectorized math.
+
+    Inputs (shapes)
+    ---------------
+    - z:        [..., N] complex
+    - z_j:      [..., M, N] complex (or broadcastable to it)
+    - vec_d:    [..., N] complex
+    - vec_d_j:  [..., M, N] complex (or broadcastable)
+    - sigma_par, sigma_perp: real, broadcastable
+    - offsets:  [O, N] long (on the target device)
+    - R_j:      optional precomputed geometry (broadcastable to [..., M, N, 2])
+    - q_max:    optional scalar clamp for q before rho
+
+    Output
+    ------
+    - eta_sum_j: [..., M] (typically real; depends on rho implementation)
+
+    Strengths
+    ---------
+    - Fully vectorized over contributors and offsets (high throughput).
+    - Simple contract; re-usable across periodization strategies.
+
+    Weaknesses
+    ----------
+    - Temporarily materializes eta[..., M, O] before reduction over O.
+    Memory scales as O(M * O); prefer calling it from a streaming loop with
+    small shells/batches of offsets when O is large.
+    """
 
     device = z.device
     r_dtype = z.real.dtype
@@ -1004,6 +1119,37 @@ def T_classic_window(
     R_j: Optional[torch.Tensor] = None,
     q_max: Optional[float] = None,
 ) -> torch.Tensor:
+    """
+    Classic CPSF field via WINDOW periodization (single-batch offsets).
+
+    What it does
+    ------------
+    - Obtains exactly one batch of integer offsets [O, N] from offsets_iterator
+    (e.g. produced by CPSFPeriodization(kind=WINDOW)).
+    - Calls psi_over_offsets to sum eta over the window and aggregates
+    T(z, vec_d) = sum_j (alpha_j * eta_j) * T_hat_j.
+
+    Where it is used
+    ----------------
+    - Small-to-moderate N and window radius W so the full cube |n|_inf <= W
+    fits into one vectorized pass.
+
+    Why no runtime checks here
+    --------------------------
+    - Iterator discipline (exactly one batch) and input validations are handled
+    by the router; this function assumes canonical inputs.
+
+    Strengths
+    ---------
+    - One-shot execution; maximum vectorization; minimal Python overhead.
+    - Accurate for the provided window.
+
+    Weaknesses
+    ----------
+    - Peak memory ~ O(M * O) with O = (2W+1)^N due to temporary eta[..., M, O].
+    - Accuracy depends on W: tails outside the window are truncated.
+    Prefer FULL when you need robust tail control.
+    """
 
     N = z.shape[-1]
     device = z.device
@@ -1042,6 +1188,41 @@ def T_classic_full(
     tol_rel: Optional[float] = None,
     consecutive_below: int = 1,
 ) -> torch.Tensor:
+    """
+    Classic CPSF field via FULL periodization (streaming over shells).
+
+    What it does
+    ------------
+    - Streams successive infinity-norm shells ||n||_inf = W from offsets_iterator
+    (e.g. CPSFPeriodization(kind=FULL)).
+    - For each shell, computes and immediately reduces psi_over_offsets.
+    - Optionally applies early stopping via tol_abs / tol_rel when the shell
+    contribution becomes negligible.
+    - Returns accumulated T(z, vec_d).
+
+    Where it is used
+    ----------------
+    - Default robust classic backend when window size is unknown or large,
+    memory is tight, or evaluation is near torus boundaries.
+
+    Why no runtime checks here
+    --------------------------
+    - The router validates iterator semantics and parameters; this function
+    focuses on lean streaming accumulation.
+
+    Strengths
+    ---------
+    - No thick materialization: peak memory ~ O(M * O_W) for the current shell.
+    - Natural place for tolerance-based early stop; robust near boundaries.
+    - Works uniformly across configurations (safe fallback).
+
+    Weaknesses
+    ----------
+    - Runtime grows with the number of shells; in high dimensions shell size
+    grows roughly as (2W+1)^N - (2W-1)^N ~ O(W^(N-1)).
+    - Needs a meaningful tol_* or a finite max_radius to avoid oversumming.
+    """
+
     N = z.shape[-1]
     device = z.device
     c_dtype = z.dtype
