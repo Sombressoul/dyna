@@ -1,10 +1,6 @@
 from dyna.lib.cpsf import functional
 
-from dyna.lib.cpsf.context import (
-    CPSFContext,
-    CPSFGeometryCache,
-    CPSFDerivedCache,
-)
+from dyna.lib.cpsf.context import CPSFContext
 from dyna.lib.cpsf.contribution_store_facade import CPSFContributionStoreFacade
 from dyna.lib.cpsf.core import CPSFCore
 from dyna.lib.cpsf.periodization import CPSFPeriodization
@@ -30,8 +26,6 @@ __all__ = [
     "CPSFContributionStore",
     "CPSFContributionStoreFacade",
     "CPSFCore",
-    "CPSFDerivedCache",
-    "CPSFGeometryCache",
     "CPSFPeriodization",
     "CPSFModule",
 

@@ -9,18 +9,6 @@ from dyna.lib.cpsf.structures import (
 from dyna.lib.cpsf.periodization import CPSFPeriodization
 
 
-class CPSFGeometryCache:
-    """Cache by j: R_j, R_ext_j, Σ_j, L_j; invalidate by d, σ∥, σ⊥."""
-
-    pass
-
-
-class CPSFDerivedCache:
-    """Cache by j: v_j = α_j * t_hat_j; invalidate by α or t_hat."""
-
-    pass
-
-
 class CPSFContext:
     def __init__(
         self,
@@ -36,5 +24,3 @@ class CPSFContext:
         self.dtypes = dtypes
         self.exp_clip_q_max = exp_clip_q_max
         self.epoch: int = 0
-        self.geometry_cache = CPSFGeometryCache()
-        self.derived_cache = CPSFDerivedCache()
