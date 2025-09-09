@@ -5,7 +5,7 @@ from dataclasses import (
     field as dataclasses_field,
 )
 from enum import Enum, auto as enum_auto
-from typing import Sequence, Optional, Union, Literal
+from typing import Sequence, Optional, Union, Literal, Protocol, Iterator
 
 
 CPSFIndexLike = Union[torch.Tensor, Sequence[int]]
@@ -84,3 +84,11 @@ class CPSFDTypes:
     dtype_c: torch.dtype
     accum_dtype: torch.dtype
     device: torch.device
+
+
+class CPSFPsiOffsetsIterator(Protocol):
+    def __call__(
+        self, *, N: int, device: Union[str, torch.device]
+    ) -> Iterator[torch.Tensor]:
+        """Returns an iterator of offset batches [O, N] (LongTensor) on `device`."""
+        ...

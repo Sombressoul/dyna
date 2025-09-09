@@ -3,7 +3,7 @@ import math
 
 from typing import Optional, Union
 
-from dyna.lib.cpsf.periodization import CPSFPeriodization
+from dyna.lib.cpsf.structures import CPSFPsiOffsetsIterator
 
 
 def R(
@@ -895,10 +895,6 @@ def Tau_nearest(
     R_j: Optional[torch.Tensor] = None,
     q_max: Optional[float] = None,
 ) -> torch.Tensor:
-    if not (torch.is_complex(z) and torch.is_complex(vec_d)):
-        raise ValueError("Tau_nearest: z, vec_d must be complex")
-    if z.dim() == 0 or z.shape[-1] < 2:
-        raise ValueError(f"Tau_nearest: N must be >= 2, got {tuple(z.shape)}")
 
     r_dtype = z.real.dtype
     dz = lift(z) - lift(z_j)
@@ -928,12 +924,6 @@ def Tau_dual(
     k: torch.Tensor,
     R_j: Optional[torch.Tensor] = None,
 ) -> torch.Tensor:
-    if not (torch.is_complex(z) and torch.is_complex(vec_d)):
-        raise ValueError("Tau_dual: z, vec_d must be complex")
-    if z.dim() == 0 or z.shape[-1] < 2:
-        raise ValueError(f"Tau_dual: N must be >= 2, got {tuple(z.shape)}")
-    if k.dim() != 2 or k.shape[-1] != z.shape[-1]:
-        raise ValueError(f"Tau_dual: expected k as [K, N], got {tuple(k.shape)}")
 
     device = z.device
     c_dtype = z.dtype
@@ -961,24 +951,143 @@ def Tau_dual(
     w_k = torch.exp(-math.pi * q_k)
     phase_arg = torch.einsum("...jn,kn->...jk", dz, k_r)
     phase = torch.exp((2j * math.pi) * phase_arg.to(c_dtype))
-    dual_sum = (w_k.to(c_dtype) * phase).sum(dim=-1)
+    dual_sum = (w_k.to(c_dtype) * phase).sum(dim=-1).real
     det_sqrt = torch.sqrt((sq ** (N - 1)) * sp)
-    eta = ang.to(c_dtype) * det_sqrt.to(c_dtype) * dual_sum
-    weight = (alpha_j.to(r_dtype)).unsqueeze(-1).to(c_dtype)
-    T = (weight * eta.unsqueeze(-1) * T_hat_j).sum(dim=-2)
+    eta = ang * det_sqrt * dual_sum
+    weight = (alpha_j.to(r_dtype) * eta).unsqueeze(-1)
+    T = (weight.to(c_dtype) * T_hat_j).sum(dim=-2)
 
     return T
 
 
-def psi(
+def psi_over_offsets(
     z: torch.Tensor,
     z_j: torch.Tensor,
     vec_d: torch.Tensor,
     vec_d_j: torch.Tensor,
     sigma_par: torch.Tensor,
     sigma_perp: torch.Tensor,
-    periodization: CPSFPeriodization,
+    offsets: torch.Tensor,
     R_j: Optional[torch.Tensor] = None,
     q_max: Optional[float] = None,
 ) -> torch.Tensor:
-    raise NotImplementedError("TODO: psi")
+
+    device = z.device
+    r_dtype = z.real.dtype
+    dz = lift(z) - lift(z_j)
+    dd = delta_vec_d(vec_d, vec_d_j)
+    Rmat = R(vec_d_j) if R_j is None else R_j
+    Rext = R_ext(Rmat)
+    off_r = offsets.to(device=device, dtype=r_dtype)
+    dz_re = dz.real.unsqueeze(-2) + off_r.unsqueeze(-3)
+    dz_im = dz.imag.unsqueeze(-2)
+    dzb = torch.complex(dz_re, dz_im)
+    dd_b = dd.unsqueeze(-2)
+    w = iota(dzb, dd_b)
+    qv = q(w, Rext.unsqueeze(-3), sigma_par, sigma_perp)
+    eta = rho(qv, q_max=q_max)
+    eta_sum_j = eta.sum(dim=-1)
+
+    return eta_sum_j
+
+
+def T_classic_window(
+    z: torch.Tensor,
+    z_j: torch.Tensor,
+    vec_d: torch.Tensor,
+    vec_d_j: torch.Tensor,
+    T_hat_j: torch.Tensor,
+    alpha_j: torch.Tensor,
+    sigma_par: torch.Tensor,
+    sigma_perp: torch.Tensor,
+    offsets_iterator: CPSFPsiOffsetsIterator,
+    R_j: Optional[torch.Tensor] = None,
+    q_max: Optional[float] = None,
+) -> torch.Tensor:
+
+    N = z.shape[-1]
+    device = z.device
+    eta_sum_j = psi_over_offsets(
+        z=z,
+        z_j=z_j,
+        vec_d=vec_d,
+        vec_d_j=vec_d_j,
+        sigma_par=sigma_par,
+        sigma_perp=sigma_perp,
+        offsets=next(offsets_iterator(N=N, device=device)),
+        R_j=R_j,
+        q_max=q_max,
+    )
+    c_dtype = z.dtype
+    weight = (alpha_j.to(eta_sum_j.real.dtype) * eta_sum_j.real).to(c_dtype)
+    weight = weight.unsqueeze(-1)
+    T = (weight * T_hat_j.to(c_dtype)).sum(dim=-2)
+
+    return T
+
+
+def T_classic_full(
+    z: torch.Tensor,
+    z_j: torch.Tensor,
+    vec_d: torch.Tensor,
+    vec_d_j: torch.Tensor,
+    T_hat_j: torch.Tensor,
+    alpha_j: torch.Tensor,
+    sigma_par: torch.Tensor,
+    sigma_perp: torch.Tensor,
+    offsets_iterator: CPSFPsiOffsetsIterator,
+    R_j: Optional[torch.Tensor] = None,
+    q_max: Optional[float] = None,
+    tol_abs: Optional[float] = None,
+    tol_rel: Optional[float] = None,
+    consecutive_below: int = 1,
+) -> torch.Tensor:
+    N = z.shape[-1]
+    device = z.device
+    c_dtype = z.dtype
+    T_acc = torch.zeros_like(T_hat_j[..., 0, :].to(c_dtype))
+    below_count = 0
+    accum_norm = torch.tensor(0.0, device=device, dtype=z.real.dtype)
+
+    for offsets in offsets_iterator(N=N, device=device):
+        eta_sum_j = psi_over_offsets(
+            z=z,
+            z_j=z_j,
+            vec_d=vec_d,
+            vec_d_j=vec_d_j,
+            sigma_par=sigma_par,
+            sigma_perp=sigma_perp,
+            offsets=offsets,
+            R_j=R_j,
+            q_max=q_max,
+        )
+
+        weight_shell = (alpha_j.to(eta_sum_j.real.dtype) * eta_sum_j.real).to(c_dtype)
+        T_shell = (weight_shell.unsqueeze(-1) * T_hat_j.to(c_dtype)).sum(dim=-2)
+        T_acc = T_acc + T_shell
+
+        if tol_abs is None and tol_rel is None:
+            continue
+
+        shell_norm = T_shell.abs().max()
+        accum_norm = torch.maximum(accum_norm, T_acc.abs().max())
+        cond_abs = (tol_abs is not None) and (
+            shell_norm
+            <= torch.as_tensor(tol_abs, device=device, dtype=shell_norm.dtype)
+        )
+        cond_rel = (tol_rel is not None) and (
+            shell_norm
+            <= (
+                torch.as_tensor(tol_rel, device=device, dtype=shell_norm.dtype)
+                * (accum_norm + 1e-30)
+            )
+        )
+
+        if cond_abs or cond_rel:
+            below_count += 1
+        else:
+            below_count = 0
+        if below_count >= consecutive_below:
+            break
+
+    return T_acc

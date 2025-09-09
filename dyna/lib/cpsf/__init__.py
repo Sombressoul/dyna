@@ -28,6 +28,7 @@ from dyna.lib.cpsf.structures import (
     CPSFIndexLike,
     CPSFIntegrationPolicy,
     CPSFPeriodizationKind,
+    CPSFPsiOffsetsIterator,
 )
 
 __all__ = [
@@ -52,6 +53,7 @@ __all__ = [
     "CPSFIndexLike",
     "CPSFIntegrationPolicy",
     "CPSFPeriodizationKind",
+    "CPSFPsiOffsetsIterator",
 
     # Subcomponents.
     "functional",
