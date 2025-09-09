@@ -7,13 +7,6 @@ from dyna.lib.cpsf.context import (
 )
 from dyna.lib.cpsf.contribution_store_facade import CPSFContributionStoreFacade
 from dyna.lib.cpsf.core import CPSFCore
-from dyna.lib.cpsf.errors import (
-    UnitDirectionError,
-    InactiveIndexError,
-    NumericalError,
-    ZeroMaterializationError,
-    SnapshotViolationError,
-)
 from dyna.lib.cpsf.periodization import CPSFPeriodization
 from dyna.lib.cpsf.module import CPSFModule
 from dyna.lib.cpsf.contribution_store import CPSFContributionStore
@@ -57,11 +50,4 @@ __all__ = [
 
     # Subcomponents.
     "functional",
-
-    # Errors.
-    "UnitDirectionError",
-    "InactiveIndexError",
-    "NumericalError",
-    "ZeroMaterializationError",
-    "SnapshotViolationError",
 ]
