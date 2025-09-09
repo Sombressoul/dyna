@@ -1,8 +1,9 @@
 import torch
 
-from typing import Optional
+from typing import Optional, Union
 
 from dyna.lib.cpsf.context import CPSFContext
+from dyna.lib.cpsf.structures import CPSFPsiOffsetsIterator
 from dyna.lib.cpsf.functional.core_math import (
     # CPSF core math
     delta_vec_d,
@@ -13,8 +14,15 @@ from dyna.lib.cpsf.functional.core_math import (
     R,
     R_ext,
     Sigma,
+    # Field engine
+    psi_over_offsets,
+    T_classic_full,
+    T_classic_window,
+    Tau_nearest,
+    Tau_dual,
     # Math helpers
     cholesky_spd,
+    hermitianize,
 )
 
 
@@ -28,9 +36,19 @@ class CPSFCore:
     def R(
         self,
         vec_d: torch.Tensor,
+        kappa: float = 1.0e-3,
+        sigma: float = 1.0e-3,
+        jitter: float = 1.0e-6,
+        p: float = 2.0,
+        qmix: float = 2.0,
     ) -> torch.Tensor:
         return R(
             vec_d=vec_d,
+            kappa=kappa,
+            sigma=sigma,
+            jitter=jitter,
+            p=p,
+            qmix=qmix,
         )
 
     def R_ext(
@@ -103,51 +121,160 @@ class CPSFCore:
             q_max=self.ctx.exp_clip_q_max,
         )
 
-    def resolvent_delta_T_hat(
+    def hermitianize(
         self,
-        alpha_j: torch.Tensor,
-        v_j: torch.Tensor,
-        A: Optional[torch.Tensor] = None,
-        eps: float = 1.0e-6,
+        A: torch.Tensor,
     ) -> torch.Tensor:
-        dtype = v_j.dtype
-        device = v_j.device
+        return hermitianize(
+            A=A,
+        )
 
-        def _unsqueeze_to(alpha: torch.Tensor, target_ndim: int) -> torch.Tensor:
-            a = torch.as_tensor(alpha, dtype=dtype, device=device)
-            while a.dim() < target_ndim:
-                a = a.unsqueeze(-1)
-            return a
+    def cholesky_spd(
+        self,
+        A: torch.Tensor,
+        eps: Optional[Union[float, torch.Tensor]] = None,
+        use_jitter: bool = False,
+    ) -> torch.Tensor:
+        return cholesky_spd(
+            A=A,
+            eps=eps,
+            use_jitter=use_jitter,
+        )
 
-        if A is None:
-            a = _unsqueeze_to(alpha_j, v_j.dim())
-            denom = a + eps
-            return v_j / denom
+    def Tau_nearest(
+        self,
+        z: torch.Tensor,
+        z_j: torch.Tensor,
+        vec_d: torch.Tensor,
+        vec_d_j: torch.Tensor,
+        T_hat_j: torch.Tensor,
+        alpha_j: torch.Tensor,
+        sigma_par: torch.Tensor,
+        sigma_perp: torch.Tensor,
+        R_j: Optional[torch.Tensor] = None,
+        q_max: Optional[float] = None,
+    ) -> torch.Tensor:
+        return Tau_nearest(
+            z=z,
+            z_j=z_j,
+            vec_d=vec_d,
+            vec_d_j=vec_d_j,
+            T_hat_j=T_hat_j,
+            alpha_j=alpha_j,
+            sigma_par=sigma_par,
+            sigma_perp=sigma_perp,
+            R_j=R_j,
+            q_max=q_max,
+        )
 
-        if A.dim() < 2 or A.shape[-1] != A.shape[-2]:
-            raise ValueError(
-                f"resolvent_delta_T_hat: A must be [..., M, M], got {tuple(A.shape)}"
-            )
-        M = A.shape[-1]
-        if v_j.shape[-1] != M:
-            raise ValueError(
-                f"resolvent_delta_T_hat: trailing dim mismatch: v_j:[..., {v_j.shape[-1]}] vs A:[..., {M}, {M}]"
-            )
+    def Tau_dual(
+        self,
+        z: torch.Tensor,
+        z_j: torch.Tensor,
+        vec_d: torch.Tensor,
+        vec_d_j: torch.Tensor,
+        T_hat_j: torch.Tensor,
+        alpha_j: torch.Tensor,
+        sigma_par: torch.Tensor,
+        sigma_perp: torch.Tensor,
+        k: torch.Tensor,
+        R_j: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
+        return Tau_dual(
+            z=z,
+            z_j=z_j,
+            vec_d=vec_d,
+            vec_d_j=vec_d_j,
+            T_hat_j=T_hat_j,
+            alpha_j=alpha_j,
+            sigma_par=sigma_par,
+            sigma_perp=sigma_perp,
+            k=k,
+            R_j=R_j,
+        )
 
-        I = torch.eye(M, dtype=dtype, device=device).expand(*A.shape[:-2], M, M)
-        a_mm = _unsqueeze_to(alpha_j, A.dim())
-        eps_t = torch.as_tensor(eps, dtype=dtype, device=device)
-        K = a_mm * I + eps_t * A.to(dtype=dtype, device=device)
-        L = cholesky_spd(K, use_jitter=True)
+    def psi_over_offsets(
+        self,
+        z: torch.Tensor,
+        z_j: torch.Tensor,
+        vec_d: torch.Tensor,
+        vec_d_j: torch.Tensor,
+        sigma_par: torch.Tensor,
+        sigma_perp: torch.Tensor,
+        offsets: torch.Tensor,
+        R_j: Optional[torch.Tensor] = None,
+        q_max: Optional[float] = None,
+    ) -> torch.Tensor:
+        return psi_over_offsets(
+            z=z,
+            z_j=z_j,
+            vec_d=vec_d,
+            vec_d_j=vec_d_j,
+            sigma_par=sigma_par,
+            sigma_perp=sigma_perp,
+            offsets=offsets,
+            R_j=R_j,
+            q_max=q_max,
+        )
 
-        rhs = v_j.unsqueeze(-1)
-        if hasattr(torch.linalg, "solve_triangular"):
-            y = torch.linalg.solve_triangular(L, rhs, upper=False, left=True)
-            Lt = L.mH if torch.is_complex(L) else L.transpose(-2, -1)
-            x = torch.linalg.solve_triangular(Lt, y, upper=True, left=True)
-        else:
-            y = torch.triangular_solve(rhs, L, upper=False).solution
-            Lt = L.mH if torch.is_complex(L) else L.transpose(-2, -1)
-            x = torch.triangular_solve(y, Lt, upper=True).solution
+    def T_classic_window(
+        self,
+        z: torch.Tensor,
+        z_j: torch.Tensor,
+        vec_d: torch.Tensor,
+        vec_d_j: torch.Tensor,
+        T_hat_j: torch.Tensor,
+        alpha_j: torch.Tensor,
+        sigma_par: torch.Tensor,
+        sigma_perp: torch.Tensor,
+        offsets_iterator: CPSFPsiOffsetsIterator,
+        R_j: Optional[torch.Tensor] = None,
+        q_max: Optional[float] = None,
+    ) -> torch.Tensor:
+        return T_classic_window(
+            z=z,
+            z_j=z_j,
+            vec_d=vec_d,
+            vec_d_j=vec_d_j,
+            T_hat_j=T_hat_j,
+            alpha_j=alpha_j,
+            sigma_par=sigma_par,
+            sigma_perp=sigma_perp,
+            offsets_iterator=offsets_iterator,
+            R_j=R_j,
+            q_max=q_max,
+        )
 
-        return x.squeeze(-1)
+    def T_classic_full(
+        self,
+        z: torch.Tensor,
+        z_j: torch.Tensor,
+        vec_d: torch.Tensor,
+        vec_d_j: torch.Tensor,
+        T_hat_j: torch.Tensor,
+        alpha_j: torch.Tensor,
+        sigma_par: torch.Tensor,
+        sigma_perp: torch.Tensor,
+        offsets_iterator: CPSFPsiOffsetsIterator,
+        R_j: Optional[torch.Tensor] = None,
+        q_max: Optional[float] = None,
+        tol_abs: Optional[float] = None,
+        tol_rel: Optional[float] = None,
+        consecutive_below: int = 1,
+    ) -> torch.Tensor:
+        return T_classic_full(
+            z=z,
+            z_j=z_j,
+            vec_d=vec_d,
+            vec_d_j=vec_d_j,
+            T_hat_j=T_hat_j,
+            alpha_j=alpha_j,
+            sigma_par=sigma_par,
+            sigma_perp=sigma_perp,
+            offsets_iterator=offsets_iterator,
+            R_j=R_j,
+            q_max=q_max,
+            tol_abs=tol_abs,
+            tol_rel=tol_rel,
+            consecutive_below=consecutive_below,
+        )
