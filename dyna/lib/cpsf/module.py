@@ -4,18 +4,67 @@ from typing import Optional, Tuple
 
 from dyna.lib.cpsf.structures import (
     CPSFConsistency,
+    CPSFContributionField,
     CPSFContributionSet,
+    CPSFIndexLike,
     CPSFModuleReadFlags,
 )
-from dyna.lib.cpsf.contribution_store_facade import CPSFContributionStoreFacade
+from dyna.lib.cpsf.contribution_store import CPSFContributionStore
 
 
 class CPSFModule:
     def __init__(
         self,
-        store_facade: CPSFContributionStoreFacade,
+        store: CPSFContributionStore,
     ):
-        self.store_facade = store_facade
+        self.store = store
+
+    def _store_create(
+        self,
+        contribution_set: CPSFContributionSet,
+    ) -> None:
+        return self.store.create(
+            contribution_set=contribution_set,
+        )
+
+    def _store_read(
+        self,
+        idx: CPSFIndexLike,
+        fields: list[CPSFContributionField] = None,
+        active_buffer: bool = True,
+        active_overlay: bool = True,
+    ) -> CPSFContributionSet:
+        return self.store.read(
+            idx=idx,
+            fields=fields,
+            active_buffer=active_buffer,
+            active_overlay=active_overlay,
+        )
+
+    def _store_update(
+        self,
+        contribution_set: CPSFContributionSet,
+        fields: list[CPSFContributionField] = None,
+        preserve_grad: bool = True,
+    ) -> None:
+        return self.store.update(
+            contribution_set=contribution_set,
+            fields=fields,
+            preserve_grad=preserve_grad,
+        )
+
+    def _store_delete(
+        self,
+        idx: CPSFIndexLike,
+    ) -> None:
+        return self.store.delete(
+            idx=idx,
+        )
+
+    def _store_consolidate(
+        self,
+    ) -> bool:
+        return self.store.consolidate()
 
     def _resolve_read_flags(
         self,
@@ -70,7 +119,8 @@ class CPSFModule:
         active_buffer = storage_flags.active_buffer
         active_overlay = storage_flags.active_overlay
 
-        # TODO
+        # TODO: Implement CPSFRouter to route contributions between T-field reading
+        #       backends (T_classic_full, T_classic_window, Tau_dual and Tau_nearest).
 
         raise NotImplementedError("TODO")
 
@@ -84,7 +134,8 @@ class CPSFModule:
         active_buffer = storage_flags.active_buffer
         active_overlay = storage_flags.active_overlay
 
-        # TODO
+        # TODO: Find best match [z, vec_d] for target T_star in the field.
+        #       See "Semantic Inverse Projection".
 
         raise NotImplementedError("TODO")
 
@@ -101,7 +152,8 @@ class CPSFModule:
         active_buffer = storage_flags.active_buffer
         active_overlay = storage_flags.active_overlay
 
-        # TODO
+        # TODO: Project error back to contributions (see "Semantic Error Projection")
+        #       with controllable learning rate.
 
         raise NotImplementedError("TODO")
 
@@ -116,11 +168,14 @@ class CPSFModule:
         active_buffer = storage_flags.active_buffer
         active_overlay = storage_flags.active_overlay
 
-        # TODO
+        # TODO: Generate new contributions (see "Generative Recall") with limited
+        #       max deviation.
 
         raise NotImplementedError("TODO")
 
     def consolidate(
         self,
     ) -> bool:
-        return self.store_facade.consolidate()
+        # TODO: Any additional logic:
+        #       consolidation hooks, cache invalidation, etc.
+        return self._store_consolidate()

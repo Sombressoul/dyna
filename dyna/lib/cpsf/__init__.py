@@ -1,7 +1,6 @@
 from dyna.lib.cpsf import functional
 
 from dyna.lib.cpsf.contribution_store import CPSFContributionStore
-from dyna.lib.cpsf.contribution_store_facade import CPSFContributionStoreFacade
 from dyna.lib.cpsf.core import CPSFCore
 from dyna.lib.cpsf.periodization import CPSFPeriodization
 from dyna.lib.cpsf.module import CPSFModule
@@ -19,7 +18,6 @@ from dyna.lib.cpsf.structures import (
 __all__ = [
     # Main components.
     "CPSFContributionStore",
-    "CPSFContributionStoreFacade",
     "CPSFCore",
     "CPSFPeriodization",
     "CPSFModule",
