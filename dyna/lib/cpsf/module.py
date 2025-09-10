@@ -16,8 +16,21 @@ class CPSFModule:
     def __init__(
         self,
         store: CPSFContributionStore,
+        consistency: CPSFConsistency = CPSFConsistency.live,
     ):
+        # Guards
+        if not isinstance(consistency, CPSFConsistency):
+            raise ValueError(
+                f"CPSFModule: 'consistency' should be an instance of CPSFConsistency, got '{type(consistency)}'"
+            )
+        if not isinstance(store, CPSFContributionStore):
+            raise ValueError(
+                f"CPSFModule: 'store' should be an instance of CPSFContributionStore, got '{type(store)}'"
+            )
+
+        # Assign
         self.store = store
+        self.consistency = consistency
 
     def _store_create(
         self,
@@ -68,41 +81,40 @@ class CPSFModule:
 
     def _resolve_read_flags(
         self,
-        consistency: CPSFConsistency,
-        overrides: Optional[CPSFModuleReadFlags],
+        consistency_overrides: Optional[CPSFModuleReadFlags],
     ) -> CPSFModuleReadFlags:
-        if consistency == CPSFConsistency.snapshot:
+        if self.consistency == CPSFConsistency.snapshot:
             flags = CPSFModuleReadFlags(
                 active_buffer=False,
                 active_overlay=False,
             )
-        elif consistency == CPSFConsistency.live:
+        elif self.consistency == CPSFConsistency.live:
             flags = CPSFModuleReadFlags(
                 active_buffer=True,
                 active_overlay=True,
             )
         else:
-            raise ValueError(f"Unknown consistency: {consistency}")
+            raise ValueError(f"Unknown consistency: {self.consistency}")
 
-        if overrides is not None:
-            if not isinstance(overrides, CPSFModuleReadFlags):
+        if consistency_overrides is not None:
+            if not isinstance(consistency_overrides, CPSFModuleReadFlags):
                 raise TypeError(
                     "\n".join(
                         [
                             f"overrides must be CPSFModuleReadFlags.",
-                            f"Got {type(overrides)}",
+                            f"Got {type(consistency_overrides)}",
                         ]
                     )
                 )
 
             flags.active_buffer = (
-                overrides.active_buffer
-                if overrides.active_buffer is not None
+                consistency_overrides.active_buffer
+                if consistency_overrides.active_buffer is not None
                 else flags.active_buffer
             )
             flags.active_overlay = (
-                overrides.active_overlay
-                if overrides.active_overlay is not None
+                consistency_overrides.active_overlay
+                if consistency_overrides.active_overlay is not None
                 else flags.active_overlay
             )
 
@@ -112,10 +124,9 @@ class CPSFModule:
         self,
         z: torch.Tensor,
         d: torch.Tensor,
-        consistency: CPSFConsistency = CPSFConsistency.snapshot,
-        overrides: Optional[CPSFModuleReadFlags] = None,
+        consistency_overrides: Optional[CPSFModuleReadFlags] = None,
     ) -> torch.Tensor:
-        storage_flags = self._resolve_read_flags(consistency, overrides)
+        storage_flags = self._resolve_read_flags(consistency_overrides)
         active_buffer = storage_flags.active_buffer
         active_overlay = storage_flags.active_overlay
 
@@ -127,10 +138,9 @@ class CPSFModule:
     def find(
         self,
         T_star: torch.Tensor,
-        consistency: CPSFConsistency = CPSFConsistency.snapshot,
-        overrides: Optional[CPSFModuleReadFlags] = None,
+        consistency_overrides: Optional[CPSFModuleReadFlags] = None,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
-        storage_flags = self._resolve_read_flags(consistency, overrides)
+        storage_flags = self._resolve_read_flags(consistency_overrides)
         active_buffer = storage_flags.active_buffer
         active_overlay = storage_flags.active_overlay
 
@@ -145,10 +155,9 @@ class CPSFModule:
         d: torch.Tensor,
         T_star: torch.Tensor,
         learning_rate: float,
-        consistency: CPSFConsistency = CPSFConsistency.snapshot,
-        overrides: Optional[CPSFModuleReadFlags] = None,
+        consistency_overrides: Optional[CPSFModuleReadFlags] = None,
     ) -> None:
-        storage_flags = self._resolve_read_flags(consistency, overrides)
+        storage_flags = self._resolve_read_flags(consistency_overrides)
         active_buffer = storage_flags.active_buffer
         active_overlay = storage_flags.active_overlay
 
@@ -161,10 +170,9 @@ class CPSFModule:
         self,
         T_star: torch.Tensor,
         deviation_limit: float,
-        consistency: CPSFConsistency = CPSFConsistency.snapshot,
-        overrides: Optional[CPSFModuleReadFlags] = None,
+        consistency_overrides: Optional[CPSFModuleReadFlags] = None,
     ) -> CPSFContributionSet:
-        storage_flags = self._resolve_read_flags(consistency, overrides)
+        storage_flags = self._resolve_read_flags(consistency_overrides)
         active_buffer = storage_flags.active_buffer
         active_overlay = storage_flags.active_overlay
 
