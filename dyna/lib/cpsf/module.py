@@ -10,6 +10,7 @@ from dyna.lib.cpsf.structures import (
     CPSFModuleReadFlags,
 )
 from dyna.lib.cpsf.contribution_store import CPSFContributionStore
+from dyna.lib.cpsf.core import CPSFCore
 
 
 class CPSFModule:
@@ -29,8 +30,9 @@ class CPSFModule:
             )
 
         # Assign
-        self.store = store
+        self.core = CPSFCore()
         self.consistency = consistency
+        self.store = store
 
     def _store_create(
         self,
