@@ -15,6 +15,14 @@ class CPSFContributionStoreFacade:
     ):
         self.store = store
 
+    def create(
+        self,
+        contribution_set: CPSFContributionSet,
+    ) -> None:
+        return self.store.create(
+            contribution_set=contribution_set,
+        )
+
     def read(
         self,
         idx: CPSFIndexLike,

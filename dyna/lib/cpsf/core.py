@@ -26,11 +26,6 @@ from dyna.lib.cpsf.functional.core_math import (
 
 
 class CPSFCore:
-    def __init__(
-        self,
-    ):
-        pass
-
     def R(
         self,
         vec_d: torch.Tensor,

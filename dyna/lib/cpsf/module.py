@@ -1,9 +1,10 @@
 import torch
 
-from typing import Optional, Tuple, Union
+from typing import Optional, Tuple
 
 from dyna.lib.cpsf.structures import (
     CPSFConsistency,
+    CPSFContributionSet,
     CPSFModuleReadFlags,
 )
 from dyna.lib.cpsf.contribution_store_facade import CPSFContributionStoreFacade
@@ -64,8 +65,14 @@ class CPSFModule:
         d: torch.Tensor,
         consistency: CPSFConsistency = CPSFConsistency.snapshot,
         overrides: Optional[CPSFModuleReadFlags] = None,
-    ) -> Union[torch.Tensor, Tuple[torch.Tensor, dict]]:
-        raise NotImplementedError
+    ) -> torch.Tensor:
+        storage_flags = self._resolve_read_flags(consistency, overrides)
+        active_buffer = storage_flags.active_buffer
+        active_overlay = storage_flags.active_overlay
+
+        # TODO
+
+        raise NotImplementedError("TODO")
 
     def find(
         self,
@@ -73,23 +80,42 @@ class CPSFModule:
         consistency: CPSFConsistency = CPSFConsistency.snapshot,
         overrides: Optional[CPSFModuleReadFlags] = None,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
-        raise NotImplementedError
+        storage_flags = self._resolve_read_flags(consistency, overrides)
+        active_buffer = storage_flags.active_buffer
+        active_overlay = storage_flags.active_overlay
 
-    def project_error(
+        # TODO
+
+        raise NotImplementedError("TODO")
+
+    def project(
         self,
         z: torch.Tensor,
         d: torch.Tensor,
-        T_ref: torch.Tensor,
+        T_star: torch.Tensor,
+        learning_rate: float,
         consistency: CPSFConsistency = CPSFConsistency.snapshot,
         overrides: Optional[CPSFModuleReadFlags] = None,
-    ) -> Union[torch.Tensor, Tuple[torch.Tensor, dict]]:
-        raise NotImplementedError
+    ) -> None:
+        storage_flags = self._resolve_read_flags(consistency, overrides)
+        active_buffer = storage_flags.active_buffer
+        active_overlay = storage_flags.active_overlay
 
-    def generative_recall(
+        # TODO
+
+        raise NotImplementedError("TODO")
+
+    def generate(
         self,
         T_star: torch.Tensor,
-        delta: Optional[torch.Tensor] = None,
+        deviation_limit: float,
         consistency: CPSFConsistency = CPSFConsistency.snapshot,
         overrides: Optional[CPSFModuleReadFlags] = None,
-    ) -> torch.Tensor:
-        raise NotImplementedError
+    ) -> CPSFContributionSet:
+        storage_flags = self._resolve_read_flags(consistency, overrides)
+        active_buffer = storage_flags.active_buffer
+        active_overlay = storage_flags.active_overlay
+
+        # TODO
+
+        raise NotImplementedError("TODO")
