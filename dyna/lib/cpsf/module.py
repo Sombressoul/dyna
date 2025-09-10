@@ -119,3 +119,8 @@ class CPSFModule:
         # TODO
 
         raise NotImplementedError("TODO")
+
+    def consolidate(
+        self,
+    ) -> bool:
+        return self.store_facade.consolidate()
