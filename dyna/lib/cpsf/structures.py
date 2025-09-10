@@ -9,7 +9,6 @@ from typing import Sequence, Optional, Union, Literal, Protocol, Iterator
 
 
 CPSFIndexLike = Union[torch.Tensor, Sequence[int]]
-CPSFSelection = Union[slice, torch.LongTensor, list, tuple]
 
 
 class CPSFConsistency(Enum):
@@ -59,31 +58,9 @@ class CPSFContributionField(Enum):
     ALPHA = enum_auto()
 
 
-@dataclass
-class CPSFChunkPolicy:
-    J_tile: int
-    Q_tile: int
-    S_tile: Optional[int] = None
-
-
 class CPSFPeriodizationKind(Enum):
     FULL = enum_auto()
     WINDOW = enum_auto()
-
-
-@dataclass
-class CPSFIntegrationPolicy:
-    kind: Literal["quad", "mc", "strat"] = "quad"
-    samples: int = 0
-    seed: Optional[int] = None
-
-
-@dataclass
-class CPSFDTypes:
-    dtype_r: torch.dtype
-    dtype_c: torch.dtype
-    accum_dtype: torch.dtype
-    device: torch.device
 
 
 class CPSFPsiOffsetsIterator(Protocol):

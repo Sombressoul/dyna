@@ -5,7 +5,6 @@ from dyna.lib.cpsf.structures import (
     CPSFContributionSet,
     CPSFIndexLike,
 )
-from dyna.lib.cpsf.context import CPSFContext
 from dyna.lib.cpsf.contribution_store import CPSFContributionStore
 
 
@@ -13,10 +12,8 @@ class CPSFContributionStoreFacade:
     def __init__(
         self,
         store: CPSFContributionStore,
-        context: CPSFContext,
     ):
         self.store = store
-        self.ctx = context
 
     def read(
         self,
@@ -56,9 +53,3 @@ class CPSFContributionStoreFacade:
         self,
     ) -> bool:
         return self.store.consolidate()
-
-    def begin_snapshot(
-        self,
-    ) -> int:
-        self.ctx.epoch += 1
-        return self.ctx.epoch

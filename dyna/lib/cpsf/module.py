@@ -1,23 +1,19 @@
 import torch
 
-from typing import Optional, Dict, Any, Tuple, Union
+from typing import Optional, Tuple, Union
 
 from dyna.lib.cpsf.structures import (
     CPSFConsistency,
-    CPSFSelection,
     CPSFModuleReadFlags,
 )
-from dyna.lib.cpsf.context import CPSFContext
 from dyna.lib.cpsf.contribution_store_facade import CPSFContributionStoreFacade
 
 
 class CPSFModule:
     def __init__(
         self,
-        context: CPSFContext,
         store_facade: CPSFContributionStoreFacade,
     ):
-        self.ctx = context
         self.store_facade = store_facade
 
     def _resolve_read_flags(
@@ -62,14 +58,21 @@ class CPSFModule:
 
         return flags
 
-    def evaluate(
+    def read(
         self,
         z: torch.Tensor,
         d: torch.Tensor,
         consistency: CPSFConsistency = CPSFConsistency.snapshot,
         overrides: Optional[CPSFModuleReadFlags] = None,
-        return_report: bool = False,
     ) -> Union[torch.Tensor, Tuple[torch.Tensor, dict]]:
+        raise NotImplementedError
+
+    def find(
+        self,
+        T_star: torch.Tensor,
+        consistency: CPSFConsistency = CPSFConsistency.snapshot,
+        overrides: Optional[CPSFModuleReadFlags] = None,
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         raise NotImplementedError
 
     def project_error(
@@ -79,30 +82,7 @@ class CPSFModule:
         T_ref: torch.Tensor,
         consistency: CPSFConsistency = CPSFConsistency.snapshot,
         overrides: Optional[CPSFModuleReadFlags] = None,
-        return_report: bool = False,
     ) -> Union[torch.Tensor, Tuple[torch.Tensor, dict]]:
-        raise NotImplementedError
-
-    def semantic_update(
-        self,
-        selection: CPSFSelection,
-        z: torch.Tensor,
-        d: torch.Tensor,
-        T_ref: torch.Tensor,
-        apply: bool = False,
-        preserve_grad: bool = True,
-        consistency: CPSFConsistency = CPSFConsistency.snapshot,
-        overrides: Optional[CPSFModuleReadFlags] = None,
-        return_report: bool = False,
-    ) -> Union[Dict[str, torch.Tensor], Tuple[Dict[str, torch.Tensor], dict]]:
-        raise NotImplementedError
-
-    def inverse_project(
-        self,
-        T_star: torch.Tensor,
-        consistency: CPSFConsistency = CPSFConsistency.snapshot,
-        overrides: Optional[CPSFModuleReadFlags] = None,
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
         raise NotImplementedError
 
     def generative_recall(
@@ -112,13 +92,4 @@ class CPSFModule:
         consistency: CPSFConsistency = CPSFConsistency.snapshot,
         overrides: Optional[CPSFModuleReadFlags] = None,
     ) -> torch.Tensor:
-        raise NotImplementedError
-
-    def behavior_step(
-        self,
-        T_star: torch.Tensor,
-        delta: Optional[torch.Tensor] = None,
-        consistency: CPSFConsistency = CPSFConsistency.snapshot,
-        overrides: Optional[CPSFModuleReadFlags] = None,
-    ) -> Dict[str, Any]:
         raise NotImplementedError

@@ -2,7 +2,6 @@ import torch
 
 from typing import Optional, Union
 
-from dyna.lib.cpsf.context import CPSFContext
 from dyna.lib.cpsf.structures import CPSFPsiOffsetsIterator
 from dyna.lib.cpsf.functional.core_math import (
     # CPSF core math
@@ -29,9 +28,8 @@ from dyna.lib.cpsf.functional.core_math import (
 class CPSFCore:
     def __init__(
         self,
-        context: CPSFContext,
     ):
-        self.ctx = context
+        pass
 
     def R(
         self,
@@ -115,10 +113,11 @@ class CPSFCore:
     def rho(
         self,
         q: torch.Tensor,
+        q_max: Optional[Union[int, float, torch.Tensor]] = None,
     ) -> torch.Tensor:
         return rho(
             q=q,
-            q_max=self.ctx.exp_clip_q_max,
+            q_max=q_max,
         )
 
     def hermitianize(
