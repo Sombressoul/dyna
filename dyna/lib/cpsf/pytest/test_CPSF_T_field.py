@@ -890,20 +890,94 @@ def test_T05_dual_equals_classic_full(dtype, N, S):
         )
 
 
-# ===> T06 — Сходимость окна: T_classic_window → T_classic_full при росте радиуса/массива n
+# ===> T06 — window convergence: T_classic_window → T_classic_full as window grows
 @pytest.mark.parametrize("dtype", DTYPES)
 @pytest.mark.parametrize("N", NS)
 @pytest.mark.parametrize("S", S_VALS)
 def test_T06_window_converges_to_full(dtype, N, S):
-    """
-    Что проверяем:
-      - При расширении окна (по n ∈ Z^N) классическая сумма приближается к T_classic_full
-    Шаги:
-      - Запустить T_classic_window с увеличивающимися радиусами окна
-      - Оценить норму ошибки относительно T_classic_full — должна убывать
-      - Ссылка: абсолютная сходимость гауссовой периодизации (Appendix A, A.1–A.2)
-    """
-    pass
+    device = TARGET_DEVICE
+    rtol, atol = _get_tols(dtype)
+
+    if N > 4:
+        pytest.skip("T06 uses R_full<=5; skip for N>4 to keep cost reasonable.")
+
+    core = make_core()
+    store = make_store(N=N, S=S)
+    M = 8
+    add_random_contributions(store=store, M=M, N=N, S=S, dtype=dtype, device=device)
+
+    z_j, vec_d_j, T_hat_j, sigma_par, sigma_perp, alpha = _read_active_as_tensors(
+        store=store, dtype=dtype, device=device
+    )
+    assert z_j.shape == (M, N) and vec_d_j.shape == (M, N) and T_hat_j.shape == (M, S)
+
+    REAL = torch.float32 if dtype == torch.complex64 else torch.float64
+    z = (
+        torch.randn(N, dtype=REAL, device=device)
+        + 1j * torch.randn(N, dtype=REAL, device=device)
+    ).to(dtype)
+    vec_d_single = _rand_unit_vec(N, dtype, device)
+    vec_d = vec_d_single.unsqueeze(0).expand(M, N).contiguous()
+    R_full = 5
+    W_list = [1, 2, 3, 4, 5]
+    per_full = CPSFPeriodization(kind=CPSFPeriodizationKind.FULL, max_radius=R_full)
+    T_ref = core.T_classic_full(
+        z=z,
+        z_j=z_j,
+        vec_d=vec_d,
+        vec_d_j=vec_d_j,
+        T_hat_j=T_hat_j,
+        alpha_j=alpha,
+        sigma_par=sigma_par,
+        sigma_perp=sigma_perp,
+        offsets_iterator=per_full.iter_offsets,
+        R_j=None,
+        q_max=None,
+    )
+    assert T_ref.shape == (S,)
+    ref_mag = T_ref.abs().max().item()
+
+    jitter = rtol * ref_mag + atol
+    eps = torch.finfo(torch.float32 if dtype == torch.complex64 else torch.float64).eps
+    floor = max(jitter, eps)
+
+    errs = []
+    for W in W_list:
+        per_win = CPSFPeriodization(kind=CPSFPeriodizationKind.WINDOW, window=W)
+        T_win = core.T_classic_window(
+            z=z,
+            z_j=z_j,
+            vec_d=vec_d,
+            vec_d_j=vec_d_j,
+            T_hat_j=T_hat_j,
+            alpha_j=alpha,
+            sigma_par=sigma_par,
+            sigma_perp=sigma_perp,
+            offsets_iterator=per_win.iter_offsets,
+            R_j=None,
+            q_max=None,
+        )
+        assert T_win.shape == (S,)
+        errs.append((T_win - T_ref).abs().max().item())
+
+    for i in range(len(errs) - 1):
+        assert errs[i + 1] <= errs[i] + 5.0 * floor, (
+            f"Non-monotone window convergence: W={W_list[i]} err={errs[i]:.3e} "
+            f"→ W={W_list[i+1]} err={errs[i+1]:.3e}, floor={floor:.3e}"
+        )
+
+    assert errs[-1] <= 10.0 * floor, (
+        f"Final window W={W_list[-1]} not close enough to FULL (R={R_full}): "
+        f"err_end={errs[-1]:.3e}, floor={floor:.3e}"
+    )
+
+    if errs[0] > 20.0 * floor:
+        target = max(0.5 * errs[0], 10.0 * floor)
+        assert errs[-1] <= target, (
+            "Insufficient global improvement: "
+            f"err_start={errs[0]:.3e}, err_end={errs[-1]:.3e}, "
+            f"target<=max(0.5*start, 10*floor)={target:.3e}, floor={floor:.3e}"
+        )
 
 
 # ===> T07 — Точность Tau_nearest внутри «безопасной» области (большая Δq_min)
