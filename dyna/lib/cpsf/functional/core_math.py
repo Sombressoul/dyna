@@ -1016,7 +1016,7 @@ def Tau_dual(
     q_k_b = (sp - sq)[..., None] * (bh_k.abs() ** 2)
     q_k = q_k_a + q_k_b
     w_k = torch.exp(-math.pi * q_k)
-    phase_arg = torch.einsum("...jn,kn->...jk", dz, k_r)
+    phase_arg = torch.einsum("...jn,kn->...jk", dz.real, k_r)
     phase = torch.exp((2j * math.pi) * phase_arg.to(c_dtype))
     dual_sum = (w_k.to(c_dtype) * phase).sum(dim=-1).real
     det_sqrt = torch.sqrt((sq ** (N - 1)) * sp)
