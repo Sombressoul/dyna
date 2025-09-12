@@ -930,6 +930,7 @@ def Tau_nearest(
     """
 
     r_dtype = z.real.dtype
+    c_dtype = z.dtype
     dz = lift(z) - lift(z_j)
     dz_wrapped_re = torch.remainder(dz.real + 0.5, 1.0) - 0.5
     dz_T = torch.complex(dz_wrapped_re.to(r_dtype), dz.imag.to(r_dtype))
@@ -939,8 +940,8 @@ def Tau_nearest(
     w = iota(dz_T, dd)
     qv = q(w, Rext, sigma_par, sigma_perp)
     eta = rho(qv, q_max=q_max)
-    weight = (alpha_j * eta.to(alpha_j.dtype)).unsqueeze(-1)
-    T = (weight * T_hat_j).sum(dim=-2)
+    weight = (alpha_j.to(r_dtype) * eta).unsqueeze(-1)
+    T = (weight.to(c_dtype) * T_hat_j).sum(dim=-2)
 
     return T
 
