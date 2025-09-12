@@ -200,6 +200,8 @@ class CPSFPeriodization:
             def _multi_cartesian(rng: torch.Tensor, repeat: int) -> torch.Tensor:
                 if repeat <= 0:
                     return torch.zeros(1, 0, dtype=torch.long, device=dev)
+                if repeat == 1:
+                    return rng.view(-1, 1)
                 axes = [rng] * repeat
                 return torch.cartesian_prod(*axes)
 
@@ -212,15 +214,16 @@ class CPSFPeriodization:
                 Q = post.shape[0]
                 count = P * Q
 
-                if j > 0:
-                    left = pre.repeat_interleave(Q, dim=0)
-                else:
-                    left = torch.zeros(count, 0, dtype=torch.long, device=dev)
-
-                if N - j - 1 > 0:
-                    right = post.repeat(P, 1)
-                else:
-                    right = torch.zeros(count, 0, dtype=torch.long, device=dev)
+                left = (
+                    pre.repeat_interleave(Q, dim=0)
+                    if j > 0
+                    else torch.zeros(count, 0, dtype=torch.long, device=dev)
+                )
+                right = (
+                    post.repeat(P, 1)
+                    if (N - j - 1) > 0
+                    else torch.zeros(count, 0, dtype=torch.long, device=dev)
+                )
 
                 col_neg = torch.full((count, 1), -W, dtype=torch.long, device=dev)
                 col_pos = torch.full((count, 1), W, dtype=torch.long, device=dev)
