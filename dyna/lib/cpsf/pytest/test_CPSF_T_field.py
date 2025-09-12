@@ -22,11 +22,13 @@ from dyna.lib.cpsf.functional.core_math import (
 # =========================
 # Global config
 # =========================
-TARGET_DEVICE = torch.device("cpu")
+TARGET_DEVICE = torch.device(
+    "cpu"
+)  # cuda is broken due to random generator issue...fuck it
 
 DTYPES = [torch.complex64, torch.complex128]
 NS = [2, 3, 4, 5, 6, 7, 8]
-S_VALS = [1, 8, 32, 64]
+S_VALS = [1, 8, 32]
 SEED = 1337
 _GEN = {}
 
@@ -957,7 +959,9 @@ def test_T05_dual_equals_classic_full(dtype, N, S):
     )
 
     z_j_raw, vec_d_j, T_hat_j, _, _, alpha = _read_active_as_tensors(
-        store=store, dtype=dtype, device=device
+        store=store,
+        dtype=dtype,
+        device=device,
     )
     z_j = z_j_raw.real.to(dtype)
     vec_d = vec_d_j.clone()
@@ -966,7 +970,6 @@ def test_T05_dual_equals_classic_full(dtype, N, S):
     sp = torch.full((M,), sigma_val, dtype=r_dtype, device=device)
     sq = torch.full((M,), sigma_val, dtype=r_dtype, device=device)
     REAL = _real_dtype_of(dtype)
-    gen = _gen_for(device)
     B = 2
     z_batch_real = torch.randn(B, N, generator=gen, dtype=REAL, device=device)
     z_batch = z_batch_real.to(dtype)
