@@ -104,22 +104,30 @@ def _real_dtype_for_complex(cdtype: torch.dtype) -> torch.dtype:
 
 
 def _rand_unit_complex_matrix(
-    m: int, n: int, cdtype: torch.dtype, device: torch.device
+    m: int,
+    n: int,
+    cdtype: torch.dtype,
+    device: torch.device,
+    gen: torch.Generator,
 ) -> torch.Tensor:
     rdtype = _real_dtype_for_complex(cdtype)
-    x = torch.randn(m, n, dtype=rdtype, device=device)
-    y = torch.randn(m, n, dtype=rdtype, device=device)
+    x = torch.randn(m, n, dtype=rdtype, device=device, generator=gen)
+    y = torch.randn(m, n, dtype=rdtype, device=device, generator=gen)
     z = torch.complex(x, y).to(dtype=cdtype)
     norm = z.norm(dim=1, keepdim=True).clamp_min(1e-12)
     return z / norm
 
 
 def _rand_complex_matrix(
-    m: int, n: int, cdtype: torch.dtype, device: torch.device
+    m: int,
+    n: int,
+    cdtype: torch.dtype,
+    device: torch.device,
+    gen: torch.Generator,
 ) -> torch.Tensor:
     rdtype = _real_dtype_for_complex(cdtype)
-    x = torch.randn(m, n, dtype=rdtype, device=device)
-    y = torch.randn(m, n, dtype=rdtype, device=device)
+    x = torch.randn(m, n, dtype=rdtype, device=device, generator=gen)
+    y = torch.randn(m, n, dtype=rdtype, device=device, generator=gen)
     return torch.complex(x, y).to(dtype=cdtype)
 
 
@@ -130,14 +138,27 @@ def add_random_contributions(
     S: int,
     dtype: torch.dtype,
     device: torch.device,
+    gen: torch.Generator,
 ):
-    z = _rand_complex_matrix(M, N, dtype, device)
-    vec_d = _rand_unit_complex_matrix(M, N, dtype, device)
-    t_hat = _rand_complex_matrix(M, S, dtype, device)
+    z = _rand_complex_matrix(M, N, dtype, device, gen)
+    vec_d = _rand_unit_complex_matrix(M, N, dtype, device, gen)
+    t_hat = _rand_complex_matrix(M, S, dtype, device, gen)
     rdtype = store.target_dtype_r
-    sigma_par = 0.1 + 0.9 * torch.rand(M, 1, dtype=rdtype, device=device)
-    sigma_perp = 0.1 + 0.9 * torch.rand(M, 1, dtype=rdtype, device=device)
-    alpha = torch.rand(M, 1, dtype=rdtype, device=device)
+    sigma_par = 0.1 + 0.9 * torch.rand(
+        M,
+        1,
+        dtype=rdtype,
+        device=device,
+        generator=gen,
+    )
+    sigma_perp = 0.1 + 0.9 * torch.rand(
+        M,
+        1,
+        dtype=rdtype,
+        device=device,
+        generator=gen,
+    )
+    alpha = torch.rand(M, 1, dtype=rdtype, device=device, generator=gen)
     cs = CPSFContributionSet(
         idx=None,
         z=z,
@@ -190,11 +211,16 @@ def _k_zero(N: int, device: torch.device):
     return torch.zeros(1, N, dtype=torch.long, device=device)
 
 
-def _rand_unit_vec(N: int, dtype: torch.dtype, device: torch.device):
+def _rand_unit_vec(
+    N: int,
+    dtype: torch.dtype,
+    device: torch.device,
+    gen: torch.Generator,
+):
     REAL = torch.float32 if dtype == torch.complex64 else torch.float64
     v = (
-        torch.randn(N, dtype=REAL, device=device)
-        + 1j * torch.randn(N, dtype=REAL, device=device)
+        torch.randn(N, dtype=REAL, device=device, generator=gen)
+        + 1j * torch.randn(N, dtype=REAL, device=device, generator=gen)
     ).to(dtype)
     return v / (v.norm() + 1e-12)
 
@@ -215,6 +241,7 @@ def _real_dtype_of(cdtype: torch.dtype) -> torch.dtype:
 @pytest.mark.parametrize("S", S_VALS)
 def test_T01_shape_dtype_device_and_args(impl_name, impl_fn, dtype, N, S):
     device = TARGET_DEVICE
+    gen = _gen_for(device)
 
     # -------------------------------------------------------------------------
     # Positive path: minimal valid configuration
@@ -222,7 +249,15 @@ def test_T01_shape_dtype_device_and_args(impl_name, impl_fn, dtype, N, S):
     core = make_core()
     store = make_store(N=N, S=S)
     M = 1
-    add_random_contributions(store=store, M=M, N=N, S=S, dtype=dtype, device=device)
+    add_random_contributions(
+        store=store,
+        M=M,
+        N=N,
+        S=S,
+        dtype=dtype,
+        device=device,
+        gen=gen,
+    )
 
     z_j, vec_d_j, T_hat_j, sigma_par, sigma_perp, alpha = _read_active_as_tensors(
         store=store, dtype=dtype, device=device
@@ -232,10 +267,10 @@ def test_T01_shape_dtype_device_and_args(impl_name, impl_fn, dtype, N, S):
 
     REAL = torch.float32 if dtype == torch.complex64 else torch.float64
     z = (
-        torch.randn(N, dtype=REAL, device=device)
-        + 1j * torch.randn(N, dtype=REAL, device=device)
+        torch.randn(N, dtype=REAL, device=device, generator=gen)
+        + 1j * torch.randn(N, dtype=REAL, device=device, generator=gen)
     ).to(dtype)
-    vec_d_single = _rand_unit_vec(N, dtype, device)  # (N,)
+    vec_d_single = _rand_unit_vec(N, dtype, device, gen=gen)  # (N,)
     vec_d = vec_d_single.unsqueeze(0).expand(M, N).contiguous()  # (M, N)
 
     per_win_ok = CPSFPeriodization(kind=CPSFPeriodizationKind.WINDOW, window=1)
@@ -333,49 +368,94 @@ def test_T01_shape_dtype_device_and_args(impl_name, impl_fn, dtype, N, S):
     if impl_name in ("Tau_nearest", "T_classic_window", "T_classic_full"):
         if impl_name == "Tau_nearest":
             with pytest.raises((ValueError, RuntimeError)):
-                _ = _call_backend(z, vec_d, sigma_bad, sigma_perp)
-            with pytest.raises((ValueError, RuntimeError)):
-                _ = _call_backend(z, vec_d, sigma_par, sigma_bad)
-        elif impl_name == "T_classic_window":
-            with pytest.raises((ValueError, RuntimeError)):
                 _ = _call_backend(
-                    z, vec_d, sigma_bad, sigma_perp, per_iter=per_win_ok.iter_offsets
+                    z,
+                    vec_d,
+                    sigma_bad,
+                    sigma_perp,
                 )
             with pytest.raises((ValueError, RuntimeError)):
                 _ = _call_backend(
-                    z, vec_d, sigma_par, sigma_bad, per_iter=per_win_ok.iter_offsets
+                    z,
+                    vec_d,
+                    sigma_par,
+                    sigma_bad,
+                )
+        elif impl_name == "T_classic_window":
+            with pytest.raises((ValueError, RuntimeError)):
+                _ = _call_backend(
+                    z,
+                    vec_d,
+                    sigma_bad,
+                    sigma_perp,
+                    per_iter=per_win_ok.iter_offsets,
+                )
+            with pytest.raises((ValueError, RuntimeError)):
+                _ = _call_backend(
+                    z,
+                    vec_d,
+                    sigma_par,
+                    sigma_bad,
+                    per_iter=per_win_ok.iter_offsets,
                 )
         elif impl_name == "T_classic_full":
             with pytest.raises((ValueError, RuntimeError)):
                 _ = _call_backend(
-                    z, vec_d, sigma_bad, sigma_perp, per_iter=per_full_ok.iter_offsets
+                    z,
+                    vec_d,
+                    sigma_bad,
+                    sigma_perp,
+                    per_iter=per_full_ok.iter_offsets,
                 )
             with pytest.raises((ValueError, RuntimeError)):
                 _ = _call_backend(
-                    z, vec_d, sigma_par, sigma_bad, per_iter=per_full_ok.iter_offsets
+                    z,
+                    vec_d,
+                    sigma_par,
+                    sigma_bad,
+                    per_iter=per_full_ok.iter_offsets,
                 )
 
     vec_d_bad = vec_d_single.unsqueeze(0).expand(M + 1, N).contiguous()
     if impl_name == "Tau_nearest":
         with pytest.raises((ValueError, RuntimeError)):
-            _ = _call_backend(z, vec_d_bad, sigma_par, sigma_perp)
+            _ = _call_backend(
+                z,
+                vec_d_bad,
+                sigma_par,
+                sigma_perp,
+            )
     elif impl_name == "Tau_dual":
         with pytest.raises((ValueError, RuntimeError)):
-            _ = _call_backend(z, vec_d_bad, sigma_par, sigma_perp, k=k_ok)
+            _ = _call_backend(
+                z,
+                vec_d_bad,
+                sigma_par,
+                sigma_perp,
+                k=k_ok,
+            )
     elif impl_name == "T_classic_window":
         with pytest.raises((ValueError, RuntimeError)):
             _ = _call_backend(
-                z, vec_d_bad, sigma_par, sigma_perp, per_iter=per_win_ok.iter_offsets
+                z,
+                vec_d_bad,
+                sigma_par,
+                sigma_perp,
+                per_iter=per_win_ok.iter_offsets,
             )
     elif impl_name == "T_classic_full":
         with pytest.raises((ValueError, RuntimeError)):
             _ = _call_backend(
-                z, vec_d_bad, sigma_par, sigma_perp, per_iter=per_full_ok.iter_offsets
+                z,
+                vec_d_bad,
+                sigma_par,
+                sigma_perp,
+                per_iter=per_full_ok.iter_offsets,
             )
 
     z_bad = (
-        torch.randn(N + 1, dtype=REAL, device=device)
-        + 1j * torch.randn(N + 1, dtype=REAL, device=device)
+        torch.randn(N + 1, dtype=REAL, device=device, generator=gen)
+        + 1j * torch.randn(N + 1, dtype=REAL, device=device, generator=gen)
     ).to(dtype)
     if impl_name == "Tau_nearest":
         with pytest.raises((ValueError, RuntimeError)):
@@ -414,12 +494,21 @@ def test_T02_toroidality_in_z(impl_name, impl_fn, dtype, N, S):
         pytest.skip("T02 checks toroidality only for Tau_nearest / Tau_dual.")
 
     device = TARGET_DEVICE
+    gen = _gen_for(device)
     rtol, atol = _get_tols(dtype)
 
     core = make_core()
     store = make_store(N=N, S=S)
     M = 1
-    add_random_contributions(store=store, M=M, N=N, S=S, dtype=dtype, device=device)
+    add_random_contributions(
+        store=store,
+        M=M,
+        N=N,
+        S=S,
+        dtype=dtype,
+        device=device,
+        gen=gen,
+    )
 
     z_j, vec_d_j, T_hat_j, sigma_par, sigma_perp, alpha = _read_active_as_tensors(
         store=store, dtype=dtype, device=device
@@ -428,16 +517,23 @@ def test_T02_toroidality_in_z(impl_name, impl_fn, dtype, N, S):
 
     REAL = torch.float32 if dtype == torch.complex64 else torch.float64
     z = (
-        torch.randn(N, dtype=REAL, device=device)
-        + 1j * torch.randn(N, dtype=REAL, device=device)
+        torch.randn(N, dtype=REAL, device=device, generator=gen)
+        + 1j * torch.randn(N, dtype=REAL, device=device, generator=gen)
     ).to(dtype)
     v = (
-        torch.randn(N, dtype=REAL, device=device)
-        + 1j * torch.randn(N, dtype=REAL, device=device)
+        torch.randn(N, dtype=REAL, device=device, generator=gen)
+        + 1j * torch.randn(N, dtype=REAL, device=device, generator=gen)
     ).to(dtype)
     v = v / (v.norm() + 1e-12)
     vec_d = v.unsqueeze(0).expand(M, N).contiguous()
-    n_int = torch.randint(low=-1, high=2, size=(N,), device=device, dtype=torch.long)
+    n_int = torch.randint(
+        low=-1,
+        high=2,
+        size=(N,),
+        device=device,
+        dtype=torch.long,
+        generator=gen,
+    )
     n = n_int.to(dtype=REAL).to(dtype)
     z_shift = z + n
 
@@ -515,12 +611,21 @@ def test_T02_toroidality_in_z(impl_name, impl_fn, dtype, N, S):
 @pytest.mark.parametrize("S", S_VALS)
 def test_T03_linearity_in_hatT_and_alpha(impl_name, impl_fn, dtype, N, S):
     device = TARGET_DEVICE
+    gen = _gen_for(device)
     rtol, atol = _get_tols(dtype)
 
     core = make_core()
     store = make_store(N=N, S=S)
     M = 3
-    add_random_contributions(store=store, M=M, N=N, S=S, dtype=dtype, device=device)
+    add_random_contributions(
+        store=store,
+        M=M,
+        N=N,
+        S=S,
+        dtype=dtype,
+        device=device,
+        gen=gen,
+    )
 
     z_j, vec_d_j, T_hat_j_base, sigma_par, sigma_perp, alpha_base = (
         _read_active_as_tensors(store=store, dtype=dtype, device=device)
@@ -530,7 +635,6 @@ def test_T03_linearity_in_hatT_and_alpha(impl_name, impl_fn, dtype, N, S):
     )
 
     REAL = _real_dtype_of(dtype)
-    gen = _gen_for(device)
     z = (
         torch.randn(N, generator=gen, dtype=REAL, device=device)
         + 1j * torch.randn(N, generator=gen, dtype=REAL, device=device)
@@ -683,6 +787,7 @@ def test_T03_linearity_in_hatT_and_alpha(impl_name, impl_fn, dtype, N, S):
 @pytest.mark.parametrize("S", S_VALS)
 def test_T04_isotropic_limit_sigma_par_eq_sigma_perp(impl_name, impl_fn, dtype, N, S):
     device = TARGET_DEVICE
+    gen = _gen_for(device)
     rtol, atol = _get_tols(dtype)
 
     def _random_Q_perp(
@@ -702,13 +807,20 @@ def test_T04_isotropic_limit_sigma_par_eq_sigma_perp(impl_name, impl_fn, dtype, 
     core = make_core()
     store = make_store(N=N, S=S)
     M = 3
-    add_random_contributions(store=store, M=M, N=N, S=S, dtype=dtype, device=device)
+    add_random_contributions(
+        store=store,
+        M=M,
+        N=N,
+        S=S,
+        dtype=dtype,
+        device=device,
+        gen=gen,
+    )
     z_j, vec_d_j, T_hat_j, sigma_par, sigma_perp, alpha = _read_active_as_tensors(
         store=store, dtype=dtype, device=device
     )
     assert z_j.shape == (M, N) and vec_d_j.shape == (M, N)
 
-    gen = _gen_for(device)
     REAL = _real_dtype_of(dtype)
     z = (
         torch.randn(N, generator=gen, dtype=REAL, device=device)
@@ -820,6 +932,7 @@ def test_T04_isotropic_limit_sigma_par_eq_sigma_perp(impl_name, impl_fn, dtype, 
 @pytest.mark.parametrize("S", S_VALS)
 def test_T05_dual_equals_classic_full(dtype, N, S):
     device = TARGET_DEVICE
+    gen = _gen_for(device)
     rtol, atol = _get_tols(dtype)
 
     if N > 4:
@@ -833,7 +946,15 @@ def test_T05_dual_equals_classic_full(dtype, N, S):
     core = make_core()
     store = make_store(N=N, S=S)
     M = 8
-    add_random_contributions(store=store, M=M, N=N, S=S, dtype=dtype, device=device)
+    add_random_contributions(
+        store=store,
+        M=M,
+        N=N,
+        S=S,
+        dtype=dtype,
+        device=device,
+        gen=gen,
+    )
 
     z_j_raw, vec_d_j, T_hat_j, _, _, alpha = _read_active_as_tensors(
         store=store, dtype=dtype, device=device
@@ -896,6 +1017,7 @@ def test_T05_dual_equals_classic_full(dtype, N, S):
 @pytest.mark.parametrize("S", S_VALS)
 def test_T06_window_converges_to_full(dtype, N, S):
     device = TARGET_DEVICE
+    gen = _gen_for(device)
     rtol, atol = _get_tols(dtype)
 
     if N > 4:
@@ -904,7 +1026,15 @@ def test_T06_window_converges_to_full(dtype, N, S):
     core = make_core()
     store = make_store(N=N, S=S)
     M = 8
-    add_random_contributions(store=store, M=M, N=N, S=S, dtype=dtype, device=device)
+    add_random_contributions(
+        store=store,
+        M=M,
+        N=N,
+        S=S,
+        dtype=dtype,
+        device=device,
+        gen=gen,
+    )
 
     z_j, vec_d_j, T_hat_j, sigma_par, sigma_perp, alpha = _read_active_as_tensors(
         store=store, dtype=dtype, device=device
@@ -913,10 +1043,10 @@ def test_T06_window_converges_to_full(dtype, N, S):
 
     REAL = torch.float32 if dtype == torch.complex64 else torch.float64
     z = (
-        torch.randn(N, dtype=REAL, device=device)
-        + 1j * torch.randn(N, dtype=REAL, device=device)
+        torch.randn(N, dtype=REAL, device=device, generator=gen)
+        + 1j * torch.randn(N, dtype=REAL, device=device, generator=gen)
     ).to(dtype)
-    vec_d_single = _rand_unit_vec(N, dtype, device)
+    vec_d_single = _rand_unit_vec(N, dtype, device, gen=gen)
     vec_d = vec_d_single.unsqueeze(0).expand(M, N).contiguous()
     R_full = 5
     W_list = [1, 2, 3, 4, 5]
@@ -980,20 +1110,114 @@ def test_T06_window_converges_to_full(dtype, N, S):
         )
 
 
-# ===> T07 — Точность Tau_nearest внутри «безопасной» области (большая Δq_min)
+# ===> T07 — Nearest-image accuracy in the interior (large Δq_min)
 @pytest.mark.parametrize("dtype", DTYPES)
 @pytest.mark.parametrize("N", NS)
 @pytest.mark.parametrize("S", S_VALS)
 def test_T07_nearest_image_accuracy_interior(dtype, N, S):
-    """
-    Что проверяем:
-      - Tau_nearest ≈ T_classic_full, если Δq_min достаточно большой (экспоненциальная малость хвоста)
-    Шаги:
-      - Подобрать запросы (z, d) с большой Δq_min
-      - Сравнить Tau_nearest с T_classic_full
-      - Ссылка: оценка ошибки nearest-image (Appendix A, A.6)
-    """
-    pass
+    device = TARGET_DEVICE
+    gen = _gen_for(device)
+    rtol, atol = _get_tols(dtype)
+
+    if N > 5:
+        pytest.skip("T07 uses R_full<=7; skip for N>5 to keep cost reasonable.")
+
+    core = make_core()
+    store = make_store(N=N, S=S)
+
+    M = 1
+    add_random_contributions(
+        store=store,
+        M=M,
+        N=N,
+        S=S,
+        dtype=dtype,
+        device=device,
+        gen=gen,
+    )
+
+    z_j, vec_d_j, T_hat_j, sigma_par0, sigma_perp0, alpha = _read_active_as_tensors(
+        store=store,
+        dtype=dtype,
+        device=device,
+    )
+    assert z_j.shape == (M, N) and vec_d_j.shape == (M, N) and T_hat_j.shape == (M, S)
+
+    z = z_j.squeeze(0)
+    vec_d = vec_d_j.clone()
+    r_dtype = store.target_dtype_r
+    sigma_val = 0.05
+    sp = torch.full((M,), sigma_val, dtype=r_dtype, device=device)
+    sq = torch.full((M,), sigma_val, dtype=r_dtype, device=device)
+    R_full = 7
+    per_full = CPSFPeriodization(kind=CPSFPeriodizationKind.FULL, max_radius=R_full)
+    T_full = core.T_classic_full(
+        z=z,
+        z_j=z_j,
+        vec_d=vec_d,
+        vec_d_j=vec_d_j,
+        T_hat_j=T_hat_j,
+        alpha_j=alpha,
+        sigma_par=sp,
+        sigma_perp=sq,
+        offsets_iterator=per_full.iter_offsets,
+        R_j=None,
+        q_max=None,
+    )
+    assert T_full.shape == (S,)
+
+    T_zero = core.T_classic_full(
+        z=z,
+        z_j=z_j,
+        vec_d=vec_d,
+        vec_d_j=vec_d_j,
+        T_hat_j=T_hat_j,
+        alpha_j=alpha,
+        sigma_par=sp,
+        sigma_perp=sq,
+        offsets_iterator=_offsets_iterator_zero(),
+        R_j=None,
+        q_max=None,
+    )
+    assert T_zero.shape == (S,)
+
+    T_near = core.Tau_nearest(
+        z=z,
+        z_j=z_j,
+        vec_d=vec_d,
+        vec_d_j=vec_d_j,
+        T_hat_j=T_hat_j,
+        alpha_j=alpha,
+        sigma_par=sp,
+        sigma_perp=sq,
+        R_j=None,
+        q_max=None,
+    )
+    assert T_near.shape == (S,)
+
+    ref_mag = T_full.abs().max().item()
+    floor = rtol * ref_mag + atol
+
+    diff_near_zero = (T_near - T_zero).abs().max().item()
+    assert diff_near_zero <= 10.0 * floor, (
+        "Tau_nearest must equal the n=0 term in the interior regime: "
+        f"max|near - zero|={diff_near_zero:.3e}, floor={floor:.3e}, "
+        f"N={N}, S={S}, dtype={dtype}"
+    )
+
+    tail = (T_full - T_zero).abs().max().item()
+    diff_near_full = (T_near - T_full).abs().max().item()
+    assert diff_near_full <= tail + 10.0 * floor, (
+        "Nearest-image error must be bounded by the true tail magnitude: "
+        f"|near-full|={diff_near_full:.3e} vs tail={tail:.3e}, floor={floor:.3e}, "
+        f"N={N}, S={S}, dtype={dtype}"
+    )
+
+    size_factor = max(1.0, float(S))
+    assert tail <= 1e3 * floor * size_factor, (
+        "Tail should be small in the interior (large Δq_min): "
+        f"tail={tail:.3e}, floor={floor:.3e}, S={S}, dtype={dtype}"
+    )
 
 
 # ===> T08 — batch/broadcast: формы, батч-совместимость входов, согласование устройств
