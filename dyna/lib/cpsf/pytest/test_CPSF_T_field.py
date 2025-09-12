@@ -1223,85 +1223,202 @@ def test_T07_nearest_image_accuracy_interior(dtype, N, S):
     )
 
 
-# ===> T08 — batch/broadcast: формы, батч-совместимость входов, согласование устройств
-@pytest.mark.parametrize("impl_name,impl_fn", FIELD_IMPLS)
-@pytest.mark.parametrize("dtype", DTYPES)
+# ===> T08 — batch/broadcast: shapes, batch-compatibility, device agreement
+@pytest.mark.parametrize(
+    "impl_name,impl_fn", FIELD_IMPLS, ids=[n for n, _ in FIELD_IMPLS]
+)
+@pytest.mark.parametrize("dtype", DTYPES, ids=lambda d: str(d).split(".")[-1])
 @pytest.mark.parametrize("N", NS)
 @pytest.mark.parametrize("S", S_VALS)
 def test_T08_batch_and_broadcast_semantics(impl_name, impl_fn, dtype, N, S):
-    """
-    Что проверяем:
-      - Работа с батчами запросов (разные batch_shape), широковещание параметров вкладов
-      - Корректные выходные формы и согласование устройств при смешанных входах
-    Шаги:
-      - Сформировать несколько b_shape конфигураций
-      - Проверить, что выход имеет ожидаемую форму и dtype/device
-    """
-    pass
+    device = TARGET_DEVICE
+    gen = _gen_for(device)
+
+    def _real_dtype_of(cdtype: torch.dtype) -> torch.dtype:
+        return torch.float32 if cdtype == torch.complex64 else torch.float64
+
+    core = make_core()
+    store = make_store(N=N, S=S)
+    M = 7
+    add_random_contributions(
+        store=store, M=M, N=N, S=S, dtype=dtype, device=device, gen=gen
+    )
+
+    (
+        z_j_base,
+        vec_d_j_base,
+        T_hat_j_base,
+        sigma_par_base,
+        sigma_perp_base,
+        alpha_base,
+    ) = _read_active_as_tensors(store=store, dtype=dtype, device=device)
+    assert z_j_base.shape == (M, N)
+    assert vec_d_j_base.shape == (M, N)
+    assert T_hat_j_base.shape == (M, S)
+
+    REAL = _real_dtype_of(dtype)
+    v = (
+        torch.randn(N, dtype=REAL, device=device, generator=gen)
+        + 1j * torch.randn(N, dtype=REAL, device=device, generator=gen)
+    ).to(dtype)
+    v = v / (v.norm() + 1e-12)
+
+    BATCH_SHAPES = [(), (4,), (2, 3)]
+
+    def _call_backend(
+        z,
+        z_j,
+        vec_d,
+        vec_d_j,
+        T_hat_j,
+        alpha,
+        sigma_par,
+        sigma_perp,
+        *,
+        per_iter=None,
+        k=None,
+    ):
+        if impl_name == "Tau_nearest":
+            return core.Tau_nearest(
+                z=z,
+                z_j=z_j,
+                vec_d=vec_d,
+                vec_d_j=vec_d_j,
+                T_hat_j=T_hat_j,
+                alpha_j=alpha,
+                sigma_par=sigma_par,
+                sigma_perp=sigma_perp,
+                R_j=None,
+                q_max=None,
+            )
+        elif impl_name == "Tau_dual":
+            return core.Tau_dual(
+                z=z,
+                z_j=z_j,
+                vec_d=vec_d,
+                vec_d_j=vec_d_j,
+                T_hat_j=T_hat_j,
+                alpha_j=alpha,
+                sigma_par=sigma_par,
+                sigma_perp=sigma_perp,
+                k=k,
+                R_j=None,
+            )
+        elif impl_name == "T_classic_window":
+            return core.T_classic_window(
+                z=z,
+                z_j=z_j,
+                vec_d=vec_d,
+                vec_d_j=vec_d_j,
+                T_hat_j=T_hat_j,
+                alpha_j=alpha,
+                sigma_par=sigma_par,
+                sigma_perp=sigma_perp,
+                offsets_iterator=per_iter,
+                R_j=None,
+                q_max=None,
+            )
+        elif impl_name == "T_classic_full":
+            return core.T_classic_full(
+                z=z,
+                z_j=z_j,
+                vec_d=vec_d,
+                vec_d_j=vec_d_j,
+                T_hat_j=T_hat_j,
+                alpha_j=alpha,
+                sigma_par=sigma_par,
+                sigma_perp=sigma_perp,
+                offsets_iterator=per_iter,
+                R_j=None,
+                q_max=None,
+            )
+        else:
+            raise AssertionError(f"Unknown impl_name={impl_name}")
+
+    for bshape in BATCH_SHAPES:
+        if bshape == ():
+            z = (
+                torch.randn(N, dtype=REAL, device=device, generator=gen)
+                + 1j * torch.randn(N, dtype=REAL, device=device, generator=gen)
+            ).to(dtype)
+            z_j = z_j_base
+            vec_d_j = vec_d_j_base
+            vec_d = v.unsqueeze(0).expand(M, N).contiguous()
+            T_hat_j = T_hat_j_base
+            alpha = alpha_base
+            sp = sigma_par_base
+            sq = sigma_perp_base
+            expected = (S,)
+        else:
+            z_r = torch.randn(*bshape, 1, N, dtype=REAL, device=device, generator=gen)
+            z_i = torch.randn(*bshape, 1, N, dtype=REAL, device=device, generator=gen)
+            z = (z_r + 1j * z_i).to(dtype)
+
+            z_j = z_j_base.unsqueeze(0).expand(*bshape, M, N).contiguous()
+            vec_d_j = vec_d_j_base.unsqueeze(0).expand(*bshape, M, N).contiguous()
+            vec_d = (
+                v.view(*([1] * len(bshape)), 1, N).expand(*bshape, M, N).contiguous()
+            )
+            T_hat_j = T_hat_j_base.unsqueeze(0).expand(*bshape, M, S).contiguous()
+            alpha = alpha_base.unsqueeze(0).expand(*bshape, M).contiguous()
+            sp = sigma_par_base.unsqueeze(0).expand(*bshape, M).contiguous()
+            sq = sigma_perp_base.unsqueeze(0).expand(*bshape, M).contiguous()
+            expected = (*bshape, S)
+
+        if impl_name == "Tau_nearest":
+            T = _call_backend(z, z_j, vec_d, vec_d_j, T_hat_j, alpha, sp, sq)
+        elif impl_name == "Tau_dual":
+            k = _k_zero(N, device)
+            T = _call_backend(z, z_j, vec_d, vec_d_j, T_hat_j, alpha, sp, sq, k=k)
+        elif impl_name == "T_classic_window":
+            T = _call_backend(
+                z,
+                z_j,
+                vec_d,
+                vec_d_j,
+                T_hat_j,
+                alpha,
+                sp,
+                sq,
+                per_iter=_offsets_iterator_zero(),
+            )
+        elif impl_name == "T_classic_full":
+            T = _call_backend(
+                z,
+                z_j,
+                vec_d,
+                vec_d_j,
+                T_hat_j,
+                alpha,
+                sp,
+                sq,
+                per_iter=_offsets_iterator_zero(),
+            )
+
+        assert (
+            T.shape == expected
+        ), f"{impl_name}: for batch_shape={bshape}, expected {expected}, got {tuple(T.shape)}"
+        assert T.dtype == dtype, f"{impl_name}: expected dtype={dtype}, got {T.dtype}"
+        assert (
+            T.device.type == device.type
+        ), f"{impl_name}: expected device={device}, got {T.device}"
 
 
-# ===> T09 — CPU/GPU parity (опционально при наличии CUDA)
-@pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA not available")
-@pytest.mark.parametrize("impl_name,impl_fn", FIELD_IMPLS)
-@pytest.mark.parametrize("dtype", DTYPES)
-@pytest.mark.parametrize("N", [2, 8, 16])
-@pytest.mark.parametrize("S", [1, 8])
-def test_T09_device_propagation_and_cpu_gpu_parity(impl_name, impl_fn, dtype, N, S):
-    """
-    Что проверяем:
-      - Совпадение результатов CPU/GPU и корректную пропагацию устройств
-    Шаги:
-      - Дублировать данные на cpu/cuda, сравнить результаты
-    """
-    pass
-
-
-# ===> T10 — детерминизм при фиксированном SEED
-@pytest.mark.parametrize("impl_name,impl_fn", FIELD_IMPLS)
-@pytest.mark.parametrize("dtype", DTYPES)
-@pytest.mark.parametrize("N", NS)
-@pytest.mark.parametrize("S", S_VALS)
-def test_T10_determinism_with_fixed_seed(impl_name, impl_fn, dtype, N, S):
-    """
-    Что проверяем:
-      - Повторяемость результата при фиксированном SEED (для генерации вкладов/запросов)
-    Шаги:
-      - Дважды построить одинаковые входы при одинаковом SEED и сравнить результаты
-    """
-    pass
-
-
-# ===> T11 — согласованность чтения из CPSFContributionStore (snapshot/live/overlay, если применимо)
-@pytest.mark.parametrize("impl_name,impl_fn", FIELD_IMPLS)
-@pytest.mark.parametrize("dtype", DTYPES)
-@pytest.mark.parametrize("N", NS)
-@pytest.mark.parametrize("S", S_VALS)
-def test_T11_store_read_consistency_policies(impl_name, impl_fn, dtype, N, S):
-    """
-    Что проверяем:
-      - Что выбор политики чтения из хранилища (если поддерживается флагами) не ломает корректность T
-    Шаги:
-      - Заполнить store; читать через разные режимы (напр. snapshot vs live)
-      - Вызвать backend и убедиться в идентичности/ожидаемой эквивалентности результатов
-    """
-    pass
-
-
-# ===> T12 — численная устойчивость (экстремальные sigma^{||}, sigma^{⊥})
-@pytest.mark.parametrize("impl_name,impl_fn", FIELD_IMPLS)
-@pytest.mark.parametrize("dtype", DTYPES)
-@pytest.mark.parametrize("N", NS)
-@pytest.mark.parametrize("S", S_VALS)
-@pytest.mark.parametrize("scale", [1e-6, 1e-3, 1.0, 1e3, 1e6])
-def test_T12_numerical_stability_extreme_sigmas(impl_name, impl_fn, dtype, N, S, scale):
-    """
-    Что проверяем:
-      - Устойчивость при экстремальных масштабах затуханий
-    Шаги:
-      - Масштабировать (sigma_par, sigma_perp) общей константой 'scale'
-      - Сравнить разные реализации между собой и/или с эталонной (T_classic_full)
-    """
-    pass
+# # ===> T09 — численная устойчивость (экстремальные sigma^{||}, sigma^{⊥})
+# @pytest.mark.parametrize("impl_name,impl_fn", FIELD_IMPLS)
+# @pytest.mark.parametrize("dtype", DTYPES)
+# @pytest.mark.parametrize("N", NS)
+# @pytest.mark.parametrize("S", S_VALS)
+# @pytest.mark.parametrize("scale", [1e-6, 1e-3, 1.0, 1e3, 1e6])
+# def test_T09_numerical_stability_extreme_sigmas(impl_name, impl_fn, dtype, N, S, scale):
+#     """
+#     Что проверяем:
+#       - Устойчивость при экстремальных масштабах затуханий
+#     Шаги:
+#       - Масштабировать (sigma_par, sigma_perp) общей константой 'scale'
+#       - Сравнить разные реализации между собой и/или с эталонной (T_classic_full)
+#     """
+#     pass
 
 
 # =========================
