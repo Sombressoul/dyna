@@ -216,83 +216,105 @@ def _real_dtype_of(cdtype: torch.dtype) -> torch.dtype:
 def test_T01_shape_dtype_device_and_args(impl_name, impl_fn, dtype, N, S):
     device = TARGET_DEVICE
 
+    # -------------------------------------------------------------------------
+    # Positive path: minimal valid configuration
+    # -------------------------------------------------------------------------
     core = make_core()
     store = make_store(N=N, S=S)
     M = 1
     add_random_contributions(store=store, M=M, N=N, S=S, dtype=dtype, device=device)
 
     z_j, vec_d_j, T_hat_j, sigma_par, sigma_perp, alpha = _read_active_as_tensors(
-        store, dtype=dtype, device=device
+        store=store, dtype=dtype, device=device
     )
-    assert z_j.shape == (M, N) and T_hat_j.shape[-1] == S
+    assert z_j.shape == (M, N) and vec_d_j.shape == (M, N)
+    assert T_hat_j.shape == (M, S)
 
-    z = torch.randn(N, dtype=dtype, device=device) + 1j * torch.randn(
-        N, dtype=dtype, device=device
-    )
-    vec_d_single = _rand_unit_vec(N, dtype, device)
-    vec_d = vec_d_single.unsqueeze(0).expand(M, N).contiguous()
+    REAL = torch.float32 if dtype == torch.complex64 else torch.float64
+    z = (
+        torch.randn(N, dtype=REAL, device=device)
+        + 1j * torch.randn(N, dtype=REAL, device=device)
+    ).to(dtype)
+    vec_d_single = _rand_unit_vec(N, dtype, device)  # (N,)
+    vec_d = vec_d_single.unsqueeze(0).expand(M, N).contiguous()  # (M, N)
+
+    per_win_ok = CPSFPeriodization(kind=CPSFPeriodizationKind.WINDOW, window=1)
+    per_full_ok = CPSFPeriodization(kind=CPSFPeriodizationKind.FULL, max_radius=1)
+    k_ok = _k_zero(N, device)  # [1, N]
+
+    def _call_backend(z, vec_d, sigma_par, sigma_perp, *, per_iter=None, k=None):
+        if impl_name == "Tau_nearest":
+            return core.Tau_nearest(
+                z=z,
+                z_j=z_j,
+                vec_d=vec_d,
+                vec_d_j=vec_d_j,
+                T_hat_j=T_hat_j,
+                alpha_j=alpha,
+                sigma_par=sigma_par,
+                sigma_perp=sigma_perp,
+                R_j=None,
+                q_max=None,
+            )
+        elif impl_name == "Tau_dual":
+            assert k is not None, "Tau_dual requires k"
+            return core.Tau_dual(
+                z=z,
+                z_j=z_j,
+                vec_d=vec_d,
+                vec_d_j=vec_d_j,
+                T_hat_j=T_hat_j,
+                alpha_j=alpha,
+                sigma_par=sigma_par,
+                sigma_perp=sigma_perp,
+                k=k,
+                R_j=None,
+            )
+        elif impl_name == "T_classic_window":
+            assert per_iter is not None, "T_classic_window requires offsets_iterator"
+            return core.T_classic_window(
+                z=z,
+                z_j=z_j,
+                vec_d=vec_d,
+                vec_d_j=vec_d_j,
+                T_hat_j=T_hat_j,
+                alpha_j=alpha,
+                sigma_par=sigma_par,
+                sigma_perp=sigma_perp,
+                offsets_iterator=per_iter,
+                R_j=None,
+                q_max=None,
+            )
+        elif impl_name == "T_classic_full":
+            assert per_iter is not None, "T_classic_full requires offsets_iterator"
+            return core.T_classic_full(
+                z=z,
+                z_j=z_j,
+                vec_d=vec_d,
+                vec_d_j=vec_d_j,
+                T_hat_j=T_hat_j,
+                alpha_j=alpha,
+                sigma_par=sigma_par,
+                sigma_perp=sigma_perp,
+                offsets_iterator=per_iter,
+                R_j=None,
+                q_max=None,
+            )
+        else:
+            raise AssertionError(f"Unknown impl_name={impl_name}")
 
     if impl_name == "Tau_nearest":
-        T = core.Tau_nearest(
-            z=z,
-            z_j=z_j,
-            vec_d=vec_d,
-            vec_d_j=vec_d_j,
-            T_hat_j=T_hat_j,
-            alpha_j=alpha,
-            sigma_par=sigma_par,
-            sigma_perp=sigma_perp,
-            R_j=None,
-            q_max=None,
-        )
-
+        T = _call_backend(z, vec_d, sigma_par, sigma_perp)
     elif impl_name == "Tau_dual":
-        k = _k_zero(N, device)
-        T = core.Tau_dual(
-            z=z,
-            z_j=z_j,
-            vec_d=vec_d,
-            vec_d_j=vec_d_j,
-            T_hat_j=T_hat_j,
-            alpha_j=alpha,
-            sigma_par=sigma_par,
-            sigma_perp=sigma_perp,
-            k=k,
-            R_j=None,
-        )
-
+        T = _call_backend(z, vec_d, sigma_par, sigma_perp, k=k_ok)
     elif impl_name == "T_classic_window":
-        per = CPSFPeriodization(kind=CPSFPeriodizationKind.WINDOW, window=1)
-        T = core.T_classic_window(
-            z=z,
-            z_j=z_j,
-            vec_d=vec_d,
-            vec_d_j=vec_d_j,
-            T_hat_j=T_hat_j,
-            alpha_j=alpha,
-            sigma_par=sigma_par,
-            sigma_perp=sigma_perp,
-            offsets_iterator=per.iter_offsets,
-            R_j=None,
-            q_max=None,
+        T = _call_backend(
+            z, vec_d, sigma_par, sigma_perp, per_iter=per_win_ok.iter_offsets
         )
-
     elif impl_name == "T_classic_full":
-        per = CPSFPeriodization(kind=CPSFPeriodizationKind.FULL, max_radius=1)
-        T = core.T_classic_full(
-            z=z,
-            z_j=z_j,
-            vec_d=vec_d,
-            vec_d_j=vec_d_j,
-            T_hat_j=T_hat_j,
-            alpha_j=alpha,
-            sigma_par=sigma_par,
-            sigma_perp=sigma_perp,
-            offsets_iterator=per.iter_offsets,
-            R_j=None,
-            q_max=None,
+        T = _call_backend(
+            z, vec_d, sigma_par, sigma_perp, per_iter=per_full_ok.iter_offsets
         )
-
     else:
         raise AssertionError(f"Unknown impl_name={impl_name}")
 
@@ -300,7 +322,85 @@ def test_T01_shape_dtype_device_and_args(impl_name, impl_fn, dtype, N, S):
         S,
     ), f"{impl_name}: expected output shape (S,), got {tuple(T.shape)}"
     assert T.dtype == dtype, f"{impl_name}: expected dtype={dtype}, got {T.dtype}"
-    assert T.device.type == device.type, f"{impl_name}: expected device={device}, got {T.device}"
+    assert (
+        T.device.type == device.type
+    ), f"{impl_name}: expected device={device}, got {T.device}"
+
+    # -------------------------------------------------------------------------
+    # Negative cases: validation & shape guards (minimal violations)
+    # -------------------------------------------------------------------------
+    sigma_bad = torch.full_like(sigma_par, fill_value=-0.5)
+    if impl_name in ("Tau_nearest", "T_classic_window", "T_classic_full"):
+        if impl_name == "Tau_nearest":
+            with pytest.raises((ValueError, RuntimeError)):
+                _ = _call_backend(z, vec_d, sigma_bad, sigma_perp)
+            with pytest.raises((ValueError, RuntimeError)):
+                _ = _call_backend(z, vec_d, sigma_par, sigma_bad)
+        elif impl_name == "T_classic_window":
+            with pytest.raises((ValueError, RuntimeError)):
+                _ = _call_backend(
+                    z, vec_d, sigma_bad, sigma_perp, per_iter=per_win_ok.iter_offsets
+                )
+            with pytest.raises((ValueError, RuntimeError)):
+                _ = _call_backend(
+                    z, vec_d, sigma_par, sigma_bad, per_iter=per_win_ok.iter_offsets
+                )
+        elif impl_name == "T_classic_full":
+            with pytest.raises((ValueError, RuntimeError)):
+                _ = _call_backend(
+                    z, vec_d, sigma_bad, sigma_perp, per_iter=per_full_ok.iter_offsets
+                )
+            with pytest.raises((ValueError, RuntimeError)):
+                _ = _call_backend(
+                    z, vec_d, sigma_par, sigma_bad, per_iter=per_full_ok.iter_offsets
+                )
+
+    vec_d_bad = vec_d_single.unsqueeze(0).expand(M + 1, N).contiguous()
+    if impl_name == "Tau_nearest":
+        with pytest.raises((ValueError, RuntimeError)):
+            _ = _call_backend(z, vec_d_bad, sigma_par, sigma_perp)
+    elif impl_name == "Tau_dual":
+        with pytest.raises((ValueError, RuntimeError)):
+            _ = _call_backend(z, vec_d_bad, sigma_par, sigma_perp, k=k_ok)
+    elif impl_name == "T_classic_window":
+        with pytest.raises((ValueError, RuntimeError)):
+            _ = _call_backend(
+                z, vec_d_bad, sigma_par, sigma_perp, per_iter=per_win_ok.iter_offsets
+            )
+    elif impl_name == "T_classic_full":
+        with pytest.raises((ValueError, RuntimeError)):
+            _ = _call_backend(
+                z, vec_d_bad, sigma_par, sigma_perp, per_iter=per_full_ok.iter_offsets
+            )
+
+    z_bad = (
+        torch.randn(N + 1, dtype=REAL, device=device)
+        + 1j * torch.randn(N + 1, dtype=REAL, device=device)
+    ).to(dtype)
+    if impl_name == "Tau_nearest":
+        with pytest.raises((ValueError, RuntimeError)):
+            _ = _call_backend(z_bad, vec_d, sigma_par, sigma_perp)
+    elif impl_name == "Tau_dual":
+        with pytest.raises((ValueError, RuntimeError)):
+            _ = _call_backend(z_bad, vec_d, sigma_par, sigma_perp, k=k_ok)
+    elif impl_name == "T_classic_window":
+        with pytest.raises((ValueError, RuntimeError)):
+            _ = _call_backend(
+                z_bad, vec_d, sigma_par, sigma_perp, per_iter=per_win_ok.iter_offsets
+            )
+    elif impl_name == "T_classic_full":
+        with pytest.raises((ValueError, RuntimeError)):
+            _ = _call_backend(
+                z_bad, vec_d, sigma_par, sigma_perp, per_iter=per_full_ok.iter_offsets
+            )
+
+    if impl_name == "T_classic_window":
+        with pytest.raises((ValueError, RuntimeError)):
+            _ = CPSFPeriodization(kind=CPSFPeriodizationKind.WINDOW, window=0)
+    if impl_name == "Tau_dual":
+        k_bad = torch.zeros(3, N + 1, dtype=torch.long, device=device)
+        with pytest.raises((ValueError, RuntimeError)):
+            _ = _call_backend(z, vec_d, sigma_par, sigma_perp, k=k_bad)
 
 
 # ===> T02 — Validate toroidal invariance: T(z + n, d) == T(z, d) for n ∈ Z^N.
@@ -749,8 +849,8 @@ def test_T05_dual_equals_classic_full(dtype, N, S):
     B = 2
     z_batch_real = torch.randn(B, N, generator=gen, dtype=REAL, device=device)
     z_batch = z_batch_real.to(dtype)
-    per_full = CPSFPeriodization(kind=CPSFPeriodizationKind.FULL, max_radius=7)
-    k = _k_cube(K=7, N=N, device=device)
+    per_full = CPSFPeriodization(kind=CPSFPeriodizationKind.FULL, max_radius=8)
+    k = _k_cube(K=8, N=N, device=device)
 
     for b in range(B):
         z = z_batch[b]
