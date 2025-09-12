@@ -1099,7 +1099,12 @@ def psi_over_offsets(
     dzb = torch.complex(dz_re, dz_im)
     dd_b = dd.unsqueeze(-2).expand_as(dzb)
     w = iota(dzb, dd_b)
-    qv = q(w, Rext.unsqueeze(-3), sigma_par, sigma_perp)
+    qv = q(
+        w,
+        Rext.unsqueeze(-3),
+        sigma_par[..., None],
+        sigma_perp[..., None],
+    )
     eta = rho(qv, q_max=q_max)
     eta_sum_j = eta.sum(dim=-1)
 
