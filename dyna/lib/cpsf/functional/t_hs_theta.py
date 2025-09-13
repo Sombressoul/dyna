@@ -2,6 +2,9 @@ import math
 import torch
 
 
+from dyna.lib.cpsf.functional.core_math import delta_vec_d
+
+
 def T_HS_Theta(
     z,
     z_j,
@@ -109,18 +112,6 @@ def T_HS_Theta(
     one_over_sq = 1.0 / torch.clamp(sigma_perp, min=tiny)
     c_ang = (sigma_par - sigma_perp) / (torch.clamp(sigma_par * sigma_perp, min=tiny))
 
-    try:
-        from dyna.lib.cpsf.functional.core_math import delta_vec_d as _delta_vec_d  # type: ignore
-
-        use_delta = True
-    except Exception:
-        try:
-            from .core_math import delta_vec_d as _delta_vec_d  # type: ignore
-
-            use_delta = True
-        except Exception:
-            use_delta = False
-
     if device.type == "cuda":
         free_bytes, _ = torch.cuda.mem_get_info()
         target_bytes = int(
@@ -145,24 +136,20 @@ def T_HS_Theta(
         kappa_eff_c = kappa_eff[m0:m1]
         norm_fac_c = norm_fac[m0:m1]
 
-        den = (
-            _norm(vec_d_j[m0:m1], dim=-1, keepdim=True)
-            .to(r_dtype)
-            .clamp_min(torch.as_tensor(1e-20, device=device, dtype=r_dtype))
-        )
-        b = vec_d_j[m0:m1] / den.to(c_dtype)
+        inv_den = 1.0 / _norm(vec_d_j[m0:m1], dim=-1, keepdim=True).to(
+            r_dtype
+        ).clamp_min(tiny)
+        b = vec_d_j[m0:m1] * inv_den.to(c_dtype)
         bR = b.real.to(r_dtype)
         bI = b.imag.to(r_dtype)
         bR_eff = (kappa_eff_c.view(-1, 1) * bR).contiguous()
         bI_eff = (kappa_eff_c.view(-1, 1) * bI).contiguous()
         dz = _frac01((z.unsqueeze(1) - z_j_c.unsqueeze(0)).real.to(r_dtype))
-
-        if use_delta:
-            vdb = vec_d.unsqueeze(1).expand(B, mc, N)
-            vjj = vec_d_j[m0:m1].unsqueeze(0).expand(B, mc, N)
-            dd = _delta_vec_d(vdb, vjj)
-        else:
-            dd = vec_d.unsqueeze(1) - vec_d_j[m0:m1].unsqueeze(0)
+        dd = delta_vec_d(
+            vec_d=vec_d.unsqueeze(1).expand(B, mc, N),
+            vec_d_j=vec_d_j[m0:m1].unsqueeze(0).expand(B, mc, N),
+            eps=tiny,
+        )
         dd_norm2 = (dd.abs() ** 2).sum(dim=-1).to(r_dtype)
         bh_dd = (torch.conj(b).unsqueeze(0) * dd).sum(dim=-1)
         q_ang = one_over_sq[m0:m1].unsqueeze(0) * dd_norm2 - c_ang[m0:m1].unsqueeze(
@@ -201,7 +188,8 @@ def T_HS_Theta(
         per_elem_bufs = 2
         ns_cap_den = max(1, B * mc * qc_full)
         ns_cap = max(
-            1, int(target_bytes // (bytes_per_elem * per_elem_bufs * ns_cap_den))
+            1,
+            int(target_bytes // (bytes_per_elem * per_elem_bufs * ns_cap_den)),
         )
         step_ns = min(n_chunk, max(1, ns_cap))
 
