@@ -31,11 +31,11 @@ def T_HS_Theta(
     def _norm(x, dim=-1, keepdim=False):
         return torch.linalg.vector_norm(x, dim=dim, keepdim=keepdim)
 
-    # ---- 2D GH cache (flat nodes + log-weights) ----
-    if not hasattr(T_HS_Theta, "_gh_cache"):
-        T_HS_Theta._gh_cache = {}
+    # ---- 1D GH cache (nodes + log-weights) ----
+    if not hasattr(T_HS_Theta, "_gh1d_cache"):
+        T_HS_Theta._gh1d_cache = {}
     gh_key = (device.type, getattr(device, "index", -1), str(r_dtype), int(quad_nodes))
-    cached = T_HS_Theta._gh_cache.get(gh_key)
+    cached = T_HS_Theta._gh1d_cache.get(gh_key)
     if cached is None:
         Q = quad_nodes
         if Q < 1:
@@ -47,18 +47,13 @@ def T_HS_Theta(
         J.diagonal(-1).copy_(off)
         tau, V = torch.linalg.eigh(J)                            # (Q,)
         w = (math.sqrt(math.pi) * (V[0, :] ** 2)).to(r_dtype)    # (Q,)
-        t1_flat = tau.view(-1, 1).expand(-1, Q).reshape(-1)      # (Q^2,)
-        t2_flat = tau.view(1, -1).expand(Q, -1).reshape(-1)
-        logw2_flat = (
-            torch.log(torch.clamp(w, min=tiny)).view(-1, 1)
-            + torch.log(torch.clamp(w, min=tiny)).view(1, -1)
-        ).reshape(-1)
-        T_HS_Theta._gh_cache[gh_key] = (t1_flat, t2_flat, logw2_flat)
-        t1_flat, t2_flat, logw2_flat = T_HS_Theta._gh_cache[gh_key]
+        logw_1d = torch.log(torch.clamp(w, min=tiny))            # (Q,)
+        T_HS_Theta._gh1d_cache[gh_key] = (tau, logw_1d)
+        tau_1d, logw_1d = tau, logw_1d
     else:
-        t1_flat, t2_flat, logw2_flat = cached
+        tau_1d, logw_1d = cached
         Q = quad_nodes
-    qc_full = t1_flat.numel()
+    qc_full = Q * Q
 
     # ---- shapes / casts ----
     B, N = z.shape[-2], z.shape[-1]
@@ -118,7 +113,7 @@ def T_HS_Theta(
         mc = m1 - m0
 
         z_j_c     = z_j[m0:m1]
-        a_c       = a_j[m0:m1]                     # (mc,)
+        a_c       = a_j[m0:m1]
         alpha_c   = alpha_j[m0:m1]
         T_hat_c   = T_hat_j[m0:m1]
         Kp_c_det  = Kp_j[m0:m1]
@@ -172,12 +167,7 @@ def T_HS_Theta(
         A_lse = torch.full((B, mc), -float("inf"), device=device, dtype=r_dtype)
         S_lse = torch.zeros((B, mc), device=device, dtype=r_dtype)
 
-        # one-shot q arrays
-        t1c = t1_flat.to(r_dtype)          # (qc,)
-        t2c = t2_flat.to(r_dtype)
-        lwc3 = logw2_flat.to(r_dtype).view(1, 1, -1)  # (1,1,qc)
-
-        # choose ns_sub (2 buffers B,mc,ns,qc)
+        # choose ns_sub budget
         per_elem_bufs = 2
         ns_cap_den = max(1, B * mc * qc_full)
         ns_cap = max(1, int(target_bytes // (bytes_per_elem * per_elem_bufs * ns_cap_den)))
@@ -190,92 +180,125 @@ def T_HS_Theta(
             n1 = min(n0 + step_ns, N)
             ns = n1 - n0
 
-            # ---- trig-split (A′): cos(A-B)=cosA*cosB+sinA*sinB ----
-            # A = 2π Δz  : (B,mc,ns)
-            Aphase = TWO_PI * dz[:, :, n0:n1]                  # (B,mc,ns)
+            # A = 2π Δz : (B,mc,ns)
+            Aphase = TWO_PI * dz[:, :, n0:n1]
             cA = torch.cos(Aphase)
             sA = torch.sin(Aphase)
 
-            # B = 2π * shift, shift = t1*bR_eff + t2*bI_eff : (mc,ns,qc)
-            sR = bR_eff[:, n0:n1].unsqueeze(-1) * t1c.view(1, 1, -1)   # (mc,ns,qc)
-            sI = bI_eff[:, n0:n1].unsqueeze(-1) * t2c.view(1, 1, -1)
-            Bphase = TWO_PI * (sR + sI)                                 # (mc,ns,qc)
-            cB = torch.cos(Bphase)
-            sB = torch.sin(Bphase)
+            # φ = 2π * t1 * bR_eff[:,ns], ψ = 2π * t2 * bI_eff[:,ns]
+            phi = TWO_PI * (bR_eff[:, n0:n1].unsqueeze(-1) * tau_1d.view(1, 1, -1))  # (mc,ns,Q)
+            psi = TWO_PI * (bI_eff[:, n0:n1].unsqueeze(-1) * tau_1d.view(1, 1, -1))  # (mc,ns,Q)
+            cphi = torch.cos(phi)
+            sphi = torch.sin(phi)
+            cpsi = torch.cos(psi)
+            spsi = torch.sin(psi)
 
-            # x = cos(theta) = cosA*cosB + sinA*sinB  → (B,mc,ns,qc)
-            x = (cA.unsqueeze(-1) * cB.unsqueeze(0) + sA.unsqueeze(-1) * sB.unsqueeze(0)).to(r_dtype)
+            # q-tiling in 2D (q1 × q2)
+            denom = max(1, B * mc * ns)
+            q_cap = max(1, int(target_bytes // (bytes_per_elem * per_elem_bufs * denom)))
+            base = max(1, int(math.sqrt(q_cap)))
+            q1_step = max(1, min(Q, base))
+            q2_step = max(1, min(Q, max(1, q_cap // q1_step)))
 
-            # ========= process K-buckets (Chebyshev for K<=4, else Clenshaw) =========
-            for g in range(num_groups):
-                Kval = int(Kvals[g].item())
-                s = int(starts[g].item())
-                e = s + int(counts[g].item())
-                xg = x[:, s:e, :ns, :]                              # (B,m_g,ns,qc)
+            # ======================= (q1,q2)-tiles =======================
+            for i0 in range(0, Q, q1_step):
+                i1 = min(i0 + q1_step, Q)
+                q1 = i1 - i0
 
-                if Kval == 0:
-                    part = (ns * log_inv_sqrt_a[s:e].view(1, e - s, 1)).expand(B, e - s, qc_full)
+                cphi_i = cphi[:, :, i0:i1]     # (mc,ns,q1)
+                sphi_i = sphi[:, :, i0:i1]
+                logw_i = logw_1d[i0:i1]        # (q1,)
 
-                elif Kval <= 4:
-                    inv_a = 1.0 / torch.clamp(a_c[s:e], min=tiny)   # (m_g,)
-                    c1  = torch.exp((-PI * 1.0) * inv_a).view(1, e - s, 1, 1)
-                    if Kval >= 2:
-                        r1  = torch.exp((-3.0 * PI) * inv_a).view(1, e - s, 1, 1)
-                        c2  = c1 * r1
-                    if Kval >= 3:
-                        rho = torch.exp((-2.0 * PI) * inv_a).view(1, e - s, 1, 1)
-                        r2  = r1 * rho
-                        c3  = c2 * r2
-                    if Kval == 4:
-                        r3  = r2 * rho
-                        c4  = c3 * r3
+                for j0 in range(0, Q, q2_step):
+                    j1 = min(j0 + q2_step, Q)
+                    q2 = j1 - j0
 
-                    T1 = xg
-                    x2 = xg * xg
-                    T2 = 2.0 * x2 - 1.0
-                    T3 = 4.0 * x2 * xg - 3.0 * xg
-                    T4 = 8.0 * x2 * x2 - 8.0 * x2 + 1.0
+                    cpsi_j = cpsi[:, :, j0:j1] # (mc,ns,q2)
+                    spsi_j = spsi[:, :, j0:j1]
+                    logw_j = logw_1d[j0:j1]    # (q2,)
 
-                    S = c1 * T1
-                    if Kval >= 2: S = S + c2 * T2
-                    if Kval >= 3: S = S + c3 * T3
-                    if Kval == 4: S = S + c4 * T4
+                    # FIX: use unsqueeze(-2) so shapes broadcast as (mc,ns,q1,1)*(mc,ns,1,q2)
+                    cB = cphi_i.unsqueeze(-1) * cpsi_j.unsqueeze(-2) - sphi_i.unsqueeze(-1) * spsi_j.unsqueeze(-2)
+                    sB = sphi_i.unsqueeze(-1) * cpsi_j.unsqueeze(-2) + cphi_i.unsqueeze(-1) * spsi_j.unsqueeze(-2)
 
-                    sum_expr = torch.log1p(torch.clamp(2.0 * S, min=-1.0 + tiny))
-                    part = sum_expr.sum(dim=2) + (ns * log_inv_sqrt_a[s:e].view(1, e - s, 1))
+                    # x = cos(A - B) = cosA*cosB + sinA*sinB  → (B,mc,ns,q1,q2)
+                    x_block = (cA.unsqueeze(-1).unsqueeze(-1) * cB.unsqueeze(0)
+                               + sA.unsqueeze(-1).unsqueeze(-1) * sB.unsqueeze(0)).to(r_dtype)
 
-                else:
-                    inv_a = 1.0 / torch.clamp(a_c[s:e], min=tiny)             # (m_g,)
-                    Kf = float(Kval)
-                    cK  = torch.exp((-PI * (Kf * Kf)) * inv_a).view(1, e - s, 1, 1)
-                    rKm1= torch.exp((-(2.0 * Kf - 1.0) * PI) * inv_a).view(1, e - s, 1, 1)
-                    rho = torch.exp(( -2.0 * PI) * inv_a).view(1, e - s, 1, 1)
+                    # flatten q1×q2 → ql
+                    x_flat = x_block.reshape(B, mc, ns, q1 * q2)  # (B,mc,ns,ql)
+                    lw_blk = (logw_i.view(1, 1, q1, 1) + logw_j.view(1, 1, 1, q2)).reshape(1, 1, q1 * q2)
 
-                    b1 = torch.zeros_like(xg, dtype=r_dtype)
-                    b2 = torch.zeros_like(xg, dtype=r_dtype)
-                    c = cK.clone()
-                    r = rKm1.clone()
+                    # ========= process K-buckets (Chebyshev for K<=4, else Clenshaw) =========
+                    for g in range(num_groups):
+                        Kval = int(Kvals[g].item())
+                        s = int(starts[g].item())
+                        e = s + int(counts[g].item())
+                        xg = x_flat[:, s:e, :ns, :]                              # (B,m_g,ns,ql)
 
-                    for _ in range(Kval, 0, -1):
-                        b0 = 2.0 * xg * b1 - b2 + c
-                        b2, b1 = b1, b0
-                        c = c / r
-                        r = r / rho
-                        tail = (c * r) / torch.clamp(1.0 - r, min=1e-12)
-                        if float(tail.max().detach()) < float(eps_theta * 0.125):
-                            break
+                        if Kval == 0:
+                            part = (ns * log_inv_sqrt_a[s:e].view(1, e - s, 1)).expand(B, e - s, q1 * q2)
 
-                    S = b1 * xg - b2
-                    sum_expr = torch.log1p(torch.clamp(2.0 * S, min=-1.0 + tiny))
-                    part = sum_expr.sum(dim=2) + (ns * log_inv_sqrt_a[s:e].view(1, e - s, 1))
+                        elif Kval <= 4:
+                            inv_a = 1.0 / torch.clamp(a_c[s:e], min=tiny)   # (m_g,)
+                            c1  = torch.exp((-PI * 1.0) * inv_a).view(1, e - s, 1, 1)
+                            if Kval >= 2:
+                                r1  = torch.exp((-3.0 * PI) * inv_a).view(1, e - s, 1, 1)
+                                c2  = c1 * r1
+                            if Kval >= 3:
+                                rho = torch.exp((-2.0 * PI) * inv_a).view(1, e - s, 1, 1)
+                                r2  = r1 * rho
+                                c3  = c2 * r2
+                            if Kval == 4:
+                                r3  = r2 * rho
+                                c4  = c3 * r3
 
-                # ---- in-place LSE update (no cat) ----
-                L = part + lwc3                                         # (B,m_g,qc)
-                Lmax = L.max(dim=-1).values                             # (B,m_g)
-                Mx = torch.maximum(A_lse[:, s:e], Lmax)
-                S_lse[:, s:e] = S_lse[:, s:e] * torch.exp(A_lse[:, s:e] - Mx) \
-                                 + torch.exp(L - Mx.unsqueeze(-1)).sum(dim=-1)
-                A_lse[:, s:e] = Mx
+                            T1 = xg
+                            x2 = xg * xg
+                            T2 = 2.0 * x2 - 1.0
+                            T3 = 4.0 * x2 * xg - 3.0 * xg
+                            T4 = 8.0 * x2 * x2 - 8.0 * x2 + 1.0
+
+                            S = c1 * T1
+                            if Kval >= 2: S = S + c2 * T2
+                            if Kval >= 3: S = S + c3 * T3
+                            if Kval == 4: S = S + c4 * T4
+
+                            sum_expr = torch.log1p(torch.clamp(2.0 * S, min=-1.0 + tiny))
+                            part = sum_expr.sum(dim=2) + (ns * log_inv_sqrt_a[s:e].view(1, e - s, 1))  # (B,m_g,ql)
+
+                        else:
+                            inv_a = 1.0 / torch.clamp(a_c[s:e], min=tiny)             # (m_g,)
+                            Kf = float(Kval)
+                            cK  = torch.exp((-PI * (Kf * Kf)) * inv_a).view(1, e - s, 1, 1)
+                            rKm1= torch.exp((-(2.0 * Kf - 1.0) * PI) * inv_a).view(1, e - s, 1, 1)
+                            rho = torch.exp(( -2.0 * PI) * inv_a).view(1, e - s, 1, 1)
+
+                            b1 = torch.zeros_like(xg, dtype=r_dtype)
+                            b2 = torch.zeros_like(xg, dtype=r_dtype)
+                            c = cK.clone()
+                            r = rKm1.clone()
+
+                            for _ in range(Kval, 0, -1):
+                                b0 = 2.0 * xg * b1 - b2 + c
+                                b2, b1 = b1, b0
+                                c = c / r
+                                r = r / rho
+                                tail = (c * r) / torch.clamp(1.0 - r, min=1e-12)
+                                if float(tail.max().detach()) < float(eps_theta * 0.125):
+                                    break
+
+                            S = b1 * xg - b2
+                            sum_expr = torch.log1p(torch.clamp(2.0 * S, min=-1.0 + tiny))
+                            part = sum_expr.sum(dim=2) + (ns * log_inv_sqrt_a[s:e].view(1, e - s, 1))
+
+                        # ---- in-place LSE update (no cat) ----
+                        L = part + lw_blk                                         # (B,m_g,ql)
+                        Lmax = L.max(dim=-1).values                                # (B,m_g)
+                        Mx = torch.maximum(A_lse[:, s:e], Lmax)
+                        S_lse[:, s:e] = S_lse[:, s:e] * torch.exp(A_lse[:, s:e] - Mx) \
+                                         + torch.exp(L - Mx.unsqueeze(-1)).sum(dim=-1)
+                        A_lse[:, s:e] = Mx
 
         # η и финальный вес; 2×SGEMM (TF32 off локально)
         eta = (norm_fac_c.view(1, mc) * torch.exp(A_lse) * S_lse).reshape(B, mc)
