@@ -1,6 +1,6 @@
 # dyna/lib/cpsf/benchmark/benchmark_CPSF_compare_HSTheta_vs_TauDual.py
 # Run examples:
-# > python -m dyna.lib.cpsf.benchmark.benchmark_CPSF_compare_HSTheta_vs_TauDual --N 4 --M 128 --S 64 --batch 16 --dtype c64 --device cpu --K 7 --quad_nodes 12
+# > python -m dyna.lib.cpsf.benchmark.benchmark_CPSF_compare_HSTheta_vs_TauDual --N 4 --M 128 --S 64 --batch 16 --dtype c64 --device cpu --K 7 --quad_nodes 7
 
 import argparse
 import torch
@@ -58,7 +58,7 @@ def main():
     ap.add_argument("--dtype", choices=["c64", "c128"], default="c64")
     ap.add_argument("--device", choices=["auto", "cpu", "cuda"], default="auto")
     # HS-Theta params
-    ap.add_argument("--quad_nodes", type=int, default=12)
+    ap.add_argument("--quad_nodes", type=int, default=7)
     ap.add_argument("--eps_total", type=float, default=1.0e-3)
     ap.add_argument("--n_chunk", type=int, default=256)
     ap.add_argument("--m_chunk", type=int, default=256)

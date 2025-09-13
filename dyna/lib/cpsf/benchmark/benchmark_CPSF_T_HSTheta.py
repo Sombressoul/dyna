@@ -1,6 +1,6 @@
 # dyna/lib/cpsf/benchmark/benchmark_CPSF_T_HSTheta.py
 # Run examples:
-# > python -m dyna.lib.cpsf.benchmark.benchmark_CPSF_T_HSTheta --N 256 --M 256 --S 128 --batch 128 --dtype c64 --device cuda --iters 50 --warmup 10 --n_chunk 256 --m_chunk 256 --quad_nodes 12
+# > python -m dyna.lib.cpsf.benchmark.benchmark_CPSF_T_HSTheta --N 256 --M 256 --S 128 --batch 128 --dtype c64 --device cuda --iters 50 --warmup 10 --n_chunk 256 --m_chunk 256 --quad_nodes 7
 
 import argparse, time, math, torch
 
@@ -67,7 +67,7 @@ def main():
     ap.add_argument("--iters", type=int, default=50)
     ap.add_argument("--warmup", type=int, default=10)
     # HS-Theta controls
-    ap.add_argument("--quad_nodes", type=int, default=12)
+    ap.add_argument("--quad_nodes", type=int, default=7)
     ap.add_argument("--eps_total", type=float, default=1.0e-3)
     ap.add_argument("--n_chunk", type=int, default=256)
     ap.add_argument("--m_chunk", type=int, default=256)

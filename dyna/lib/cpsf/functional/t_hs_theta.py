@@ -36,7 +36,7 @@ def T_HSTheta(
     sigma_par,
     sigma_perp,
     *,
-    quad_nodes: int = 12,
+    quad_nodes: int = 7,
     eps_total: float = 1.0e-3,
     n_chunk: int = 256,
     m_chunk: int = 256,
