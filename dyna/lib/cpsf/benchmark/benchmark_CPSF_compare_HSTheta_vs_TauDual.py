@@ -7,7 +7,7 @@ import math
 import torch
 
 from ..functional.core_math import Tau_dual
-from ..functional.t_hs_theta import T_HS_theta
+from ..functional.t_hs_theta import T_HS_Theta
 
 
 def _real_dtype_of(cdtype: torch.dtype) -> torch.dtype:
@@ -101,7 +101,7 @@ def main():
     sp = torch.maximum(sp, sq + 1e-3)
 
     # HS-Theta
-    T_hs = T_HS_theta(
+    T_hs = T_HS_Theta(
         z=z,
         z_j=z_j,
         vec_d=vec_d,

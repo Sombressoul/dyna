@@ -2,7 +2,7 @@ import math
 import torch
 
 @torch.no_grad()
-def T_HS_theta(
+def T_HS_Theta(
     z,
     z_j,
     vec_d,

@@ -4,7 +4,7 @@
 
 import argparse, time, math, torch
 
-from ..functional.t_hs_theta import T_HS_theta
+from ..functional.t_hs_theta import T_HS_Theta
 
 
 def _fmt_bytes(x: int) -> str:
@@ -118,7 +118,7 @@ def main():
     sp = torch.maximum(sp, sq + 1e-3)
 
     if args.verify_devices:
-        out = T_HS_theta(
+        out = T_HS_Theta(
             z=z,
             z_j=z_j,
             vec_d=vec_d,
@@ -147,7 +147,7 @@ def main():
     if dev.type == "cuda":
         torch.cuda.synchronize()
     for _ in range(args.warmup):
-        _ = T_HS_theta(
+        _ = T_HS_Theta(
             z=z,
             z_j=z_j,
             vec_d=vec_d,
@@ -174,7 +174,7 @@ def main():
         sch = schedule(wait=1, warmup=1, active=4, repeat=1)
         with profile(activities=activities, schedule=sch, record_shapes=False, profile_memory=True) as prof:
             for _ in range(6):
-                _ = T_HS_theta(
+                _ = T_HS_Theta(
                     z=z,
                     z_j=z_j,
                     vec_d=vec_d,
@@ -214,7 +214,7 @@ def main():
             start = torch.cuda.Event(enable_timing=True)
             end = torch.cuda.Event(enable_timing=True)
             start.record()
-            out = T_HS_theta(
+            out = T_HS_Theta(
                 z=z,
                 z_j=z_j,
                 vec_d=vec_d,
@@ -242,7 +242,7 @@ def main():
             alloc_delta_max = max(alloc_delta_max, max(0, mem1 - mem0))
         else:
             t0 = time.perf_counter()
-            out = T_HS_theta(
+            out = T_HS_Theta(
                 z=z,
                 z_j=z_j,
                 vec_d=vec_d,
