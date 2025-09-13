@@ -241,28 +241,21 @@ def T_HS_Theta(
 
                         elif Kval <= 4:
                             inv_a = 1.0 / torch.clamp(a_c[s:e], min=tiny)   # (m_g,)
-                            c1  = torch.exp((-PI * 1.0) * inv_a).view(1, e - s, 1, 1)
+                            x2 = xg * xg
                             if Kval >= 2:
                                 r1  = torch.exp((-3.0 * PI) * inv_a).view(1, e - s, 1, 1)
+                                c1  = torch.exp(-PI * inv_a).view(1, e - s, 1, 1)
                                 c2  = c1 * r1
+                                S = c1 * xg + c2 * (2.0 * x2 - 1.0)
                             if Kval >= 3:
                                 rho = torch.exp((-2.0 * PI) * inv_a).view(1, e - s, 1, 1)
                                 r2  = r1 * rho
                                 c3  = c2 * r2
+                                S = S + c3 * (4.0 * x2 * xg - 3.0 * xg)
                             if Kval == 4:
                                 r3  = r2 * rho
                                 c4  = c3 * r3
-
-                            T1 = xg
-                            x2 = xg * xg
-                            T2 = 2.0 * x2 - 1.0
-                            T3 = 4.0 * x2 * xg - 3.0 * xg
-                            T4 = 8.0 * x2 * x2 - 8.0 * x2 + 1.0
-
-                            S = c1 * T1
-                            if Kval >= 2: S = S + c2 * T2
-                            if Kval >= 3: S = S + c3 * T3
-                            if Kval == 4: S = S + c4 * T4
+                                S = S + c4 * (8.0 * x2 * x2 - 8.0 * x2 + 1.0)
 
                             sum_expr = torch.log1p(torch.clamp(2.0 * S, min=-1.0 + tiny))
                             part = sum_expr.sum(dim=2) + (ns * log_inv_sqrt_a[s:e].view(1, e - s, 1))  # (B,m_g,ql)
