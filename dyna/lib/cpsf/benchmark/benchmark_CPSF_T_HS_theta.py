@@ -1,6 +1,6 @@
 # dyna/lib/cpsf/benchmark/benchmark_CPSF_T_HS_theta.py
 # Run examples:
-# > python -m dyna.lib.cpsf.benchmark.benchmark_CPSF_T_HS_theta --N 256 --M 256 --S 128 --batch 128 --dtype c64 --device cuda --iters 10 --warmup 5 --theta_mode poisson --n_chunk 128
+# > python -m dyna.lib.cpsf.benchmark.benchmark_CPSF_T_HS_theta --N 256 --M 256 --S 128 --batch 128 --dtype c64 --device cuda --iters 10 --warmup 5 --n_chunk 128
 
 import argparse, time, math, torch
 
@@ -55,9 +55,7 @@ def main():
     ap.add_argument("--warmup", type=int, default=10)
     # HS-Theta controls
     ap.add_argument("--quad_nodes", type=int, default=12, choices=[8, 12, 16])
-    ap.add_argument("--theta_mode", type=str, default="auto", choices=["auto", "direct", "poisson"])
     ap.add_argument("--eps_total", type=float, default=1.0e-3)
-    ap.add_argument("--a_threshold", type=float, default=1.0)
     ap.add_argument("--n_chunk", type=int, default=64)
     ap.add_argument("--m_chunk", type=int, default=65536)
     # misc
@@ -94,8 +92,7 @@ def main():
         f"warmup={args.warmup}, iters={args.iters}"
     )
     print(
-        f"HS-Theta: quad_nodes={args.quad_nodes}, theta_mode={args.theta_mode}, "
-        f"eps_total={args.eps_total}, a_threshold={args.a_threshold}, "
+        f"HS-Theta: quad_nodes={args.quad_nodes}, eps_total={args.eps_total}, "
         f"n_chunk={args.n_chunk}, m_chunk={args.m_chunk}"
     )
 
@@ -128,9 +125,7 @@ def main():
             sigma_par=sp,
             sigma_perp=sq,
             quad_nodes=args.quad_nodes,
-            theta_mode=args.theta_mode,
             eps_total=args.eps_total,
-            a_threshold=args.a_threshold,
             n_chunk=args.n_chunk,
             m_chunk=args.m_chunk,
             dtype_override=CDTYPE,
@@ -157,9 +152,7 @@ def main():
             sigma_par=sp,
             sigma_perp=sq,
             quad_nodes=args.quad_nodes,
-            theta_mode=args.theta_mode,
             eps_total=args.eps_total,
-            a_threshold=args.a_threshold,
             n_chunk=args.n_chunk,
             m_chunk=args.m_chunk,
             dtype_override=CDTYPE,
@@ -184,9 +177,7 @@ def main():
                     sigma_par=sp,
                     sigma_perp=sq,
                     quad_nodes=args.quad_nodes,
-                    theta_mode=args.theta_mode,
                     eps_total=args.eps_total,
-                    a_threshold=args.a_threshold,
                     n_chunk=args.n_chunk,
                     m_chunk=args.m_chunk,
                     dtype_override=CDTYPE,
@@ -224,9 +215,7 @@ def main():
                 sigma_par=sp,
                 sigma_perp=sq,
                 quad_nodes=args.quad_nodes,
-                theta_mode=args.theta_mode,
                 eps_total=args.eps_total,
-                a_threshold=args.a_threshold,
                 n_chunk=args.n_chunk,
                 m_chunk=args.m_chunk,
                 dtype_override=CDTYPE,
@@ -252,9 +241,7 @@ def main():
                 sigma_par=sp,
                 sigma_perp=sq,
                 quad_nodes=args.quad_nodes,
-                theta_mode=args.theta_mode,
                 eps_total=args.eps_total,
-                a_threshold=args.a_threshold,
                 n_chunk=args.n_chunk,
                 m_chunk=args.m_chunk,
                 dtype_override=CDTYPE,

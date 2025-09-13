@@ -54,9 +54,7 @@ def main():
     ap.add_argument("--device", choices=["auto", "cpu", "cuda"], default="auto")
     # HS-Theta params
     ap.add_argument("--quad_nodes", type=int, default=12, choices=[8, 12, 16])
-    ap.add_argument("--theta_mode", type=str, default="auto", choices=["auto", "direct", "poisson"])
     ap.add_argument("--eps_total", type=float, default=1.0e-3)
-    ap.add_argument("--a_threshold", type=float, default=1.0)
     ap.add_argument("--n_chunk", type=int, default=64)
     ap.add_argument("--m_chunk", type=int, default=65536)
     # misc
@@ -81,7 +79,7 @@ def main():
         print(f"WARNING: k-grid size {(2*K+1)**N:,} is large; consider reducing N or K.")
 
     print(f"Device={dev.type}, dtype={CDTYPE}, N={N}, M={M}, S={S}, B={B}, K={K}")
-    print(f"HS-Theta: quad_nodes={args.quad_nodes}, theta_mode={args.theta_mode}, eps_total={args.eps_total}")
+    print(f"HS-Theta: quad_nodes={args.quad_nodes}, eps_total={args.eps_total}")
 
     z = _make_complex((B, N), CDTYPE, dev, seed=args.seed + 1)
     vec_d = _make_unit_batch(B, N, CDTYPE, dev, seed=args.seed + 2)
@@ -111,9 +109,7 @@ def main():
         sigma_par=sp,
         sigma_perp=sq,
         quad_nodes=args.quad_nodes,
-        theta_mode=args.theta_mode,
         eps_total=args.eps_total,
-        a_threshold=args.a_threshold,
         n_chunk=args.n_chunk,
         m_chunk=args.m_chunk,
         dtype_override=CDTYPE,
