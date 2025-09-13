@@ -225,19 +225,16 @@ def T_HS_Theta(
                 i1 = min(i0 + q1_step, Q)
                 q1 = i1 - i0
 
-                cphi_i = cphi[:, :, i0:i1]     # (mc,ns,q1)
+                cphi_i = cphi[:, :, i0:i1]
                 sphi_i = sphi[:, :, i0:i1]
-                logw_i = logw_1d[i0:i1]        # (q1,)
 
                 for j0 in range(0, Q, q2_step):
                     j1 = min(j0 + q2_step, Q)
                     q2 = j1 - j0
 
-                    cpsi_j = cpsi[:, :, j0:j1] # (mc,ns,q2)
+                    cpsi_j = cpsi[:, :, j0:j1]
                     spsi_j = spsi[:, :, j0:j1]
-                    logw_j = logw_1d[j0:j1]    # (q2,)
 
-                    # FIX: use unsqueeze(-2) so shapes broadcast as (mc,ns,q1,1)*(mc,ns,1,q2)
                     cB = cphi_i.unsqueeze(-1) * cpsi_j.unsqueeze(-2) - sphi_i.unsqueeze(-1) * spsi_j.unsqueeze(-2)
                     sB = sphi_i.unsqueeze(-1) * cpsi_j.unsqueeze(-2) + cphi_i.unsqueeze(-1) * spsi_j.unsqueeze(-2)
 
@@ -245,18 +242,18 @@ def T_HS_Theta(
                     x_block = (cA.unsqueeze(-1).unsqueeze(-1) * cB.unsqueeze(0) + sA.unsqueeze(-1).unsqueeze(-1) * sB.unsqueeze(0)).to(r_dtype)
 
                     # flatten q1×q2 → ql
-                    x_flat = x_block.reshape(B, mc, ns, q1 * q2)  # (B,mc,ns,ql)
-                    lw_blk = (logw_i.view(1, 1, q1, 1) + logw_j.view(1, 1, 1, q2)).reshape(1, 1, q1 * q2)
+                    q1q2 = q1 * q2
+                    lw_blk = (logw_1d[i0:i1].view(1, 1, q1, 1) + logw_1d[j0:j1].view(1, 1, 1, q2)).view(1, 1, q1q2)
 
                     # ========= process K-buckets (Chebyshev for K<=4, else Clenshaw) =========
                     for g in range(num_groups):
                         Kval = int(Kvals[g].item())
                         s = int(starts[g].item())
                         e = s + int(counts[g].item())
-                        xg = x_flat[:, s:e, :ns, :]
+                        xg = x_block.view(B, mc, ns, q1q2)[:, s:e, :ns, :]
 
                         if Kval == 0:
-                            part = (ns * log_inv_sqrt_a[s:e].view(1, e - s, 1)).expand(B, e - s, q1 * q2)
+                            part = (ns * log_inv_sqrt_a[s:e].view(1, e - s, 1)).expand(B, e - s, q1q2)
 
                         elif Kval <= 4:
                             x2 = xg * xg
