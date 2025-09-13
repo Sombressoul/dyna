@@ -1,4 +1,4 @@
-# Appendix B — Poisson-only `T_HS_Theta`: Mathematics and Theory (N ≥ 2)
+# Appendix B — Poisson-only `T_HSTheta`: Mathematics and Theory (N ≥ 2)
 
 ## 1. Notation and assumptions
 
