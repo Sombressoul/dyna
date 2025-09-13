@@ -192,7 +192,13 @@ def T_HSTheta(
         else:
             num_groups = 0
 
-        L_accum = torch.full((B, mc, 1), -float("inf"), device=device, dtype=r_dtype)
+        log_inv_sqrt_a = -0.5 * torch.log(torch.clamp(a_c, min=tiny))
+        buf_inv_a = 1.0 / torch.clamp(a_c, min=tiny)
+        buf_ex01 = torch.exp(-PI * buf_inv_a)
+        buf_ex02 = buf_ex01 * buf_ex01
+        buf_ex04 = buf_ex02 * buf_ex02
+        buf_ex08 = buf_ex04 * buf_ex04
+        buf_ex16 = buf_ex08 * buf_ex08
 
         per_elem_bufs = 2
         ns_cap_den = max(1, B * mc * qc_full)
@@ -201,15 +207,23 @@ def T_HSTheta(
             int(target_bytes // (bytes_per_elem * per_elem_bufs * ns_cap_den)),
         )
         step_ns = min(n_chunk, max(1, ns_cap))
-
-        log_inv_sqrt_a = -0.5 * torch.log(torch.clamp(a_c, min=tiny))
-
-        buf_inv_a = 1.0 / torch.clamp(a_c, min=tiny)
-        buf_ex01 = torch.exp(-PI * buf_inv_a)
-        buf_ex02 = buf_ex01 * buf_ex01
-        buf_ex04 = buf_ex02 * buf_ex02
-        buf_ex08 = buf_ex04 * buf_ex04
-        buf_ex16 = buf_ex08 * buf_ex08
+        ns_ref = min(step_ns, N)
+        denom_ref = max(1, B * mc * ns_ref)
+        q_cap_ref = max(
+            1,
+            int(target_bytes // (bytes_per_elem * per_elem_bufs * denom_ref)),
+        )
+        base_ref = max(1, int(math.sqrt(q_cap_ref)))
+        q1_step = max(1, min(Q, base_ref))
+        q2_step = max(1, min(Q, max(1, q_cap_ref // q1_step)))
+        num_q1 = (Q + q1_step - 1) // q1_step
+        num_q2 = (Q + q2_step - 1) // q2_step
+        q_accum = [
+            [[None for _ in range(num_q2)] for _ in range(num_q1)]
+            for _ in range(num_groups)
+        ]
+        q_lwblk = [[None for _ in range(num_q2)] for _ in range(num_q1)]
+        L_accum = torch.full((B, mc, 1), -float("inf"), device=device, dtype=r_dtype)
 
         # ======================= n-tiles =======================
         for n0 in range(0, N, step_ns):
@@ -220,14 +234,6 @@ def T_HSTheta(
             phi = TWO_PI * (bR_eff[:, n0:n1].unsqueeze(-1) * tau_1d.view(1, 1, -1))
             psi = TWO_PI * (bI_eff[:, n0:n1].unsqueeze(-1) * tau_1d.view(1, 1, -1))
             cA, sA, cphi, sphi, cpsi, spsi = fused_sincos(Aphase, phi, psi)
-
-            denom = max(1, B * mc * ns)
-            q_cap = max(
-                1, int(target_bytes // (bytes_per_elem * per_elem_bufs * denom))
-            )
-            base = max(1, int(math.sqrt(q_cap)))
-            q1_step = max(1, min(Q, base))
-            q2_step = max(1, min(Q, max(1, q_cap // q1_step)))
 
             # ======================= (q1,q2)-tiles =======================
             for i0 in range(0, Q, q1_step):
@@ -332,12 +338,36 @@ def T_HSTheta(
                                 ns * log_inv_sqrt_a[s:e].view(1, m_g, 1)
                             )
 
-                        L = part + lw_blk
-                        group_lse = torch.logsumexp(L, dim=-1, keepdim=True)
-                        combined = torch.cat([L_accum[:, s:e, :], group_lse], dim=-1)
-                        L_accum[:, s:e, :] = torch.logsumexp(
-                            combined, dim=-1, keepdim=True
-                        )
+                        i_idx = i0 // q1_step
+                        j_idx = j0 // q2_step
+                        if q_lwblk[i_idx][j_idx] is None:
+                            q_lwblk[i_idx][j_idx] = (
+                                logw_1d[i0:i1].view(1, 1, q1, 1)
+                                + logw_1d[j0:j1].view(1, 1, 1, q2)
+                            ).view(1, 1, q1 * q2)
+
+                        acc = q_accum[g][i_idx][j_idx]
+                        if acc is None:
+                            q_accum[g][i_idx][j_idx] = part
+                        else:
+                            q_accum[g][i_idx][j_idx] = acc + part
+
+        for i_idx in range(num_q1):
+            for j_idx in range(num_q2):
+                lw_blk = q_lwblk[i_idx][j_idx]
+                if lw_blk is None:
+                    continue
+                for g in range(num_groups):
+                    s = int(starts[g].item())
+                    e = s + int(counts[g].item())
+                    m_g = e - s
+                    acc = q_accum[g][i_idx][j_idx]
+                    if acc is None:
+                        continue
+                    L = acc + lw_blk
+                    group_lse = torch.logsumexp(L, dim=-1, keepdim=True)
+                    combined = torch.cat([L_accum[:, s:e, :], group_lse], dim=-1)
+                    L_accum[:, s:e, :] = torch.logsumexp(combined, dim=-1, keepdim=True)
 
         eta = (norm_fac_c.view(1, mc) * torch.exp(L_accum.squeeze(-1))).reshape(B, mc)
         weight = (alpha_c.reshape(1, mc) * ang_fac.reshape(B, mc) * eta).to(
