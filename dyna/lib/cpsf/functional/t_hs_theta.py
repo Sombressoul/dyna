@@ -26,7 +26,7 @@ def fused_sincos(Aphase, phi, psi):
     return cA, sA, cphi, sphi, cpsi, spsi
 
 
-def T_HS_Theta(
+def T_HSTheta(
     z,
     z_j,
     vec_d,
@@ -38,8 +38,8 @@ def T_HS_Theta(
     *,
     quad_nodes: int = 12,
     eps_total: float = 1.0e-3,
-    n_chunk: int = 64,
-    m_chunk: int = 65536,
+    n_chunk: int = 256,
+    m_chunk: int = 256,
     dtype_override: torch.dtype | None = None,
 ):
     device = z.device
@@ -55,11 +55,11 @@ def T_HS_Theta(
     def _norm(x: torch.Tensor, dim: int = -1, keepdim: bool = False):
         return torch.linalg.vector_norm(x, dim=dim, keepdim=keepdim)
 
-    if not hasattr(T_HS_Theta, "_gh1d_cache"):
-        T_HS_Theta._gh1d_cache = {}
+    if not hasattr(T_HSTheta, "_gh1d_cache"):
+        T_HSTheta._gh1d_cache = {}
 
     gh_key = (device.type, getattr(device, "index", -1), str(r_dtype), int(quad_nodes))
-    cached = T_HS_Theta._gh1d_cache.get(gh_key)
+    cached = T_HSTheta._gh1d_cache.get(gh_key)
     if cached is None:
         Q = quad_nodes
         if Q < 1:
@@ -72,7 +72,7 @@ def T_HS_Theta(
         tau, V = torch.linalg.eigh(J)
         w = (math.sqrt(math.pi) * (V[0, :] ** 2)).to(r_dtype)
         logw_1d = torch.log(torch.clamp(w, min=tiny))
-        T_HS_Theta._gh1d_cache[gh_key] = (tau, logw_1d)
+        T_HSTheta._gh1d_cache[gh_key] = (tau, logw_1d)
         tau_1d, logw_1d = tau, logw_1d
     else:
         tau_1d, logw_1d = cached
@@ -192,8 +192,7 @@ def T_HS_Theta(
         else:
             num_groups = 0
 
-        A_lse = torch.full((B, mc), -float("inf"), device=device, dtype=r_dtype)
-        S_lse = torch.zeros((B, mc), device=device, dtype=r_dtype)
+        L_accum = torch.full((B, mc, 1), -float("inf"), device=device, dtype=r_dtype)
 
         per_elem_bufs = 2
         ns_cap_den = max(1, B * mc * qc_full)
@@ -334,14 +333,13 @@ def T_HS_Theta(
                             )
 
                         L = part + lw_blk
-                        Lmax = L.max(dim=-1).values
-                        Mx = torch.maximum(A_lse[:, s:e], Lmax)
-                        S_lse[:, s:e] = S_lse[:, s:e] * torch.exp(
-                            A_lse[:, s:e] - Mx
-                        ) + torch.exp(L - Mx.unsqueeze(-1)).sum(dim=-1)
-                        A_lse[:, s:e] = Mx
+                        group_lse = torch.logsumexp(L, dim=-1, keepdim=True)
+                        combined = torch.cat([L_accum[:, s:e, :], group_lse], dim=-1)
+                        L_accum[:, s:e, :] = torch.logsumexp(
+                            combined, dim=-1, keepdim=True
+                        )
 
-        eta = (norm_fac_c.view(1, mc) * torch.exp(A_lse) * S_lse).reshape(B, mc)
+        eta = (norm_fac_c.view(1, mc) * torch.exp(L_accum.squeeze(-1))).reshape(B, mc)
         weight = (alpha_c.reshape(1, mc) * ang_fac.reshape(B, mc) * eta).to(
             torch.float32
         )

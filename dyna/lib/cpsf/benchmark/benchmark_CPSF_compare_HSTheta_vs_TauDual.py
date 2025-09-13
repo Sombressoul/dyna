@@ -3,18 +3,23 @@
 # > python -m dyna.lib.cpsf.benchmark.benchmark_CPSF_compare_HSTheta_vs_TauDual --N 4 --M 128 --S 64 --batch 16 --dtype c64 --device cpu --K 7 --quad_nodes 12
 
 import argparse
-import math
 import torch
 
 from ..functional.core_math import Tau_dual
-from ..functional.t_hs_theta import T_HS_Theta
+from ..functional.t_hs_theta import T_HSTheta
 
 
 def _real_dtype_of(cdtype: torch.dtype) -> torch.dtype:
     return torch.float32 if cdtype == torch.complex64 else torch.float64
 
 
-def _make_unit_batch(B: int, N: int, dtype: torch.dtype, device: torch.device, seed: int) -> torch.Tensor:
+def _make_unit_batch(
+    B: int,
+    N: int,
+    dtype: torch.dtype,
+    device: torch.device,
+    seed: int,
+) -> torch.Tensor:
     g = torch.Generator(device=device).manual_seed(seed)
     REAL = _real_dtype_of(dtype)
     xr = torch.randn(B, N, generator=g, device=device, dtype=REAL)
@@ -46,17 +51,17 @@ def _k_cube(K: int, N: int, device: torch.device) -> torch.Tensor:
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--N", type=int, default=4)
-    ap.add_argument("--M", type=int, default=2048)
-    ap.add_argument("--S", type=int, default=256)
-    ap.add_argument("--batch", type=int, default=1024)
-    ap.add_argument("--K", type=int, default=5)
+    ap.add_argument("--M", type=int, default=128)
+    ap.add_argument("--S", type=int, default=64)
+    ap.add_argument("--batch", type=int, default=16)
+    ap.add_argument("--K", type=int, default=7)
     ap.add_argument("--dtype", choices=["c64", "c128"], default="c64")
     ap.add_argument("--device", choices=["auto", "cpu", "cuda"], default="auto")
     # HS-Theta params
-    ap.add_argument("--quad_nodes", type=int, default=12, choices=[8, 12, 16])
+    ap.add_argument("--quad_nodes", type=int, default=12)
     ap.add_argument("--eps_total", type=float, default=1.0e-3)
-    ap.add_argument("--n_chunk", type=int, default=64)
-    ap.add_argument("--m_chunk", type=int, default=65536)
+    ap.add_argument("--n_chunk", type=int, default=256)
+    ap.add_argument("--m_chunk", type=int, default=256)
     # misc
     ap.add_argument("--seed", type=int, default=42)
     args = ap.parse_args()
@@ -76,7 +81,9 @@ def main():
     if N < 1 or M < 1 or S < 1 or B < 1:
         raise SystemExit("Invalid sizes.")
     if (2 * K + 1) ** N > 2_000_000:
-        print(f"WARNING: k-grid size {(2*K+1)**N:,} is large; consider reducing N or K.")
+        print(
+            f"WARNING: k-grid size {(2*K+1)**N:,} is large; consider reducing N or K."
+        )
 
     print(f"Device={dev.type}, dtype={CDTYPE}, N={N}, M={M}, S={S}, B={B}, K={K}")
     print(f"HS-Theta: quad_nodes={args.quad_nodes}, eps_total={args.eps_total}")
@@ -99,7 +106,7 @@ def main():
     sp = torch.maximum(sp, sq + 1e-3)
 
     # HS-Theta
-    T_hs = T_HS_Theta(
+    T_hs = T_HSTheta(
         z=z,
         z_j=z_j,
         vec_d=vec_d,
@@ -160,22 +167,31 @@ def main():
     s_star = s_star_per.mean()  # глобальная оценка масштаба
     T_hs_cal = s_star * T_hs
     diff_cal = T_hs_cal - T_dual
-    rel_l2_cal = torch.linalg.vector_norm(diff_cal, dim=-1) / torch.clamp(torch.linalg.vector_norm(T_dual, dim=-1), min=1e-12)
-    print(f"\nScale diagnostic: s*={s_star.item():.8f}, "
+    rel_l2_cal = torch.linalg.vector_norm(diff_cal, dim=-1) / torch.clamp(
+        torch.linalg.vector_norm(T_dual, dim=-1), min=1e-12
+    )
+    print(
+        f"\nScale diagnostic: s*={s_star.item():.8f}, "
         f"var={s_star_per.var().sqrt().item():.3e}, "
-        f"relL2(mean) after scale={rel_l2_cal.mean().item():.6e}")
-
+        f"relL2(mean) after scale={rel_l2_cal.mean().item():.6e}"
+    )
 
     print("\n=== Accuracy: T_HS_theta vs Tau_dual ===")
-    print(f"Per-sample relative L2: mean={rel_l2_mean:.6e}, median={rel_l2_median:.6e}, p95={rel_l2_p95:.6e}, max={rel_l2_max:.6e}")
-    print(f"Elementwise: MAE={mae_elem:.6e}, MSE={mse_elem:.6e}, mean(|Δ|/|T_dual|)={rel_elem_mean:.6e}, p95(|Δ|/|T_dual|)={rel_elem_p95:.6e}")
+    print(
+        f"Per-sample relative L2: mean={rel_l2_mean:.6e}, median={rel_l2_median:.6e}, p95={rel_l2_p95:.6e}, max={rel_l2_max:.6e}"
+    )
+    print(
+        f"Elementwise: MAE={mae_elem:.6e}, MSE={mse_elem:.6e}, mean(|Δ|/|T_dual|)={rel_elem_mean:.6e}, p95(|Δ|/|T_dual|)={rel_elem_p95:.6e}"
+    )
 
     if torch.isnan(rel_l2_mean) or torch.isinf(rel_l2_mean):
         raise SystemExit("Numerical instability detected.")
 
     # Optional quick consistency assertion for typical small N,K
     if N <= 4 and K <= 5:
-        assert rel_l2_mean < 1e-2, "Mean relative L2 seems high; adjust HS-Theta params or investigate."
+        assert (
+            rel_l2_mean < 1e-2
+        ), "Mean relative L2 seems high; adjust HS-Theta params or investigate."
 
 
 if __name__ == "__main__":

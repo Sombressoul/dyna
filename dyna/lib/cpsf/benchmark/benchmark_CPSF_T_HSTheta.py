@@ -1,13 +1,15 @@
-# dyna/lib/cpsf/benchmark/benchmark_CPSF_T_HS_theta.py
+# dyna/lib/cpsf/benchmark/benchmark_CPSF_T_HSTheta.py
 # Run examples:
-# > python -m dyna.lib.cpsf.benchmark.benchmark_CPSF_T_HS_theta --N 256 --M 256 --S 128 --batch 128 --dtype c64 --device cuda --iters 10 --warmup 5 --n_chunk 128
+# > python -m dyna.lib.cpsf.benchmark.benchmark_CPSF_T_HSTheta --N 256 --M 256 --S 128 --batch 128 --dtype c64 --device cuda --iters 50 --warmup 10 --n_chunk 256 --m_chunk 256 --quad_nodes 12
 
 import argparse, time, math, torch
 
-from ..functional.t_hs_theta import T_HS_Theta
+from ..functional.t_hs_theta import T_HSTheta
 
 
-def _fmt_bytes(x: int) -> str:
+def _fmt_bytes(
+    x: int,
+) -> str:
     u = ["B", "KB", "MB", "GB", "TB"]
     i = 0
     v = float(x)
@@ -22,7 +24,11 @@ def _real_dtype_of(cdtype: torch.dtype) -> torch.dtype:
 
 
 def _make_unit_batch(
-    B: int, N: int, dtype: torch.dtype, device: torch.device, seed: int
+    B: int,
+    N: int,
+    dtype: torch.dtype,
+    device: torch.device,
+    seed: int,
 ) -> torch.Tensor:
     g = torch.Generator(device=device).manual_seed(seed)
     REAL = _real_dtype_of(dtype)
@@ -34,7 +40,12 @@ def _make_unit_batch(
     return v / n
 
 
-def _make_complex(shape, dtype, device, seed):
+def _make_complex(
+    shape: tuple[int],
+    dtype: torch.dtype,
+    device: torch.device,
+    seed: int,
+):
     g = torch.Generator(device=device).manual_seed(seed)
     REAL = _real_dtype_of(dtype)
     xr = torch.randn(*shape, generator=g, device=device, dtype=REAL)
@@ -45,19 +56,21 @@ def _make_complex(shape, dtype, device, seed):
 @torch.no_grad()
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--N", type=int, default=8, help="Torus dimension (>=2)")
-    ap.add_argument("--M", type=int, default=2048, help="Number of contributions")
-    ap.add_argument("--S", type=int, default=256, help="Spectral dimension per contribution")
-    ap.add_argument("--batch", type=int, default=64, help="Batch of query rays (B)")
+    ap.add_argument("--N", type=int, default=256, help="Torus dimension (>=2)")
+    ap.add_argument("--M", type=int, default=256, help="Number of contributions")
+    ap.add_argument(
+        "--S", type=int, default=128, help="Spectral dimension per contribution"
+    )
+    ap.add_argument("--batch", type=int, default=128, help="Batch of query rays (B)")
     ap.add_argument("--dtype", choices=["c64", "c128"], default="c64")
     ap.add_argument("--device", choices=["auto", "cpu", "cuda"], default="auto")
     ap.add_argument("--iters", type=int, default=50)
     ap.add_argument("--warmup", type=int, default=10)
     # HS-Theta controls
-    ap.add_argument("--quad_nodes", type=int, default=12, choices=[8, 12, 16])
+    ap.add_argument("--quad_nodes", type=int, default=12)
     ap.add_argument("--eps_total", type=float, default=1.0e-3)
-    ap.add_argument("--n_chunk", type=int, default=64)
-    ap.add_argument("--m_chunk", type=int, default=65536)
+    ap.add_argument("--n_chunk", type=int, default=256)
+    ap.add_argument("--m_chunk", type=int, default=256)
     # misc
     ap.add_argument("--verify_devices", action="store_true")
     ap.add_argument("--profile", action="store_true")
@@ -115,7 +128,7 @@ def main():
     sp = torch.maximum(sp, sq + 1e-3)
 
     if args.verify_devices:
-        out = T_HS_Theta(
+        out = T_HSTheta(
             z=z,
             z_j=z_j,
             vec_d=vec_d,
@@ -134,15 +147,19 @@ def main():
             f"verify: out.shape={tuple(out.shape)}, out.dtype={out.dtype}, out.device={out.device}"
         )
         assert out.shape == (B, S), f"Expected (B,S), got {tuple(out.shape)}"
-        assert out.dtype == CDTYPE and out.device.type == dev.type, "dtype/device mismatch"
-        assert torch.isfinite(out.real).all() and torch.isfinite(out.imag).all(), "non-finite output"
+        assert (
+            out.dtype == CDTYPE and out.device.type == dev.type
+        ), "dtype/device mismatch"
+        assert (
+            torch.isfinite(out.real).all() and torch.isfinite(out.imag).all()
+        ), "non-finite output"
         del out
 
     # --------- warmup ---------
     if dev.type == "cuda":
         torch.cuda.synchronize()
     for _ in range(args.warmup):
-        _ = T_HS_Theta(
+        _ = T_HSTheta(
             z=z,
             z_j=z_j,
             vec_d=vec_d,
@@ -163,11 +180,19 @@ def main():
     # --------- optional short profiling ---------
     if args.profile:
         from torch.profiler import profile, ProfilerActivity, schedule
-        activities = [ProfilerActivity.CPU] + ([ProfilerActivity.CUDA] if dev.type == "cuda" else [])
+
+        activities = [ProfilerActivity.CPU] + (
+            [ProfilerActivity.CUDA] if dev.type == "cuda" else []
+        )
         sch = schedule(wait=1, warmup=1, active=4, repeat=1)
-        with profile(activities=activities, schedule=sch, record_shapes=False, profile_memory=True) as prof:
+        with profile(
+            activities=activities,
+            schedule=sch,
+            record_shapes=False,
+            profile_memory=True,
+        ) as prof:
             for _ in range(6):
-                _ = T_HS_Theta(
+                _ = T_HSTheta(
                     z=z,
                     z_j=z_j,
                     vec_d=vec_d,
@@ -185,7 +210,9 @@ def main():
                 prof.step()
         print(
             prof.key_averages().table(
-                sort_by=("self_cuda_time_total" if dev.type == "cuda" else "cpu_time_total"),
+                sort_by=(
+                    "self_cuda_time_total" if dev.type == "cuda" else "cpu_time_total"
+                ),
                 row_limit=15,
             )
         )
@@ -205,7 +232,7 @@ def main():
             start = torch.cuda.Event(enable_timing=True)
             end = torch.cuda.Event(enable_timing=True)
             start.record()
-            out = T_HS_Theta(
+            out = T_HSTheta(
                 z=z,
                 z_j=z_j,
                 vec_d=vec_d,
@@ -231,7 +258,7 @@ def main():
             alloc_delta_max = max(alloc_delta_max, max(0, mem1 - mem0))
         else:
             t0 = time.perf_counter()
-            out = T_HS_Theta(
+            out = T_HSTheta(
                 z=z,
                 z_j=z_j,
                 vec_d=vec_d,
@@ -263,6 +290,7 @@ def main():
     else:
         try:
             import psutil, os
+
             rss = psutil.Process(os.getpid()).memory_info().rss
             print(f"Process RSS:   {_fmt_bytes(rss)}")
         except Exception:
