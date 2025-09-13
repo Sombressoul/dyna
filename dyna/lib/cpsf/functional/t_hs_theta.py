@@ -6,7 +6,10 @@ from dyna.lib.cpsf.functional.core_math import delta_vec_d
 
 
 @torch.jit.script
-def _int_pow(base: torch.Tensor, n: int) -> torch.Tensor:
+def _int_pow(
+    base: torch.Tensor,
+    n: int,
+) -> torch.Tensor:
     out = torch.ones_like(base)
     b = base
     k = int(n)
@@ -19,7 +22,11 @@ def _int_pow(base: torch.Tensor, n: int) -> torch.Tensor:
 
 
 @torch.jit.script
-def fused_sincos(Aphase, phi, psi):
+def fused_sincos(
+    Aphase: torch.Tensor,
+    phi: torch.Tensor,
+    psi: torch.Tensor,
+) -> tuple[torch.Tensor]:
     cA, sA = torch.cos(Aphase), torch.sin(Aphase)
     cphi, sphi = torch.cos(phi), torch.sin(phi)
     cpsi, spsi = torch.cos(psi), torch.sin(psi)
