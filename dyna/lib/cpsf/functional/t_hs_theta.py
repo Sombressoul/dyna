@@ -5,6 +5,27 @@ import torch
 from dyna.lib.cpsf.functional.core_math import delta_vec_d
 
 
+@torch.jit.script
+def _int_pow(base: torch.Tensor, n: int) -> torch.Tensor:
+    out = torch.ones_like(base)
+    b = base
+    k = int(n)
+    while k > 0:
+        if (k & 1) != 0:
+            out = out * b
+        b = b * b
+        k >>= 1
+    return out
+
+
+@torch.jit.script
+def fused_sincos(Aphase, phi, psi):
+    cA, sA = torch.cos(Aphase), torch.sin(Aphase)
+    cphi, sphi = torch.cos(phi), torch.sin(phi)
+    cpsi, spsi = torch.cos(psi), torch.sin(psi)
+    return cA, sA, cphi, sphi, cpsi, spsi
+
+
 def T_HS_Theta(
     z,
     z_j,
@@ -28,22 +49,11 @@ def T_HS_Theta(
     TWO_PI = 2.0 * math.pi
     tiny = torch.as_tensor(torch.finfo(r_dtype).tiny, device=device, dtype=r_dtype)
 
-    def _frac01(x):
+    def _frac01(x: torch.Tensor):
         return torch.frac(x + 0.5) - 0.5
 
-    def _norm(x, dim=-1, keepdim=False):
+    def _norm(x: torch.Tensor, dim: int = -1, keepdim: bool = False):
         return torch.linalg.vector_norm(x, dim=dim, keepdim=keepdim)
-
-    def _int_pow(base: torch.Tensor, n: int) -> torch.Tensor:
-        out = torch.ones_like(base)
-        b = base
-        k = int(n)
-        while k > 0:
-            if (k & 1) != 0:
-                out = out * b
-            b = b * b
-            k >>= 1
-        return out
 
     if not hasattr(T_HS_Theta, "_gh1d_cache"):
         T_HS_Theta._gh1d_cache = {}
@@ -208,15 +218,9 @@ def T_HS_Theta(
             ns = n1 - n0
 
             Aphase = TWO_PI * dz[:, :, n0:n1]
-            cA = torch.cos(Aphase)
-            sA = torch.sin(Aphase)
-
             phi = TWO_PI * (bR_eff[:, n0:n1].unsqueeze(-1) * tau_1d.view(1, 1, -1))
             psi = TWO_PI * (bI_eff[:, n0:n1].unsqueeze(-1) * tau_1d.view(1, 1, -1))
-            cphi = torch.cos(phi)
-            sphi = torch.sin(phi)
-            cpsi = torch.cos(psi)
-            spsi = torch.sin(psi)
+            cA, sA, cphi, sphi, cpsi, spsi = fused_sincos(Aphase, phi, psi)
 
             denom = max(1, B * mc * ns)
             q_cap = max(
