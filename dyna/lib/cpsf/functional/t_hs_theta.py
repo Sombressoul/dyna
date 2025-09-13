@@ -240,25 +240,22 @@ def T_HS_Theta(
                             part = (ns * log_inv_sqrt_a[s:e].view(1, e - s, 1)).expand(B, e - s, q1 * q2)
 
                         elif Kval <= 4:
-                            inv_a = 1.0 / torch.clamp(a_c[s:e], min=tiny)   # (m_g,)
+                            inv_a = 1.0 / torch.clamp(a_c[s:e], min=tiny)
+                            ex  = torch.exp(-PI * inv_a).view(1, e - s, 1, 1)
                             x2 = xg * xg
+                            S = ex * xg
                             if Kval >= 2:
-                                r1  = torch.exp((-3.0 * PI) * inv_a).view(1, e - s, 1, 1)
-                                c1  = torch.exp(-PI * inv_a).view(1, e - s, 1, 1)
-                                c2  = c1 * r1
-                                S = c1 * xg + c2 * (2.0 * x2 - 1.0)
+                                ex2 = ex * ex
+                                ex4 = ex2 * ex2
+                                S = S + ex4 * (2.0 * x2 - 1.0)
                             if Kval >= 3:
-                                rho = torch.exp((-2.0 * PI) * inv_a).view(1, e - s, 1, 1)
-                                r2  = r1 * rho
-                                c3  = c2 * r2
-                                S = S + c3 * (4.0 * x2 * xg - 3.0 * xg)
+                                ex8 = ex4 * ex4
+                                S = S + (ex8 * ex) * (4.0 * x2 * xg - 3.0 * xg)
                             if Kval == 4:
-                                r3  = r2 * rho
-                                c4  = c3 * r3
-                                S = S + c4 * (8.0 * x2 * x2 - 8.0 * x2 + 1.0)
+                                S = S + (ex8 * ex8) * (8.0 * x2 * x2 - 8.0 * x2 + 1.0)
 
                             sum_expr = torch.log1p(torch.clamp(2.0 * S, min=-1.0 + tiny))
-                            part = sum_expr.sum(dim=2) + (ns * log_inv_sqrt_a[s:e].view(1, e - s, 1))  # (B,m_g,ql)
+                            part = sum_expr.sum(dim=2) + (ns * log_inv_sqrt_a[s:e].view(1, e - s, 1))
 
                         else:
                             inv_a = 1.0 / torch.clamp(a_c[s:e], min=tiny)             # (m_g,)
