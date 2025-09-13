@@ -31,6 +31,19 @@ def T_HS_Theta(
     def _norm(x, dim=-1, keepdim=False):
         return torch.linalg.vector_norm(x, dim=dim, keepdim=keepdim)
 
+    def _int_pow(base: torch.Tensor, n: int) -> torch.Tensor:
+        # Возвращает base**n для ЦЕЛОГО n ≥ 0 через двоичное возведение в степень.
+        # base: тензор любой формы; n: скаляр int. Без exp/log, только умножения.
+        out = torch.ones_like(base)
+        b = base
+        k = int(n)
+        while k > 0:
+            if (k & 1) != 0:
+                out = out * b
+            b = b * b
+            k >>= 1
+        return out
+
     # ---- 1D GH cache (nodes + log-weights) ----
     if not hasattr(T_HS_Theta, "_gh1d_cache"):
         T_HS_Theta._gh1d_cache = {}
@@ -175,6 +188,13 @@ def T_HS_Theta(
 
         log_inv_sqrt_a = -0.5 * torch.log(torch.clamp(a_c, min=tiny))  # (mc,)
 
+        buf_inv_a = 1.0 / torch.clamp(a_c, min=tiny)
+        buf_ex01 = torch.exp(-PI * buf_inv_a)
+        buf_ex02 = buf_ex01 * buf_ex01
+        buf_ex04 = buf_ex02 * buf_ex02
+        buf_ex08 = buf_ex04 * buf_ex04
+        buf_ex16 = buf_ex08 * buf_ex08
+
         # ======================= n-tiles =======================
         for n0 in range(0, N, step_ns):
             n1 = min(n0 + step_ns, N)
@@ -222,8 +242,7 @@ def T_HS_Theta(
                     sB = sphi_i.unsqueeze(-1) * cpsi_j.unsqueeze(-2) + cphi_i.unsqueeze(-1) * spsi_j.unsqueeze(-2)
 
                     # x = cos(A - B) = cosA*cosB + sinA*sinB  → (B,mc,ns,q1,q2)
-                    x_block = (cA.unsqueeze(-1).unsqueeze(-1) * cB.unsqueeze(0)
-                               + sA.unsqueeze(-1).unsqueeze(-1) * sB.unsqueeze(0)).to(r_dtype)
+                    x_block = (cA.unsqueeze(-1).unsqueeze(-1) * cB.unsqueeze(0) + sA.unsqueeze(-1).unsqueeze(-1) * sB.unsqueeze(0)).to(r_dtype)
 
                     # flatten q1×q2 → ql
                     x_flat = x_block.reshape(B, mc, ns, q1 * q2)  # (B,mc,ns,ql)
@@ -234,40 +253,39 @@ def T_HS_Theta(
                         Kval = int(Kvals[g].item())
                         s = int(starts[g].item())
                         e = s + int(counts[g].item())
-                        xg = x_flat[:, s:e, :ns, :]                              # (B,m_g,ns,ql)
+                        xg = x_flat[:, s:e, :ns, :]
 
                         if Kval == 0:
                             part = (ns * log_inv_sqrt_a[s:e].view(1, e - s, 1)).expand(B, e - s, q1 * q2)
 
                         elif Kval <= 4:
-                            inv_a = 1.0 / torch.clamp(a_c[s:e], min=tiny)
-                            ex  = torch.exp(-PI * inv_a).view(1, e - s, 1, 1)
                             x2 = xg * xg
-                            S = ex * xg
+                            S = buf_ex01[s:e].view(1, e - s, 1, 1) * xg
                             if Kval >= 2:
-                                ex2 = ex * ex
-                                ex4 = ex2 * ex2
-                                S = S + ex4 * (2.0 * x2 - 1.0)
+                                S = S + buf_ex04[s:e].view(1, e - s, 1, 1) * (2.0 * x2 - 1.0)
                             if Kval >= 3:
-                                ex8 = ex4 * ex4
-                                S = S + (ex8 * ex) * (4.0 * x2 * xg - 3.0 * xg)
+                                S = S + (buf_ex08[s:e].view(1, e - s, 1, 1) * buf_ex01[s:e].view(1, e - s, 1, 1)) * (4.0 * x2 * xg - 3.0 * xg)
                             if Kval == 4:
-                                S = S + (ex8 * ex8) * (8.0 * x2 * x2 - 8.0 * x2 + 1.0)
+                                S = S + buf_ex16[s:e].view(1, e - s, 1, 1) * (8.0 * x2 * x2 - 8.0 * x2 + 1.0)
 
                             sum_expr = torch.log1p(torch.clamp(2.0 * S, min=-1.0 + tiny))
                             part = sum_expr.sum(dim=2) + (ns * log_inv_sqrt_a[s:e].view(1, e - s, 1))
 
                         else:
-                            inv_a = 1.0 / torch.clamp(a_c[s:e], min=tiny)             # (m_g,)
-                            Kf = float(Kval)
-                            cK  = torch.exp((-PI * (Kf * Kf)) * inv_a).view(1, e - s, 1, 1)
-                            rKm1= torch.exp((-(2.0 * Kf - 1.0) * PI) * inv_a).view(1, e - s, 1, 1)
-                            rho = torch.exp(( -2.0 * PI) * inv_a).view(1, e - s, 1, 1)
+                            m_g = e - s
+                            e1   = buf_ex01[s:e].view(1, m_g, 1, 1)
+                            rho  = buf_ex02[s:e].view(1, m_g, 1, 1)
+                            rKm1 = e1 * _int_pow(rho, Kval - 1)
+
+                            if (Kval & 1) == 0:
+                                cK = _int_pow(rho, (Kval * Kval) // 2)
+                            else:
+                                cK = e1 * _int_pow(rho, (Kval * Kval - 1) // 2)
 
                             b1 = torch.zeros_like(xg, dtype=r_dtype)
                             b2 = torch.zeros_like(xg, dtype=r_dtype)
-                            c = cK.clone()
-                            r = rKm1.clone()
+                            c  = cK.clone()
+                            r  = rKm1.clone()
 
                             for _ in range(Kval, 0, -1):
                                 b0 = 2.0 * xg * b1 - b2 + c
@@ -280,14 +298,12 @@ def T_HS_Theta(
 
                             S = b1 * xg - b2
                             sum_expr = torch.log1p(torch.clamp(2.0 * S, min=-1.0 + tiny))
-                            part = sum_expr.sum(dim=2) + (ns * log_inv_sqrt_a[s:e].view(1, e - s, 1))
+                            part = sum_expr.sum(dim=2) + (ns * log_inv_sqrt_a[s:e].view(1, m_g, 1))
 
-                        # ---- in-place LSE update (no cat) ----
-                        L = part + lw_blk                                         # (B,m_g,ql)
-                        Lmax = L.max(dim=-1).values                                # (B,m_g)
+                        L = part + lw_blk
+                        Lmax = L.max(dim=-1).values
                         Mx = torch.maximum(A_lse[:, s:e], Lmax)
-                        S_lse[:, s:e] = S_lse[:, s:e] * torch.exp(A_lse[:, s:e] - Mx) \
-                                         + torch.exp(L - Mx.unsqueeze(-1)).sum(dim=-1)
+                        S_lse[:, s:e] = S_lse[:, s:e] * torch.exp(A_lse[:, s:e] - Mx) + torch.exp(L - Mx.unsqueeze(-1)).sum(dim=-1)
                         A_lse[:, s:e] = Mx
 
         # η и финальный вес; 2×SGEMM (TF32 off локально)
