@@ -116,6 +116,7 @@ def T_HS_Theta(
         m1 = min(m0 + m_chunk, M)
         mc = m1 - m0
 
+        # slice per-chunk
         z_j_c     = z_j[m0:m1]
         a_c       = a_j[m0:m1]                     # (mc,)
         alpha_c   = alpha_j[m0:m1]
@@ -129,8 +130,8 @@ def T_HS_Theta(
         b = vec_d_j[m0:m1] / den.to(c_dtype)
         bR = b.real.to(r_dtype).contiguous()        # (mc,N)
         bI = b.imag.to(r_dtype).contiguous()
-        bR_eff = (kappa_eff_c.view(-1, 1) * bR)     # (mc,N)
-        bI_eff = (kappa_eff_c.view(-1, 1) * bI)
+        bR_eff = (kappa_eff_c.view(-1, 1) * bR).contiguous()     # (mc,N)
+        bI_eff = (kappa_eff_c.view(-1, 1) * bI).contiguous()
 
         # wrapped displacements
         dz = _wrap01((z.unsqueeze(1) - z_j_c.unsqueeze(0)).real.to(r_dtype)).contiguous()  # (B,mc,N)
@@ -147,18 +148,33 @@ def T_HS_Theta(
         q_ang   = one_over_sq[m0:m1].unsqueeze(0) * dd_norm2 - c_ang[m0:m1].unsqueeze(0) * (bh_dd.abs() ** 2)
         ang_fac = torch.exp(-PI * q_ang).to(r_dtype)        # (B,mc)
 
-        # LSE accumulators over q (будем закрывать каждый ns-сабтайл сразу по всему q)
+        # ---------- sort/bucket by Kp to avoid masks in Clenshaw ----------
+        perm = torch.argsort(Kp_c)                 # (mc,)
+        invp = torch.empty_like(perm)
+        invp[perm] = torch.arange(mc, device=device)
+        # permute all per-j arrays along mc
+        a_c        = a_c[perm]
+        alpha_c    = alpha_c[perm]
+        T_hat_c    = T_hat_c[perm, :]
+        Kp_c       = Kp_c[perm]
+        kappa_eff_c= kappa_eff_c[perm]
+        norm_fac_c = norm_fac_c[perm]
+        bR_eff     = bR_eff[perm, :]
+        bI_eff     = bI_eff[perm, :]
+        dz         = dz[:, perm, :]
+        ang_fac    = ang_fac[:, perm]
+
+        # groups
+        if mc > 0:
+            Kvals, counts = torch.unique_consecutive(Kp_c, return_counts=True)
+            starts = torch.cumsum(torch.cat([torch.zeros(1, device=device, dtype=counts.dtype), counts[:-1]]), dim=0)
+            num_groups = Kvals.numel()
+        else:
+            num_groups = 0
+
+        # LSE accumulators over q (закрываем на каждом ns-сабтайле)
         A_lse = torch.full((B, mc), -float("inf"), device=device, dtype=r_dtype)
         S_lse = torch.zeros((B, mc), device=device, dtype=r_dtype)
-
-        # precompute Poisson coeffs once per m-chunk (с маской по j сразу)
-        Kp_max = int(Kp_c.max().item())
-        log_inv_sqrt_a = -0.5 * torch.log(torch.clamp(a_c, min=tiny))        # (mc,)
-        if Kp_max > 0:
-            k_idx = torch.arange(1, Kp_max + 1, device=device, dtype=r_dtype).view(1, -1)  # (1,Kp_max)
-            coeff_all = torch.exp(-PI * (k_idx ** 2) / torch.clamp(a_c.view(-1,1), min=tiny))  # (mc,Kp_max)
-            mask_k = (k_idx <= Kp_c.view(-1,1)).to(r_dtype)                                    # (mc,Kp_max)
-            coeff_all.mul_(mask_k)  # сразу обнуляем хвосты, чтобы в k-цикле не ветвиться
 
         # one-shot q vectors
         t1c = t1_flat.to(r_dtype)          # (qc,)
@@ -169,11 +185,20 @@ def T_HS_Theta(
         per_elem_bufs = 2
         ns_cap_den = max(1, B * mc * qc_full)
         ns_cap = max(1, int(target_bytes // (bytes_per_elem * per_elem_bufs * ns_cap_den)))
-        for n0 in range(0, N, min(n_chunk, max(1, ns_cap))):
-            n1 = min(n0 + min(n_chunk, max(1, ns_cap)), N)
+        step_ns = min(n_chunk, max(1, ns_cap))
+
+        # preallocate Clenshaw buffers for max group width (reuse)
+        b1_buf = torch.zeros((B, mc, step_ns, qc_full), device=device, dtype=r_dtype)
+        b2_buf = torch.zeros_like(b1_buf)
+
+        # log factor outside Σ_ns
+        log_inv_sqrt_a = -0.5 * torch.log(torch.clamp(a_c, min=tiny))  # (mc,)
+
+        for n0 in range(0, N, step_ns):
+            n1 = min(n0 + step_ns, N)
             ns = n1 - n0
 
-            # shift = t1*bR_eff + t2*bI_eff  (broadcast, без mm)
+            # shift = t1*bR_eff + t2*bI_eff  (broadcast)
             sR = bR_eff[:, n0:n1].unsqueeze(-1) * t1c.view(1, 1, -1)   # (mc,ns,qc)
             sI = bI_eff[:, n0:n1].unsqueeze(-1) * t2c.view(1, 1, -1)
             shift = (sR + sI).contiguous()                              # (mc,ns,qc)
@@ -182,29 +207,53 @@ def T_HS_Theta(
             u = _wrap01(dz[:, :, n0:n1].unsqueeze(-1) - shift.unsqueeze(0))   # (B,mc,ns,qc)
             cosx = torch.cos(TWO_PI * u).contiguous()
 
-            if Kp_max == 0:
-                # sum_ns logθ = ns*(-½ log a)
-                part = (ns * log_inv_sqrt_a.view(1, mc, 1)).expand(B, mc, qc_full)  # (B,mc,qc)
-            else:
-                # Clenshaw (векторно), без ветвлений внутри по j
-                b1 = torch.zeros_like(u, dtype=r_dtype)
-                b2 = torch.zeros_like(b1)
-                for k in range(Kp_max, 0, -1):
-                    ck = coeff_all[:, k-1].view(1, mc, 1, 1)  # (1,mc,1,1)
-                    b0 = torch.addcmul(-b2, cosx, b1, value=2.0)  # 2*cosx*b1 - b2
-                    b0.add_(ck)
-                    b2, b1 = b1, b0
-                S = b1 * cosx - b2
-                sum_expr = S.mul_(2.0).add_(1.0)        # 1 + 2S
-                sum_expr.clamp_(min=tiny).log_()
-                part = sum_expr.sum(dim=2).add_(ns * log_inv_sqrt_a.view(1, mc, 1))  # (B,mc,qc)
+            # process Kp-buckets without masks inside k-loop
+            for g in range(num_groups):
+                Kval = int(Kvals[g].item())
+                s = int(starts[g].item())
+                e = s + int(counts[g].item())
+                if Kval == 0:
+                    # sum_ns logθ = ns*(-½ log a)
+                    part = (ns * log_inv_sqrt_a[s:e].view(1, e - s, 1)).expand(B, e - s, qc_full)
+                else:
+                    # Clenshaw on slice (no masks): prepare backward ladder c_k and r_k-1
+                    inv_a = 1.0 / torch.clamp(a_c[s:e], min=tiny)             # (m_g,)
+                    Kf = float(Kval)
+                    cK  = torch.exp((-PI * (Kf * Kf)) * inv_a)                # c_K
+                    rKm1= torch.exp((-(2.0 * Kf - 1.0) * PI) * inv_a)         # r_{K-1}
+                    rho = torch.exp(( -2.0 * PI) * inv_a)                     # rho
 
-            # LSE update on full-q in one shot
-            L = part.add_(lwc.view(1, 1, -1))          # (B,mc,qc)
-            Lmax = L.max(dim=-1).values                # (B,mc)
-            Mx = torch.maximum(A_lse, Lmax)
-            S_lse = S_lse.mul_(torch.exp(A_lse - Mx)).add_(torch.exp(L - Mx.unsqueeze(-1)).sum(dim=-1))
-            A_lse = Mx
+                    # Clenshaw buffers (views) and zero_
+                    b1 = b1_buf[:, s:e, :ns, :]; b1.zero_()
+                    b2 = b2_buf[:, s:e, :ns, :]; b2.zero_()
+                    cosx_g = cosx[:, s:e, :ns, :]
+
+                    c = cK.view(1, e - s, 1, 1).to(r_dtype)
+                    r = rKm1.view(1, e - s, 1, 1).to(r_dtype)
+                    rho_v = rho.view(1, e - s, 1, 1).to(r_dtype)
+
+                    for _ in range(Kval, 0, -1):
+                        # b0 = 2*cosx*b1 - b2 + c
+                        b0 = torch.addcmul(-b2, cosx_g, b1, value=2.0)
+                        b0.add_(c)
+                        b2, b1 = b1, b0
+                        # c_{k-1} = c_k / r_{k-1};  r_{k-2} = r_{k-1} / rho
+                        c = c / r
+                        r = r / rho_v
+
+                    S = b1 * cosx_g - b2
+                    sum_expr = S.mul_(2.0).add_(1.0)   # 1 + 2S
+                    sum_expr.clamp_(min=tiny).log_()   # log(1+2S)
+                    part = sum_expr.sum(dim=2).add_(ns * log_inv_sqrt_a[s:e].view(1, e - s, 1))
+
+                # LSE update for this bucket
+                L = part.add_(lwc.view(1, 1, -1))                 # (B,m_g,qc)
+                Lmax = L.max(dim=-1).values                       # (B,m_g)
+                A_blk = A_lse[:, s:e]; S_blk = S_lse[:, s:e]
+                Mx = torch.maximum(A_blk, Lmax)
+                S_blk = S_blk.mul_(torch.exp(A_blk - Mx)).add_(torch.exp(L - Mx.unsqueeze(-1)).sum(dim=-1))
+                A_lse[:, s:e] = Mx
+                S_lse[:, s:e] = S_blk
 
         # η и финальный комбинированный вес; 2×SGEMM (TF32 off локально)
         eta = (norm_fac_c.view(1, mc) * torch.exp(A_lse) * S_lse).reshape(B, mc)
