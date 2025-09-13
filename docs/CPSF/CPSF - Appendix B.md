@@ -1,273 +1,225 @@
-# Appendix B — HS-Θ (Hubbard–Stratonovich + θ-sums) for rank-1 anisotropic periodic Gaussians
+# Appendix B — Poisson-only `T_HS_Theta`: Mathematics and Theory (N ≥ 2)
 
-This appendix documents the algorithm implemented by `T_HS_theta(...)`. Notation matches the code.
+## 1. Notation and assumptions
 
-## B.1. Data, shapes, and basic notation
-
-* Inputs (devices/dtypes as in code):
-
-  * $z \in \mathbb{C}^{B\times N}$,
-  * $z_j \in \mathbb{C}^{M\times N}$,
-  * $\mathrm{vec\_d} \in \mathbb{C}^{B\times N}$,
-  * $\mathrm{vec\_d\_j} \in \mathbb{C}^{M\times N}$,
-  * $\widehat T_j \in \mathbb{C}^{M\times S}$,
-  * $\alpha_j \in \mathbb{R}^{M}$,
-  * $\sigma_{\parallel},\sigma_{\perp}\in\mathbb{R}^M_{>0}$ (component-wise for $j=1,\dots,M$).
-
-* Output: $T(z,\mathrm{vec\_d}) \in \mathbb{C}^{B\times S}$.
-
-* Toroidal wrap (component-wise):
+Dimensions: $B$ (batch), $M$ (sources), $N\ge 2$ (direction size), $S$ (output size).
+Inputs:
 
 $$
-\mathrm{wrap}(u) \;:=\; u-\mathrm{round}(u) \;\in [-\tfrac12,\tfrac12).
+\begin{aligned}
+&z\in\mathbb{R}^{B\times N},\quad z_j\in\mathbb{R}^{M\times N},\\
+&\vec d\in\mathbb{C}^{B\times N},\quad \vec d_j\in\mathbb{C}^{M\times N},\\
+&\widehat T_j\in\mathbb{C}^{M\times S},\quad \alpha_j\in\mathbb{R}^M,\\
+&\sigma_{\parallel},\sigma_{\perp}\in\mathbb{R}^M,\quad \sigma_{\parallel,j}>0,\ \sigma_{\perp,j}>0.
+\end{aligned}
 $$
 
-* Directional difference on the torus:
+1D Gauss–Hermite nodes/weights for weight $e^{-t^2}$:
+$(\tau_q,w_q)_{q=1}^Q$ (Golub–Welsch).
+2D tensor product rule: nodes $(\tau_{q_1},\tau_{q_2})$, weights $w_{q_1}w_{q_2}$.
+Fractional reduction: $\operatorname{frac}(x):=\mathrm{frac}(x+\tfrac12)-\tfrac12\in[-\tfrac12,\tfrac12)$.
+
+## 2. Anisotropy and normalization (Poisson-only)
 
 $$
-\Delta_d(\mathrm{vec\_d},\mathrm{vec\_d\_j})\in\mathbb{C}^{B\times M\times N},
+a_j:=\frac{1}{\sigma_{\perp,j}},\qquad 
+\gamma_j:=\frac{\sigma_{\perp,j}}{\sigma_{\parallel,j}},\qquad 
+\kappa_j:=\sqrt{\frac{(\sigma_{\parallel,j}-\sigma_{\perp,j})\,\sigma_{\perp,j}}{\pi\,\sigma_{\parallel,j}}}.
 $$
 
-implemented by `delta_vec_d` (fallback: plain difference if unavailable).
-
-* Unit complex direction for each contribution $j$:
-
-$$
-b_j \;:=\; \frac{\mathrm{vec\_d\_j}[j,:]}{\|\mathrm{vec\_d\_j}[j,:]\|_2}
-\;\in\;\mathbb{C}^N,
-\quad
-b_j = b_{R,j} + i\,b_{I,j},
-\quad
-\|b_j\|_2=1.
-$$
-
-* Anisotropy scalars (per $j$):
+Unit direction $b_j:=\vec d_j/\|\vec d_j\|\in\mathbb{C}^N$; real/imag parts $b_j^R,b_j^I\in\mathbb{R}^N$.
+Effective amplitude $\kappa^{\mathrm{eff}}_j:=\kappa_j\,\gamma_j^{-1/2}$.
+Phase shifts for batch $b$, source $j$, component $n$:
 
 $$
-a_j := \frac{1}{\sigma_{\perp,j}},\qquad
-\gamma_j := \frac{\sigma_{\perp,j}}{\sigma_{\parallel,j}}\in(0,1],\qquad
-\kappa_j^2 := \frac{(\sigma_{\parallel,j}-\sigma_{\perp,j})\,\sigma_{\perp,j}}{\pi\,\sigma_{\parallel,j}}\;\ge 0.
+\Delta z_{b,j,n}:=\operatorname{frac}\!\left(z_{b,n}-z_{j,n}\right)\in[-\tfrac12,\tfrac12).
 $$
 
-Scaled quantities used in code:
+Angular factor:
 
 $$
-\tilde\kappa_j := \frac{\kappa_j}{\sqrt{\gamma_j}},\qquad
-\mathrm{norm\_fac}_j := \frac{1}{\pi\sqrt{\gamma_j}}.
+q_{b,j}\ :=\ \frac{\|\vec d_b-\vec d_j\|^2}{\sigma_{\perp,j}}
+\;-\;\frac{\sigma_{\parallel,j}-\sigma_{\perp,j}}{\sigma_{\parallel,j}\sigma_{\perp,j}}\,
+\bigl|\langle b_j,\ \vec d_b-\vec d_j\rangle\bigr|^2,
+\qquad 
+\mathrm{Ang}_{b,j}:=\exp(-\pi\,q_{b,j}).
 $$
 
-* Gauss–Hermite (1D) nodes and weights (for $\int_{\mathbb{R}} e^{-\tau^2}f(\tau)\,d\tau$):
-  $\{\tau_q,w_q\}_{q=1}^{Q}$, with $Q=$ `quad_nodes`. Tensor grid $\mathcal{Q}=\{(\tau_p,\tau_q)\}_{p,q=1}^Q$, weights $w_{pq}=w_p w_q$.
-
-## B.2. HS factorization and coordinate separation
-
-For each contribution $j$ and quadrature node $(\tau_1,\tau_2)$, define per-coordinate shifted phases
+Normalization:
 
 $$
-u_{n}^{(j)}(\tau_1,\tau_2)
-\;:=\;
-\mathrm{wrap}\!\left(\operatorname{Re}(z-z_j)_{n} \;-\; \tilde\kappa_j\big(\tau_1\,b_{R,j,n} + \tau_2\,b_{I,j,n}\big)\right),
-\quad n=1,\dots,N.
+\mathcal{N}_j:=\frac{1}{\pi}\,\gamma_j^{-1/2}.
 $$
 
-Then the HS-separated factor for fixed $(\tau_1,\tau_2)$ is the product of 1D periodic Gaussians:
+## 3. Phase factorization and double trigonometric split
+
+For $q_1,q_2\in\{1,\dots,Q\}$ and $n\in\{1,\dots,N\}$:
 
 $$
-\eta_j(z\mid \tau_1,\tau_2)
-\;=\;
-\prod_{n=1}^{N}\theta_{a_j}\!\left(u_{n}^{(j)}(\tau_1,\tau_2)\right).
-$$
-
-The full $\eta_j$ combines quadrature:
-
-$$
-\boxed{\quad
-\eta_j(z)\;=\;\mathrm{norm\_fac}_j \sum_{(\tau_1,\tau_2)\in\mathcal{Q}}
-w(\tau_1)w(\tau_2)\;\prod_{n=1}^{N}\theta_{a_j}\!\big(u_{n}^{(j)}(\tau_1,\tau_2)\big)
-\quad}
-$$
-
-with accumulation in the log-domain (Sec. B.5).
-
-An independent “angular” factor, identical to `Tau_dual`, is
-
-$$
-\boxed{\;
-\mathrm{ang}_j(z,\mathrm{vec\_d})
-=
-\exp\!\Big(
--\pi\Big[
-\sigma_{\perp,j}^{-1}\,\|\Delta_d\|_2^2 \;-\;
-\frac{\sigma_{\parallel,j}-\sigma_{\perp,j}}{\sigma_{\parallel,j}\sigma_{\perp,j}}\,
-\big|\langle b_j,\Delta_d\rangle\big|^2
-\Big]\Big),
-\;}
-$$
-
-where $\Delta_d=\Delta_d(\mathrm{vec\_d},\mathrm{vec\_d\_j}[j,:])\in\mathbb{C}^{B\times N}$.
-
-## B.3. Periodic Gaussian $\theta_a(u)$ and truncations
-
-For $u\in[-\tfrac12,\tfrac12)$, $a>0$:
-
-**Direct form (lattice in real space):**
-
-$$
-\theta_a(u)=\sum_{n\in\mathbb{Z}} e^{-\pi a (u+n)^2}
-\;\approx\;
-\sum_{|n|\le W} e^{-\pi a (u+n)^2}.
-$$
-
-**Poisson form (via Poisson summation):**
-
-$$
-\theta_a(u)
-=
-\frac{1}{\sqrt{a}}+\frac{2}{\sqrt{a}}\sum_{k=1}^{\infty} e^{-\pi k^2/a}\cos(2\pi k u)
-\;\approx\;
-\frac{1}{\sqrt{a}}+\frac{2}{\sqrt{a}}\sum_{k=1}^{K} e^{-\pi k^2/a}\cos(2\pi k u).
-$$
-
-**Form and radii selection.** With a per-$\theta$ error budget
-
-$$
-\varepsilon_\theta := \frac{\varepsilon_{\mathrm{tot}}}{2\,N\,Q^2},
-$$
-
-the code uses
-
-$$
-W \;\approx\; \Big\lceil \sqrt{\frac{-\log \varepsilon_\theta}{\pi a}}\Big\rceil + 1,\qquad
-K \;\approx\; \Big\lceil \sqrt{\frac{a}{\pi}(-\log \varepsilon_\theta)}\Big\rceil.
-$$
-
-Mode:
-
-$$
-\texttt{auto}:~ \text{Direct if } a\ge a_{\mathrm{thr}},~ \text{Poisson otherwise};\quad
-\texttt{direct}/\texttt{poisson}:~ forced.
-$$
-
-## B.4. Quadrature and log-domain accumulation
-
-Let $L_{j}(\tau_1,\tau_2):=\sum_{n=1}^N \log \theta_{a_j}(u_n^{(j)}(\tau_1,\tau_2))$.
-Then
-
-$$
-\eta_j(z)=\mathrm{norm\_fac}_j \sum_{(\tau_1,\tau_2)\in\mathcal{Q}} \exp\!\big(L_j(\tau_1,\tau_2)+\log w(\tau_1) + \log w(\tau_2)\big).
-$$
-
-Numerically:
-
-* the sum over $n$ is carried as $\sum \log(\cdot)$ in chunks of coordinates;
-* the sum over $(\tau_1,\tau_2)$ is accumulated with online log-sum-exp (Sec. B.5).
-
-## B.5. Streaming accumulators and chunking
-
-Chunking parameters (as in code): `m_chunk` over contributions $j$, `n_chunk` over coordinates $n$, `q_chunk` over GH-node pairs $(\tau_1,\tau_2)$. `q_chunk` is chosen adaptively from available memory.
-
-**Online LSE over a chunk $\mathcal{Q}_{\mathrm{chunk}}$.** Maintain $(A_j,S_j)$ such that
-
-$$
-\sum_{(\tau_1,\tau_2)\in \mathcal{Q}_{\le}} e^{L_j(\tau_1,\tau_2)}
-= e^{A_j} S_j.
-$$
-
-For a new chunk with values $\{L_j^{(q)}\}_{q\in\mathcal{Q}_{\mathrm{chunk}}}$,
-
-$$
-A_j^{\mathrm{new}} = \max\big(A_j,\max_{q} L_j^{(q)}\big),\quad
-S_j^{\mathrm{new}} = S_j\,e^{A_j-A_j^{\mathrm{new}}} + \sum_{q} e^{L_j^{(q)}-A_j^{\mathrm{new}}}.
-$$
-
-At the end,
-
-$$
-\eta_j(z) = \mathrm{norm\_fac}_j \, e^{A_j} S_j.
-$$
-
-**Direct/Poisson partition.** In `auto`, contributions split into $\,J_{\mathrm{dir}}=\{j:a_j\ge a_{\mathrm{thr}}\}$ and $J_{\mathrm{poi}}=\{j:a_j< a_{\mathrm{thr}}\}$. For each $q$-chunk, compute $\theta_a$ **separately** on these subsets:
-
-* Direct (stream over offsets $n\in[-W_j,W_j]$; mask $|n|\le W_j$ per $j$):
-
-$$
-\theta_{a_j}(u) \approx \sum_{|n|\le W_j} e^{-\pi a_j (u+n)^2}.
-$$
-
-* Poisson (stream over harmonics $k=1..K_j$; $k=0$ term $1/\sqrt{a_j}$ added once):
-
-$$
-\theta_{a_j}(u) \approx \frac{1}{\sqrt{a_j}} + 
-\frac{2}{\sqrt{a_j}}\sum_{k=1}^{K_j} e^{-\pi k^2/a_j}\cos(2\pi k u).
-$$
-
-Per-coordinate products $\prod_n \theta_{a_j}(\cdot)$ are accumulated as $\sum_n \log \theta_{a_j}(\cdot)$. Before $\log$, values are clamped below by machine-`tiny`.
-
-## B.6. Angular factor and spectral aggregation
-
-For each $j$,
-
-$$
-\mathrm{ang}_j(z,\mathrm{vec\_d}) = \exp\!\Big(
--\pi\big[\sigma_{\perp,j}^{-1}\,\|\Delta_d\|_2^2
-- \tfrac{\sigma_{\parallel,j}-\sigma_{\perp,j}}{\sigma_{\parallel,j}\sigma_{\perp,j}}
-|\langle b_j,\Delta_d\rangle|^2\big]\Big),
+\phi_{j,n}(q_1):=2\pi\,\tau_{q_1}\,\kappa_j^{\mathrm{eff}}\, b^R_{j,n},\qquad
+\psi_{j,n}(q_2):=2\pi\,\tau_{q_2}\,\kappa_j^{\mathrm{eff}}\, b^I_{j,n}.
 $$
 
 $$
-\eta_j(z) = \mathrm{norm\_fac}_j \, e^{A_j} S_j.
+\theta_{b,j,n}(q_1,q_2):=2\pi\,\Delta z_{b,j,n}-\bigl(\phi_{j,n}(q_1)+\psi_{j,n}(q_2)\bigr).
 $$
 
-Define weights $w_j(z):=\alpha_j\,\mathrm{ang}_j(z,\mathrm{vec\_d})\,\eta_j(z)\in\mathbb{R}^{B}$. The final field is
+Define $x_{b,j,n}(q_1,q_2):=\cos\theta_{b,j,n}(q_1,q_2)$ via
 
 $$
-\boxed{\quad
-T(z,\mathrm{vec\_d})
-\;=\;
-\sum_{j=1}^{M} w_j(z)\;\widehat T_j
-\;\in\;\mathbb{C}^{B\times S}.
-\quad}
+\cos(\theta)=\cos A\cos B+\sin A\sin B,\quad
+\cos(\phi+\psi)=\cos\phi\cos\psi-\sin\phi\sin\psi,
 $$
 
-## B.7. Numerical details
+with $A=2\pi\,\Delta z_{b,j,n}$, $B=\phi_{j,n}(q_1)+\psi_{j,n}(q_2)$.
+Thus $\cos A,\sin A$ are computed per $(b,j,n)$; $\cos\phi,\sin\phi$ per $(j,n,q_1)$; $\cos\psi,\sin\psi$ per $(j,n,q_2)$.
 
-* **Log domain:** products in $n$ → sums of logs; quadrature sum → online LSE accumulators $(A_j,S_j)$.
-* **Truncation:** $W_j,K_j$ from $\varepsilon_\theta=\varepsilon_{\mathrm{tot}}/(2NQ^2)$ (B.3).
-* **Mode selection:** `poisson` is preferable for small $a_j$ (large $\sigma_{\perp,j}$); `direct` for large $a_j$. `auto` uses the threshold $a_{\mathrm{thr}}$.
-* **Memory:** no materialization of $(B,mc,Nc,qc,K)$ / $(B,mc,Nc,qc,\mathrm{No})$ / $(B,mc,Q^2)$; only streaming buffers of shape $(B,mc,Nc,qc)$. `q_chunk` is set adaptively from free memory (with min/max caps).
-* **Safeguards:** all $\theta_a$ are clamped below by dtype-dependent `tiny` before $\log$.
+## 4. Spectral series and tail control
 
-## B.8. Pseudocode (one $m$-chunk)
+Chebyshev polynomials of the first kind: $T_k(\cos\vartheta)=\cos(k\vartheta)$, $|T_k(x)|\le 1$ for $|x|\le 1$.
+Coefficients:
 
-```
-Input: z(B,N), z_j(mc,N), vec_d(B,N), vec_d_j(mc,N), T_hat_j(mc,S),
-       alpha_j(mc), σ∥(mc), σ⊥(mc), Q, eps_tot, a_thr, n_chunk
-Output: ΔT(B,S)
+$$
+c_{j,k}:=\exp\!\bigl(-\pi\,k^2\,a_j^{-1}\bigr),\qquad 
+r_{j,k}:=\frac{c_{j,k+1}}{c_{j,k}}=\exp\!\bigl(-(2k+1)\pi\,a_j^{-1}\bigr),\quad 
+\rho_j:=e^{-2\pi a_j^{-1}}.
+$$
 
-Precompute per j:
-  a=1/σ⊥, γ=σ⊥/σ∥, κ^2=((σ∥−σ⊥)σ⊥)/(πσ∥), κ_eff=κ/√γ, norm_fac=1/(π√γ)
-  choose mode_j ∈ {Direct, Poisson}; compute W_j or K_j from eps_tot/(2 N Q^2)
+Per $(b,j,n,q_1,q_2)$ and truncation $K\in\mathbb{N}$:
 
-dz = wrap( Re(z) − Re(z_j) ) ∈ ℝ^{B×mc×N}
-ang_fac(B,mc) from Δd(vec_d, vec_d_j)  # same as Tau_dual
+$$
+S_{b,j,n}(q_1,q_2;K):=\sum_{k=1}^{K} c_{j,k}\,T_k\!\bigl(x_{b,j,n}(q_1,q_2)\bigr).
+$$
 
-A_lse(B,mc) = −∞ ; S_lse(B,mc) = 0
+**Closed form for $K\le 4$** via one base $e_j:=e^{-\pi a_j^{-1}}$:
 
-for (τ1,τ2) in GH grid, in q-chunks:
-  for n in [1..N] in n-chunks:
-    for j in J_dir:                # a_j ≥ a_thr
-      u_d(B,|J_dir|,Nc,qc) = dz − κ_eff(j)*(τ1 b_R + τ2 b_I)
-      θ_direct via streaming over offsets n∈[−W_j..W_j] (mask |n|≤W_j), keep axis qc
-      accumulate log over coordinates Nc
-    for j in J_poi:                # a_j < a_thr
-      u_p(B,|J_poi|,Nc,qc) = dz − κ_eff(j)*(τ1 b_R + τ2 b_I)
-      θ_poisson = 1/√a_j + streaming sum k=1..K_j of exp(−πk^2/a_j) cos(2πk u_p)
-      accumulate log over coordinates Nc
+$$
+c_{j,1}=e_j,\quad c_{j,2}=e_j^{4},\quad c_{j,3}=e_j^{9},\quad c_{j,4}=e_j^{16}.
+$$
 
-  L_dir = log_acc_dir + log w(τ1) + log w(τ2)  # shape (B,|J_dir|)
-  L_poi = log_acc_poi + log w(τ1) + log w(τ2)  # shape (B,|J_poi|)
-  online-LSE merge (A_lse,S_lse) with L_dir and L_poi
+**Clenshaw for $K>4$** with
 
-eta(B,mc) = norm_fac · exp(A_lse) · S_lse
-ΔT(B,S) += (alpha(mc) ⊙ ang_fac(B,mc) ⊙ eta(B,mc)) · T_hat_j(mc,S)
-```
+$$
+c_{j,K}=
+\begin{cases}
+\rho_j^{K^2/2},& K\ \text{even},\\[2pt]
+e_j\,\rho_j^{(K^2-1)/2},& K\ \text{odd}.
+\end{cases}
+$$
+
+**Tail bound (geometric):**
+
+$$
+\sum_{m\ge 1} c_{j,K+m}\,\bigl|T_{K+m}(x)\bigr|
+\;\le\; \frac{c_{j,K}\,r_{j,K}}{1-r_{j,K}}.
+$$
+
+## 5. Log-domain stabilization and error allocation
+
+Per $(b,j,q_1,q_2)$, sum over $n=1,\dots,N$:
+
+$$
+\Lambda_{b,j}(q_1,q_2):=\sum_{n=1}^{N}\log\!\bigl(1+2\,S_{b,j,n}(q_1,q_2;K_j)\bigr)-\tfrac12\,N\,\log a_j.
+$$
+
+2D quadrature (log-sum-exp):
+
+$$
+\mathcal{L}_{b,j}:=\log\sum_{q_1,q_2=1}^{Q}\exp\!\Bigl(\Lambda_{b,j}(q_1,q_2)+\log w_{q_1}+\log w_{q_2}\Bigr).
+$$
+
+Set
+
+$$
+\eta_{b,j}:=\mathcal{N}_j\,\exp(\mathcal{L}_{b,j}).
+$$
+
+**Lipschitz control.** For $f(x)=\log(1+2x)$ on $x>-1/2$:
+
+$$
+|f'(x)|=\frac{2}{1+2x}\le 2.
+$$
+
+Hence, if $|\Delta S_{b,j,n}(q_1,q_2)|\le \varepsilon_\theta$ pointwise, then
+
+$$
+\bigl|\Delta \Lambda_{b,j}\bigr|\le 2\,N\,Q^2\,\varepsilon_\theta.
+$$
+
+Choose
+
+$$
+\varepsilon_\theta:=\frac{\varepsilon_{\mathrm{total}}}{2\,N\,Q^2}.
+$$
+
+**Stopping rule (strict):**
+
+$$
+\frac{c_{j,K}\,r_{j,K}}{1-r_{j,K}}\ \le\ \varepsilon_\theta.
+$$
+
+## 6. Final assembly
+
+Weights:
+
+$$
+W_{b,j}:=\alpha_j\,\mathrm{Ang}_{b,j}\,\eta_{b,j}\ \in\ \mathbb{R}_{\ge 0}.
+$$
+
+Output, for $s=1,\dots,S$:
+
+$$
+\mathrm{Re}\,T_{b,s}\ =\ \sum_{j=1}^{M} W_{b,j}\,\mathrm{Re}\,\widehat T_{j,s},\qquad
+\mathrm{Im}\,T_{b,s}\ =\ \sum_{j=1}^{M} W_{b,j}\,\mathrm{Im}\,\widehat T_{j,s}.
+$$
+
+(Implementation: two GEMMs for real/imag parts.)
+
+## 7. Streaming and tiling
+
+* Source tiling: $j\in[m_0,m_1)$ with $m_c=m_1-m_0$.
+* $K$-bucketing: sort $j$ by $K_j$, process groups of equal $K$.
+* Coordinate tiling: $n\in[n_0,n_1)$; accumulate $\sum_n \log(1+2S_{b,j,n})$ without materializing $(B\times m_c\times N\times Q^2)$.
+* Quadrature tiling: outer-product assembly of $\cos(\phi+\psi),\sin(\phi+\psi)$ from $(j,n,q_1)$ and $(j,n,q_2)$; log-sum-exp accumulator $(A_{b,j},S_{b,j})$ updated per $(q_1,q_2)$-tile.
+
+## 8. Numerical guards
+
+* Machine guard $\texttt{tiny}$ by dtype.
+* $\log(\max(w_q,\texttt{tiny}))$, $\log(\max(a_j,\texttt{tiny}))$, $\log(1+\max(2S,-1+\texttt{tiny}))$.
+* Denominator guard $\max(1-r_{j,K},\texttt{tiny})$.
+* Phase reduction via $\operatorname{frac}$ on $[-\tfrac12,\tfrac12)$.
+* If available: use $\mathrm{sincos}$ for paired trigonometry.
+
+## 9. Complexity and memory
+
+Let $Q$ be 1D quadrature size (2D has $Q^2$ nodes).
+Time:
+
+$$
+\Theta\!\bigl(B\,M\,N\,Q^2\bigr)
+\quad (\text{constant factors reduced by 1D trig split and streaming}).
+$$
+
+Peak memory (per source tile):
+
+$$
+\mathcal{O}\!\bigl(B\,m_c + B\,m_c\,n_s + m_c\,S\bigr),
+$$
+
+with $m_c$ = source-chunk size, $n_s$ = coordinate-tile size. Quadrature cache: $\mathcal{O}(Q)$.
+
+## 10. Differentiability
+
+All continuous inputs $(z,z_j,\vec d,\vec d_j,\alpha_j,\sigma_{\parallel},\sigma_{\perp})$ pass through smooth operations (trigonometry, algebra, $\exp,\log,\log1p$, LSE, GEMM). The scheme is differentiable almost everywhere w\.r.t. these parameters. Discrete components (sorting by $K_j$, integer $K_j$ selection) are piecewise-constant by design for truncation control.
+
+## 11. Tolerance verification
+
+Local truncation:
+
+$$
+\frac{c_{j,K}\,r_{j,K}}{1-r_{j,K}}\ \le\ \varepsilon_\theta,\qquad 
+\varepsilon_\theta=\frac{\varepsilon_{\mathrm{total}}}{2\,N\,Q^2}.
+$$
+
+Global contribution to the log-sum bounded by $\varepsilon_{\mathrm{total}}$ via the 2-Lipschitz bound of $x\mapsto\log(1+2x)$ on $x>-1/2$.
+2D GH product rule achieves the standard polynomial-moment exactness up to degree $2Q-1$ per axis.
