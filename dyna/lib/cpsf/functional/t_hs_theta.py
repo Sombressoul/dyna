@@ -26,7 +26,7 @@ def fused_sincos(
     Aphase: torch.Tensor,
     phi: torch.Tensor,
     psi: torch.Tensor,
-) -> tuple[torch.Tensor]:
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
     cA, sA = torch.cos(Aphase), torch.sin(Aphase)
     cphi, sphi = torch.cos(phi), torch.sin(phi)
     cpsi, spsi = torch.cos(psi), torch.sin(psi)
