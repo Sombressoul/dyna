@@ -145,6 +145,10 @@ def main():
         R_j=None,
     )
 
+    print(f"\nValues diagnostic:")
+    print(f"T_dual: \n\t{T_dual.real.mean()=}\n\t{T_dual.real.min()=}\n\t{T_dual.real.max()=}")
+    print(f"T_hs:   \n\t{T_hs.real.mean()=}\n\t{T_hs.real.min()=}\n\t{T_hs.real.max()=}")
+
     eps = torch.as_tensor(1e-12, device=dev, dtype=REAL)
     diff = T_hs - T_dual
     l2_dual = torch.linalg.vector_norm(T_dual, dim=-1)
