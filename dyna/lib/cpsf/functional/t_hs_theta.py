@@ -173,7 +173,7 @@ def T_HSTheta(
         q_ang = one_over_sq[m0:m1].unsqueeze(0) * dd_norm2 - c_ang[m0:m1].unsqueeze(
             0
         ) * (bh_dd.abs() ** 2)
-        ang_fac = torch.exp(-PI * q_ang).to(r_dtype)
+        log_ang = (-PI) * q_ang
 
         # ======================= K-bucket (detached) =======================
         perm = torch.argsort(Kp_c_det)
@@ -186,7 +186,7 @@ def T_HSTheta(
         bR_eff = bR_eff[perm, :]
         bI_eff = bI_eff[perm, :]
         dz = dz[:, perm, :]
-        ang_fac = ang_fac[:, perm]
+        log_ang = log_ang[:, perm]
 
         if mc > 0:
             Kvals, counts = torch.unique_consecutive(Kp_c, return_counts=True)
@@ -377,10 +377,21 @@ def T_HSTheta(
                     combined = torch.cat([L_accum[:, s:e, :], group_lse], dim=-1)
                     L_accum[:, s:e, :] = torch.logsumexp(combined, dim=-1, keepdim=True)
 
-        eta = (norm_fac_c.view(1, mc) * torch.exp(L_accum.squeeze(-1))).reshape(B, mc)
-        weight = (alpha_c.reshape(1, mc) * ang_fac.reshape(B, mc) * eta).to(
-            torch.float32
+        log_eta = torch.log(torch.clamp(norm_fac_c, min=tiny)).view(
+            1, mc
+        ) + L_accum.squeeze(-1)
+        alpha_abs = alpha_c.abs()
+        log_alpha_c = torch.where(
+            alpha_abs == 0,
+            torch.full_like(alpha_abs, -float("inf")),
+            torch.log(alpha_abs),
         )
+        sign_alpha_c = torch.sign(alpha_c)
+        log_alpha = log_alpha_c.view(1, mc).expand(B, mc)
+        sign_full = sign_alpha_c.view(1, mc).expand(B, mc).to(torch.float32)
+        log_w_full = log_eta + log_ang + log_alpha
+        row_max = torch.amax(log_w_full, dim=1, keepdim=True)
+        w32 = torch.exp(log_w_full - row_max).to(torch.float32) * sign_full
 
         R = T_hat_c.real.to(torch.float32)
         I = T_hat_c.imag.to(torch.float32)
@@ -389,12 +400,16 @@ def T_HSTheta(
             prev_tf32 = torch.backends.cuda.matmul.allow_tf32
             torch.backends.cuda.matmul.allow_tf32 = False
             try:
-                T_out.real = T_out.real + weight @ R
-                T_out.imag = T_out.imag + weight @ I
+                part_R = w32 @ R
+                part_I = w32 @ I
             finally:
                 torch.backends.cuda.matmul.allow_tf32 = prev_tf32
         else:
-            T_out.real = T_out.real + weight @ R
-            T_out.imag = T_out.imag + weight @ I
+            part_R = w32 @ R
+            part_I = w32 @ I
+
+        scale = torch.exp(row_max.squeeze(1)).to(part_R.dtype)
+        T_out.real = T_out.real + (scale.unsqueeze(1) * part_R).to(T_out.real.dtype)
+        T_out.imag = T_out.imag + (scale.unsqueeze(1) * part_I).to(T_out.imag.dtype)
 
     return T_out
