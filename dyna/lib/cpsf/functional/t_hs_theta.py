@@ -186,6 +186,9 @@ def T_HSTheta(
         dzR = dzR[:, perm, :]
         dzI = dzI[:, perm, :]
         log_ang = log_ang[:, perm]
+        bR = bR[perm, :]
+        bI = bI[perm, :]
+        c_ang_c = c_ang[perm]
 
         if mc > 0:
             Kvals, counts = torch.unique_consecutive(Kp_c, return_counts=True)
@@ -346,20 +349,6 @@ def T_HSTheta(
                                 ns * log_inv_sqrt_a[s:e].view(1, m_g, 1)
                             )
 
-                        neg_im = (-PI) * (
-                            a_c[s:e].view(1, m_g, 1) * dzI2_sum[:, s:e, :]
-                        )
-                        part = part + neg_im
-                        bR_se = bR[s:e, n0:n1]
-                        bI_se = bI[s:e, n0:n1]
-                        dzI_se = dzI[:, s:e, n0:n1]
-                        proj_real = (bR_se.unsqueeze(0) * dzI_se).sum(dim=2)
-                        proj_imag = (bI_se.unsqueeze(0) * dzI_se).sum(dim=2)
-                        proj_abs2 = proj_real * proj_real + proj_imag * proj_imag
-                        aniso_par = (
-                            PI * c_ang[s:e].view(1, m_g, 1)
-                        ) * proj_abs2.unsqueeze(-1)
-                        part = part + aniso_par
                         i_idx = i0 // q1_step
                         j_idx = j0 // q2_step
                         if q_lwblk[i_idx][j_idx] is None:
@@ -391,9 +380,20 @@ def T_HSTheta(
                     combined = torch.cat([L_accum[:, s:e, :], group_lse], dim=-1)
                     L_accum[:, s:e, :] = torch.logsumexp(combined, dim=-1, keepdim=True)
 
-        log_eta = torch.log(torch.clamp(norm_fac_c, min=tiny)).view(
-            1, mc
-        ) + L_accum.squeeze(-1)
+        u = dzI
+        u2_sum = (u * u).sum(dim=2)
+        proj_r = (bR.unsqueeze(0) * u).sum(dim=2)
+        proj_i = (bI.unsqueeze(0) * u).sum(dim=2)
+        proj_abs2 = proj_r * proj_r + proj_i * proj_i
+        log_im = (-PI) * (a_c.view(1, mc) * u2_sum) + (PI) * (
+            c_ang_c.view(1, mc) * proj_abs2
+        )
+
+        log_eta = (
+            torch.log(torch.clamp(norm_fac_c, min=tiny)).view(1, mc)
+            + L_accum.squeeze(-1)
+            + log_im
+        )
         alpha_abs = alpha_c.abs()
         log_alpha_c = torch.where(
             alpha_abs == 0,
