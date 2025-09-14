@@ -959,38 +959,96 @@ def Tau_dual(
     R_j: Optional[torch.Tensor] = None,
 ) -> torch.Tensor:
     """
-    Tau backend: dual (Poisson) summation over integer frequencies.
+    Tau backend: dual (Poisson) summation over integer frequencies, with complex
+    spectral coordinates support (handles Im(z)).
 
     What it does
     ------------
-    - Evaluates CPSF contribution in the reciprocal lattice.
-    - Uses frequencies k in Z^N (router supplies symmetric set, e.g. {0} U {+-k}).
-    - Computes angular factor exp(-pi * delta^H S0^{-1} delta), spectral weights
-    exp(-pi * k^H S0 k), and complex phase from dz.
-    - Takes real part of the spectral sum to obtain a real envelope eta.
-    - Returns T(z, vec_d) = sum_j (alpha_j * eta_j) * T_hat_j with real weight.
+    Evaluates the CPSF contribution in the reciprocal lattice. Uses a symmetric
+    set of integer frequencies k in Z^N and accumulates a real envelope eta_j
+    per source j, then returns
+        T(z, vec_d) = sum_j (alpha_j * eta_j) * T_hat_j
+    with a real weight.
 
-    Where it is used
-    ----------------
-    - Fat kernels (large sigma_*): only a small number of harmonics matter.
-    - High-dimensional regimes: K stays small (often K ~ 1 or 1+2N for R=1).
+    Mathematical sketch
+    -------------------
+    Let dz = z - z_j (complex), dd = delta_vec_d(vec_d, vec_d_j).
 
-    Why no runtime checks here
-    --------------------------
-    - The router enforces k-shape [K, N], symmetry, truncation policy, and dtypes.
-    - This function focuses on fast vectorized evaluation.
+    Denote sp = sigma_par, sq = sigma_perp, a = 1/sq, and
 
-    Strengths
-    ---------
-    - Good scaling in N when sigma_* is large; compute and memory ~ O(M * K).
-    - No spatial combinatorial explosion; numerically stable.
+        c_ang = (sp - sq) / (sp * sq) = 1/sq - 1/sp.
 
-    Weaknesses
+    Let b be the first column of R(vec_d_j) (unit axis aligned with vec_d_j).
+
+    1) Angular factor (directional geometry, real):
+        q_ang = a * ||dd||^2 - c_ang * |<b, dd>|^2
+        ang_dir = exp(-pi * q_ang)
+
+    2) Imaginary-position penalty (free imaginary torus coordinate):
+    ```
+       u        = Im(dz)   # no wrapping
+       im_iso   = -pi * a * sum_n (u_n^2)
+       im_aniso = +pi * c_ang * | sum_n conj(b_n) * u_n |^2
+       ang = ang_dir * exp(im_iso + im_aniso)
+    ```
+       Note: Only Re(dz) enters the oscillatory phase; Im(dz) enters as a
+       multiplicative Gaussian factor. This matches the canonical CPSF form.
+
+    3) Spectral (reciprocal-lattice) weights for k in Z^N:
+    ```
+        q_k = sq * ||k||^2 + (sp - sq) * |<b, k>|^2
+        w_k = exp(-pi * q_k)
+    ```
+
+    4) Complex phase from the wrapped real coordinate only:
+    ```
+        phase = exp( 2*pi*i * <k, Re(dz)> )
+    ```
+
+    5) Dual sum and envelope:
+    ```
+        dual_sum = sum_k ( w_k * phase ).real
+        det_sqrt = sqrt( sq^(N-1) * sp )
+        eta_j = ang * det_sqrt * dual_sum
+    ```
+
+    Shapes and broadcasting
+    -----------------------
+    - z:           [B, N] or [..., B, N] complex
+    - z_j:         [M, N] complex
+    - vec_d:       [B, N] complex
+    - vec_d_j:     [M, N] complex
+    - T_hat_j:     [M, S] complex
+    - alpha_j:     [M] real
+    - sigma_par:   [M] real
+    - sigma_perp:  [M] real
+    - k:           [K, N] real integers
+    - R_j (opt):   [M, N, N] complex unitary; if None, computed as R(vec_d_j)
+
+    Broadcasting assumes a batch over B and sources over M. The router is
+    expected to supply a symmetric frequency set (e.g., {0} U {+-k}), enforce
+    dtypes, and ensure shapes are consistent.
+
+    Numerical notes
+    ---------------
+    - Only Re(dz) contributes to the oscillatory phase; Im(dz) contributes via
+      exp(im_iso + im_aniso), which is a purely real damping/amplification
+      term consistent with the CPSF Gaussian envelope.
+    - The angular factor uses the same a and c_ang parameters as in the spatial
+      block of the covariance.
+    - The final eta_j is real by construction; any tiny imaginary residue from
+      finite precision is dropped via .real.
+
+    Complexity
     ----------
-    - Requires a frequency-set builder and truncation tolerance.
-    - For very narrow kernels K grows and this backend becomes inefficient
-    compared to nearest/classic.
-    - Non-symmetric k may produce tiny imaginary residue (we drop via .real).
+    Compute and memory scale as O(B * (M * K + M * N)) with vectorized einsums.
+
+    Returns
+    -------
+    T : torch.Tensor of shape [B, S], complex
+        Field values obtained by summing per-source spectral envelopes against
+        T_hat_j with real weights (alpha_j * eta_j).
+
     """
 
     device = z.device
@@ -1005,10 +1063,19 @@ def Tau_dual(
     sq = torch.as_tensor(sigma_perp, device=device, dtype=r_dtype)
     a = 1.0 / sq
     c = (sp - sq) / (sp * sq + 0.0)
+    u = dz.imag.to(r_dtype)
+    b_exp = torch.conj(b).unsqueeze(0)
+    proj = (b_exp * u).sum(dim=-1)
+    proj_abs2 = proj.real * proj.real + proj.imag * proj.imag
+    u2_sum = (u * u).sum(dim=-1)
+    im_iso = (-math.pi) * a.unsqueeze(0) * u2_sum
+    im_aniso = (math.pi) * c.unsqueeze(0) * proj_abs2
     dd_norm2 = (dd.abs() ** 2).sum(dim=-1)
     bh_dd = (torch.conj(b) * dd).sum(dim=-1)
     q_ang = a * dd_norm2 - c * (bh_dd.abs() ** 2)
     ang = torch.exp(-math.pi * q_ang)
+    ang = ang * torch.exp(im_iso + im_aniso)
+    ang = ang.squeeze(0)
     k_r = k.to(device=device, dtype=r_dtype)
     k_norm2 = (k_r**2).sum(dim=-1)
     k_c = torch.complex(k_r, torch.zeros_like(k_r))
