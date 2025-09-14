@@ -26,7 +26,9 @@ def fused_sincos(
     Aphase: torch.Tensor,
     phi: torch.Tensor,
     psi: torch.Tensor,
-) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+) -> tuple[
+    torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor
+]:
     cA, sA = torch.cos(Aphase), torch.sin(Aphase)
     cphi, sphi = torch.cos(phi), torch.sin(phi)
     cpsi, spsi = torch.cos(psi), torch.sin(psi)
@@ -55,12 +57,6 @@ def T_HSTheta(
     PI = math.pi
     TWO_PI = 2.0 * math.pi
     tiny = torch.as_tensor(torch.finfo(r_dtype).tiny, device=device, dtype=r_dtype)
-
-    def _frac01(x: torch.Tensor):
-        return torch.frac(x + 0.5) - 0.5
-
-    def _norm(x: torch.Tensor, dim: int = -1, keepdim: bool = False):
-        return torch.linalg.vector_norm(x, dim=dim, keepdim=keepdim)
 
     if not hasattr(T_HSTheta, "_gh1d_cache"):
         T_HSTheta._gh1d_cache = {}
@@ -153,15 +149,20 @@ def T_HSTheta(
         kappa_eff_c = kappa_eff[m0:m1]
         norm_fac_c = norm_fac[m0:m1]
 
-        inv_den = 1.0 / _norm(vec_d_j[m0:m1], dim=-1, keepdim=True).to(
-            r_dtype
-        ).clamp_min(tiny)
+        inv_den = 1.0 / torch.linalg.vector_norm(
+            vec_d_j[m0:m1], dim=-1, keepdim=True
+        ).to(r_dtype).clamp_min(tiny)
         b = vec_d_j[m0:m1] * inv_den.to(c_dtype)
         bR = b.real.to(r_dtype)
         bI = b.imag.to(r_dtype)
         bR_eff = (kappa_eff_c.view(-1, 1) * bR).contiguous()
         bI_eff = (kappa_eff_c.view(-1, 1) * bI).contiguous()
-        dz = _frac01((z.unsqueeze(1) - z_j_c.unsqueeze(0)).real.to(r_dtype))
+        dz = (
+            torch.remainder(
+                (z.unsqueeze(1) - z_j_c.unsqueeze(0)).real.to(r_dtype) + 0.5, 1.0
+            )
+            - 0.5
+        )
         dd = delta_vec_d(
             vec_d=vec_d.unsqueeze(1).expand(B, mc, N),
             vec_d_j=vec_d_j[m0:m1].unsqueeze(0).expand(B, mc, N),
@@ -351,7 +352,7 @@ def T_HSTheta(
                             q_lwblk[i_idx][j_idx] = (
                                 logw_1d[i0:i1].view(1, 1, q1, 1)
                                 + logw_1d[j0:j1].view(1, 1, 1, q2)
-                            ).view(1, 1, q1 * q2)
+                            ).view(1, 1, q1q2)
 
                         acc = q_accum[g][i_idx][j_idx]
                         if acc is None:
