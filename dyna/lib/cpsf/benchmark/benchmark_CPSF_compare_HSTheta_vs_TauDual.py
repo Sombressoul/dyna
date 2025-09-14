@@ -63,6 +63,7 @@ def main():
     ap.add_argument("--n_chunk", type=int, default=256)
     ap.add_argument("--m_chunk", type=int, default=256)
     # misc
+    ap.add_argument("--phase_scale", type=float, default=0.0)
     ap.add_argument("--seed", type=int, default=42)
     args = ap.parse_args()
 
@@ -89,9 +90,11 @@ def main():
     print(f"HS-Theta: quad_nodes={args.quad_nodes}, eps_total={args.eps_total}")
 
     z = _make_complex((B, N), CDTYPE, dev, seed=args.seed + 1)
+    z.imag = z.imag * args.phase_scale
     vec_d = _make_unit_batch(B, N, CDTYPE, dev, seed=args.seed + 2)
 
     z_j = _make_complex((M, N), CDTYPE, dev, seed=args.seed + 3)
+    z_j.imag = z_j.imag * args.phase_scale
     vec_d_j = _make_unit_batch(M, N, CDTYPE, dev, seed=args.seed + 4)
     T_hat_j = _make_complex((M, S), CDTYPE, dev, seed=args.seed + 5)
 

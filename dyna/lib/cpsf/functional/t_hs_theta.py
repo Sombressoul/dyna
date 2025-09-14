@@ -157,12 +157,10 @@ def T_HSTheta(
         bI = b.imag.to(r_dtype)
         bR_eff = (kappa_eff_c.view(-1, 1) * bR).contiguous()
         bI_eff = (kappa_eff_c.view(-1, 1) * bI).contiguous()
-        dz = (
-            torch.remainder(
-                (z.unsqueeze(1) - z_j_c.unsqueeze(0)).real.to(r_dtype) + 0.5, 1.0
-            )
-            - 0.5
-        )
+        dZ = z.unsqueeze(1) - z_j_c.unsqueeze(0)
+        dzR = torch.remainder(dZ.real.to(r_dtype) + 0.5, 1.0) - 0.5
+        dzI = dZ.imag.to(r_dtype)
+
         dd = delta_vec_d(
             vec_d=vec_d.unsqueeze(1).expand(B, mc, N),
             vec_d_j=vec_d_j[m0:m1].unsqueeze(0).expand(B, mc, N),
@@ -185,7 +183,8 @@ def T_HSTheta(
         norm_fac_c = norm_fac_c[perm]
         bR_eff = bR_eff[perm, :]
         bI_eff = bI_eff[perm, :]
-        dz = dz[:, perm, :]
+        dzR = dzR[:, perm, :]
+        dzI = dzI[:, perm, :]
         log_ang = log_ang[:, perm]
 
         if mc > 0:
@@ -238,10 +237,11 @@ def T_HSTheta(
             n1 = min(n0 + step_ns, N)
             ns = n1 - n0
 
-            Aphase = TWO_PI * dz[:, :, n0:n1]
+            Aphase = TWO_PI * dzR[:, :, n0:n1]
             phi = TWO_PI * (bR_eff[:, n0:n1].unsqueeze(-1) * tau_1d.view(1, 1, -1))
             psi = TWO_PI * (bI_eff[:, n0:n1].unsqueeze(-1) * tau_1d.view(1, 1, -1))
             cA, sA, cphi, sphi, cpsi, spsi = fused_sincos(Aphase, phi, psi)
+            dzI2_sum = (dzI[:, :, n0:n1] * dzI[:, :, n0:n1]).sum(dim=2, keepdim=True)
 
             # ======================= (q1,q2)-tiles =======================
             for i0 in range(0, Q, q1_step):
@@ -346,6 +346,20 @@ def T_HSTheta(
                                 ns * log_inv_sqrt_a[s:e].view(1, m_g, 1)
                             )
 
+                        neg_im = (-PI) * (
+                            a_c[s:e].view(1, m_g, 1) * dzI2_sum[:, s:e, :]
+                        )
+                        part = part + neg_im
+                        bR_se = bR[s:e, n0:n1]
+                        bI_se = bI[s:e, n0:n1]
+                        dzI_se = dzI[:, s:e, n0:n1]
+                        proj_real = (bR_se.unsqueeze(0) * dzI_se).sum(dim=2)
+                        proj_imag = (bI_se.unsqueeze(0) * dzI_se).sum(dim=2)
+                        proj_abs2 = proj_real * proj_real + proj_imag * proj_imag
+                        aniso_par = (
+                            PI * c_ang[s:e].view(1, m_g, 1)
+                        ) * proj_abs2.unsqueeze(-1)
+                        part = part + aniso_par
                         i_idx = i0 // q1_step
                         j_idx = j0 // q2_step
                         if q_lwblk[i_idx][j_idx] is None:
