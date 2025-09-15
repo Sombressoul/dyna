@@ -148,47 +148,102 @@ def main():
         R_j=None,
     )
 
-    print(f"\nValues diagnostic:")
-    print(f"T_dual: \n\t{T_dual.real.mean()=}\n\t{T_dual.real.min()=}\n\t{T_dual.real.max()=}")
-    print(f"T_hs:   \n\t{T_hs.real.mean()=}\n\t{T_hs.real.min()=}\n\t{T_hs.real.max()=}")
+    # ===== Diagnostics (scale, masking, cos-sim) =====
+    def _flatten_batch(x: torch.Tensor) -> torch.Tensor:
+        return x.reshape(x.shape[0], -1)
 
-    eps = torch.as_tensor(1e-12, device=dev, dtype=REAL)
-    diff = T_hs - T_dual
-    l2_dual = torch.linalg.vector_norm(T_dual, dim=-1)
-    l2_diff = torch.linalg.vector_norm(diff, dim=-1)
-    rel_l2 = (l2_diff / torch.clamp(l2_dual, min=eps)).to(REAL)
-    mae_elem = diff.abs().to(REAL).mean()
-    mse_elem = (diff.abs().to(REAL) ** 2).mean()
-    rel_elem = (diff.abs() / torch.clamp(T_dual.abs(), min=eps)).to(REAL)
-    rel_elem_mean = rel_elem.mean()
-    rel_elem_p95 = torch.quantile(rel_elem.flatten(), 0.95)
-    rel_l2_mean = rel_l2.mean()
-    rel_l2_median = torch.median(rel_l2)
-    rel_l2_p95 = torch.quantile(rel_l2, 0.95)
-    rel_l2_max = rel_l2.max()
+    def _energy2(x_flat: torch.Tensor) -> torch.Tensor:
+        # squared L2 per sample
+        return (x_flat.real**2 + x_flat.imag**2).sum(dim=1)
 
-    # после вычисления T_hs и T_dual:
-    num = (T_dual.conj() * T_hs).sum(dim=-1).real  # (B,)
-    den = (T_dual.conj() * T_dual).sum(dim=-1).real + 1e-30
-    s_star_per = (num / den).clamp_min(1e-12)
-    s_star = s_star_per.mean()  # глобальная оценка масштаба
-    T_hs_cal = s_star * T_hs
-    diff_cal = T_hs_cal - T_dual
-    rel_l2_cal = torch.linalg.vector_norm(diff_cal, dim=-1) / torch.clamp(
-        torch.linalg.vector_norm(T_dual, dim=-1), min=1e-12
-    )
-    print(
-        f"\nScale diagnostic: s*={s_star.item():.8f}, "
-        f"var={s_star_per.var().sqrt().item():.3e}, "
-        f"relL2(mean) after scale={rel_l2_cal.mean().item():.6e}"
-    )
+    def _safe_stats(x: torch.Tensor, name: str):
+        if x.numel() == 0:
+            print(f"{name}: <no data>")
+            return
+        q95 = torch.quantile(x, torch.tensor(0.95, device=x.device))
+        print(
+            f"{name}: mean={x.mean().item():.6e}, median={x.median().item():.6e}, p95={q95.item():.6e}, max={x.max().item():.6e}"
+        )
 
-    print("\n=== Accuracy: T_HS_theta vs Tau_dual ===")
-    print(
-        f"Per-sample relative L2: mean={rel_l2_mean:.6e}, median={rel_l2_median:.6e}, p95={rel_l2_p95:.6e}, max={rel_l2_max:.6e}"
+    REAL = _real_dtype_of(CDTYPE)
+
+    td = _flatten_batch(T_dual)
+    th = _flatten_batch(T_hs)
+
+    e2 = _energy2(td)
+    # Energy threshold: small but dtype-aware
+    energy_tau = 1.0e-12 if REAL == torch.float32 else 1.0e-24
+    mask = e2 > energy_tau
+    num_live = int(mask.sum().item())
+    num_total = int(e2.numel())
+
+    print("\nEnergy diagnostic (||T_dual|| per-sample):")
+    _safe_stats(e2.sqrt(), "||T_dual||_2")
+    print(f"Live samples (>tau={energy_tau:g}): {num_live}/{num_total}")
+
+    if num_live == 0:
+        print(
+            "".join(
+                [
+                    "\n\t=== ENERGY COLLAPSE DETECTED ===",
+                    "\n\t=== Zero live samples.       ===",
+                ]
+            )
+        )
+    else:
+        # Global scale (energy-weighted)
+        num = (td.conj() * th).sum().real
+        den = (td.abs() ** 2).sum().real
+        s_star_global = (num / den).item() if den > 0 else float("nan")
+
+        # Cosine similarity (global, scale-invariant)
+        norm_td = den.sqrt()
+        norm_th = ((th.abs() ** 2).sum().real).sqrt()
+        cos_global = (
+            (num.abs() / (norm_td * norm_th + 1e-30)).item()
+            if (norm_td > 0 and norm_th > 0)
+            else float("nan")
+        )
+        cos_global = min(cos_global, 1.0)
+
+        print("\nScale & alignment:")
+        print(f"s*_global={s_star_global:.8f}")
+        print(f"cos(angle) (global)={cos_global:.12f}")
+
+    # Per-sample relative L2 (masked by energy)
+    diff = th - td
+    rel_l2 = diff.abs().pow(2).sum(dim=1).sqrt()
+    den_l2 = e2.sqrt()
+    # no energy = NaN... avoid statistics corruption
+    rel_l2 = torch.where(
+        mask,
+        rel_l2 / den_l2.clamp_min(1e-30),
+        torch.tensor(float("nan"), device=rel_l2.device, dtype=rel_l2.dtype),
     )
+    rel_l2_masked = rel_l2[mask]
+
+    print("\n=== Accuracy: T_HS_theta vs Tau_dual (masked by energy) ===")
+    if rel_l2_masked.numel() == 0:
+        print("Per-sample relative L2: <no live samples>")
+        rel_l2_mean = torch.tensor(0.0, dtype=REAL, device=td.device)
+    else:
+        q95 = torch.quantile(
+            rel_l2_masked, torch.tensor(0.95, device=rel_l2_masked.device)
+        )
+        print(
+            f"Per-sample relative L2: mean={rel_l2_masked.mean().item():.6e}, median={rel_l2_masked.median().item():.6e}, p95={q95.item():.6e}, max={rel_l2_masked.max().item():.6e}"
+        )
+        rel_l2_mean = rel_l2_masked.mean()
+
+    # Elementwise metrics (avoid div-by-zero by tiny denom)
+    abs_diff = (th - td).abs()
+    abs_td = td.abs()
+    elem_mae = abs_diff.mean()
+    elem_mse = (abs_diff**2).mean()
+    elem_rel = abs_diff / (abs_td + 1e-30)
+    q95_elem_rel = torch.quantile(elem_rel, torch.tensor(0.95, device=elem_rel.device))
     print(
-        f"Elementwise: MAE={mae_elem:.6e}, MSE={mse_elem:.6e}, mean(|Δ|/|T_dual|)={rel_elem_mean:.6e}, p95(|Δ|/|T_dual|)={rel_elem_p95:.6e}"
+        f"Elementwise: MAE={elem_mae.item():.6e}, MSE={elem_mse.item():.6e}, mean(|Δ|/|T_dual|)={elem_rel.mean().item():.6e}, p95(|Δ|/|T_dual|)={q95_elem_rel.item():.6e}"
     )
 
     if torch.isnan(rel_l2_mean) or torch.isinf(rel_l2_mean):
