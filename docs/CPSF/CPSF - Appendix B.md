@@ -1,4 +1,6 @@
-# Appendix B — HS-Theta Backend `T_HSTheta` (Revised, N ≥ 2)
+# Appendix B — PHC (Poisson–Hermite–Clenshaw) evaluator for T-field — `T_PHC`
+
+Poisson–Hermite–Clenshaw evaluator for T-field.
 
 ## B.0 Notation
 
@@ -18,8 +20,6 @@ Angular offset $\delta\vec d:=\vec d-\vec d_j$. Gaussian–Hermite 1D nodes/weig
 $$
 \mathcal N_j=\frac{1}{\pi}\,\gamma_j^{-1/2}.
 $$
-
-This section follows the original “Poisson-only HS-Theta” structure and notation.&#x20;
 
 ---
 

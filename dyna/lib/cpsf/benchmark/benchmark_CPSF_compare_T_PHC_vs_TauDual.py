@@ -1,12 +1,12 @@
-# dyna/lib/cpsf/benchmark/benchmark_CPSF_compare_HSTheta_vs_TauDual.py
+# dyna/lib/cpsf/benchmark/benchmark_CPSF_compare_T_PHC_vs_TauDual.py
 # Run examples:
-# > python -m dyna.lib.cpsf.benchmark.benchmark_CPSF_compare_HSTheta_vs_TauDual --N 4 --M 128 --S 64 --batch 16 --dtype c64 --device cpu --K 7 --quad_nodes 7 --phase_scale 0.5
+# > python -m dyna.lib.cpsf.benchmark.benchmark_CPSF_compare_T_PHC_vs_TauDual --N 4 --M 128 --S 64 --batch 16 --dtype c64 --device cpu --K 7 --quad_nodes 7 --phase_scale 0.5
 
 import argparse
 import torch
 
 from ..functional.core_math import Tau_dual
-from ..functional.t_hs_theta import T_HSTheta
+from ..functional.t_phc import T_PHC
 
 
 def _real_dtype_of(cdtype: torch.dtype) -> torch.dtype:
@@ -109,7 +109,7 @@ def main():
     sp = torch.maximum(sp, sq + 1e-3)
 
     # HS-Theta
-    T_hs = T_HSTheta(
+    T_hs = T_PHC(
         z=z,
         z_j=z_j,
         vec_d=vec_d,

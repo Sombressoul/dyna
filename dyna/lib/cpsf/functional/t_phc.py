@@ -35,7 +35,7 @@ def fused_sincos(
     return cA, sA, cphi, sphi, cpsi, spsi
 
 
-def T_HSTheta(
+def T_PHC(
     z,
     z_j,
     vec_d,
@@ -58,11 +58,11 @@ def T_HSTheta(
     TWO_PI = 2.0 * math.pi
     tiny = torch.as_tensor(torch.finfo(r_dtype).tiny, device=device, dtype=r_dtype)
 
-    if not hasattr(T_HSTheta, "_gh1d_cache"):
-        T_HSTheta._gh1d_cache = {}
+    if not hasattr(T_PHC, "_gh1d_cache"):
+        T_PHC._gh1d_cache = {}
 
     gh_key = (device.type, getattr(device, "index", -1), str(r_dtype), int(quad_nodes))
-    cached = T_HSTheta._gh1d_cache.get(gh_key)
+    cached = T_PHC._gh1d_cache.get(gh_key)
     if cached is None:
         Q = quad_nodes
         if Q < 1:
@@ -75,7 +75,7 @@ def T_HSTheta(
         tau, V = torch.linalg.eigh(J)
         w = (math.sqrt(math.pi) * (V[0, :] ** 2)).to(r_dtype)
         logw_1d = torch.log(torch.clamp(w, min=tiny))
-        T_HSTheta._gh1d_cache[gh_key] = (tau, logw_1d)
+        T_PHC._gh1d_cache[gh_key] = (tau, logw_1d)
         tau_1d, logw_1d = tau, logw_1d
     else:
         tau_1d, logw_1d = cached

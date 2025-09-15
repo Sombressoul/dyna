@@ -1,10 +1,10 @@
-# dyna/lib/cpsf/benchmark/benchmark_CPSF_T_HSTheta.py
+# dyna/lib/cpsf/benchmark/benchmark_CPSF_T_PHC.py
 # Run examples:
-# > python -m dyna.lib.cpsf.benchmark.benchmark_CPSF_T_HSTheta --N 256 --M 256 --S 128 --batch 128 --dtype c64 --device cuda --iters 50 --warmup 10 --n_chunk 256 --m_chunk 256 --quad_nodes 7
+# > python -m dyna.lib.cpsf.benchmark.benchmark_CPSF_T_PHC --N 256 --M 256 --S 128 --batch 128 --dtype c64 --device cuda --iters 50 --warmup 10 --n_chunk 256 --m_chunk 256 --quad_nodes 7
 
-import argparse, time, math, torch
+import argparse, time, torch
 
-from ..functional.t_hs_theta import T_HSTheta
+from ..functional.t_phc import T_PHC
 
 
 def _fmt_bytes(
@@ -128,7 +128,7 @@ def main():
     sp = torch.maximum(sp, sq + 1e-3)
 
     if args.verify_devices:
-        out = T_HSTheta(
+        out = T_PHC(
             z=z,
             z_j=z_j,
             vec_d=vec_d,
@@ -159,7 +159,7 @@ def main():
     if dev.type == "cuda":
         torch.cuda.synchronize()
     for _ in range(args.warmup):
-        _ = T_HSTheta(
+        _ = T_PHC(
             z=z,
             z_j=z_j,
             vec_d=vec_d,
@@ -192,7 +192,7 @@ def main():
             profile_memory=True,
         ) as prof:
             for _ in range(6):
-                _ = T_HSTheta(
+                _ = T_PHC(
                     z=z,
                     z_j=z_j,
                     vec_d=vec_d,
@@ -232,7 +232,7 @@ def main():
             start = torch.cuda.Event(enable_timing=True)
             end = torch.cuda.Event(enable_timing=True)
             start.record()
-            out = T_HSTheta(
+            out = T_PHC(
                 z=z,
                 z_j=z_j,
                 vec_d=vec_d,
@@ -258,7 +258,7 @@ def main():
             alloc_delta_max = max(alloc_delta_max, max(0, mem1 - mem0))
         else:
             t0 = time.perf_counter()
-            out = T_HSTheta(
+            out = T_PHC(
                 z=z,
                 z_j=z_j,
                 vec_d=vec_d,
