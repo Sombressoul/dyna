@@ -244,7 +244,6 @@ def T_HSTheta(
             phi = TWO_PI * (bR_eff[:, n0:n1].unsqueeze(-1) * tau_1d.view(1, 1, -1))
             psi = TWO_PI * (bI_eff[:, n0:n1].unsqueeze(-1) * tau_1d.view(1, 1, -1))
             cA, sA, cphi, sphi, cpsi, spsi = fused_sincos(Aphase, phi, psi)
-            dzI2_sum = (dzI[:, :, n0:n1] * dzI[:, :, n0:n1]).sum(dim=2, keepdim=True)
 
             # ======================= (q1,q2)-tiles =======================
             for i0 in range(0, Q, q1_step):
