@@ -1,6 +1,6 @@
 # dyna/lib/cpsf/benchmark/benchmark_CPSF_compare_T_PHC_vs_TauDual.py
 # Run examples:
-# > python -m dyna.lib.cpsf.benchmark.benchmark_CPSF_compare_T_PHC_vs_TauDual --N 4 --M 128 --S 64 --batch 16 --dtype c64 --device cpu --K 7 --quad_nodes 7 --phase_scale 0.5
+# > python -m dyna.lib.cpsf.benchmark.benchmark_CPSF_compare_T_PHC_vs_TauDual --N 4 --M 128 --S 64 --batch 16 --dtype c64 --device cpu --K 7 --quad_nodes 7 --phase_scale 1.0 --eps_total 1.0e-3 --seed 1337
 
 import argparse
 import torch
