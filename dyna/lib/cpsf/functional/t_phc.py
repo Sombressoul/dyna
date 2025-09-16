@@ -37,13 +37,13 @@ def fused_sincos(
 
 def T_PHC(
     z: torch.Tensor,
-    z_j: torch.Tensor,
     vec_d: torch.Tensor,
+    z_j: torch.Tensor,
     vec_d_j: torch.Tensor,
     T_hat_j: torch.Tensor,
     alpha_j: torch.Tensor,
-    sigma_par: torch.Tensor,
-    sigma_perp: torch.Tensor,
+    sigma_par_j: torch.Tensor,
+    sigma_perp_j: torch.Tensor,
     *,
     quad_nodes: int = 7,
     eps_total: float = 1.0e-3,
@@ -61,12 +61,12 @@ def T_PHC(
     ----------
     z           : Complex tensor of shape [B, N]
         Query points on the torus. Only Re(z) is wrapped to the lattice; Im(z) is free.
-    z_j         : Complex tensor of shape [M, N]
-        Contribution centers. Only Re(z_j) participates in wrap with Re(z); Im(z_j) is
-        free.
     vec_d       : Complex tensor of shape [B, N]
         Unit direction vectors for each query (unit norm along the last dimension is
         expected).
+    z_j         : Complex tensor of shape [M, N]
+        Contribution centers. Only Re(z_j) participates in wrap with Re(z); Im(z_j) is
+        free.
     vec_d_j     : Complex tensor of shape [M, N]
         Unit direction vectors for each contribution (unit norm along the last dimension
         is expected).
@@ -74,11 +74,11 @@ def T_PHC(
         Per-contribution spectral profiles (columns index S output channels or features).
     alpha_j     : Real tensor of shape [M] or broadcastable to [M]
         Per-contribution scalar weights. Sign is preserved.
-    sigma_par   : Real positive tensor of shape [M] or broadcastable to [M]
-        Parallel variance parameter (along vec_d_j). Must satisfy sigma_par > 0 and
-        typically sigma_par >= sigma_perp.
-    sigma_perp  : Real positive tensor of shape [M] or broadcastable to [M]
-        Perpendicular variance parameter. Must satisfy sigma_perp > 0.
+    sigma_par_j : Real positive tensor of shape [M] or broadcastable to [M]
+        Parallel variance parameter (along vec_d_j). Must satisfy sigma_par_j > 0 and
+        typically sigma_par_j >= sigma_perp_j.
+    sigma_perp_j  : Real positive tensor of shape [M] or broadcastable to [M]
+        Perpendicular variance parameter. Must satisfy sigma_perp_j > 0.
     quad_nodes  : Integer
         Number of Gauss-Hermite nodes per axis (default 12). Larger values increase
         accuracy and cost.
@@ -135,18 +135,18 @@ def T_PHC(
     vec_d_j = vec_d_j.to(c_dtype)
     T_hat_j = T_hat_j.to(c_dtype)
     alpha_j = alpha_j.to(r_dtype)
-    sigma_par = sigma_par.to(r_dtype)
-    sigma_perp = sigma_perp.to(r_dtype)
+    sigma_par_j = sigma_par_j.to(r_dtype)
+    sigma_perp_j = sigma_perp_j.to(r_dtype)
 
-    a_j = 1.0 / torch.clamp(sigma_perp, min=tiny)
+    a_j = 1.0 / torch.clamp(sigma_perp_j, min=tiny)
     gamma_j = torch.clamp(
-        sigma_perp / torch.clamp(sigma_par, min=tiny), min=tiny, max=1.0
+        sigma_perp_j / torch.clamp(sigma_par_j, min=tiny), min=tiny, max=1.0
     )
     kappa_j = torch.sqrt(
         torch.clamp(
-            (sigma_par - sigma_perp)
-            * torch.clamp(sigma_perp, min=tiny)
-            / (PI * torch.clamp(sigma_par, min=tiny)),
+            (sigma_par_j - sigma_perp_j)
+            * torch.clamp(sigma_perp_j, min=tiny)
+            / (PI * torch.clamp(sigma_par_j, min=tiny)),
             min=0.0,
         )
     )
@@ -164,8 +164,8 @@ def T_PHC(
             )
         )
     ).to(torch.int64)
-    one_over_sq = 1.0 / torch.clamp(sigma_perp, min=tiny)
-    c_ang = (sigma_par - sigma_perp) / (torch.clamp(sigma_par * sigma_perp, min=tiny))
+    one_over_sq = 1.0 / torch.clamp(sigma_perp_j, min=tiny)
+    c_ang = (sigma_par_j - sigma_perp_j) / (torch.clamp(sigma_par_j * sigma_perp_j, min=tiny))
 
     if device.type == "cuda":
         free_bytes, _ = torch.cuda.mem_get_info()

@@ -111,13 +111,13 @@ def main():
     # HS-Theta
     T_hs = T_PHC(
         z=z,
-        z_j=z_j,
         vec_d=vec_d,
+        z_j=z_j,
         vec_d_j=vec_d_j,
         T_hat_j=T_hat_j,
         alpha_j=alpha_j,
-        sigma_par=sp,
-        sigma_perp=sq,
+        sigma_par_j=sp,
+        sigma_perp_j=sq,
         quad_nodes=args.quad_nodes,
         eps_total=args.eps_total,
         n_chunk=args.n_chunk,
