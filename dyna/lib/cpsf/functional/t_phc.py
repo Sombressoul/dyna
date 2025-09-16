@@ -36,14 +36,14 @@ def fused_sincos(
 
 
 def T_PHC(
-    z,
-    z_j,
-    vec_d,
-    vec_d_j,
-    T_hat_j,
-    alpha_j,
-    sigma_par,
-    sigma_perp,
+    z: torch.Tensor,
+    z_j: torch.Tensor,
+    vec_d: torch.Tensor,
+    vec_d_j: torch.Tensor,
+    T_hat_j: torch.Tensor,
+    alpha_j: torch.Tensor,
+    sigma_par: torch.Tensor,
+    sigma_perp: torch.Tensor,
     *,
     quad_nodes: int = 7,
     eps_total: float = 1.0e-3,
@@ -51,6 +51,48 @@ def T_PHC(
     m_chunk: int = 256,
     dtype_override: torch.dtype | None = None,
 ):
+    """
+    T_PHC: Poisson-Hermite-Clenshaw evaluator for the torus-periodic field T.
+
+    Computes the complex field T for a batch of query points against a set of M
+    contributions using the PHC algorithm:
+
+    Parameters
+    ----------
+    z           : Complex tensor of shape [B, N]
+        Query points on the torus. Only Re(z) is wrapped to the lattice; Im(z) is free.
+    z_j         : Complex tensor of shape [M, N]
+        Contribution centers. Only Re(z_j) participates in wrap with Re(z); Im(z_j) is
+        free.
+    vec_d       : Complex tensor of shape [B, N]
+        Unit direction vectors for each query (unit norm along the last dimension is
+        expected).
+    vec_d_j     : Complex tensor of shape [M, N]
+        Unit direction vectors for each contribution (unit norm along the last dimension
+        is expected).
+    T_hat_j     : Complex tensor of shape [M, S]
+        Per-contribution spectral profiles (columns index S output channels or features).
+    alpha_j     : Real tensor of shape [M] or broadcastable to [M]
+        Per-contribution scalar weights. Sign is preserved.
+    sigma_par   : Real positive tensor of shape [M] or broadcastable to [M]
+        Parallel variance parameter (along vec_d_j). Must satisfy sigma_par > 0 and
+        typically sigma_par >= sigma_perp.
+    sigma_perp  : Real positive tensor of shape [M] or broadcastable to [M]
+        Perpendicular variance parameter. Must satisfy sigma_perp > 0.
+    quad_nodes  : Integer
+        Number of Gauss-Hermite nodes per axis (default 12). Larger values increase
+        accuracy and cost.
+    eps_total   : Float
+        Total error budget for the PHC evaluation (default 1e-3). Internally split
+        between quadrature and theta tail to guarantee a relative L2 error target
+        on active tiles.
+    n_chunk     : Int (optional)
+        Tile size over the Hermite integration dimension. Use None to auto-select
+        from available memory.
+    m_chunk     : Int (optional)
+        Tile size over contributions M. Use None to auto-select from available memory.
+    """
+
     device = z.device
     c_dtype = z.dtype if dtype_override is None else dtype_override
     r_dtype = torch.float32 if c_dtype == torch.complex64 else torch.float64
