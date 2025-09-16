@@ -431,7 +431,6 @@ def T_PHC_Fused(
         log_im = (-PI) * (a_c.view(1, mc) * u2_sum) + (PI) * (
             c_ang_c.view(1, mc) * proj_abs2
         )
-
         log_eta = (
             torch.log(torch.clamp(norm_fac_c, min=tiny)).view(1, mc)
             + L_accum.squeeze(-1)

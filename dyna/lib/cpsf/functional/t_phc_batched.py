@@ -184,9 +184,8 @@ def T_PHC_Batched(
     for m0 in range(0, M, m_chunk):
         m1 = min(m0 + m_chunk, M)
         mc = m1 - m0
-        BM = B * mc  # flattened batch*chunk size for K-bucketing
+        BM = B * mc
 
-        # Per-chunk views with leading B axis
         z_j_c = z_j[:, m0:m1, :]
         a_c = a_j[:, m0:m1]
         alpha_c = alpha_j[:, m0:m1]
@@ -195,46 +194,38 @@ def T_PHC_Batched(
         kappa_eff_c = kappa_eff[:, m0:m1]
         norm_fac_c = norm_fac[:, m0:m1]
 
-        # Normalize contribution directions per (B, m)
         inv_den = 1.0 / torch.linalg.vector_norm(
             vec_d_j[:, m0:m1, :], dim=-1, keepdim=True
         ).to(r_dtype).clamp_min(tiny)
-        b = vec_d_j[:, m0:m1, :] * inv_den.to(c_dtype)  # [B, mc, N]
+        b = vec_d_j[:, m0:m1, :] * inv_den.to(c_dtype)
         bR = b.real.to(r_dtype)
         bI = b.imag.to(r_dtype)
-        bR_eff = (kappa_eff_c.unsqueeze(-1) * bR).contiguous()  # [B, mc, N]
-        bI_eff = (kappa_eff_c.unsqueeze(-1) * bI).contiguous()  # [B, mc, N]
-
-        # Coordinate deltas (wrap only Re)
-        dZ = z.unsqueeze(1) - z_j_c  # [B, mc, N]
+        bR_eff = (kappa_eff_c.unsqueeze(-1) * bR).contiguous()
+        bI_eff = (kappa_eff_c.unsqueeze(-1) * bI).contiguous()
+        dZ = z.unsqueeze(1) - z_j_c
         dzR = torch.remainder(dZ.real.to(r_dtype) + 0.5, 1.0) - 0.5
         dzI = dZ.imag.to(r_dtype)
 
-        # Angular penalty
         dd = delta_vec_d(
-            vec_d=vec_d.unsqueeze(1).expand(B, mc, N),  # [B, mc, N]
-            vec_d_j=vec_d_j[:, m0:m1, :],  # [B, mc, N]
+            vec_d=vec_d.unsqueeze(1).expand(B, mc, N),
+            vec_d_j=vec_d_j[:, m0:m1, :],
             eps=tiny,
         )
-        dd_norm2 = (dd.abs() ** 2).sum(dim=-1).to(r_dtype)  # [B, mc]
-        bh_dd = (torch.conj(b) * dd).sum(dim=-1)  # [B, mc]
+        dd_norm2 = (dd.abs() ** 2).sum(dim=-1).to(r_dtype)
+        bh_dd = (torch.conj(b) * dd).sum(dim=-1)
         q_ang = one_over_sq[:, m0:m1] * dd_norm2 - c_ang[:, m0:m1] * (bh_dd.abs() ** 2)
-        log_ang = (-PI) * q_ang  # [B, mc]
+        log_ang = (-PI) * q_ang
 
         # ======================= K-bucket (detached) across flattened (B*mc) =======================
-        K_flat = Kp_c_det.reshape(BM)  # [BM]
-        a_flat = a_c.reshape(BM)  # [BM]
-
-        # Precompute scalar buffers (flattened) used inside groups
-        log_inv_sqrt_a_f = -0.5 * torch.log(torch.clamp(a_flat, min=tiny))  # [BM]
-        buf_inv_a_f = 1.0 / torch.clamp(a_flat, min=tiny)  # [BM]
-        buf_ex01_f = torch.exp(-PI * buf_inv_a_f)  # [BM]
+        K_flat = Kp_c_det.reshape(BM)
+        a_flat = a_c.reshape(BM)
+        log_inv_sqrt_a_f = -0.5 * torch.log(torch.clamp(a_flat, min=tiny))
+        buf_inv_a_f = 1.0 / torch.clamp(a_flat, min=tiny)
+        buf_ex01_f = torch.exp(-PI * buf_inv_a_f)
         buf_ex02_f = buf_ex01_f * buf_ex01_f
         buf_ex04_f = buf_ex02_f * buf_ex02_f
         buf_ex08_f = buf_ex04_f * buf_ex04_f
         buf_ex16_f = buf_ex08_f * buf_ex08_f
-
-        # Memory-aware tiling (same logic; just accounting for B*mc)
         per_elem_bufs = 2
         ns_cap_den = max(1, B * mc * qc_full)
         ns_cap = max(
@@ -253,8 +244,7 @@ def T_PHC_Batched(
         num_q1 = (Q + q1_step - 1) // q1_step
         num_q2 = (Q + q2_step - 1) // q2_step
 
-        # Sort flattened K and form run-length groups
-        perm = torch.argsort(K_flat)  # [BM]
+        perm = torch.argsort(K_flat)
         K_sorted = K_flat[perm]
         if BM > 0:
             Kvals, counts = torch.unique_consecutive(K_sorted, return_counts=True)
@@ -268,7 +258,6 @@ def T_PHC_Batched(
         else:
             num_groups = 0
 
-        # Accumulators per (group, q1-block, q2-block)
         q_accum = [
             [[None for _ in range(num_q2)] for _ in range(num_q1)]
             for _ in range(num_groups)
@@ -281,8 +270,7 @@ def T_PHC_Batched(
             n1 = min(n0 + step_ns, N)
             ns = n1 - n0
 
-            # Phases
-            Aphase = TWO_PI * dzR[:, :, n0:n1]  # [B, mc, ns]
+            Aphase = TWO_PI * dzR[:, :, n0:n1]
             phi = TWO_PI * (
                 bR_eff[:, :, n0:n1].unsqueeze(-1) * tau_1d.view(1, 1, 1, -1)
             )
@@ -296,33 +284,27 @@ def T_PHC_Batched(
                 i1 = min(i0 + q1_step, Q)
                 q1 = i1 - i0
 
-                cphi_i = cphi[:, :, :, i0:i1]  # [B, mc, ns, q1]
+                cphi_i = cphi[:, :, :, i0:i1]
                 sphi_i = sphi[:, :, :, i0:i1]
 
                 for j0 in range(0, Q, q2_step):
                     j1 = min(j0 + q2_step, Q)
                     q2 = j1 - j0
 
-                    cpsi_j = cpsi[:, :, :, j0:j1]  # [B, mc, ns, q2]
+                    cpsi_j = cpsi[:, :, :, j0:j1]
                     spsi_j = spsi[:, :, :, j0:j1]
 
                     cB = cphi_i.unsqueeze(-1) * cpsi_j.unsqueeze(-2) - sphi_i.unsqueeze(
                         -1
-                    ) * spsi_j.unsqueeze(
-                        -2
-                    )  # [B,mc,ns,q1,q2]
+                    ) * spsi_j.unsqueeze(-2)
                     sB = sphi_i.unsqueeze(-1) * cpsi_j.unsqueeze(-2) + cphi_i.unsqueeze(
                         -1
-                    ) * spsi_j.unsqueeze(
-                        -2
-                    )  # [B,mc,ns,q1,q2]
+                    ) * spsi_j.unsqueeze(-2)
 
                     x_block = (
                         cA.unsqueeze(-1).unsqueeze(-1) * cB
                         + sA.unsqueeze(-1).unsqueeze(-1) * sB
-                    ).to(
-                        r_dtype
-                    )  # [B,mc,ns,q1,q2]
+                    ).to(r_dtype)
 
                     q1q2 = q1 * q2
                     if q_lwblk[i0 // q1_step][j0 // q2_step] is None:
@@ -331,20 +313,19 @@ def T_PHC_Batched(
                             + logw_1d[j0:j1].view(1, 1, 1, q2)
                         ).view(1, 1, q1q2)
 
-                    # Flatten x_block along (B,mc) to align with flattened grouping
-                    x_flat = x_block.reshape(BM, ns, q1q2)  # [BM, ns, q1q2]
+                    x_flat = x_block.reshape(BM, ns, q1q2)
 
                     # ======================= K-buckets (Chebyshev for K<=4, else Clenshaw) =======================
                     for g in range(num_groups):
                         Kval = int(Kvals[g].item())
                         s = int(starts[g].item())
                         e = s + int(counts[g].item())
-                        idx = perm[s:e]  # indices into flattened BM
+                        idx = perm[s:e]
                         m_g = e - s
                         if m_g == 0:
                             continue
 
-                        xg = x_flat.index_select(0, idx)  # [m_g, ns, q1q2]
+                        xg = x_flat.index_select(0, idx)
 
                         if Kval == 0:
                             part = (
@@ -371,7 +352,7 @@ def T_PHC_Batched(
                             )
                             part = sum_expr.sum(dim=1) + (
                                 ns * log_inv_sqrt_a_f.index_select(0, idx).view(m_g, 1)
-                            )  # [m_g, q1q2]
+                            )
 
                         else:
                             ex01 = buf_ex01_f.index_select(0, idx).view(m_g, 1, 1)
@@ -407,7 +388,7 @@ def T_PHC_Batched(
                             )
                             part = sum_expr.sum(dim=1) + (
                                 ns * log_inv_sqrt_a_f.index_select(0, idx).view(m_g, 1)
-                            )  # [m_g, q1q2]
+                            )
 
                         i_idx = i0 // q1_step
                         j_idx = j0 // q2_step
@@ -417,13 +398,12 @@ def T_PHC_Batched(
                         else:
                             q_accum[g][i_idx][j_idx] = acc + part
 
-        # Combine quadrature blocks into L_accum (flattened), then reshape back to [B, mc, 1]
         for i_idx in range(num_q1):
             for j_idx in range(num_q2):
                 lw_blk = q_lwblk[i_idx][j_idx]
                 if lw_blk is None:
                     continue
-                lw_blk_flat = lw_blk.view(1, -1)  # [1, q1q2]
+                lw_blk_flat = lw_blk.view(1, -1)
                 for g in range(num_groups):
                     s = int(starts[g].item())
                     e = s + int(counts[g].item())
@@ -434,60 +414,51 @@ def T_PHC_Batched(
                     acc = q_accum[g][i_idx][j_idx]
                     if acc is None:
                         continue
-                    L = acc + lw_blk_flat  # [m_g, q1q2]
-                    group_lse = torch.logsumexp(L, dim=-1, keepdim=True)  # [m_g,1]
-                    cur = L_accum_flat.index_select(0, idx)  # [m_g,1]
+                    L = acc + lw_blk_flat
+                    group_lse = torch.logsumexp(L, dim=-1, keepdim=True)
+                    cur = L_accum_flat.index_select(0, idx)
                     combined = torch.logsumexp(
                         torch.cat([cur, group_lse], dim=-1), dim=-1, keepdim=True
                     )
                     L_accum_flat.index_copy_(0, idx, combined)
 
-        L_accum = L_accum_flat.view(B, mc, 1)  # back to [B, mc, 1]
-
-        # Imaginary-axis factor (u = Im(dZ))
-        u = dzI  # [B, mc, N]
-        u2_sum = (u * u).sum(dim=2)  # [B, mc]
-        proj_r = (bR * u).sum(dim=2)  # [B, mc]
-        proj_i = (bI * u).sum(dim=2)  # [B, mc]
+        L_accum = L_accum_flat.view(B, mc, 1)
+        u = dzI
+        u2_sum = (u * u).sum(dim=2)
+        proj_r = (bR * u).sum(dim=2)
+        proj_i = (bI * u).sum(dim=2)
         proj_abs2 = proj_r * proj_r + proj_i * proj_i
-        log_im = (-PI) * (a_c * u2_sum) + (PI) * (
-            c_ang[:, m0:m1] * proj_abs2
-        )  # [B, mc]
-
+        log_im = (-PI) * (a_c * u2_sum) + (PI) * (c_ang[:, m0:m1] * proj_abs2)
         log_eta = (
             torch.log(torch.clamp(norm_fac_c, min=tiny)) + L_accum.squeeze(-1) + log_im
-        )  # [B, mc]
-
-        # Alpha weights (sign + log-abs)
+        )
         alpha_abs = alpha_c.abs()
         log_alpha_c = torch.where(
             alpha_abs == 0,
             torch.full_like(alpha_abs, -float("inf")),
             torch.log(alpha_abs),
-        )  # [B, mc]
-        sign_full = torch.sign(alpha_c).to(torch.float32)  # [B, mc]
-        log_w_full = log_eta + log_ang + log_alpha_c  # [B, mc]
+        )
+        sign_full = torch.sign(alpha_c).to(torch.float32)
+        log_w_full = log_eta + log_ang + log_alpha_c
+        row_max = torch.amax(log_w_full, dim=1, keepdim=True)
+        w32 = torch.exp(log_w_full - row_max).to(torch.float32) * sign_full
 
-        row_max = torch.amax(log_w_full, dim=1, keepdim=True)  # [B, 1]
-        w32 = torch.exp(log_w_full - row_max).to(torch.float32) * sign_full  # [B, mc]
-
-        # GEMM per batch
-        R = T_hat_c.real.to(torch.float32)  # [B, mc, S]
+        R = T_hat_c.real.to(torch.float32)
         I = T_hat_c.imag.to(torch.float32)
 
         if device.type == "cuda":
             prev_tf32 = torch.backends.cuda.matmul.allow_tf32
             torch.backends.cuda.matmul.allow_tf32 = False
             try:
-                part_R = torch.bmm(w32.unsqueeze(1), R).squeeze(1)  # [B, S]
-                part_I = torch.bmm(w32.unsqueeze(1), I).squeeze(1)  # [B, S]
+                part_R = torch.bmm(w32.unsqueeze(1), R).squeeze(1)
+                part_I = torch.bmm(w32.unsqueeze(1), I).squeeze(1)
             finally:
                 torch.backends.cuda.matmul.allow_tf32 = prev_tf32
         else:
             part_R = torch.bmm(w32.unsqueeze(1), R).squeeze(1)
             part_I = torch.bmm(w32.unsqueeze(1), I).squeeze(1)
 
-        scale = torch.exp(row_max.squeeze(1)).to(part_R.dtype)  # [B]
+        scale = torch.exp(row_max.squeeze(1)).to(part_R.dtype)
         T_out.real = T_out.real + (scale.unsqueeze(1) * part_R).to(T_out.real.dtype)
         T_out.imag = T_out.imag + (scale.unsqueeze(1) * part_I).to(T_out.imag.dtype)
 
