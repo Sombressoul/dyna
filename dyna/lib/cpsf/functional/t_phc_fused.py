@@ -165,7 +165,9 @@ def T_PHC_Fused(
         )
     ).to(torch.int64)
     one_over_sq = 1.0 / torch.clamp(sigma_perp_j, min=tiny)
-    c_ang = (sigma_par_j - sigma_perp_j) / (torch.clamp(sigma_par_j * sigma_perp_j, min=tiny))
+    c_ang = (sigma_par_j - sigma_perp_j) / (
+        torch.clamp(sigma_par_j * sigma_perp_j, min=tiny)
+    )
 
     if device.type == "cuda":
         free_bytes, _ = torch.cuda.mem_get_info()
