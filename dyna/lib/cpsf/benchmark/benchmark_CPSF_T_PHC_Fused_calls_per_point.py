@@ -1,10 +1,10 @@
-# dyna/lib/cpsf/benchmark/benchmark_CPSF_T_PHC_calls_per_point.py
+# dyna/lib/cpsf/benchmark/benchmark_CPSF_T_PHC_Fused_calls_per_point.py
 # Examples:
-#   CPU:  python -m dyna.lib.cpsf.benchmark.benchmark_CPSF_T_PHC_calls_per_point --N 256 --M 256 --S 128 --calls 256 --dtype c64 --device cpu
-#   CUDA: python -m dyna.lib.cpsf.benchmark.benchmark_CPSF_T_PHC_calls_per_point --N 256 --M 256 --S 128 --calls 256 --dtype c64 --device cuda --quad_nodes 7 --eps_total 1e-3
+#   CPU:  python -m dyna.lib.cpsf.benchmark.benchmark_CPSF_T_PHC_Fused_calls_per_point --N 256 --M 256 --S 128 --calls 256 --dtype c64 --device cpu
+#   CUDA: python -m dyna.lib.cpsf.benchmark.benchmark_CPSF_T_PHC_Fused_calls_per_point --N 256 --M 256 --S 128 --calls 256 --dtype c64 --device cuda --quad_nodes 7 --eps_total 1e-3
 
 import argparse, time, torch
-from ..functional.t_phc import T_PHC
+from ..functional.t_phc_fused import T_PHC_Fused
 
 def _real_dtype_of(cdtype: torch.dtype) -> torch.dtype:
     return torch.float32 if cdtype == torch.complex64 else torch.float64
@@ -102,7 +102,7 @@ def main():
             z_j, vd_j, T_hat, alpha, sp, sq = contribs[i]
         else:
             z_j, vd_j, T_hat, alpha, sp, sq = contribs
-        _ = T_PHC(
+        _ = T_PHC_Fused(
             z=z, vec_d=vd,
             z_j=z_j, vec_d_j=vd_j,
             T_hat_j=T_hat, alpha_j=alpha,
@@ -128,7 +128,7 @@ def main():
             torch.cuda.synchronize()
             start = torch.cuda.Event(enable_timing=True); end = torch.cuda.Event(enable_timing=True)
             start.record()
-            out = T_PHC(
+            out = T_PHC_Fused(
                 z=z, vec_d=vd,
                 z_j=z_j, vec_d_j=vd_j,
                 T_hat_j=T_hat, alpha_j=alpha,
@@ -148,7 +148,7 @@ def main():
             else:
                 z_j, vd_j, T_hat, alpha, sp, sq = contribs
             t0 = time.perf_counter()
-            out = T_PHC(
+            out = T_PHC_Fused(
                 z=z, vec_d=vd,
                 z_j=z_j, vec_d_j=vd_j,
                 T_hat_j=T_hat, alpha_j=alpha,

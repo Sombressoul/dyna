@@ -1,12 +1,12 @@
-# dyna/lib/cpsf/benchmark/benchmark_CPSF_compare_T_PHC_vs_TauDual.py
+# dyna/lib/cpsf/benchmark/benchmark_CPSF_compare_T_PHC_Fused_vs_TauDual.py
 # Run examples:
-# > python -m dyna.lib.cpsf.benchmark.benchmark_CPSF_compare_T_PHC_vs_TauDual --N 4 --M 128 --S 64 --batch 16 --dtype c64 --device cpu --K 7 --quad_nodes 7 --phase_scale 1.0 --eps_total 1.0e-3 --seed 1337
+# > python -m dyna.lib.cpsf.benchmark.benchmark_CPSF_compare_T_PHC_Fused_vs_TauDual --N 4 --M 128 --S 64 --batch 16 --dtype c64 --device cpu --K 7 --quad_nodes 7 --phase_scale 1.0 --eps_total 1.0e-3 --seed 1337
 
 import argparse
 import torch
 
 from ..functional.core_math import Tau_dual
-from ..functional.t_phc import T_PHC
+from ..functional.t_phc_fused import T_PHC_Fused
 
 
 def _real_dtype_of(cdtype: torch.dtype) -> torch.dtype:
@@ -109,7 +109,7 @@ def main():
     sp = torch.maximum(sp, sq + 1e-3)
 
     # HS-Theta
-    T_hs = T_PHC(
+    T_phc = T_PHC_Fused(
         z=z,
         vec_d=vec_d,
         z_j=z_j,
@@ -123,6 +123,18 @@ def main():
         n_chunk=args.n_chunk,
         m_chunk=args.m_chunk,
         dtype_override=CDTYPE,
+    )
+
+    print(
+        "".join([
+            f"\nT_PHC values diag:",
+            f"\n\tStdDev:   \t{T_phc.std().item()}",
+            f"\n\tVariance: \t{T_phc.var().item()}",
+            f"\n\tMean:     \t{T_phc.mean().item()}",
+            f"\n\tAbsMean:  \t{T_phc.abs().mean().item()}",
+            f"\n\tAbsMin:   \t{T_phc.abs().min().item()}",
+            f"\n\tAbsMax:   \t{T_phc.abs().max().item()}",
+        ])
     )
 
     # Tau_dual
@@ -168,7 +180,7 @@ def main():
     REAL = _real_dtype_of(CDTYPE)
 
     td = _flatten_batch(T_dual)
-    th = _flatten_batch(T_hs)
+    tp = _flatten_batch(T_phc)
 
     e2 = _energy2(td)
     # Energy threshold: small but dtype-aware
@@ -192,13 +204,13 @@ def main():
         )
     else:
         # Global scale (energy-weighted)
-        num = (td.conj() * th).sum().real
+        num = (td.conj() * tp).sum().real
         den = (td.abs() ** 2).sum().real
         s_star_global = (num / den).item() if den > 0 else float("nan")
 
         # Cosine similarity (global, scale-invariant)
         norm_td = den.sqrt()
-        norm_th = ((th.abs() ** 2).sum().real).sqrt()
+        norm_th = ((tp.abs() ** 2).sum().real).sqrt()
         cos_global = (
             (num.abs() / (norm_td * norm_th + 1e-30)).item()
             if (norm_td > 0 and norm_th > 0)
@@ -211,7 +223,7 @@ def main():
         print(f"cos(angle) (global)={cos_global:.12f}")
 
     # Per-sample relative L2 (masked by energy)
-    diff = th - td
+    diff = tp - td
     rel_l2 = diff.abs().pow(2).sum(dim=1).sqrt()
     den_l2 = e2.sqrt()
     # no energy = NaN... avoid statistics corruption
@@ -222,7 +234,7 @@ def main():
     )
     rel_l2_masked = rel_l2[mask]
 
-    print("\n=== Accuracy: T_HS_theta vs Tau_dual (masked by energy) ===")
+    print("\n=== Accuracy: T_PHC_Fused vs Tau_dual (masked by energy) ===")
     if rel_l2_masked.numel() == 0:
         print("Per-sample relative L2: <no live samples>")
         rel_l2_mean = torch.tensor(0.0, dtype=REAL, device=td.device)
@@ -236,7 +248,7 @@ def main():
         rel_l2_mean = rel_l2_masked.mean()
 
     # Elementwise metrics (avoid div-by-zero by tiny denom)
-    abs_diff = (th - td).abs()
+    abs_diff = (tp - td).abs()
     abs_td = td.abs()
     elem_mae = abs_diff.mean()
     elem_mse = (abs_diff**2).mean()

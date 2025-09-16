@@ -1,10 +1,10 @@
-# dyna/lib/cpsf/benchmark/benchmark_CPSF_T_PHC.py
+# dyna/lib/cpsf/benchmark/benchmark_CPSF_T_PHC_Fused.py
 # Run examples:
-# > python -m dyna.lib.cpsf.benchmark.benchmark_CPSF_T_PHC --N 256 --M 256 --S 128 --batch 128 --dtype c64 --device cuda --iters 50 --warmup 10 --n_chunk 256 --m_chunk 256 --quad_nodes 7
+# > python -m dyna.lib.cpsf.benchmark.benchmark_CPSF_T_PHC_Fused --N 256 --M 256 --S 128 --batch 128 --dtype c64 --device cuda --iters 50 --warmup 10 --n_chunk 256 --m_chunk 256 --quad_nodes 7
 
 import argparse, time, torch
 
-from ..functional.t_phc import T_PHC
+from ..functional.t_phc_fused import T_PHC_Fused
 
 
 def _fmt_bytes(
@@ -128,7 +128,7 @@ def main():
     sp = torch.maximum(sp, sq + 1e-3)
 
     if args.verify_devices:
-        out = T_PHC(
+        out = T_PHC_Fused(
             z=z,
             vec_d=vec_d,
             z_j=z_j,
@@ -159,7 +159,7 @@ def main():
     if dev.type == "cuda":
         torch.cuda.synchronize()
     for _ in range(args.warmup):
-        _ = T_PHC(
+        _ = T_PHC_Fused(
             z=z,
             vec_d=vec_d,
             z_j=z_j,
@@ -192,7 +192,7 @@ def main():
             profile_memory=True,
         ) as prof:
             for _ in range(6):
-                _ = T_PHC(
+                _ = T_PHC_Fused(
                     z=z,
                     vec_d=vec_d,
                     z_j=z_j,
@@ -232,7 +232,7 @@ def main():
             start = torch.cuda.Event(enable_timing=True)
             end = torch.cuda.Event(enable_timing=True)
             start.record()
-            out = T_PHC(
+            out = T_PHC_Fused(
                 z=z,
                 vec_d=vec_d,
                 z_j=z_j,
@@ -258,7 +258,7 @@ def main():
             alloc_delta_max = max(alloc_delta_max, max(0, mem1 - mem0))
         else:
             t0 = time.perf_counter()
-            out = T_PHC(
+            out = T_PHC_Fused(
                 z=z,
                 vec_d=vec_d,
                 z_j=z_j,
@@ -281,7 +281,7 @@ def main():
     std = (sum((t - avg) ** 2 for t in times) / max(1, len(times) - 1)) ** 0.5
     thr = B / (avg / 1e3)  # fields/s (each has S outputs)
 
-    print("\n=== T_HS_theta Benchmark ===")
+    print("\n=== T_PHC_Fused Benchmark ===")
     print(f"Avg time/iter: {avg:.3f} ms  (± {std:.3f} ms)")
     print(f"Throughput:    {thr:,.0f} fields/s  (each has S={S})")
     if dev.type == "cuda":

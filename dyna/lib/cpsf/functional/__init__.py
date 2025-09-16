@@ -21,7 +21,8 @@ from dyna.lib.cpsf.functional.core_math import (
     hermitianize,
     cholesky_spd,
 )
-from dyna.lib.cpsf.functional.t_phc import T_PHC
+from dyna.lib.cpsf.functional.t_phc_fused import T_PHC_Fused
+from dyna.lib.cpsf.functional.t_phc_batched import T_PHC_Batched
 
 __all__ = [
     # CPSF core math
@@ -39,7 +40,8 @@ __all__ = [
     "Tau_dual",
     "Tau_nearest",
     # Stand-alone backend(s)
-    "T_PHC",
+    "T_PHC_Fused",
+    "T_PHC_Batched",
     # Math helpers
     "hermitianize",
     "cholesky_spd",

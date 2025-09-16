@@ -35,7 +35,7 @@ def fused_sincos(
     return cA, sA, cphi, sphi, cpsi, spsi
 
 
-def T_PHC(
+def T_PHC_Fused(
     z: torch.Tensor,
     vec_d: torch.Tensor,
     z_j: torch.Tensor,
@@ -52,7 +52,7 @@ def T_PHC(
     dtype_override: torch.dtype | None = None,
 ):
     """
-    T_PHC: Poisson-Hermite-Clenshaw evaluator for the torus-periodic field T.
+    T_PHC_Fused: Poisson-Hermite-Clenshaw evaluator for the torus-periodic field T.
 
     Computes the complex field T for a batch of query points against a set of M
     contributions using the PHC algorithm:
@@ -100,11 +100,11 @@ def T_PHC(
     TWO_PI = 2.0 * math.pi
     tiny = torch.as_tensor(torch.finfo(r_dtype).tiny, device=device, dtype=r_dtype)
 
-    if not hasattr(T_PHC, "_gh1d_cache"):
-        T_PHC._gh1d_cache = {}
+    if not hasattr(T_PHC_Fused, "_gh1d_cache"):
+        T_PHC_Fused._gh1d_cache = {}
 
     gh_key = (device.type, getattr(device, "index", -1), str(r_dtype), int(quad_nodes))
-    cached = T_PHC._gh1d_cache.get(gh_key)
+    cached = T_PHC_Fused._gh1d_cache.get(gh_key)
     if cached is None:
         Q = quad_nodes
         if Q < 1:
@@ -117,7 +117,7 @@ def T_PHC(
         tau, V = torch.linalg.eigh(J)
         w = (math.sqrt(math.pi) * (V[0, :] ** 2)).to(r_dtype)
         logw_1d = torch.log(torch.clamp(w, min=tiny))
-        T_PHC._gh1d_cache[gh_key] = (tau, logw_1d)
+        T_PHC_Fused._gh1d_cache[gh_key] = (tau, logw_1d)
         tau_1d, logw_1d = tau, logw_1d
     else:
         tau_1d, logw_1d = cached
