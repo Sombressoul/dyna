@@ -154,6 +154,18 @@ def main():
         T_phc_fused_list.append(Tb)
     T_phc_fused = torch.cat(T_phc_fused_list, dim=0)  # [B,S]
 
+    print(
+        "".join([
+            f"\nT_PHC_Fused diag:",
+            f"\n\tStdDev:   \t{T_phc_fused.std().item()}",
+            f"\n\tVariance: \t{T_phc_fused.var().item()}",
+            f"\n\tMean:     \t{T_phc_fused.mean().item()}",
+            f"\n\tAbsMean:  \t{T_phc_fused.abs().mean().item()}",
+            f"\n\tAbsMin:   \t{T_phc_fused.abs().min().item()}",
+            f"\n\tAbsMax:   \t{T_phc_fused.abs().max().item()}",
+        ])
+    )
+
     # ===== Diagnostics & accuracy =====
     def _flatten_batch(x: torch.Tensor) -> torch.Tensor:
         return x.reshape(x.shape[0], -1)
