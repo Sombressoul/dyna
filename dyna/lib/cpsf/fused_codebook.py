@@ -16,6 +16,8 @@ class CPSFFusedCodebook(nn.Module):
         n_chunk: Optional[int] = None,
         m_chunk: Optional[int] = None,
         eps_total: float = 1.0e-3,
+        autonorm_vec_d: bool = True,
+        autonorm_vec_d_j: bool = True,
         c_dtype: torch.dtype = torch.complex64,
     ) -> None:
         super().__init__()
@@ -27,6 +29,8 @@ class CPSFFusedCodebook(nn.Module):
         self.n_chunk = int(n_chunk) if n_chunk is not None else self.N
         self.m_chunk = int(m_chunk) if m_chunk is not None else self.M
         self.eps_total = float(eps_total)
+        self.autonorm_vec_d = bool(autonorm_vec_d)
+        self.autonorm_vec_d_j = bool(autonorm_vec_d_j)
         self.c_dtype = c_dtype
         self.r_dtype = torch.float32 if c_dtype == torch.complex64 else torch.float64
 
@@ -99,6 +103,15 @@ class CPSFFusedCodebook(nn.Module):
 
         return p
 
+    def _to_unit(
+        self,
+        x: torch.Tensor,
+    ) -> torch.Tensor:
+        n = torch.linalg.vector_norm(x, dim=-1, keepdim=True)
+        n = torch.where(n.real == 0, torch.ones_like(n), n)
+        x = (x / n).to(dtype=self.c_dtype)
+        return x
+
     def forward(
         self,
         z: torch.Tensor,
@@ -111,9 +124,21 @@ class CPSFFusedCodebook(nn.Module):
 
         return T_PHC_Fused(
             z=z,
-            vec_d=vec_d,
+            vec_d=(
+                self._to_unit(
+                    vec_d,
+                )
+                if self.autonorm_vec_d
+                else vec_d
+            ),
             z_j=self.z_j,
-            vec_d_j=self.vec_d_j,
+            vec_d_j=(
+                self._to_unit(
+                    self.vec_d_j,
+                )
+                if self.autonorm_vec_d_j
+                else self.vec_d_j
+            ),
             T_hat_j=self.T_hat_j,
             alpha_j=torch.clamp(
                 self.alpha_j,
