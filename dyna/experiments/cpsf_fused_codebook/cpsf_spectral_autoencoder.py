@@ -5,9 +5,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from dyna.lib.cpsf.fused_codebook import CPSFFusedCodebook
-from dyna.functional.backward_gradient_normalization import (
-    backward_gradient_normalization,
-)
 
 
 class ConvBlock(nn.Module):
@@ -85,8 +82,8 @@ class CPSFSpectralAutoencoder(nn.Module):
         N: int = 16,
         S: int = 256,
         quad_nodes: int = 6,
-        n_chunk: int = 1024,
-        m_chunk: int = 1024,
+        n_chunk: int = 2048,
+        m_chunk: int = 4096,
         eps_total: float = 1e-3,
         c_dtype: torch.dtype = torch.complex64,
     ) -> None:
@@ -118,6 +115,8 @@ class CPSFSpectralAutoencoder(nn.Module):
             quad_nodes=quad_nodes,
             n_chunk=n_chunk,
             m_chunk=m_chunk,
+            autonorm_vec_d=True,
+            autonorm_vec_d_j=True,
             eps_total=eps_total,
             c_dtype=c_dtype,
         )
@@ -161,16 +160,11 @@ class CPSFSpectralAutoencoder(nn.Module):
         x = F.tanh(self.linear_c(x))
         x = F.tanh(self.linear_d(x))
 
-        # x = backward_gradient_normalization(x)
         z = vector_to_spectrum(x[..., :32], self.N)
         vec_d = vector_to_spectrum(x[..., 32:], self.N)
-        n = torch.linalg.vector_norm(vec_d, dim=-1, keepdim=True)
-        n = torch.where(n.real == 0, torch.ones_like(n), n)
-        vec_d = (vec_d / n).to(dtype=self.c_dtype)
         codes = self.codebook(z, vec_d)
         vec = spectrum_to_vector(codes, dim=-1)
         x = vec.reshape([B, W, H, self.S]).permute([0, 3, 1, 2]).to(x_dtype)
-        # x = backward_gradient_normalization(x)
 
         # Decoder
         x = self.d1(x)
