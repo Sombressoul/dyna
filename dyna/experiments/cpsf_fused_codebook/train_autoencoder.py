@@ -7,6 +7,7 @@ from typing import Tuple
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 from PIL import Image, ImageDraw
 
@@ -48,6 +49,11 @@ def save_side_by_side(
     save_path.parent.mkdir(parents=True, exist_ok=True)
     canvas.save(save_path, format="PNG")
 
+def kl_recon_loss(pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+    B = pred.shape[0]
+    q = pred.view(B, -1).log_softmax(dim=1)   # log q
+    p = target.view(B, -1).log_softmax(dim=1) # log p
+    return F.kl_div(q, p, log_target=True, reduction="batchmean")
 
 # -----------------------------
 # Training
@@ -71,7 +77,7 @@ def train(
     model = CPSFSpectralAutoencoder().to(device)
     model.train()
     opt = torch.optim.AdamW(model.parameters(), lr=lr)
-    loss_fn = nn.MSELoss()
+    loss_fn = kl_recon_loss
 
     out_dir = Path(out_dir)
     (out_dir / "previews").mkdir(parents=True, exist_ok=True)
