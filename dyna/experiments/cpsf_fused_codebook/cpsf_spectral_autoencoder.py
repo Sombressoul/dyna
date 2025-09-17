@@ -5,7 +5,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from dyna.lib.cpsf.fused_codebook import CPSFFusedCodebook
-from dyna.functional.backward_gradient_normalization import backward_gradient_normalization
+from dyna.functional.backward_gradient_normalization import (
+    backward_gradient_normalization,
+)
 
 
 class ConvBlock(nn.Module):
@@ -86,11 +88,12 @@ class CPSFSpectralAutoencoder(nn.Module):
         n_chunk: int = 1024,
         m_chunk: int = 1024,
         eps_total: float = 1e-3,
-        c_dtype: torch.dtype = torch.complex128,
+        c_dtype: torch.dtype = torch.complex64,
     ) -> None:
         super().__init__()
         self.N = N
         self.S = S
+        self.c_dtype = c_dtype
 
         # Encoder → latent [B,16,16,16]
         self.e1 = ConvBlock(3, 32, downsample=True)
@@ -141,47 +144,41 @@ class CPSFSpectralAutoencoder(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # Encoder
         x = self.e1(x)
-        x = backward_gradient_normalization(x)
         x = self.e2(x)
-        x = backward_gradient_normalization(x)
         x = self.e3(x)
-        x = backward_gradient_normalization(x)
         x = self.e4(x)
-        x = backward_gradient_normalization(x)
         x = self.bottleneck(x)
-        x = backward_gradient_normalization(x)
 
         # Bottleneck
         x = self.head(x)
-        x = backward_gradient_normalization(x)
         x_dtype = x.dtype
         B, C, W, H = x.shape
         x = x.permute([0, 2, 3, 1]).flatten(0, 2)
+
         x = F.tanh(self.linear_a(x))
-        x = backward_gradient_normalization(x)
         x = F.tanh(self.linear_b(x))
         x = self.do(x)
-        x = backward_gradient_normalization(x)
         x = F.tanh(self.linear_c(x))
-        x = backward_gradient_normalization(x)
         x = F.tanh(self.linear_d(x))
-        x = backward_gradient_normalization(x)
+
+        # x = backward_gradient_normalization(x)
         z = vector_to_spectrum(x[..., :32], self.N)
         vec_d = vector_to_spectrum(x[..., 32:], self.N)
+        n = torch.linalg.vector_norm(vec_d, dim=-1, keepdim=True)
+        n = torch.where(n.real == 0, torch.ones_like(n), n)
+        vec_d = (vec_d / n).to(dtype=self.c_dtype)
         codes = self.codebook(z, vec_d)
         vec = spectrum_to_vector(codes, dim=-1)
-        vec = vec.reshape([B, W, H, self.S]).permute([0, 3, 1, 2]).to(x_dtype)
-        x = backward_gradient_normalization(vec)
+        x = vec.reshape([B, W, H, self.S]).permute([0, 3, 1, 2]).to(x_dtype)
+        # x = backward_gradient_normalization(x)
 
         # Decoder
-        x = self.d1(vec)
-        x = backward_gradient_normalization(x)
+        x = self.d1(x)
         x = self.d2(x)
-        x = backward_gradient_normalization(x)
         x = self.d3(x)
-        x = backward_gradient_normalization(x)
         x = self.d4(x)
         x = F.sigmoid(x)
+
         return x
 
 
