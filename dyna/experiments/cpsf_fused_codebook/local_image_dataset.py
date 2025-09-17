@@ -54,7 +54,7 @@ class LocalImageDataset(Dataset):
     ) -> int:
         return len(self.files)
 
-    def _load_to_tensor(
+    def _load_to_uint8tensor(
         self,
         path: Path,
     ) -> torch.Tensor:
@@ -66,7 +66,7 @@ class LocalImageDataset(Dataset):
             arr = np.asarray(im, dtype=np.uint8)
 
         t = torch.from_numpy(arr).permute(2, 0, 1).contiguous()
-        t = t.to(dtype=self.dtype).div(255.0)
+        t = t.to(torch.uint8)
         if self.device is not None:
             t = t.to(self.device, non_blocking=True)
 
@@ -81,12 +81,12 @@ class LocalImageDataset(Dataset):
 
         cached = self._cache[idx]
         if cached is not None:
-            return cached
+            return cached.to(self.dtype).div(255.0)
 
-        t = self._load_to_tensor(self.files[idx])
+        t = self._load_to_uint8tensor(self.files[idx])
         self._cache[idx] = t
 
-        return t
+        return t.to(self.dtype).div(255.0)
 
     def clear_cache(
         self,

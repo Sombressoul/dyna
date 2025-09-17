@@ -86,7 +86,7 @@ class CPSFSpectralAutoencoder(nn.Module):
         S: int = 256,
         quad_nodes: int = 6,
         n_chunk: int = 2048,
-        m_chunk: int = 4096,
+        m_chunk: int = 2048,
         eps_total: float = 1e-3,
         c_dtype: torch.dtype = torch.complex64,
     ) -> None:
@@ -147,10 +147,15 @@ class CPSFSpectralAutoencoder(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # Encoder
         x = self.e1(x)
+        x = backward_gradient_normalization(x)
         x = self.e2(x)
+        x = backward_gradient_normalization(x)
         x = self.e3(x)
+        x = backward_gradient_normalization(x)
         x = self.e4(x)
+        x = backward_gradient_normalization(x)
         x = self.bottleneck(x)
+        x = backward_gradient_normalization(x)
 
         # Bottleneck
         x = self.head(x)
@@ -159,14 +164,20 @@ class CPSFSpectralAutoencoder(nn.Module):
         B, C, W, H = x.shape
         x = x.permute([0, 2, 3, 1]).flatten(0, 2)
 
+        # Classify
         x = F.tanh(self.linear_a(x))
+        x = backward_gradient_normalization(x)
         x = F.tanh(self.linear_b(x))
+        x = backward_gradient_normalization(x)
         x = self.do(x)
         x = F.tanh(self.linear_c(x))
+        x = backward_gradient_normalization(x)
         x = F.tanh(self.linear_d(x))
+        x = backward_gradient_normalization(x)
         x = F.tanh(self.linear_e(x))
         x = backward_gradient_normalization(x)
 
+        # Retrieve from T-field
         z = x[..., :32]
         z = vector_to_spectrum(z, self.N)
         vec_d = x[..., 32:]
@@ -178,10 +189,13 @@ class CPSFSpectralAutoencoder(nn.Module):
 
         # Decoder
         x = self.d1(x)
+        x = backward_gradient_normalization(x)
         x = self.d2(x)
+        x = backward_gradient_normalization(x)
         x = self.d3(x)
-        x = self.d4(x)
-        x = F.sigmoid(x)
+        x = backward_gradient_normalization(x)
+        x = (self.d4(x) + 1.0).div(2.0)
+        x = F.relu(x)
 
         return x
 

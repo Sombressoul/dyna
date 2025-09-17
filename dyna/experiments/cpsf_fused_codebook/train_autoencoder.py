@@ -1,5 +1,5 @@
 # run:
-# > python -m dyna.experiments.cpsf_fused_codebook.train_autoencoder --data-root "..\!datasets\Img_512-512_4096_01\" --size 256 256 --epochs 50 --batch 1 --grad_acc 4 --lr 1e-4 --device cuda --log-every 10 --out-dir ./temp
+# > python -m dyna.experiments.cpsf_fused_codebook.train_autoencoder --data-root "..\!datasets\Img_512-512_4096_01\" --size 256 256 --epochs 50 --batch 2 --grad_acc 1 --lr 1e-4 --device cuda --log-every 10 --out-dir ./temp
 
 from pathlib import Path
 import argparse
@@ -51,8 +51,8 @@ def save_side_by_side(
 
 def kl_recon_loss(pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
     B = pred.shape[0]
-    q = pred.view(B, -1).log_softmax(dim=1)   # log q
-    p = target.view(B, -1).log_softmax(dim=1) # log p
+    q = pred.reshape(B, -1).log_softmax(dim=1)   # log q
+    p = target.reshape(B, -1).log_softmax(dim=1) # log p
     return F.kl_div(q, p, log_target=True, reduction="batchmean")
 
 # -----------------------------
