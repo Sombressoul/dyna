@@ -313,7 +313,7 @@ def T_PHC_Batched(
                             + logw_1d[j0:j1].view(1, 1, 1, q2)
                         ).view(1, 1, q1q2)
 
-                    x_flat = x_block.reshape(BM, ns, q1q2)
+                    x_flat = x_block.view(BM, ns, q1q2)
 
                     # ======================= K-buckets (Chebyshev for K<=4, else Clenshaw) =======================
                     for g in range(num_groups):
