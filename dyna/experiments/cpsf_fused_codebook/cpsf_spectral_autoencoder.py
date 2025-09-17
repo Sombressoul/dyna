@@ -5,6 +5,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from dyna.lib.cpsf.fused_codebook import CPSFFusedCodebook
+from dyna.functional.backward_gradient_normalization import (
+    backward_gradient_normalization,
+)
 
 
 class ConvBlock(nn.Module):
@@ -105,7 +108,8 @@ class CPSFSpectralAutoencoder(nn.Module):
         self.linear_a = nn.Linear(64, 256)
         self.linear_b = nn.Linear(256, 256)
         self.linear_c = nn.Linear(256, 256)
-        self.linear_d = nn.Linear(256, 64)
+        self.linear_d = nn.Linear(256, 256)
+        self.linear_e = nn.Linear(256, 64)
 
         # CPSF codebook
         self.codebook = CPSFFusedCodebook(
@@ -150,6 +154,7 @@ class CPSFSpectralAutoencoder(nn.Module):
 
         # Bottleneck
         x = self.head(x)
+        x = backward_gradient_normalization(x)
         x_dtype = x.dtype
         B, C, W, H = x.shape
         x = x.permute([0, 2, 3, 1]).flatten(0, 2)
@@ -159,12 +164,17 @@ class CPSFSpectralAutoencoder(nn.Module):
         x = self.do(x)
         x = F.tanh(self.linear_c(x))
         x = F.tanh(self.linear_d(x))
+        x = F.tanh(self.linear_e(x))
+        x = backward_gradient_normalization(x)
 
-        z = vector_to_spectrum(x[..., :32], self.N)
-        vec_d = vector_to_spectrum(x[..., 32:], self.N)
+        z = x[..., :32]
+        z = vector_to_spectrum(z, self.N)
+        vec_d = x[..., 32:]
+        vec_d = vector_to_spectrum(vec_d, self.N)
         codes = self.codebook(z, vec_d)
         vec = spectrum_to_vector(codes, dim=-1)
         x = vec.reshape([B, W, H, self.S]).permute([0, 3, 1, 2]).to(x_dtype)
+        x = backward_gradient_normalization(x)
 
         # Decoder
         x = self.d1(x)
