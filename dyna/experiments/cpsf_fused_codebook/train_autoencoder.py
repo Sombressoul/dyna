@@ -10,8 +10,11 @@ import torch.nn as nn
 
 from PIL import Image, ImageDraw
 
-from dyna.experiments.cpsf_fused_codebook.classic_autoencoder_256_16_256 import ClassicAutoencoder
+from dyna.experiments.cpsf_fused_codebook.cpsf_spectral_autoencoder import (
+    CPSFSpectralAutoencoder,
+)
 from dyna.experiments.cpsf_fused_codebook.local_image_dataset import LocalImageDataset
+
 
 # -----------------------------
 # Utilities
@@ -64,7 +67,7 @@ def train(
     ds = LocalImageDataset(str(data_root), size=size, device=device)
     loader = ds.get_dataloader(batch_size=batch_size, shuffle=True, drop_last=True)
 
-    model = ClassicAutoencoder().to(device)
+    model = CPSFSpectralAutoencoder().to(device)
     model.train()
     opt = torch.optim.Adam(model.parameters(), lr=lr)
     loss_fn = nn.MSELoss()
@@ -182,4 +185,3 @@ if __name__ == "__main__":
         device_str=args.device,
         log_every=args.log_every,
     )
-
