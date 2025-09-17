@@ -232,7 +232,7 @@ def T_PHC_Fused(
         log_ang = log_ang[:, perm]
         bR = bR[perm, :]
         bI = bI[perm, :]
-        c_ang_c = c_ang[perm]
+        c_ang_c = c_ang[m0:m1][perm]
 
         if mc > 0:
             Kvals, counts = torch.unique_consecutive(Kp_c, return_counts=True)
