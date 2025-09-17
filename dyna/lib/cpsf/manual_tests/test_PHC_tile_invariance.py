@@ -1,3 +1,6 @@
+# run:
+# > python -m dyna.lib.cpsf.manual_tests.test_PHC_tile_invariance --device cuda --dtype c64 --B 32 --N 8 --M 128 --S 64 --quad_nodes 7 --eps_total 1.0e-3 --seed 1337
+
 import argparse, torch
 
 from ..functional.t_phc_fused import T_PHC_Fused
