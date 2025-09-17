@@ -64,6 +64,14 @@ class CPSFFusedCodebook(nn.Module):
             requires_grad=True,
         )
 
+    def _get_tiny(
+        self,
+        x: torch.Tensor,
+    ) -> torch.Tensor:
+        return torch.as_tensor(
+            torch.finfo(x.dtype).tiny, device=x.device, dtype=x.dtype
+        )
+
     def _init_complex(
         self,
         shape: Union[torch.Size, list[int]],
@@ -101,9 +109,18 @@ class CPSFFusedCodebook(nn.Module):
             z_j=self.z_j,
             vec_d_j=self.vec_d_j,
             T_hat_j=self.T_hat_j,
-            alpha_j=self.alpha_j,
-            sigma_par_j=self.sigma_par_j,
-            sigma_perp_j=self.sigma_perp_j,
+            alpha_j=torch.clamp(
+                self.alpha_j,
+                min=self._get_tiny(self.alpha_j),
+            ),
+            sigma_par_j=torch.clamp(
+                self.sigma_par_j,
+                min=self._get_tiny(self.sigma_par_j),
+            ),
+            sigma_perp_j=torch.clamp(
+                self.sigma_perp_j,
+                min=self._get_tiny(self.sigma_perp_j),
+            ),
             quad_nodes=self.quad_nodes,
             eps_total=self.eps_total,
             n_chunk=self.n_chunk,
