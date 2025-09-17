@@ -1,5 +1,5 @@
 # run:
-# > python -m dyna.experiments.cpsf_fused_codebook.train_autoencoder --data-root "..\!datasets\Img_512-512_4096_01\" --size 256 256 --epochs 50 --batch 2 --grad_acc 1 --lr 1e-4 --device cuda --log-every 10 --out-dir ./temp
+# > python -m dyna.experiments.cpsf_fused_codebook.train_autoencoder --data-root "..\!datasets\Img_512-512_4096_01\" --size 512 512 --epochs 50 --batch 1 --grad_acc 2 --lr 1e-4 --device cuda --log-every 10 --out-dir ./temp
 
 from pathlib import Path
 import argparse
@@ -190,7 +190,7 @@ if __name__ == "__main__":
         "--size",
         type=int,
         nargs=2,
-        default=[256, 256],
+        default=[512, 512],
         help="Target size H W",
     )
     p.add_argument(

@@ -84,7 +84,7 @@ class CPSFSpectralAutoencoder(nn.Module):
         *,
         N: int = 16,
         S: int = 256,
-        quad_nodes: int = 6,
+        quad_nodes: int = 8,
         n_chunk: int = 2048,
         m_chunk: int = 2048,
         eps_total: float = 1e-3,
@@ -96,14 +96,15 @@ class CPSFSpectralAutoencoder(nn.Module):
         self.c_dtype = c_dtype
 
         # Encoder → latent [B,16,16,16]
-        self.e1 = ConvBlock(3, 32, downsample=True)
+        self.e0 = ConvBlock(3, 16, downsample=True)
+        self.e1 = ConvBlock(16, 32, downsample=True)
         self.e2 = ConvBlock(32, 64, downsample=True)
         self.e3 = ConvBlock(64, 64, downsample=True)
         self.e4 = ConvBlock(64, 16, downsample=True)
         self.bottleneck = Bottleneck(16)
 
         # Head to complex (z, vec_d): 4N channels (z_re, z_im, d_re, d_im)
-        self.head = nn.Conv2d(16, 4 * N, kernel_size=1)
+        self.head = nn.Conv2d(16, 4 * N, kernel_size=3, padding=1, stride=1, padding_mode="reflect")
         self.do = nn.Dropout(0.1)
         self.linear_a = nn.Linear(64, 256)
         self.linear_b = nn.Linear(256, 256)
@@ -126,10 +127,11 @@ class CPSFSpectralAutoencoder(nn.Module):
         )
 
         # Decoder starting from S channels
-        self.d1 = DeconvBlock(S, 128)
-        self.d2 = DeconvBlock(128, 64)
-        self.d3 = DeconvBlock(64, 32)
-        self.d4 = DeconvBlock(32, 3, True)
+        self.d0 = DeconvBlock(S, 128)
+        self.d1 = DeconvBlock(128, 64)
+        self.d2 = DeconvBlock(64, 32)
+        self.d3 = DeconvBlock(32, 16)
+        self.d4 = DeconvBlock(16, 3, True)
 
         self.reset_parameters()
 
@@ -142,10 +144,12 @@ class CPSFSpectralAutoencoder(nn.Module):
 
     @staticmethod
     def expected_shapes() -> Tuple[Tuple[int, ...], Tuple[int, ...]]:
-        return (1, 3, 256, 256), (1, 3, 256, 256)
+        return (1, 3, 512, 512), (1, 3, 512, 512)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # Encoder
+        x = self.e0(x)
+        x = backward_gradient_normalization(x)
         x = self.e1(x)
         x = backward_gradient_normalization(x)
         x = self.e2(x)
@@ -188,6 +192,8 @@ class CPSFSpectralAutoencoder(nn.Module):
         x = backward_gradient_normalization(x)
 
         # Decoder
+        x = self.d0(x)
+        x = backward_gradient_normalization(x)
         x = self.d1(x)
         x = backward_gradient_normalization(x)
         x = self.d2(x)
@@ -205,8 +211,8 @@ class CPSFSpectralAutoencoder(nn.Module):
 # -----------------------------
 if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = CPSFSpectralAutoencoder(N=16, S=256, pos_chunk=128).to(device)
-    x = torch.randn(2, 3, 256, 256, device=device)
+    model = CPSFSpectralAutoencoder(N=16, S=256).to(device)
+    x = torch.randn(2, 3, 512, 512, device=device)
     y = model(x)
     print("input:", tuple(x.shape))
     print("output:", tuple(y.shape))
