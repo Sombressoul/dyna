@@ -1,5 +1,5 @@
 # run:
-# > python -m dyna.experiments.cpsf_fused_codebook.train_autoencoder --data-root "..\!datasets\Img_512-512_4096_01\" --size 256 256 --epochs 10 --batch 16 --lr 1e-3 --device cuda --log-every 100 --out-dir ./temp
+# > python -m dyna.experiments.cpsf_fused_codebook.train_autoencoder --data-root "..\!datasets\Img_512-512_4096_01\" --size 256 256 --epochs 50 --batch 1 --grad_acc 8 --lr 1e-3 --device cuda --log-every 10 --out-dir ./temp
 
 from pathlib import Path
 import argparse
@@ -61,6 +61,7 @@ def train(
     lr: float,
     device_str: str,
     log_every: int,
+    grad_accumulation_steps: int = 1,
 ) -> None:
     device = torch.device(device_str)
 
@@ -75,31 +76,70 @@ def train(
     out_dir = Path(out_dir)
     (out_dir / "previews").mkdir(parents=True, exist_ok=True)
 
+    accum = max(1, int(grad_accumulation_steps))
     global_step = 0
+    micro_count = 0
+    loss_accum = 0.0
+    opt.zero_grad(set_to_none=True)
+
+    x_vis = None
+    y_vis = None
+
     for epoch in range(1, epochs + 1):
-        for batch in loader:
+        micro_count = 0
+        loss_accum = 0.0
+        for i, batch in enumerate(loader, start=1):
             x = batch
             y = model(x)
-            loss = loss_fn(y, x)
+            loss_raw = loss_fn(y, x)
+            loss = loss_raw / accum
 
-            opt.zero_grad(set_to_none=True)
             loss.backward()
-            opt.step()
+            micro_count += 1
+            loss_accum += float(loss_raw.detach().item())
+            x_vis = x[0].detach()
+            y_vis = y[0].detach()
 
+            if micro_count % accum == 0:
+                opt.step()
+                opt.zero_grad(set_to_none=True)
+                global_step += 1
+
+                if log_every > 0 and (global_step % log_every == 0):
+                    loss_avg = loss_accum / accum
+                    preview_path = (
+                        out_dir
+                        / "previews"
+                        / f"ep{epoch:03d}_step{global_step:06d}_loss{loss_avg:.4f}.png"
+                    )
+                    save_side_by_side(
+                        x_vis, y_vis, preview_path, epoch, global_step, float(loss_avg)
+                    )
+                    print(
+                        f"[ep {epoch}/{epochs} | step {global_step}] loss={loss_avg:.6f} → {preview_path.name}"
+                    )
+                loss_accum = 0.0
+
+        remainder = micro_count % accum
+        if remainder != 0:
+            opt.step()
+            opt.zero_grad(set_to_none=True)
             global_step += 1
 
             if log_every > 0 and (global_step % log_every == 0):
+                loss_avg = loss_accum / remainder
                 preview_path = (
                     out_dir
                     / "previews"
-                    / f"ep{epoch:03d}_step{global_step:06d}_loss{loss.item():.4f}.png"
+                    / f"ep{epoch:03d}_step{global_step:06d}_loss{loss_avg:.4f}.png"
                 )
                 save_side_by_side(
-                    x[0], y[0], preview_path, epoch, global_step, float(loss.item())
+                    x_vis, y_vis, preview_path, epoch, global_step, float(loss_avg)
                 )
                 print(
-                    f"[ep {epoch}/{epochs} | step {global_step}] loss={loss.item():.6f} → {preview_path.name}"
+                    f"[ep {epoch}/{epochs} | step {global_step}] loss={loss_avg:.6f} → {preview_path.name}"
                 )
+            loss_accum = 0.0
 
     with torch.no_grad():
         for batch in ds.iter_batches(batch_size):
@@ -155,6 +195,11 @@ if __name__ == "__main__":
     p.add_argument(
         "--batch",
         type=int,
+        default=1,
+    )
+    p.add_argument(
+        "--grad_acc",
+        type=int,
         default=16,
     )
     p.add_argument(
@@ -184,4 +229,5 @@ if __name__ == "__main__":
         lr=args.lr,
         device_str=args.device,
         log_every=args.log_every,
+        grad_accumulation_steps=args.grad_acc,
     )

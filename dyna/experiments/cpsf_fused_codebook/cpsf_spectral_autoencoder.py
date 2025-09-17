@@ -86,7 +86,7 @@ class CPSFSpectralAutoencoder(nn.Module):
         n_chunk: int = 1024,
         m_chunk: int = 1024,
         eps_total: float = 1e-3,
-        c_dtype: torch.dtype = torch.complex64,
+        c_dtype: torch.dtype = torch.complex128,
     ) -> None:
         super().__init__()
         self.N = N
@@ -101,6 +101,11 @@ class CPSFSpectralAutoencoder(nn.Module):
 
         # Head to complex (z, vec_d): 4N channels (z_re, z_im, d_re, d_im)
         self.head = nn.Conv2d(16, 4 * N, kernel_size=1)
+        self.do = nn.Dropout(0.1)
+        self.linear_a = nn.Linear(64, 256)
+        self.linear_b = nn.Linear(256, 256)
+        self.linear_c = nn.Linear(256, 256)
+        self.linear_d = nn.Linear(256, 64)
 
         # CPSF codebook
         self.codebook = CPSFFusedCodebook(
@@ -152,6 +157,15 @@ class CPSFSpectralAutoencoder(nn.Module):
         x_dtype = x.dtype
         B, C, W, H = x.shape
         x = x.permute([0, 2, 3, 1]).flatten(0, 2)
+        x = F.tanh(self.linear_a(x))
+        x = backward_gradient_normalization(x)
+        x = F.tanh(self.linear_b(x))
+        x = self.do(x)
+        x = backward_gradient_normalization(x)
+        x = F.tanh(self.linear_c(x))
+        x = backward_gradient_normalization(x)
+        x = F.tanh(self.linear_d(x))
+        x = backward_gradient_normalization(x)
         z = vector_to_spectrum(x[..., :32], self.N)
         vec_d = vector_to_spectrum(x[..., 32:], self.N)
         codes = self.codebook(z, vec_d)
