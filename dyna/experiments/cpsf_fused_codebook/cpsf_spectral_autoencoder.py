@@ -2,8 +2,10 @@ from typing import Tuple
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 from dyna.lib.cpsf.fused_codebook import CPSFFusedCodebook
+from dyna.functional.backward_gradient_normalization import backward_gradient_normalization
 
 
 class ConvBlock(nn.Module):
@@ -13,7 +15,7 @@ class ConvBlock(nn.Module):
         self.conv2 = nn.Conv2d(
             out_ch, out_ch, kernel_size=3, padding=1, stride=2 if downsample else 1
         )
-        self.act = nn.ReLU(inplace=True)
+        self.act = F.tanh
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.act(self.conv1(x))
@@ -22,13 +24,13 @@ class ConvBlock(nn.Module):
 
 
 class DeconvBlock(nn.Module):
-    def __init__(self, in_ch: int, out_ch: int) -> None:
+    def __init__(self, in_ch: int, out_ch: int, noact: bool = False) -> None:
         super().__init__()
         self.deconv = nn.ConvTranspose2d(
             in_ch, out_ch, kernel_size=4, stride=2, padding=1
         )
         self.conv = nn.Conv2d(out_ch, out_ch, kernel_size=3, padding=1)
-        self.act = nn.ReLU(inplace=True)
+        self.act = nn.Identity() if noact else F.tanh
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.act(self.deconv(x))
@@ -41,7 +43,7 @@ class Bottleneck(nn.Module):
         super().__init__()
         self.conv1 = nn.Conv2d(ch, ch, kernel_size=3, padding=1)
         self.conv2 = nn.Conv2d(ch, ch, kernel_size=3, padding=1)
-        self.act = nn.ReLU(inplace=True)
+        self.act = F.tanh
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.act(self.conv2(self.act(self.conv1(x))))
@@ -103,7 +105,7 @@ class CPSFSpectralAutoencoder(nn.Module):
         # CPSF codebook
         self.codebook = CPSFFusedCodebook(
             N=N,
-            M=256,
+            M=2048,
             S=S,
             quad_nodes=quad_nodes,
             n_chunk=n_chunk,
@@ -116,14 +118,14 @@ class CPSFSpectralAutoencoder(nn.Module):
         self.d1 = DeconvBlock(S, 128)
         self.d2 = DeconvBlock(128, 64)
         self.d3 = DeconvBlock(64, 32)
-        self.d4 = DeconvBlock(32, 3)
+        self.d4 = DeconvBlock(32, 3, True)
 
         self.reset_parameters()
 
     def reset_parameters(self) -> None:
         for m in self.modules():
             if isinstance(m, (nn.Conv2d, nn.ConvTranspose2d)):
-                nn.init.kaiming_normal_(m.weight, nonlinearity="relu")
+                nn.init.xavier_normal_(m.weight)
                 if m.bias is not None:
                     nn.init.zeros_(m.bias)
 
@@ -134,13 +136,19 @@ class CPSFSpectralAutoencoder(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # Encoder
         x = self.e1(x)
+        x = backward_gradient_normalization(x)
         x = self.e2(x)
+        x = backward_gradient_normalization(x)
         x = self.e3(x)
+        x = backward_gradient_normalization(x)
         x = self.e4(x)
+        x = backward_gradient_normalization(x)
         x = self.bottleneck(x)
+        x = backward_gradient_normalization(x)
 
         # Bottleneck
         x = self.head(x)
+        x = backward_gradient_normalization(x)
         x_dtype = x.dtype
         B, C, W, H = x.shape
         x = x.permute([0, 2, 3, 1]).flatten(0, 2)
@@ -149,13 +157,18 @@ class CPSFSpectralAutoencoder(nn.Module):
         codes = self.codebook(z, vec_d)
         vec = spectrum_to_vector(codes, dim=-1)
         vec = vec.reshape([B, W, H, self.S]).permute([0, 3, 1, 2]).to(x_dtype)
+        x = backward_gradient_normalization(vec)
 
         # Decoder
-        y = self.d1(vec)
-        y = self.d2(y)
-        y = self.d3(y)
-        y = self.d4(y)
-        return y
+        x = self.d1(vec)
+        x = backward_gradient_normalization(x)
+        x = self.d2(x)
+        x = backward_gradient_normalization(x)
+        x = self.d3(x)
+        x = backward_gradient_normalization(x)
+        x = self.d4(x)
+        x = F.sigmoid(x)
+        return x
 
 
 # -----------------------------

@@ -31,36 +31,42 @@ class CPSFFusedCodebook(nn.Module):
         self.r_dtype = torch.float32 if c_dtype == torch.complex64 else torch.float64
 
         self.z_j = torch.nn.Parameter(
-            data=self._init_complex(
-                shape=[self.M, self.N],
-                unit=False,
-            ),
+            data=(
+                self._init_complex(
+                    shape=[self.M, self.N],
+                    unit=False,
+                )
+                / 2.0
+            ).detach(),
             requires_grad=True,
         )
         self.vec_d_j = torch.nn.Parameter(
-            data=self._init_complex(
-                shape=[self.M, self.N],
-                unit=True,
-            ),
+            data=(
+                self._init_complex(
+                    shape=[self.M, self.N],
+                    unit=True,
+                )
+                / 2.0
+            ).detach(),
             requires_grad=True,
         )
         self.T_hat_j = torch.nn.Parameter(
             data=self._init_complex(
                 shape=[self.M, self.S],
                 unit=False,
-            ),
+            ).detach(),
             requires_grad=True,
         )
         self.alpha_j = torch.nn.Parameter(
-            data=torch.rand([self.M], dtype=self.r_dtype),
+            data=torch.empty([self.M], dtype=self.r_dtype).uniform_(0.5, 1.5).detach(),
             requires_grad=True,
         )
         self.sigma_par_j = torch.nn.Parameter(
-            data=torch.empty([self.M], dtype=self.r_dtype).uniform_(0.5, 1.5),
+            data=torch.empty([self.M], dtype=self.r_dtype).uniform_(0.5, 1.5).detach(),
             requires_grad=True,
         )
         self.sigma_perp_j = torch.nn.Parameter(
-            data=torch.empty([self.M], dtype=self.r_dtype).uniform_(0.5, 1.5),
+            data=torch.empty([self.M], dtype=self.r_dtype).uniform_(0.5, 1.5).detach(),
             requires_grad=True,
         )
 
@@ -77,8 +83,8 @@ class CPSFFusedCodebook(nn.Module):
         shape: Union[torch.Size, list[int]],
         unit: bool = False,
     ) -> torch.Tensor:
-        xr = torch.randn(shape, dtype=self.r_dtype)
-        xi = torch.randn(shape, dtype=self.r_dtype)
+        xr = torch.empty(shape, dtype=self.r_dtype).uniform_(-1.0, +1.0)
+        xi = torch.empty(shape, dtype=self.r_dtype).uniform_(-1.0, +1.0)
         p = torch.complex(
             real=xr,
             imag=xi,
