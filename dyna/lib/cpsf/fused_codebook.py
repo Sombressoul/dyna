@@ -21,14 +21,29 @@ class CPSFFusedCodebook(nn.Module):
         autonorm_vec_d_j: bool = True,
         overlap_rate: float = 0.25,
         anisotropy: float = 0.75,
+        init_S_scale: float = 1.0e-3,
         c_dtype: torch.dtype = torch.complex64,
     ) -> None:
         super().__init__()
 
+        if int(N) < 2:
+            raise ValueError("N must be >= 2")
+        if int(M) < 2:
+            raise ValueError("M must be >= 2")
+        if int(S) < 1:
+            raise ValueError("S must be >= 1")
+        if int(quad_nodes) < 2:
+            raise ValueError("quad_nodes must be >= 2")
+        if float(eps_total) <= 0.0:
+            raise ValueError("eps_total must be > 0.")
         if float(overlap_rate) <= 0.0:
             raise ValueError("overlap_rate must be > 0.")
         if float(anisotropy) < 0.0:
             raise ValueError("anisotropy must be >= 0.")
+        if float(init_S_scale) <= 0.0:
+            raise ValueError("init_S_scale must be > 0.")
+        if c_dtype not in [torch.complex64, torch.complex128]:
+            raise ValueError("c_dtype must be torch.complex64 or torch.complex128.")
 
         self.N = int(N)
         self.M = int(M)
@@ -41,6 +56,7 @@ class CPSFFusedCodebook(nn.Module):
         self.autonorm_vec_d_j = bool(autonorm_vec_d_j)
         self.overlap_rate = float(overlap_rate)
         self.anisotropy = float(anisotropy)
+        self.init_S_scale = float(init_S_scale)
         self.c_dtype = c_dtype
         self.r_dtype = torch.float32 if c_dtype == torch.complex64 else torch.float64
 
@@ -52,8 +68,9 @@ class CPSFFusedCodebook(nn.Module):
                     shape=[self.M, self.N],
                     unit=False,
                 )
-                / 2.0
-            ).detach(),
+            )
+            .mul(0.5)
+            .detach(),
             requires_grad=True,
         )
         self.vec_d_j = torch.nn.Parameter(
@@ -62,7 +79,6 @@ class CPSFFusedCodebook(nn.Module):
                     shape=[self.M, self.N],
                     unit=True,
                 )
-                / 2.0
             ).detach(),
             requires_grad=True,
         )
@@ -70,11 +86,15 @@ class CPSFFusedCodebook(nn.Module):
             data=self._init_complex(
                 shape=[self.M, self.S],
                 unit=False,
-            ).detach(),
+            )
+            .mul(self.init_S_scale)
+            .detach(),
             requires_grad=True,
         )
         self.alpha_j = torch.nn.Parameter(
-            data=torch.empty([self.M], dtype=self.r_dtype).uniform_(0.5, 1.5).detach(),
+            data=torch.empty([self.M], dtype=self.r_dtype)
+            .uniform_(0.75, 1.25)
+            .detach(),
             requires_grad=True,
         )
 
