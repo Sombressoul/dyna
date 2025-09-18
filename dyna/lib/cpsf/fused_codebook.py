@@ -1,3 +1,4 @@
+import math
 import torch
 import torch.nn as nn
 
@@ -18,9 +19,16 @@ class CPSFFusedCodebook(nn.Module):
         eps_total: float = 1.0e-3,
         autonorm_vec_d: bool = True,
         autonorm_vec_d_j: bool = True,
+        overlap_rate: float = 0.25,
+        anisotropy: float = 0.75,
         c_dtype: torch.dtype = torch.complex64,
     ) -> None:
         super().__init__()
+
+        if float(overlap_rate) <= 0.0:
+            raise ValueError("overlap_rate must be > 0.")
+        if float(anisotropy) < 0.0:
+            raise ValueError("anisotropy must be >= 0.")
 
         self.N = int(N)
         self.M = int(M)
@@ -31,8 +39,12 @@ class CPSFFusedCodebook(nn.Module):
         self.eps_total = float(eps_total)
         self.autonorm_vec_d = bool(autonorm_vec_d)
         self.autonorm_vec_d_j = bool(autonorm_vec_d_j)
+        self.overlap_rate = float(overlap_rate)
+        self.anisotropy = float(anisotropy)
         self.c_dtype = c_dtype
         self.r_dtype = torch.float32 if c_dtype == torch.complex64 else torch.float64
+
+        self._init_sigmas()
 
         self.z_j = torch.nn.Parameter(
             data=(
@@ -65,12 +77,28 @@ class CPSFFusedCodebook(nn.Module):
             data=torch.empty([self.M], dtype=self.r_dtype).uniform_(0.5, 1.5).detach(),
             requires_grad=True,
         )
+
+    def _init_sigmas(
+        self,
+    ) -> None:
+        N = float(self.N)
+        M = float(max(self.M, 1))
+        rho = 1.0 + self.anisotropy
+        V_N = (math.pi ** (N * 0.5)) / math.gamma(N * 0.5 + 1.0)
+
+        r_perp = (self.overlap_rate / (M * V_N * rho)) ** (1.0 / N)
+        if not (r_perp > 0.0):
+            raise ValueError("Computed r_perp is non-positive; check overlap_rate/M/N.")
+
+        sigma_perp = 2.0 * math.pi * (r_perp**2)
+        sigma_par = (rho**2) * sigma_perp
+
         self.sigma_par_j = torch.nn.Parameter(
-            data=torch.empty([self.M], dtype=self.r_dtype).uniform_(0.5, 1.5).detach(),
+            data=torch.full((self.M,), sigma_par, dtype=self.r_dtype).detach(),
             requires_grad=True,
         )
         self.sigma_perp_j = torch.nn.Parameter(
-            data=torch.empty([self.M], dtype=self.r_dtype).uniform_(0.5, 1.5).detach(),
+            data=torch.full((self.M,), sigma_perp, dtype=self.r_dtype).detach(),
             requires_grad=True,
         )
 
