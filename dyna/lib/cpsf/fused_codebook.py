@@ -22,6 +22,7 @@ class CPSFFusedCodebook(nn.Module):
         overlap_rate: float = 0.25,
         anisotropy: float = 0.75,
         init_S_scale: float = 1.0e-3,
+        phase_scale: float = 1.0,  # Use when T-value explodes.
         c_dtype: torch.dtype = torch.complex64,
     ) -> None:
         super().__init__()
@@ -42,6 +43,8 @@ class CPSFFusedCodebook(nn.Module):
             raise ValueError("anisotropy must be >= 0.")
         if float(init_S_scale) <= 0.0:
             raise ValueError("init_S_scale must be > 0.")
+        if float(phase_scale) < 0.0:
+            raise ValueError("phase_scale must be >= 0.")
         if c_dtype not in [torch.complex64, torch.complex128]:
             raise ValueError("c_dtype must be torch.complex64 or torch.complex128.")
 
@@ -57,6 +60,7 @@ class CPSFFusedCodebook(nn.Module):
         self.overlap_rate = float(overlap_rate)
         self.anisotropy = float(anisotropy)
         self.init_S_scale = float(init_S_scale)
+        self.phase_scale = float(phase_scale)
         self.c_dtype = c_dtype
         self.r_dtype = torch.float32 if c_dtype == torch.complex64 else torch.float64
 
@@ -160,6 +164,14 @@ class CPSFFusedCodebook(nn.Module):
         x = (x / n).to(dtype=self.c_dtype)
         return x
 
+    def _scale_phase(
+        self,
+        x: torch.Tensor,
+    ) -> torch.Tensor:
+        xr = x.real
+        xi = x.imag * self.phase_scale
+        return torch.complex(xr, xi).to(dtype=self.c_dtype)
+
     def forward(
         self,
         z: torch.Tensor,
@@ -171,7 +183,7 @@ class CPSFFusedCodebook(nn.Module):
             raise ValueError(f"'vec_d' should be complex, got: '{type(vec_d)}'")
 
         return T_PHC_Fused(
-            z=z,
+            z=self._scale_phase(z),
             vec_d=(
                 self._to_unit(
                     vec_d,
@@ -179,7 +191,7 @@ class CPSFFusedCodebook(nn.Module):
                 if self.autonorm_vec_d
                 else vec_d
             ),
-            z_j=self.z_j,
+            z_j=self._scale_phase(self.z_j),
             vec_d_j=(
                 self._to_unit(
                     self.vec_d_j,
