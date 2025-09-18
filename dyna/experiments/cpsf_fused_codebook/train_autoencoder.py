@@ -1,5 +1,7 @@
 # run:
-# > python -m dyna.experiments.cpsf_fused_codebook.train_autoencoder --data-root "..\!datasets\Img_512-512_4096_01\" --size 512 512 --epochs 50 --batch 1 --grad_acc 2 --lr 1e-4 --device cuda --log-every 10 --out-dir ./temp
+# > python -m dyna.experiments.cpsf_fused_codebook.train_autoencoder --data-root "..\!datasets\Img_512-512_4096_01\"
+#       \ --size 512 512 --epochs 50 --batch 1 --grad_acc 2 --lr 1e-4 
+#       \ --device_target cuda --device_cache cpu --log-every 10 --out-dir ./temp
 
 from pathlib import Path
 import argparse
@@ -65,13 +67,14 @@ def train(
     epochs: int,
     batch_size: int,
     lr: float,
-    device_str: str,
+    device_target: str,
+    device_cache: str,
     log_every: int,
     grad_accumulation_steps: int = 1,
 ) -> None:
-    device = torch.device(device_str)
+    device = torch.device(device_target)
 
-    ds = LocalImageDataset(str(data_root), size=size, device=device)
+    ds = LocalImageDataset(str(data_root), size=size, device_target=device, device_cache=device_cache)
     loader = ds.get_dataloader(batch_size=batch_size, shuffle=True, drop_last=True)
 
     model = CPSFSpectralAutoencoder().to(device)
@@ -214,7 +217,12 @@ if __name__ == "__main__":
         default=1e-3,
     )
     p.add_argument(
-        "--device",
+        "--device_target",
+        type=str,
+        default=("cuda" if torch.cuda.is_available() else "cpu"),
+    )
+    p.add_argument(
+        "--device_cache",
         type=str,
         default=("cuda" if torch.cuda.is_available() else "cpu"),
     )
@@ -233,7 +241,8 @@ if __name__ == "__main__":
         epochs=args.epochs,
         batch_size=args.batch,
         lr=args.lr,
-        device_str=args.device,
+        device_target=args.device_target,
+        device_cache=args.device_cache,
         log_every=args.log_every,
         grad_accumulation_steps=args.grad_acc,
     )

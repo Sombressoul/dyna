@@ -17,7 +17,8 @@ class LocalImageDataset(Dataset):
         self,
         root: str | os.PathLike,
         size: Tuple[int, int],
-        device: Optional[torch.device | str] = None,
+        device_target: Optional[torch.device | str] = None,
+        device_cache: Optional[torch.device | str] = None,
         dtype: torch.dtype = torch.float32,
     ) -> None:
         super().__init__()
@@ -33,7 +34,8 @@ class LocalImageDataset(Dataset):
                 f"LocalImageDataset: size must be (H, W) with positive ints, got {self.size}"
             )
 
-        self.device = torch.device(device) if device is not None else None
+        self.device_target = torch.device(device_target) if device_target is not None else None
+        self.device_cache = torch.device(device_cache) if device_cache is not None else None
         self.dtype = dtype
 
         files = [
@@ -67,8 +69,8 @@ class LocalImageDataset(Dataset):
 
         t = torch.from_numpy(arr).permute(2, 0, 1).contiguous()
         t = t.to(torch.uint8)
-        if self.device is not None:
-            t = t.to(self.device, non_blocking=True)
+        if self.device_cache is not None:
+            t = t.to(self.device_cache, non_blocking=True)
 
         return t
 
@@ -78,15 +80,17 @@ class LocalImageDataset(Dataset):
     ) -> torch.Tensor:
         if idx < 0 or idx >= len(self.files):
             raise IndexError(idx)
+        
+        return_t = lambda t: t.to(device=self.device_target, dtype=self.dtype).div(255.0)
 
         cached = self._cache[idx]
         if cached is not None:
-            return cached.to(self.dtype).div(255.0)
+            return return_t(cached)
 
         t = self._load_to_uint8tensor(self.files[idx])
         self._cache[idx] = t
 
-        return t.to(self.dtype).div(255.0)
+        return return_t(t)
 
     def clear_cache(
         self,
@@ -138,7 +142,7 @@ if __name__ == "__main__":
     parser.add_argument("--batch", type=int, default=8)
     args = parser.parse_args()
 
-    ds = LocalImageDataset(args.root, size=tuple(args.size), device=args.device)
+    ds = LocalImageDataset(args.root, size=tuple(args.size), device_target=args.device)
     print(f"Found {len(ds)} images in {args.root}")
 
     x0 = ds[0]
