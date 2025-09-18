@@ -5,6 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from dyna.lib.cpsf.fused_codebook import CPSFFusedCodebook
+from dyna.functional.backward_gradient_normalization import backward_gradient_normalization
 
 
 class ConvBlock(nn.Module):
@@ -77,7 +78,7 @@ def _complex64(x: torch.Tensor) -> torch.Tensor:
 
 def spectrum_to_vector(spectrum: torch.Tensor, n: int, dim: int = -1) -> torch.Tensor:
     x = torch.fft.ifft(_complex64(spectrum), n, dim=dim)
-    return x.real
+    return x.abs()
 
 
 def vector_to_spectrum(vector: torch.Tensor, n: int, dim: int = -1) -> torch.Tensor:
@@ -92,11 +93,11 @@ class CPSFSpectralAutoencoder(nn.Module):
     def __init__(
         self,
         *,
-        N: int = 64,
-        M: int = 1024,
+        N: int = 16,
+        M: int = 2048,
         S: int = 2048,
         bottleneck_ch: int = 4,
-        quad_nodes: int = 8,
+        quad_nodes: int = 6,
         n_chunk: int = 2048,
         m_chunk: int = 2048,
         eps_total: float = 1e-3,
@@ -138,10 +139,10 @@ class CPSFSpectralAutoencoder(nn.Module):
             eps_total=eps_total,
             autonorm_vec_d=True,
             autonorm_vec_d_j=True,
-            overlap_rate=0.05,
-            anisotropy=0.75,
+            overlap_rate=0.01,
+            anisotropy=1.5,
             init_S_scale=1.0e-3,
-            phase_scale=12.4,
+            phase_scale=1.0,
             c_dtype=c_dtype,
         )
         self.codebook_norm = nn.LayerNorm(
@@ -172,14 +173,21 @@ class CPSFSpectralAutoencoder(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # Encoder
         x = self.e0(x)
+        x = backward_gradient_normalization(x)
         x = self.e1(x)
+        x = backward_gradient_normalization(x)
         x = self.e2(x)
+        x = backward_gradient_normalization(x)
         x = self.e3(x)
+        x = backward_gradient_normalization(x)
         x = self.e4(x)
+        x = backward_gradient_normalization(x)
         x = self.bottleneck(x)
+        x = backward_gradient_normalization(x)
 
         # Bottleneck
         x = self.head(x)
+        x = backward_gradient_normalization(x)
         x_dtype = x.dtype
         B, C, W, H = x.shape
         x = x.permute([0, 2, 3, 1]).flatten(0, 2)
@@ -239,14 +247,19 @@ class CPSFSpectralAutoencoder(nn.Module):
         # )
         # exit()
         x = spectrum_to_vector(codes, self.S, dim=-1)
+        x = backward_gradient_normalization(x)
         x = self.codebook_norm(x)
         x = x.reshape([B, W, H, self.S]).permute([0, 3, 1, 2]).to(x_dtype)
 
         # Decoder
         x = self.d0(x)
+        x = backward_gradient_normalization(x)
         x = self.d1(x)
+        x = backward_gradient_normalization(x)
         x = self.d2(x)
+        x = backward_gradient_normalization(x)
         x = self.d3(x)
+        x = backward_gradient_normalization(x)
         x = self.d4(x)
         x = (x + 1.0) / 2.0
 
