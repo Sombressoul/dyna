@@ -1,7 +1,7 @@
 # run:
-# > python -m dyna.experiments.cpsf_fused_codebook.train_autoencoder --data-root "..\!datasets\Img_512-512_4096_01\"
-#       \ --size 512 512 --epochs 50 --batch 1 --grad_acc 2 --lr 1e-4 
-#       \ --device_target cuda --device_cache cpu --log-every 10 --out-dir ./temp
+# > python -m dyna.experiments.cpsf_fused_codebook.train_autoencoder --data-root "e:\Datasets\Images_512x512\dataset_01\"
+#       \ --size 512 512 --epochs 10 --batch 2 --grad_acc 1 --lr 1.0e-5 --device_target cuda --device_cache cpu 
+#       \ --log-every 100 --out-dir ./temp
 
 from pathlib import Path
 import argparse
