@@ -95,14 +95,16 @@ class CPSFSpectralAutoencoder(nn.Module):
         self.c_dtype = c_dtype
         self.navigation_size = 4 * N
 
+        base_act = lambda x: F.leaky_relu(x, 0.05)
+
         # Encoder
-        self.e_dropout = nn.Dropout(0.2)
-        self.e0 = ConvBlock(3, 16, downsample=True, act=F.tanh)
-        self.e1 = ConvBlock(16, 32, downsample=True, act=F.tanh)
-        self.e2 = ConvBlock(32, 64, downsample=True, act=F.tanh)
-        self.e3 = ConvBlock(64, 128, downsample=True, act=F.tanh)
-        self.e4 = ConvBlock(128, 256, downsample=True, act=F.tanh)
-        self.bottleneck = Bottleneck(256, bottleneck_ch, act=F.tanh)
+        self.e_dropout = nn.Dropout(0.1)
+        self.e0 = ConvBlock(3, 16, downsample=True, act=base_act)
+        self.e1 = ConvBlock(16, 32, downsample=True, act=base_act)
+        self.e2 = ConvBlock(32, 64, downsample=True, act=base_act)
+        self.e3 = ConvBlock(64, 128, downsample=True, act=base_act)
+        self.e4 = ConvBlock(128, 256, downsample=True, act=base_act)
+        self.bottleneck = Bottleneck(256, bottleneck_ch, act=base_act)
 
         # Head
         self.head = nn.Conv2d(
@@ -135,15 +137,15 @@ class CPSFSpectralAutoencoder(nn.Module):
             normalized_shape=[self.S],
             elementwise_affine=True,
         )
-        self.codebook_dropout = nn.Dropout(0.5)
+        self.codebook_dropout = nn.Dropout(0.2)
 
         # Decoder starting from S channels
-        self.d_dropout = nn.Dropout(0.2)
-        self.d0 = DeconvBlock(S, 512, act=F.tanh)
-        self.d1 = DeconvBlock(512, 256, act=F.tanh)
-        self.d2 = DeconvBlock(256, 128, act=F.tanh)
-        self.d3 = DeconvBlock(128, 64, act=F.tanh)
-        self.d4 = DeconvBlock(64, 3, act=F.tanh)
+        self.d_dropout = nn.Dropout(0.1)
+        self.d0 = DeconvBlock(S, 512, act=base_act)
+        self.d1 = DeconvBlock(512, 256, act=base_act)
+        self.d2 = DeconvBlock(256, 128, act=base_act)
+        self.d3 = DeconvBlock(128, 64, act=base_act)
+        self.d4 = DeconvBlock(64, 3, act=base_act)
 
         self.reset_parameters()
 
@@ -203,7 +205,6 @@ class CPSFSpectralAutoencoder(nn.Module):
         x = self.d_dropout(x)
         x = backward_gradient_normalization(x)
         x = self.d4(x)
-        x = (x + 1.0) / 2.0
 
         return x
 
