@@ -95,7 +95,7 @@ class CPSFSpectralAutoencoder(nn.Module):
         self.c_dtype = c_dtype
         self.navigation_size = 4 * N
 
-        base_act = lambda x: F.leaky_relu(x, 0.05)
+        base_act = lambda x: F.leaky_relu(x, 0.3)
 
         # Encoder
         self.e_dropout = nn.Dropout(0.1)
@@ -163,10 +163,13 @@ class CPSFSpectralAutoencoder(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # Encoder
         x = self.e0(x)
+        x = self.e_dropout(x)
         x = backward_gradient_normalization(x)
         x = self.e1(x)
+        x = self.e_dropout(x)
         x = backward_gradient_normalization(x)
         x = self.e2(x)
+        x = self.e_dropout(x)
         x = backward_gradient_normalization(x)
         x = self.e3(x)
         x = self.e_dropout(x)
