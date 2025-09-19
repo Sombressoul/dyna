@@ -91,20 +91,42 @@ class PerceptualLoss(nn.Module):
         self,
         pred: torch.Tensor,
         target: torch.Tensor,
+        reduction: str = "batchmean",
     ) -> torch.Tensor:
         x = self.vgg(self._pre(pred))
 
         with torch.no_grad():
             y = self.vgg(self._pre(target))
 
-        return kl_recon_loss(x, y)
+        return kl_recon_loss(x, y, reduction)
+
+    def combined_loss(
+        self,
+        pred: torch.Tensor,
+        target: torch.Tensor,
+        p_k_alpha: float = 0.5,
+    ) -> torch.Tensor:
+        B, C, W, H = pred.shape
+        p_loss = self.forward(pred, target, "none")
+        k_loss = kl_recon_loss(pred, target, "none")
+
+        coeff = 1.0 / (p_loss.mean() / k_loss.mean())
+
+        p_loss = p_loss.sum().div(B) * coeff
+        k_loss = k_loss.sum().div(B)
+
+        return torch.lerp(p_loss, k_loss, p_k_alpha)
 
 
-def kl_recon_loss(pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+def kl_recon_loss(
+    pred: torch.Tensor,
+    target: torch.Tensor,
+    reduction: str = "batchmean",
+) -> torch.Tensor:
     B = pred.shape[0]
     q = pred.reshape(B, -1).log_softmax(dim=1)  # log q
     p = target.reshape(B, -1).log_softmax(dim=1)  # log p
-    return F.kl_div(q, p, log_target=True, reduction="batchmean")
+    return F.kl_div(q, p, log_target=True, reduction=reduction)
 
 
 # -----------------------------
@@ -134,11 +156,7 @@ def train(
     opt = torch.optim.AdamW(model.parameters(), lr=lr)
 
     ploss = PerceptualLoss(device=device)
-
-    def loss_fn(x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
-        l_p = ploss(y, x) / 100.0  # temp ]>==---
-        l_k = kl_recon_loss(y, x)
-        return (l_p + l_k) / 2.0
+    loss_fn = lambda x, y: ploss.combined_loss(x, y, 0.9)
 
     out_dir = Path(out_dir)
     (out_dir / "previews").mkdir(parents=True, exist_ok=True)
