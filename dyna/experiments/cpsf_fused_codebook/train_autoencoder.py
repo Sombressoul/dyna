@@ -1,17 +1,21 @@
-# run:
-# > python -m dyna.experiments.cpsf_fused_codebook.train_autoencoder --data-root "e:\Datasets\Images_512x512\dataset_01\"
-#       \ --size 512 512 --epochs 10 --batch 2 --grad_acc 1 --lr 1.0e-5 --device_target cuda --device_cache cpu 
-#       \ --log-every 100 --out-dir ./temp
+# example run:
+# > python -m dyna.experiments.cpsf_fused_codebook.train_autoencoder --data-root "e:\Datasets\Images_512x512\dataset_01\" --size 256 256 --epochs 1000 --batch 8 --grad_acc 1 --lr 1.0e-4 --device_target cuda --device_cache cpu --log-every 100 --out-dir ./temp
 
-from pathlib import Path
 import argparse
-from typing import Tuple
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from PIL import Image, ImageDraw
+from PIL import (
+    Image,
+    ImageDraw,
+)
+from pathlib import Path
+from typing import Tuple
+from torchvision.models import (
+    vgg19,
+    VGG19_Weights,
+)
 
 from dyna.experiments.cpsf_fused_codebook.cpsf_spectral_autoencoder import (
     CPSFSpectralAutoencoder,
@@ -51,11 +55,57 @@ def save_side_by_side(
     save_path.parent.mkdir(parents=True, exist_ok=True)
     canvas.save(save_path, format="PNG")
 
+
+class PerceptualLoss(nn.Module):
+    def __init__(self, device: torch.device) -> None:
+        super().__init__()
+
+        weights = VGG19_Weights.IMAGENET1K_V1
+        model = vgg19(weights=weights)
+
+        vgg_features = model.features
+        # conv_index == '22' > 8
+        # conv_index == '54' > 35
+        self.vgg = nn.Sequential(*list(vgg_features)[:35]).to(device).eval()
+
+        for p in self.vgg.parameters():
+            p.requires_grad_(False)
+
+        mean, std = None, None
+        w_t = weights.transforms()
+        mean = getattr(w_t, "mean", None)
+        std = getattr(w_t, "std", None)
+
+        mean = torch.tensor(mean, dtype=torch.float32, device=device).view(1, 3, 1, 1)
+        std = torch.tensor(std, dtype=torch.float32, device=device).view(1, 3, 1, 1)
+        self.register_buffer("_mean", mean, persistent=False)
+        self.register_buffer("_std", std, persistent=False)
+
+    def _pre(
+        self,
+        x: torch.Tensor,
+    ) -> torch.Tensor:
+        return (x - self._mean) / self._std
+
+    def forward(
+        self,
+        pred: torch.Tensor,
+        target: torch.Tensor,
+    ) -> torch.Tensor:
+        x = self.vgg(self._pre(pred))
+
+        with torch.no_grad():
+            y = self.vgg(self._pre(target))
+
+        return kl_recon_loss(x, y)
+
+
 def kl_recon_loss(pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
     B = pred.shape[0]
-    q = pred.reshape(B, -1).log_softmax(dim=1)   # log q
-    p = target.reshape(B, -1).log_softmax(dim=1) # log p
+    q = pred.reshape(B, -1).log_softmax(dim=1)  # log q
+    p = target.reshape(B, -1).log_softmax(dim=1)  # log p
     return F.kl_div(q, p, log_target=True, reduction="batchmean")
+
 
 # -----------------------------
 # Training
@@ -74,13 +124,21 @@ def train(
 ) -> None:
     device = torch.device(device_target)
 
-    ds = LocalImageDataset(str(data_root), size=size, device_target=device, device_cache=device_cache)
+    ds = LocalImageDataset(
+        str(data_root), size=size, device_target=device, device_cache=device_cache
+    )
     loader = ds.get_dataloader(batch_size=batch_size, shuffle=True, drop_last=True)
 
     model = CPSFSpectralAutoencoder().to(device)
     model.train()
     opt = torch.optim.AdamW(model.parameters(), lr=lr)
-    loss_fn = kl_recon_loss
+
+    ploss = PerceptualLoss(device=device)
+
+    def loss_fn(x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+        l_p = ploss(y, x) / 100.0  # temp ]>==---
+        l_k = kl_recon_loss(y, x)
+        return (l_p + l_k) / 2.0
 
     out_dir = Path(out_dir)
     (out_dir / "previews").mkdir(parents=True, exist_ok=True)
