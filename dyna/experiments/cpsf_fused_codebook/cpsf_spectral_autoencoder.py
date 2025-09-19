@@ -96,6 +96,7 @@ class CPSFSpectralAutoencoder(nn.Module):
         self.navigation_size = 4 * N
 
         # Encoder
+        self.e_dropout = nn.Dropout(0.2)
         self.e0 = ConvBlock(3, 16, downsample=True, act=F.tanh)
         self.e1 = ConvBlock(16, 32, downsample=True, act=F.tanh)
         self.e2 = ConvBlock(32, 64, downsample=True, act=F.tanh)
@@ -134,8 +135,10 @@ class CPSFSpectralAutoencoder(nn.Module):
             normalized_shape=[self.S],
             elementwise_affine=True,
         )
+        self.codebook_dropout = nn.Dropout(0.5)
 
         # Decoder starting from S channels
+        self.d_dropout = nn.Dropout(0.2)
         self.d0 = DeconvBlock(S, 512, act=F.tanh)
         self.d1 = DeconvBlock(512, 256, act=F.tanh)
         self.d2 = DeconvBlock(256, 128, act=F.tanh)
@@ -164,8 +167,10 @@ class CPSFSpectralAutoencoder(nn.Module):
         x = self.e2(x)
         x = backward_gradient_normalization(x)
         x = self.e3(x)
+        x = self.e_dropout(x)
         x = backward_gradient_normalization(x)
         x = self.e4(x)
+        x = self.e_dropout(x)
         x = backward_gradient_normalization(x)
         x = self.bottleneck(x)
         x = backward_gradient_normalization(x)
@@ -181,16 +186,21 @@ class CPSFSpectralAutoencoder(nn.Module):
         x = self.codebook(x).abs()
         x = backward_gradient_normalization(x)
         x = self.codebook_norm(x)
+        x = self.codebook_dropout(x)
         x = x.reshape([B, W, H, self.S]).permute([0, 3, 1, 2]).to(x_dtype)
 
         # Decoder
         x = self.d0(x)
+        x = self.d_dropout(x)
         x = backward_gradient_normalization(x)
         x = self.d1(x)
+        x = self.d_dropout(x)
         x = backward_gradient_normalization(x)
         x = self.d2(x)
+        x = self.d_dropout(x)
         x = backward_gradient_normalization(x)
         x = self.d3(x)
+        x = self.d_dropout(x)
         x = backward_gradient_normalization(x)
         x = self.d4(x)
         x = (x + 1.0) / 2.0
