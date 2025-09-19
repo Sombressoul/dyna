@@ -106,8 +106,12 @@ def train(
             loss.backward()
             micro_count += 1
             loss_accum += float(loss_raw.detach().item())
-            x_vis = x[0].detach()
-            y_vis = y[0].detach()
+
+            with torch.no_grad():
+                x_vis = x[0].detach()
+                model.train(False)
+                y_vis = model(x[0].unsqueeze(0))[0].detach()
+                model.train(True)
 
             if micro_count % accum == 0:
                 opt.step()
@@ -153,7 +157,9 @@ def train(
     with torch.no_grad():
         for batch in ds.iter_batches(batch_size):
             x = batch
+            model.train(False)
             y = model(x)
+            model.train(True)
             preview_path = (
                 out_dir
                 / "previews"
