@@ -81,8 +81,9 @@ class PerceptualLoss(nn.Module):
         self.register_buffer("_mean", mean, persistent=False)
         self.register_buffer("_std", std, persistent=False)
 
-        self._cl_buf_coeff = None
-        self._cl_buf_coeff_base = []
+        self._ema_alpha = 0.1
+        self._scale_p = None
+        self._scale_k = None
 
     def _pre(
         self,
@@ -90,18 +91,42 @@ class PerceptualLoss(nn.Module):
     ) -> torch.Tensor:
         return (x - self._mean) / self._std
 
-    def forward(
+    def _kl_flat(
         self,
         pred: torch.Tensor,
         target: torch.Tensor,
         reduction: str = "batchmean",
     ) -> torch.Tensor:
-        x = self.vgg(self._pre(pred))
+        B = pred.shape[0]
+        log_q = pred.reshape(B, -1).log_softmax(dim=1)
+        log_p = target.reshape(B, -1).log_softmax(dim=1)
+        return F.kl_div(log_q, log_p, log_target=True, reduction=reduction)
 
+    def _kl_per_channel(
+        self,
+        pred: torch.Tensor,
+        target: torch.Tensor,
+        reduction: str = "batchmean",
+    ) -> torch.Tensor:
+        B, C, H, W = pred.shape
+        log_q = pred.permute(0, 2, 3, 1).reshape(B * H * W, C).log_softmax(dim=1)
+        log_p = target.permute(0, 2, 3, 1).reshape(B * H * W, C).log_softmax(dim=1)
+        return F.kl_div(log_q, log_p, log_target=True, reduction=reduction)
+
+    def forward(
+        self,
+        pred: torch.Tensor,
+        target: torch.Tensor,
+        reduction: str = "batchmean",
+        per_channel: bool = False,
+    ) -> torch.Tensor:
+        x = self.vgg(self._pre(pred))
         with torch.no_grad():
             y = self.vgg(self._pre(target))
-
-        return kl_recon_loss(x, y, reduction)
+        if per_channel:
+            return self._kl_per_channel(x, y, reduction)
+        else:
+            return self._kl_flat(x, y, reduction)
 
     def combined_loss(
         self,
@@ -109,35 +134,29 @@ class PerceptualLoss(nn.Module):
         target: torch.Tensor,
         p_k_alpha: float = 0.5,
     ) -> torch.Tensor:
-        B, C, W, H = pred.shape
-        p_loss = self.forward(pred, target, "none")
-        k_loss = kl_recon_loss(pred, target, "none")
+        eps = torch.finfo(pred.dtype).eps
 
-        if self._cl_buf_coeff is None:
-            coeff = 1.0 / (p_loss.mean() / k_loss.mean())
+        p_loss = self.forward(pred, target, reduction="batchmean", per_channel=True)
+        k_loss = self._kl_flat(pred, target, reduction="batchmean")
 
-            if len(self._cl_buf_coeff_base) < 10:
-                self._cl_buf_coeff_base.append(coeff.unsqueeze(0))
+        with torch.no_grad():
+            target_scale = torch.maximum(p_loss.detach(), k_loss.detach())
+
+            inst_scale_p = target_scale / (p_loss.detach() + eps)
+            inst_scale_k = target_scale / (k_loss.detach() + eps)
+
+            if self._scale_p is None:
+                self._scale_p = inst_scale_p
+                self._scale_k = inst_scale_k
             else:
-                self._cl_buf_coeff = torch.cat(self._cl_buf_coeff_base, -1).mean()
-        else:
-            coeff = self._cl_buf_coeff
+                a = self._ema_alpha
+                self._scale_p = (1 - a) * self._scale_p + a * inst_scale_p
+                self._scale_k = (1 - a) * self._scale_k + a * inst_scale_k
 
-        p_loss = p_loss.sum().div(B) * coeff.detach()
-        k_loss = k_loss.sum().div(B)
+        p_adj = p_loss * self._scale_p
+        k_adj = k_loss * self._scale_k
 
-        return torch.lerp(p_loss, k_loss, p_k_alpha)
-
-
-def kl_recon_loss(
-    pred: torch.Tensor,
-    target: torch.Tensor,
-    reduction: str = "batchmean",
-) -> torch.Tensor:
-    B = pred.shape[0]
-    q = pred.reshape(B, -1).log_softmax(dim=1)  # log q
-    p = target.reshape(B, -1).log_softmax(dim=1)  # log p
-    return F.kl_div(q, p, log_target=True, reduction=reduction)
+        return torch.lerp(p_adj, k_adj, p_k_alpha)
 
 
 # -----------------------------
@@ -167,7 +186,7 @@ def train(
     opt = torch.optim.AdamW(model.parameters(), lr=lr)
 
     ploss = PerceptualLoss(device=device)
-    loss_fn = lambda x, y: ploss.combined_loss(x, y, 0.9)
+    loss_fn = lambda x, y: ploss.combined_loss(pred=x, target=y, p_k_alpha=0.75)
 
     out_dir = Path(out_dir)
     (out_dir / "previews").mkdir(parents=True, exist_ok=True)
