@@ -5,7 +5,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from dyna.lib.cpsf.fused_codebook import CPSFFusedCodebook
-from dyna.functional.backward_gradient_normalization import backward_gradient_normalization
+from dyna.functional.backward_gradient_normalization import (
+    backward_gradient_normalization,
+)
 
 
 class ConvBlock(nn.Module):
@@ -69,21 +71,6 @@ class Bottleneck(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.act(self.conv2(self.act(self.conv1(x))))
-
-
-@torch.no_grad()
-def _complex64(x: torch.Tensor) -> torch.Tensor:
-    return x if x.is_complex() and x.dtype == torch.complex64 else x.to(torch.complex64)
-
-
-def spectrum_to_vector(spectrum: torch.Tensor, n: int, dim: int = -1) -> torch.Tensor:
-    x = torch.fft.ifft(_complex64(spectrum), n, dim=dim)
-    return x.abs()
-
-
-def vector_to_spectrum(vector: torch.Tensor, n: int, dim: int = -1) -> torch.Tensor:
-    x = torch.fft.fft(vector, n, dim=dim)
-    return x
 
 
 # -----------------------------
@@ -168,7 +155,7 @@ class CPSFSpectralAutoencoder(nn.Module):
 
     @staticmethod
     def expected_shapes() -> Tuple[Tuple[int, ...], Tuple[int, ...]]:
-        return (1, 3, 512, 512), (1, 3, 512, 512)
+        return (1, 3, 256, 256), (1, 3, 256, 256)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # Encoder
@@ -192,61 +179,8 @@ class CPSFSpectralAutoencoder(nn.Module):
         B, C, W, H = x.shape
         x = x.permute([0, 2, 3, 1]).flatten(0, 2)
 
-        # Retrieve from T-field
-        x = vector_to_spectrum(x, 2 * self.N)
-        z = x[..., : self.N]
-        vec_d = x[..., self.N :]
-        codes = self.codebook(z, vec_d)
-        # print(
-        #     "".join(
-        #         [
-        #             f"\nVar 'z' diagnostics:",
-        #             f"\n\tStd: {z.std()}",
-        #             f"\n\tMin (real): {z.real.min()}",
-        #             f"\n\tMax (real): {z.real.max()}",
-        #             f"\n\tAbsMin (real): {z.real.abs().min()}",
-        #             f"\n\tAbsMax (real): {z.real.abs().max()}",
-        #             f"\n\tMin (imag): {z.imag.min()}",
-        #             f"\n\tMax (imag): {z.imag.max()}",
-        #             f"\n\tAbsMin (imag): {z.imag.abs().min()}",
-        #             f"\n\tAbsMax (imag): {z.imag.abs().max()}",
-        #         ]
-        #     )
-        # )
-        # print(
-        #     "".join(
-        #         [
-        #             f"\nVar 'vec_d' diagnostics:",
-        #             f"\n\tStd: {vec_d.std()}",
-        #             f"\n\tMin (real): {vec_d.real.min()}",
-        #             f"\n\tMax (real): {vec_d.real.max()}",
-        #             f"\n\tAbsMin (real): {vec_d.real.abs().min()}",
-        #             f"\n\tAbsMax (real): {vec_d.real.abs().max()}",
-        #             f"\n\tMin (imag): {vec_d.imag.min()}",
-        #             f"\n\tMax (imag): {vec_d.imag.max()}",
-        #             f"\n\tAbsMin (imag): {vec_d.imag.abs().min()}",
-        #             f"\n\tAbsMax (imag): {vec_d.imag.abs().max()}",
-        #         ]
-        #     )
-        # )
-        # print(
-        #     "".join(
-        #         [
-        #             f"\nVar 'codes' diagnostics:",
-        #             f"\n\tStd: {codes.std()}",
-        #             f"\n\tMin (real): {codes.real.min()}",
-        #             f"\n\tMax (real): {codes.real.max()}",
-        #             f"\n\tAbsMin (real): {codes.real.abs().min()}",
-        #             f"\n\tAbsMax (real): {codes.real.abs().max()}",
-        #             f"\n\tMin (imag): {codes.imag.min()}",
-        #             f"\n\tMax (imag): {codes.imag.max()}",
-        #             f"\n\tAbsMin (imag): {codes.imag.abs().min()}",
-        #             f"\n\tAbsMax (imag): {codes.imag.abs().max()}",
-        #         ]
-        #     )
-        # )
-        # exit()
-        x = spectrum_to_vector(codes, self.S, dim=-1)
+        # Retrieve
+        x = self.codebook(x).abs()
         x = backward_gradient_normalization(x)
         x = self.codebook_norm(x)
         x = x.reshape([B, W, H, self.S]).permute([0, 3, 1, 2]).to(x_dtype)
@@ -272,7 +206,7 @@ class CPSFSpectralAutoencoder(nn.Module):
 if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = CPSFSpectralAutoencoder(N=16, S=256).to(device)
-    x = torch.randn(2, 3, 512, 512, device=device)
+    x = torch.randn(2, 3, 256, 256, device=device)
     y = model(x)
     print("input:", tuple(x.shape))
     print("output:", tuple(y.shape))

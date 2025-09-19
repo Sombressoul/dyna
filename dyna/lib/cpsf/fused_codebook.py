@@ -172,17 +172,36 @@ class CPSFFusedCodebook(nn.Module):
         xi = x.imag * self.phase_scale
         return torch.complex(xr, xi).to(dtype=self.c_dtype)
 
+    def _spectrum_to_vector(
+        self,
+        s: torch.Tensor,
+    ) -> torch.Tensor:
+        x = torch.fft.ifft(s, self.S, dim=-1)
+        return x
+
+    def _vector_to_spectrum(
+        self,
+        v: torch.Tensor,
+    ) -> torch.Tensor:
+        x = torch.fft.fft(v, 2 * self.N, dim=-1)
+        return x
+
     def forward(
         self,
-        z: torch.Tensor,
-        vec_d: torch.Tensor,
+        x: torch.Tensor,
     ) -> torch.Tensor:
-        if not z.is_complex():
-            raise ValueError(f"'z' should be complex, got: '{type(z)}'")
-        if not vec_d.is_complex():
-            raise ValueError(f"'vec_d' should be complex, got: '{type(vec_d)}'")
+        if not x.is_complex():
+            x = self._vector_to_spectrum(x)
+        else:
+            if x.shape[-1] != 2 * self.N:
+                raise ValueError(
+                    f"Complex input should have length 2N={2*self.N}, got: {x.shape[-1]}"
+                )
 
-        return T_PHC_Fused(
+        z = x[..., : self.N]
+        vec_d = x[..., self.N :]
+
+        x = T_PHC_Fused(
             z=self._scale_phase(z),
             vec_d=(
                 self._to_unit(
@@ -218,3 +237,5 @@ class CPSFFusedCodebook(nn.Module):
             m_chunk=self.m_chunk,
             dtype_override=self.c_dtype,
         )
+
+        return self._spectrum_to_vector(x)
