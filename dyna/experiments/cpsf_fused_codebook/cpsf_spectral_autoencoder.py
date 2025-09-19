@@ -5,9 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from dyna.lib.cpsf.fused_codebook import CPSFFusedCodebook
-from dyna.functional.backward_gradient_normalization import (
-    backward_gradient_normalization,
-)
+from dyna.functional.backward_gradient_normalization import backward_gradient_normalization
 
 
 class ConvBlock(nn.Module):
@@ -97,7 +95,7 @@ class CPSFSpectralAutoencoder(nn.Module):
         self.c_dtype = c_dtype
         self.navigation_size = 4 * N
 
-        # Encoder: latent [B,16,16,16]
+        # Encoder
         self.e0 = ConvBlock(3, 16, downsample=True, act=F.tanh)
         self.e1 = ConvBlock(16, 32, downsample=True, act=F.tanh)
         self.e2 = ConvBlock(32, 64, downsample=True, act=F.tanh)
