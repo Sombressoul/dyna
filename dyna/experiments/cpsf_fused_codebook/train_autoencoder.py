@@ -81,6 +81,9 @@ class PerceptualLoss(nn.Module):
         self.register_buffer("_mean", mean, persistent=False)
         self.register_buffer("_std", std, persistent=False)
 
+        self._cl_buf_coeff = None
+        self._cl_buf_coeff_base = []
+
     def _pre(
         self,
         x: torch.Tensor,
@@ -110,9 +113,17 @@ class PerceptualLoss(nn.Module):
         p_loss = self.forward(pred, target, "none")
         k_loss = kl_recon_loss(pred, target, "none")
 
-        coeff = 1.0 / (p_loss.mean() / k_loss.mean())
+        if self._cl_buf_coeff is None:
+            coeff = 1.0 / (p_loss.mean() / k_loss.mean())
 
-        p_loss = p_loss.sum().div(B) * coeff
+            if len(self._cl_buf_coeff_base) < 10:
+                self._cl_buf_coeff_base.append(coeff.unsqueeze(0))
+            else:
+                self._cl_buf_coeff = torch.cat(self._cl_buf_coeff_base, -1).mean()
+        else:
+            coeff = self._cl_buf_coeff
+
+        p_loss = p_loss.sum().div(B) * coeff.detach()
         k_loss = k_loss.sum().div(B)
 
         return torch.lerp(p_loss, k_loss, p_k_alpha)
