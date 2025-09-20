@@ -610,6 +610,102 @@ def test_P26_monotonic_sizes(N):
 
 
 # =========================
+# P27 — CUDA: iter_shells parity & device propagation
+# =========================
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA not available")
+@pytest.mark.parametrize("N", [1, 2])
+@pytest.mark.parametrize("maxr", [0, 1, 2])
+def test_P27_cuda_iter_shells_parity(N, maxr):
+    g = CPSFPeriodization()
+    cpu = torch.device("cpu")
+    gpu = torch.device("cuda")
+
+    cpu_pairs = list(g.iter_shells(N=N, start_radius=0, max_radius=maxr, device=cpu))
+    gpu_pairs = list(g.iter_shells(N=N, start_radius=0, max_radius=maxr, device=gpu))
+
+    assert [w for (w, _) in cpu_pairs] == [w for (w, _) in gpu_pairs]
+    for (_, Scpu), (_, Sgpu) in zip(cpu_pairs, gpu_pairs):
+        assert Scpu.device.type == "cpu"
+        assert Sgpu.device.type == "cuda"
+        assert _as_set(Scpu) == _as_set(Sgpu.to("cpu"))
+
+
+# =========================
+# P28 — CUDA: pack_offsets parity & device propagation
+# =========================
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA not available")
+@pytest.mark.parametrize("N", [1, 2])
+@pytest.mark.parametrize("W", [0, 1, 2])
+def test_P28_cuda_pack_offsets_parity(N, W):
+    g = CPSFPeriodization()
+    cpu = torch.device("cpu")
+    gpu = torch.device("cuda")
+
+    off_cpu, len_cpu = g.pack_offsets(N=N, max_radius=W, device=cpu)
+    off_gpu, len_gpu = g.pack_offsets(N=N, max_radius=W, device=gpu)
+
+    assert off_cpu.device.type == "cpu" and len_cpu.device.type == "cpu"
+    assert off_gpu.device.type == "cuda" and len_gpu.device.type == "cuda"
+    assert _as_set(off_cpu) == _as_set(off_gpu.to("cpu"))
+    assert torch.equal(len_cpu.cpu(), len_gpu.cpu())
+
+
+# =========================
+# P29 — CUDA: iter_packed parity (coverage & content)
+# =========================
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA not available")
+@pytest.mark.parametrize("N", [1, 2])
+@pytest.mark.parametrize("W", [1, 2])
+@pytest.mark.parametrize("target", [16, 1000])
+def test_P29_cuda_iter_packed_parity(N, W, target):
+    g = CPSFPeriodization()
+    cpu = torch.device("cpu")
+    gpu = torch.device("cuda")
+
+    packs_cpu = list(
+        g.iter_packed(
+            N=N,
+            target_points_per_pack=target,
+            start_radius=0,
+            max_radius=W,
+            device=cpu,
+        )
+    )
+    packs_gpu = list(
+        g.iter_packed(
+            N=N,
+            target_points_per_pack=target,
+            start_radius=0,
+            max_radius=W,
+            device=gpu,
+        )
+    )
+
+    assert [(a, b) for (a, b, _) in packs_cpu] == [(a, b) for (a, b, _) in packs_gpu]
+
+    cov_cpu = set()
+    for a, b, _ in packs_cpu:
+        cov_cpu.update(range(a, b + 1))
+    cov_gpu = set()
+    for a, b, _ in packs_gpu:
+        cov_gpu.update(range(a, b + 1))
+    assert cov_cpu == cov_gpu == set(range(0, W + 1))
+
+    cpu_union = (
+        set().union(*[_as_set(P) for (_, _, P) in packs_cpu]) if packs_cpu else set()
+    )
+    gpu_union = (
+        set().union(*[_as_set(P.to("cpu")) for (_, _, P) in packs_gpu])
+        if packs_gpu
+        else set()
+    )
+    assert cpu_union == gpu_union
+
+    for _, _, P in packs_gpu:
+        assert P.device.type == "cuda"
+
+
+# =========================
 # Direct run help
 # =========================
 if __name__ == "__main__":
