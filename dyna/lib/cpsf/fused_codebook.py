@@ -146,14 +146,10 @@ class CPSFFusedCodebook(nn.Module):
             imag=xi,
         ).to(dtype=self.c_dtype)
 
-        if not unit:
+        if unit:
+            return self._to_unit(p)
+        else:
             return p
-
-        n = torch.linalg.vector_norm(p, dim=-1, keepdim=True)
-        n = torch.where(n.real == 0, torch.ones_like(n), n)
-        p = (p / n).to(dtype=self.c_dtype)
-
-        return p
 
     def _to_unit(
         self,
