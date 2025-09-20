@@ -109,7 +109,7 @@ class CPSFPeriodization:
         if type(W) is not int or W < 0:
             raise ValueError("window: W must be int >= 0.")
         if type(sorted) is not bool:
-            raise ValueError("window: sorted must be boolean.")
+            raise ValueError("window: sorted must be bool.")
 
         D = 2 * N
         device = self._canonical_device(device=device)
@@ -154,7 +154,7 @@ class CPSFPeriodization:
         if type(W) is not int or W < 0:
             raise ValueError("shell: W must be int >= 0.")
         if type(sorted) is not bool:
-            raise ValueError("window: sorted must be boolean.")
+            raise ValueError("window: sorted must be bool.")
 
         D = 2 * N
         device = self._canonical_device(device=device)
@@ -199,7 +199,7 @@ class CPSFPeriodization:
         if max_radius is not None and (type(max_radius) is not int or max_radius < 0):
             raise ValueError("iter_shells: max_radius must be int >= 0 or None.")
         if type(sorted) is not bool:
-            raise ValueError("window: sorted must be boolean.")
+            raise ValueError("window: sorted must be bool.")
 
         device = self._canonical_device(device=device)
 
@@ -246,7 +246,7 @@ class CPSFPeriodization:
         if type(max_radius) is not int or max_radius < 0:
             raise ValueError("pack_offsets: max_radius must be int >= 0.")
         if type(sorted) is not bool:
-            raise ValueError("window: sorted must be boolean.")
+            raise ValueError("window: sorted must be bool.")
 
         device = self._canonical_device(device=device)
         D = 2 * N
@@ -294,7 +294,7 @@ class CPSFPeriodization:
         if max_radius is not None and (type(max_radius) is not int or max_radius < 0):
             raise ValueError("iter_packed: max_radius must be int >= 0 or None.")
         if type(sorted) is not bool:
-            raise ValueError("window: sorted must be boolean.")
+            raise ValueError("window: sorted must be bool.")
 
         device = self._canonical_device(device=device)
 
@@ -518,3 +518,106 @@ class CPSFPeriodization:
             idx = idx[order]
 
         return x[idx]
+
+    def cache_stats(
+        self,
+    ) -> dict:
+        stats = {
+            "enabled": bool(self.enable_cache),
+            "max_entries_per_kind": int(self.max_cache_entries),
+            "max_bytes_per_tensor": int(self.max_cache_bytes_per_tensor),
+            "dtype": str(self.dtype),
+            "window_entries": len(self._cache_window),
+            "shell_entries": len(self._cache_shell),
+        }
+
+        return stats
+
+    def cache_clear(
+        self,
+        *,
+        clear_window: Optional[bool] = False,
+        clear_shell: Optional[bool] = False,
+        device: Optional[torch.device] = None,
+    ) -> None:
+        if device is not None and not isinstance(device, torch.device):
+            raise ValueError("cache_clear: device must be a torch.device or None.")
+        if clear_window is not None and type(clear_window) is not bool:
+            raise ValueError("cache_clear: clear_window must be bool or None.")
+        if clear_shell is not None and type(clear_shell) is not bool:
+            raise ValueError("cache_clear: clear_shell must be bool or None.")
+
+        def _drop_for_device(lru, dev_key):
+            if dev_key is None:
+                lru.clear()
+                return
+
+            to_del = [
+                k
+                for k in lru.keys()
+                if isinstance(k, tuple) and len(k) >= 3 and k[2] == dev_key
+            ]
+            for k in to_del:
+                del lru[k]
+
+        if device is None:
+            dev_key = None
+        else:
+            dev_key = (device.type, -1 if device.index is None else int(device.index))
+
+        clear_window = clear_window if clear_window is not None else False
+        clear_shell = clear_shell if clear_shell is not None else False
+
+        if clear_window:
+            _drop_for_device(self._cache_window, dev_key)
+        if clear_shell:
+            _drop_for_device(self._cache_shell, dev_key)
+
+    def set_cache_enabled(
+        self,
+        *,
+        enabled: bool,
+        drop_existing: bool = False,
+    ) -> None:
+        if type(enabled) is not bool:
+            raise ValueError("set_cache_enabled: enabled must be bool.")
+        if type(drop_existing) is not bool:
+            raise ValueError("set_cache_enabled: drop_existing must be bool.")
+
+        self.enable_cache = bool(enabled)
+        if drop_existing:
+            self._cache_window.clear()
+            self._cache_shell.clear()
+
+    def set_cache_limits(
+        self,
+        *,
+        max_cache_entries_per_kind: Optional[int] = None,
+        max_cache_bytes_per_tensor: Optional[int] = None,
+        drop_excess_now: bool = True,
+    ) -> None:
+        if max_cache_entries_per_kind is not None:
+            if (
+                type(max_cache_entries_per_kind) is not int
+                or max_cache_entries_per_kind < 0
+            ):
+                raise ValueError(
+                    "set_cache_limits: max_cache_entries_per_kind must be int >= 0."
+                )
+            self.max_cache_entries = int(max_cache_entries_per_kind)
+
+        if max_cache_bytes_per_tensor is not None:
+            if (
+                type(max_cache_bytes_per_tensor) is not int
+                or max_cache_bytes_per_tensor < 0
+            ):
+                raise ValueError(
+                    "set_cache_limits: max_cache_bytes_per_tensor must be int >= 0."
+                )
+            self.max_cache_bytes_per_tensor = int(max_cache_bytes_per_tensor)
+
+        if drop_excess_now:
+            while len(self._cache_window) > self.max_cache_entries:
+                self._cache_window.popitem(last=False)
+            while len(self._cache_shell) > self.max_cache_entries:
+                self._cache_shell.popitem(last=False)
