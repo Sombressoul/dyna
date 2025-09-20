@@ -884,6 +884,206 @@ def test_P35_cuda_sorted_parity_window_shell(N, W):
 
 
 # =========================
+# P36 — cache on/off transparency and population
+# =========================
+def test_P36_cache_enabled_vs_disabled_population():
+    N, W = 2, 2
+
+    g_on = CPSFPeriodization(enable_cache=True)
+    _ = g_on.window(N=N, W=W, device=TARGET_DEVICE)
+    _ = g_on.shell(N=N, W=W, device=TARGET_DEVICE)
+    stats_on = g_on.cache_stats()
+    assert stats_on["enabled"] is True
+    assert stats_on["window_entries"] >= 1
+    assert stats_on["shell_entries"] >= 1
+
+    g_off = CPSFPeriodization(enable_cache=False)
+    _ = g_off.window(N=N, W=W, device=TARGET_DEVICE)
+    _ = g_off.shell(N=N, W=W, device=TARGET_DEVICE)
+    stats_off = g_off.cache_stats()
+    assert stats_off["enabled"] is False
+    assert stats_off["window_entries"] == 0
+    assert stats_off["shell_entries"] == 0
+
+
+# =========================
+# P37 — LRU eviction: max entries cap is enforced
+# =========================
+def test_P37_lru_eviction_cap_enforced():
+    g = CPSFPeriodization(enable_cache=True, max_cache_entries_per_kind=1)
+    dev = TARGET_DEVICE
+
+    _ = g.window(N=1, W=0, device=dev)
+    _ = g.window(N=1, W=1, device=dev)
+    _ = g.window(N=1, W=2, device=dev)
+
+    stats = g.cache_stats()
+    assert stats["window_entries"] == 1
+
+    _ = g.shell(N=1, W=0, device=dev)
+    _ = g.shell(N=1, W=1, device=dev)
+    _ = g.shell(N=1, W=2, device=dev)
+    stats = g.cache_stats()
+    assert stats["shell_entries"] == 1
+
+
+# =========================
+# P38 — cache_clear scoped by device (when CUDA available)
+# =========================
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA not available")
+def test_P38_cache_clear_scoped_by_device():
+    g = CPSFPeriodization(enable_cache=True, max_cache_entries_per_kind=8)
+    cpu = torch.device("cpu")
+    gpu = torch.device("cuda")
+
+    _ = g.window(N=2, W=1, device=cpu)
+    _ = g.shell(N=2, W=1, device=cpu)
+    _ = g.window(N=2, W=1, device=gpu)
+    _ = g.shell(N=2, W=1, device=gpu)
+    stats = g.cache_stats()
+    assert stats["window_entries"] >= 2
+    assert stats["shell_entries"] >= 2
+
+    g.cache_clear(clear_window=True, clear_shell=True, device=cpu)
+    s_after = g.cache_stats()
+    assert s_after["window_entries"] >= 1
+    assert s_after["shell_entries"] >= 1
+
+    g.cache_clear(clear_window=True, clear_shell=True, device=gpu)
+    s_zero = g.cache_stats()
+    assert s_zero["window_entries"] == 0
+    assert s_zero["shell_entries"] == 0
+
+
+# =========================
+# P39 — cache_clear with default flags is a no-op
+# =========================
+def test_P39_cache_clear_noop_by_default():
+    g = CPSFPeriodization(enable_cache=True)
+    dev = TARGET_DEVICE
+    _ = g.window(N=2, W=1, device=dev)
+    _ = g.shell(N=2, W=1, device=dev)
+    before = g.cache_stats()
+
+    g.cache_clear()
+    after = g.cache_stats()
+    assert after["window_entries"] == before["window_entries"]
+    assert after["shell_entries"] == before["shell_entries"]
+
+
+# =========================
+# P40 — set_cache_enabled with drop_existing
+# =========================
+def test_P40_set_cache_enabled_drop_existing():
+    g = CPSFPeriodization(enable_cache=True)
+    dev = TARGET_DEVICE
+    _ = g.window(N=1, W=1, device=dev)
+    _ = g.shell(N=1, W=1, device=dev)
+    mid = g.cache_stats()
+    assert mid["window_entries"] >= 1 and mid["shell_entries"] >= 1
+
+    g.set_cache_enabled(enabled=False, drop_existing=True)
+    s = g.cache_stats()
+    assert s["enabled"] is False
+    assert s["window_entries"] == 0
+    assert s["shell_entries"] == 0
+
+    _ = g.window(N=1, W=1, device=dev)
+    _ = g.shell(N=1, W=1, device=dev)
+    s2 = g.cache_stats()
+    assert s2["window_entries"] == 0 and s2["shell_entries"] == 0
+
+
+# =========================
+# P41 — set_cache_limits reduces current LRU sizes immediately
+# =========================
+def test_P41_set_cache_limits_restricts_now():
+    g = CPSFPeriodization(enable_cache=True, max_cache_entries_per_kind=8)
+    dev = TARGET_DEVICE
+
+    for W in range(4):
+        _ = g.window(N=2, W=W, device=dev)
+    for W in range(4):
+        _ = g.shell(N=2, W=W, device=dev)
+    pre = g.cache_stats()
+    assert pre["window_entries"] >= 4
+    assert pre["shell_entries"] >= 4
+
+    g.set_cache_limits(max_cache_entries_per_kind=1, drop_excess_now=True)
+    post = g.cache_stats()
+    assert post["max_entries_per_kind"] == 1
+    assert post["window_entries"] == 1
+    assert post["shell_entries"] == 1
+
+
+# =========================
+# P42 — sorted flag creates separate cache entries
+# =========================
+@pytest.mark.parametrize("N", [1, 2])
+@pytest.mark.parametrize("W", [0, 1])
+def test_P42_sorted_separates_cache_entries(N, W):
+    g = CPSFPeriodization(enable_cache=True, max_cache_entries_per_kind=8)
+    dev = TARGET_DEVICE
+
+    _ = g.window(N=N, W=W, device=dev, sorted=False)
+    _ = g.window(N=N, W=W, device=dev, sorted=True)
+    _ = g.shell(N=N, W=W, device=dev, sorted=False)
+    _ = g.shell(N=N, W=W, device=dev, sorted=True)
+
+    stats = g.cache_stats()
+    assert stats["window_entries"] >= 2
+    assert stats["shell_entries"] >= 2
+
+
+# =========================
+# P43 — cache_stats basic fields present and consistent
+# =========================
+def test_P43_cache_stats_shape_and_types():
+    g = CPSFPeriodization(enable_cache=True)
+    s = g.cache_stats()
+
+    for k in (
+        "enabled",
+        "max_entries_per_kind",
+        "max_bytes_per_tensor",
+        "dtype",
+        "window_entries",
+        "shell_entries",
+    ):
+        assert k in s
+
+    assert isinstance(s["enabled"], bool)
+    assert isinstance(s["max_entries_per_kind"], int)
+    assert isinstance(s["max_bytes_per_tensor"], int)
+    assert isinstance(s["dtype"], str)
+    assert isinstance(s["window_entries"], int)
+    assert isinstance(s["shell_entries"], int)
+
+
+# =========================
+# P44 — cache_clear selective: window only / shell only
+# =========================
+def test_P44_cache_clear_selective_kinds():
+    g = CPSFPeriodization(enable_cache=True, max_cache_entries_per_kind=8)
+    dev = TARGET_DEVICE
+
+    _ = g.window(N=2, W=1, device=dev)
+    _ = g.shell(N=2, W=1, device=dev)
+    s0 = g.cache_stats()
+    assert s0["window_entries"] >= 1 and s0["shell_entries"] >= 1
+
+    g.cache_clear(clear_window=True, clear_shell=False, device=None)
+    s1 = g.cache_stats()
+    assert s1["window_entries"] == 0
+    assert s1["shell_entries"] >= 1
+
+    g.cache_clear(clear_window=False, clear_shell=True, device=None)
+    s2 = g.cache_stats()
+    assert s2["window_entries"] == 0
+    assert s2["shell_entries"] == 0
+
+
+# =========================
 # Direct run help
 # =========================
 if __name__ == "__main__":
