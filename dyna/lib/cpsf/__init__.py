@@ -11,7 +11,6 @@ from dyna.lib.cpsf.structures import (
     CPSFContributionStoreIDList,
     CPSFModuleReadFlags,
     CPSFIndexLike,
-    CPSFPeriodizationKind,
     CPSFPsiOffsetsIterator,
 )
 
@@ -29,7 +28,6 @@ __all__ = [
     "CPSFContributionStoreIDList",
     "CPSFModuleReadFlags",
     "CPSFIndexLike",
-    "CPSFPeriodizationKind",
     "CPSFPsiOffsetsIterator",
 
     # Subcomponents.

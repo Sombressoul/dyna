@@ -58,11 +58,6 @@ class CPSFContributionField(Enum):
     ALPHA = enum_auto()
 
 
-class CPSFPeriodizationKind(Enum):
-    FULL = enum_auto()
-    WINDOW = enum_auto()
-
-
 class CPSFPsiOffsetsIterator(Protocol):
     def __call__(
         self, *, N: int, device: Union[str, torch.device]
