@@ -16,16 +16,6 @@ LRUCache: TypeAlias = "OrderedDict[LRUKey, torch.Tensor]"
 
 
 class CPSFPeriodization:
-    __slots__ = (
-        "enable_cache",
-        "max_cache_entries",
-        "max_cache_bytes_per_tensor",
-        "dtype",
-        "_elem_size_bytes",
-        "_cache_window",
-        "_cache_shell",
-    )
-
     def __init__(
         self,
         *,
@@ -211,6 +201,21 @@ class CPSFPeriodization:
             return
             yield  # pragma: no cover
 
+        if device.type == "cuda" and max_radius is not None:
+            D = 2 * N
+            win = self._cartesian_window_points(
+                D=D,
+                W=max_radius,
+                device=device,
+                dtype=self.dtype,
+            )
+            absmax = win.abs().amax(dim=1)
+            for W in range(start_radius, max_radius + 1):
+                m = absmax == W
+                shell = win[m]
+                yield W, shell.contiguous()
+            return
+
         W = start_radius
         while True:
             yield W, self.shell(N=N, W=W, device=device)
@@ -328,13 +333,9 @@ class CPSFPeriodization:
             return torch.zeros((1, D), dtype=dtype, device=device)
 
         axis = torch.arange(-W, W + 1, dtype=dtype, device=device)
-        axes = [axis for _ in range(D)]
-        grid = torch.cartesian_prod(*axes)
+        grids = torch.meshgrid(*([axis] * D), indexing="ij")
 
-        if grid.dim() == 1:
-            grid = grid.view(-1, 1)
-
-        return grid.view(-1, D)
+        return torch.stack([g.reshape(-1) for g in grids], dim=1).contiguous()
 
     @staticmethod
     def _shell_points(
@@ -343,6 +344,7 @@ class CPSFPeriodization:
         W: int,
         device: torch.device,
         dtype: torch.dtype,
+        threshold_CUDA: int = 1_000_000,
     ) -> torch.Tensor:
         if type(D) is not int or D < 1:
             raise ValueError("_shell_points: D must be int >= 1.")
@@ -350,6 +352,25 @@ class CPSFPeriodization:
             raise ValueError("_shell_points: W must be int >= 0.")
         if W == 0:
             return torch.zeros((1, D), dtype=dtype, device=device)
+        if type(threshold_CUDA) is not int or threshold_CUDA < 0:
+            raise ValueError("_shell_points: threshold_CUDA must be int >= 0.")
+
+        use_mask = device.type == "cuda"
+
+        if not use_mask:
+            tw = (W << 1) + 1
+            est_M = int(pow(tw, D))
+            use_mask = est_M <= threshold_CUDA
+
+        if use_mask:
+            win = CPSFPeriodization._cartesian_window_points(
+                D=D,
+                W=W,
+                device=device,
+                dtype=dtype,
+            )
+            m = win.abs().amax(dim=1) == W
+            return win[m].contiguous()
 
         axis = torch.arange(-W, W + 1, dtype=dtype, device=device)
         parts: list[torch.Tensor] = []
@@ -373,12 +394,11 @@ class CPSFPeriodization:
                 left = other[:, :j]
                 right = other[:, j:]
 
-            if left.numel() == 0:
-                base_mask = torch.ones(
-                    (other.shape[0],), dtype=torch.bool, device=device
-                )
-            else:
-                base_mask = left.abs().amax(dim=1) < W
+            base_mask = (
+                torch.ones((other.shape[0],), dtype=torch.bool, device=device)
+                if left.numel() == 0
+                else (left.abs().amax(dim=1) < W)
+            )
 
             for s in (-1, 1):
                 x = torch.empty((other.shape[0], D), dtype=dtype, device=device)
@@ -397,7 +417,7 @@ class CPSFPeriodization:
         if not parts:
             return torch.empty((0, D), dtype=dtype, device=device)
 
-        return torch.cat(parts, dim=0)
+        return torch.cat(parts, dim=0).contiguous()
 
     @staticmethod
     def _canonical_device(
