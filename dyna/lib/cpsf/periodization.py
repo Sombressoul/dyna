@@ -1,346 +1,457 @@
 import torch
 
 from collections import OrderedDict
-from typing import (
-    Iterator,
-    Optional,
-    Sequence,
-    Tuple,
-    Union,
-    MutableMapping,
-    OrderedDict as TypingOrderedDict,
+from typing import Generator, Optional, Tuple, TypeAlias
+
+_INT_DTYPES: Tuple[torch.dtype, ...] = (
+    torch.int8,
+    torch.int16,
+    torch.int32,
+    torch.int64,
+    torch.long,
 )
 
-from dyna.lib.cpsf.structures import CPSFPeriodizationKind
-
-TypeLRUCacheKey = Tuple[int, int, torch.device]
-TypeLRUCacheValue = torch.Tensor
-TypeLRUCache = TypingOrderedDict[TypeLRUCacheKey, TypeLRUCacheValue]
+LRUKey: TypeAlias = Tuple[int, int, Tuple[str, int]]
+LRUCache: TypeAlias = "OrderedDict[LRUKey, torch.Tensor]"
 
 
 class CPSFPeriodization:
+    __slots__ = (
+        "enable_cache",
+        "max_cache_entries",
+        "max_cache_bytes_per_tensor",
+        "dtype",
+        "_elem_size_bytes",
+        "_cache_window",
+        "_cache_shell",
+    )
+
     def __init__(
         self,
-        kind: CPSFPeriodizationKind,
-        window: Optional[Union[int, torch.LongTensor]] = None,
-        max_radius: Optional[Union[int, torch.LongTensor]] = None,
-        cache_active: bool = True,
-        cache_limit: int = 32,
-        cache_soft_limit_bytes: int = 128 * 1024 * 1024,
-    ):
-        if not isinstance(kind, CPSFPeriodizationKind):
-            raise TypeError(
-                f"CPSFPeriodization: 'kind' must be CPSFPeriodizationKind, got {type(kind)}"
-            )
+        *,
+        enable_cache: bool = True,
+        max_cache_entries_per_kind: int = 16,
+        max_cache_bytes_per_tensor: int = 256 * 1024 * 1024,
+        dtype: torch.dtype = torch.long,
+    ) -> None:
+        if not isinstance(dtype, torch.dtype):
+            raise ValueError("dtype: must be a torch.dtype.")
 
-        def _raise_tinfo(x, name: str, target_type: str):
-            if isinstance(x, torch.Tensor):
-                tinfo = f"type={type(x)}, dtype={x.dtype}, shape={tuple(x.shape)}, numel={x.numel()}"
-            else:
-                tinfo = f"type={type(x)}"
-            raise TypeError(
-                "".join(
-                    [
-                        f"CPSFPeriodization: '{name}' must be '{target_type}' scalar.",
-                        f"Got: {tinfo}",
-                    ]
+        if dtype not in _INT_DTYPES or dtype is torch.bool:
+            raise ValueError("dtype: must be an integer dtype (int8/16/32/64).")
+
+        if not isinstance(enable_cache, (bool, int)):
+            raise ValueError("enable_cache: must be bool.")
+
+        if not isinstance(max_cache_entries_per_kind, int):
+            raise ValueError("max_cache_entries_per_kind: must be an integer.")
+        if max_cache_entries_per_kind < 0:
+            raise ValueError("max_cache_entries_per_kind: must be >= 0.")
+
+        if not isinstance(max_cache_bytes_per_tensor, int):
+            raise ValueError("max_cache_bytes_per_tensor: must be an integer.")
+        if max_cache_bytes_per_tensor < 0:
+            raise ValueError("max_cache_bytes_per_tensor: must be >= 0.")
+
+        self.enable_cache = bool(enable_cache)
+        self.max_cache_entries = int(max_cache_entries_per_kind)
+        self.max_cache_bytes_per_tensor = int(max_cache_bytes_per_tensor)
+        self.dtype = dtype
+
+        self._elem_size_bytes = torch.empty(0, dtype=self.dtype).element_size()
+
+        if self.enable_cache:
+            if self.max_cache_bytes_per_tensor < self._elem_size_bytes:
+                raise ValueError(
+                    "max_cache_bytes_per_tensor: is too small for chosen dtype."
                 )
-            )
 
-        def _to_int_scalar(x, name: str):
-            if x is None:
-                return None
-            if isinstance(x, int) and not isinstance(x, bool):
-                return int(x)
-            if (
-                isinstance(x, torch.Tensor)
-                and x.dtype != torch.bool
-                and x.numel() == 1
-                and not torch.is_floating_point(x)
-                and not torch.is_complex(x)
-            ):
-                return int(x.item())
-            _raise_tinfo(x, name, "int")
-
-        normal_window = _to_int_scalar(window, "window")
-        normal_max_radius = _to_int_scalar(max_radius, "max_radius")
-
-        if kind is CPSFPeriodizationKind.WINDOW:
-            if normal_window is None:
-                raise ValueError("CPSFPeriodization(WINDOW): 'window' is required")
-            if normal_window < 1:
-                raise ValueError("CPSFPeriodization(WINDOW): 'window' must be >= 1")
-            if normal_max_radius is not None:
-                raise ValueError("CPSFPeriodization(WINDOW): 'max_radius' must be None")
-        elif kind is CPSFPeriodizationKind.FULL:
-            if normal_window is not None:
-                raise ValueError("CPSFPeriodization(FULL): 'window' must be None")
-            if normal_max_radius is not None and normal_max_radius < 1:
-                raise ValueError("CPSFPeriodization(FULL): 'max_radius' must be >= 1")
-        else:
-            raise ValueError(f"CPSFPeriodization: unsupported kind={kind}")
-
-        self.kind: CPSFPeriodizationKind = kind
-        self.window: Union[int, None] = normal_window
-        self.max_radius: Union[int, None] = normal_max_radius
-        self._cache_active: bool = bool(cache_active)
-        self._cache_limit: int = int(cache_limit)
-        self._cache_soft_limit_bytes: int = int(cache_soft_limit_bytes)
-        self._cache_shell: TypeLRUCache = OrderedDict()
-        self._cache_window: TypeLRUCache = OrderedDict()
+        self._cache_window: LRUCache = OrderedDict()
+        self._cache_shell: LRUCache = OrderedDict()
 
     @staticmethod
-    def _canon_device(
-        dev: Union[torch.device, str],
-    ) -> torch.device:
-        d = torch.device(dev)
-        if d.type == "cuda":
-            if not torch.cuda.is_available():
-                raise RuntimeError(
-                    "CPSFPeriodization: CUDA device requested but torch.cuda.is_available() is False"
-                )
-            if d.index is None:
-                return torch.device("cuda", torch.cuda.current_device())
-            return d
-        return d
-
-    def _lru_get(
-        self,
-        cache: MutableMapping[TypeLRUCacheKey, TypeLRUCacheValue],
-        key: TypeLRUCacheKey,
-    ) -> Optional[TypeLRUCacheValue]:
-        if not self._cache_active:
-            return None
-
-        t = cache.get(key)
-        if t is not None and isinstance(cache, OrderedDict):
-            cache.move_to_end(key)
-
-        return t
-
-    def _lru_put(
-        self,
-        cache: MutableMapping[TypeLRUCacheKey, TypeLRUCacheValue],
-        key: TypeLRUCacheKey,
-        value: TypeLRUCacheValue,
-    ) -> None:
-        if not self._cache_active:
-            return None
-
-        cache[key] = value
-        if isinstance(cache, OrderedDict):
-            cache.move_to_end(key)
-            while len(cache) > self._cache_limit:
-                cache.popitem(last=False)
-
-    def _should_cache(
-        self,
-        num_points: int,
-        N: int,
-    ) -> bool:
-        if not self._cache_active:
-            return False
-
-        est_bytes = num_points * N * 8
-        return est_bytes <= self._cache_soft_limit_bytes
-
-    def _cartesian_window_points(
-        self,
+    def window_size(
+        *,
         N: int,
         W: int,
-        device: Union[torch.device, str],
-    ) -> torch.Tensor:
-        if W < 0:
-            raise ValueError(f"_cartesian_window_points: W must be >= 0, got {W}")
-        if N < 2:
-            raise ValueError(f"_cartesian_window_points: N must be >= 2, got {N}")
-
-        dev = self._canon_device(device)
-        key = (N, W, dev)
-        cached = self._lru_get(self._cache_window, key)
-        if cached is not None:
-            return cached
+    ) -> int:
+        if type(N) is not int or N < 1:
+            raise ValueError("window_size: N must be int >= 1 (complex dimension).")
+        if type(W) is not int or W < 0:
+            raise ValueError("window_size: W must be int >= 0.")
 
         if W == 0:
-            grid = torch.zeros(1, N, dtype=torch.long, device=dev)
-        else:
-            axis = torch.arange(-W, W + 1, device=dev, dtype=torch.long)
-            axes = [axis] * N
-            grid = torch.cartesian_prod(*axes)
+            return 1
 
-        M = (2 * W + 1) ** N
-        if self._should_cache(M, N):
-            self._lru_put(self._cache_window, key, grid)
+        tw = (W << 1) + 1
 
-        return grid
+        return int(pow(tw, 2 * N))
 
-    def _shell_points(
-        self,
+    @staticmethod
+    def shell_size(
+        *,
         N: int,
         W: int,
-        device: Union[torch.device, str],
-    ) -> torch.Tensor:
-        if W < 0:
-            raise ValueError(f"_shell_points: W must be >= 0, got {W}")
-        if N < 2:
-            raise ValueError(f"_shell_points: N must be >= 2, got {N}")
-
-        dev = self._canon_device(device)
-        key = (N, W, dev)
-        cached = self._lru_get(self._cache_shell, key)
-        if cached is not None:
-            return cached
+    ) -> int:
+        if type(N) is not int or N < 1:
+            raise ValueError("shell_size: N must be int >= 1 (complex dimension).")
+        if type(W) is not int or W < 0:
+            raise ValueError("shell_size: W must be int >= 0.")
 
         if W == 0:
-            shell = torch.zeros(1, N, dtype=torch.long, device=dev)
-        else:
-            full = torch.arange(-W, W + 1, device=dev, dtype=torch.long)
-            interior = torch.arange(-W + 1, W, device=dev, dtype=torch.long)
+            return 1
 
-            def _multi_cartesian(rng: torch.Tensor, repeat: int) -> torch.Tensor:
-                if repeat <= 0:
-                    return torch.zeros(1, 0, dtype=torch.long, device=dev)
-                if repeat == 1:
-                    return rng.view(-1, 1)
-                axes = [rng] * repeat
-                return torch.cartesian_prod(*axes)
+        tw = (W << 1) + 1
+        tm = (W << 1) - 1
 
-            parts = []
-            for j in range(N):
-                pre = _multi_cartesian(interior, j)
-                post = _multi_cartesian(full, N - j - 1)
+        return int(pow(tw, 2 * N) - pow(tm, 2 * N))
 
-                P = pre.shape[0]
-                Q = post.shape[0]
-                count = P * Q
-
-                left = (
-                    pre.repeat_interleave(Q, dim=0)
-                    if j > 0
-                    else torch.zeros(count, 0, dtype=torch.long, device=dev)
-                )
-                right = (
-                    post.repeat(P, 1)
-                    if (N - j - 1) > 0
-                    else torch.zeros(count, 0, dtype=torch.long, device=dev)
-                )
-
-                col_neg = torch.full((count, 1), -W, dtype=torch.long, device=dev)
-                col_pos = torch.full((count, 1), W, dtype=torch.long, device=dev)
-
-                parts.append(torch.cat([left, col_neg, right], dim=1))
-                parts.append(torch.cat([left, col_pos, right], dim=1))
-
-            shell = torch.cat(parts, dim=0)
-
-        M_w = (2 * W + 1) ** N - (2 * W - 1) ** N if W >= 1 else 1
-
-        if self._should_cache(M_w, N):
-            self._lru_put(self._cache_shell, key, shell)
-
-        return shell
-
-    def iter_offsets(
+    def window(
         self,
+        *,
         N: int,
-        device: Union[torch.device, str],
-    ) -> Iterator[torch.Tensor]:
-        if not isinstance(N, int) or isinstance(N, bool) or N < 2:
-            raise ValueError(
-                f"CPSFPeriodization.iter_offsets: N must be an integer >= 2, got {N}"
+        W: int,
+        device: Optional[torch.device] = None,
+    ) -> torch.Tensor:
+        if type(N) is not int or N < 1:
+            raise ValueError("window: N must be int >= 1 (complex dimension).")
+        if type(W) is not int or W < 0:
+            raise ValueError("window: W must be int >= 0.")
+
+        D = 2 * N
+        device = self._canonical_device(device=device)
+        key = (D, W, self._device_key(device=device))
+
+        if self.enable_cache:
+            cached = self._lru_get(
+                lru=self._cache_window,
+                key=key,
+            )
+            if cached is not None:
+                return cached
+
+        if W == 0:
+            out = torch.zeros((1, D), dtype=self.dtype, device=device)
+            if self._should_cache(t=out):
+                self._lru_put(
+                    lru=self._cache_window,
+                    key=key,
+                    value=out,
+                )
+            return out
+
+        out = self._cartesian_window_points(
+            D=D,
+            W=W,
+            device=device,
+            dtype=self.dtype,
+        ).contiguous()
+
+        if self._should_cache(t=out):
+            self._lru_put(
+                lru=self._cache_window,
+                key=key,
+                value=out,
             )
 
-        device_c = self._canon_device(device)
+        return out
 
-        if self.kind is CPSFPeriodizationKind.WINDOW:
-            yield self._cartesian_window_points(N, self.window, device=device_c)
+    def shell(
+        self,
+        *,
+        N: int,
+        W: int,
+        device: Optional[torch.device] = None,
+    ) -> torch.Tensor:
+        if type(N) is not int or N < 1:
+            raise ValueError("shell: N must be int >= 1 (complex dimension).")
+        if type(W) is not int or W < 0:
+            raise ValueError("shell: W must be int >= 0.")
+
+        D = 2 * N
+        device = self._canonical_device(device=device)
+        key = (D, W, self._device_key(device=device))
+
+        if self.enable_cache:
+            cached = self._lru_get(lru=self._cache_shell, key=key)
+            if cached is not None:
+                return cached
+
+        if W == 0:
+            out = torch.zeros((1, D), dtype=self.dtype, device=device)
+            if self._should_cache(t=out):
+                self._lru_put(lru=self._cache_shell, key=key, value=out)
+            return out
+
+        out = self._shell_points(D=D, W=W, device=device, dtype=self.dtype).contiguous()
+
+        if self._should_cache(t=out):
+            self._lru_put(lru=self._cache_shell, key=key, value=out)
+
+        return out
+
+    def iter_shells(
+        self,
+        *,
+        N: int,
+        start_radius: int = 0,
+        max_radius: Optional[int] = None,
+        device: Optional[torch.device] = None,
+    ) -> Generator[Tuple[int, torch.Tensor], None, None]:
+        if type(N) is not int or N < 1:
+            raise ValueError("iter_shells: N must be int >= 1 (complex dimension).")
+        if type(start_radius) is not int or start_radius < 0:
+            raise ValueError("iter_shells: start_radius must be int >= 0.")
+        if max_radius is not None and (type(max_radius) is not int or max_radius < 0):
+            raise ValueError("iter_shells: max_radius must be int >= 0 or None.")
+
+        device = self._canonical_device(device=device)
+
+        if max_radius is not None and start_radius > max_radius:
             return
+            yield  # pragma: no cover
 
-        if self.kind is CPSFPeriodizationKind.FULL:
-            W = 0
-            while True:
-                yield self._shell_points(N, W, device=device_c)
-                W += 1
-                if self.max_radius is not None and W > self.max_radius:
-                    break
-            return
-
-        raise ValueError(
-            f"CPSFPeriodization.iter_offsets: unsupported kind={self.kind}"
-        )
+        W = start_radius
+        while True:
+            yield W, self.shell(N=N, W=W, device=device)
+            if max_radius is not None and W >= max_radius:
+                break
+            W += 1
 
     def pack_offsets(
         self,
+        *,
         N: int,
-        device: Union[torch.device, str],
-        radii: Sequence[int],
+        max_radius: int,
+        device: Optional[torch.device] = None,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
-        if not isinstance(N, int) or isinstance(N, bool) or N < 2:
-            raise ValueError(
-                f"CPSFPeriodization.pack_offsets: N must be an integer >= 2, got {N}"
-            )
+        if type(N) is not int or N < 1:
+            raise ValueError("pack_offsets: N must be int >= 1 (complex dimension).")
+        if type(max_radius) is not int or max_radius < 0:
+            raise ValueError("pack_offsets: max_radius must be int >= 0.")
 
-        device_c = self._canon_device(device)
-        lens: list[int] = []
-        chunks: list[torch.Tensor] = []
+        device = self._canonical_device(device=device)
+        D = 2 * N
 
-        for W in radii:
-            if not isinstance(W, int) or W < 0:
-                raise ValueError(
-                    f"pack_offsets: radii must be non-negative ints, got {W}"
-                )
-            sh = self._shell_points(N, W, device=device_c)
-            lens.append(int(sh.shape[0]))
-            chunks.append(sh)
+        shells: list[torch.Tensor] = []
+        lengths: list[int] = []
 
-        if not chunks:
+        for W, S in self.iter_shells(
+            N=N,
+            start_radius=0,
+            max_radius=max_radius,
+            device=device,
+        ):
+            shells.append(S)
+            lengths.append(S.shape[0])
+
+        if not shells:
             return (
-                torch.empty(0, N, dtype=torch.long, device=device_c),
-                torch.empty(0, dtype=torch.long, device=device_c),
+                torch.empty((0, D), dtype=self.dtype, device=device),
+                torch.empty((0,), dtype=torch.long, device=device),
             )
 
-        offsets = torch.cat(chunks, dim=0)
-        lengths = torch.as_tensor(lens, dtype=torch.long, device=device_c)
+        offsets = torch.cat(shells, dim=0).contiguous()
+        lengths_t = torch.tensor(lengths, dtype=torch.long, device=device)
 
-        return offsets, lengths
+        return offsets, lengths_t
 
-    def iter_packed_offsets(
+    def iter_packed(
         self,
+        *,
         N: int,
-        device: Union[torch.device, str],
-        pack_size: int,
+        target_points_per_pack: int,
         start_radius: int = 0,
-    ) -> Iterator[Tuple[torch.Tensor, torch.Tensor, int]]:
-        if not isinstance(N, int) or isinstance(N, bool) or N < 2:
-            raise ValueError(
-                f"CPSFPeriodization.iter_packed_offsets: N must be an integer >= 2, got {N}"
-            )
-        if not isinstance(pack_size, int) or pack_size <= 0:
-            raise ValueError("iter_packed_offsets: pack_size must be positive int")
-        if not isinstance(start_radius, int) or start_radius < 0:
-            raise ValueError(
-                "iter_packed_offsets: start_radius must be non-negative int"
-            )
+        max_radius: Optional[int] = None,
+        device: Optional[torch.device] = None,
+    ) -> Generator[Tuple[int, int, torch.Tensor], None, None]:
+        if type(N) is not int or N < 1:
+            raise ValueError("iter_packed: N must be int >= 1 (complex dimension).")
+        if type(target_points_per_pack) is not int or target_points_per_pack <= 0:
+            raise ValueError("iter_packed: target_points_per_pack must be int > 0.")
+        if type(start_radius) is not int or start_radius < 0:
+            raise ValueError("iter_packed: start_radius must be int >= 0.")
+        if max_radius is not None and (type(max_radius) is not int or max_radius < 0):
+            raise ValueError("iter_packed: max_radius must be int >= 0 or None.")
 
-        device_c = self._canon_device(device)
-        W = start_radius
-        while True:
-            if self.max_radius is not None and W > self.max_radius:
-                break
+        device = self._canonical_device(device=device)
 
-            radii: list[int] = []
+        if max_radius is not None and start_radius > max_radius:
+            return
+            yield  # pragma: no cover
 
-            for _ in range(pack_size):
-                if self.max_radius is not None and W > self.max_radius:
-                    break
-                radii.append(W)
-                W += 1
+        acc: list[torch.Tensor] = []
+        acc_count = 0
+        w_start: Optional[int] = None
+        w_last: Optional[int] = None
 
-            if not radii:
-                break
+        for W, S in self.iter_shells(
+            N=N,
+            start_radius=start_radius,
+            max_radius=max_radius,
+            device=device,
+        ):
+            if acc_count > 0 and acc_count + S.shape[0] > target_points_per_pack:
+                pack = torch.cat(acc, dim=0).contiguous()
+                assert w_start is not None and w_last is not None
+                yield (w_start, w_last, pack)
+                acc.clear()
+                acc_count = 0
+                w_start = None
+                w_last = None
 
-            offsets, lengths = self.pack_offsets(N, device_c, radii)
-            yield offsets, lengths, radii[0]
+            if w_start is None:
+                w_start = W
 
-            if self.max_radius is not None and W > self.max_radius:
-                break
+            acc.append(S)
+            acc_count += S.shape[0]
+            w_last = W
+
+        if acc_count > 0:
+            pack = torch.cat(acc, dim=0).contiguous()
+            assert w_start is not None and w_last is not None
+            yield (w_start, w_last, pack)
+
+    @staticmethod
+    def _cartesian_window_points(
+        *,
+        D: int,
+        W: int,
+        device: torch.device,
+        dtype: torch.dtype,
+    ) -> torch.Tensor:
+        if type(D) is not int or D < 1:
+            raise ValueError("_cartesian_window_points: D must be int >= 1.")
+        if type(W) is not int or W < 0:
+            raise ValueError("_cartesian_window_points: W must be int >= 0.")
+        if W == 0:
+            return torch.zeros((1, D), dtype=dtype, device=device)
+
+        axis = torch.arange(-W, W + 1, dtype=dtype, device=device)
+        axes = [axis for _ in range(D)]
+        grid = torch.cartesian_prod(*axes)
+
+        if grid.dim() == 1:
+            grid = grid.view(-1, 1)
+
+        return grid.view(-1, D)
+
+    @staticmethod
+    def _shell_points(
+        *,
+        D: int,
+        W: int,
+        device: torch.device,
+        dtype: torch.dtype,
+    ) -> torch.Tensor:
+        if type(D) is not int or D < 1:
+            raise ValueError("_shell_points: D must be int >= 1.")
+        if type(W) is not int or W < 0:
+            raise ValueError("_shell_points: W must be int >= 0.")
+        if W == 0:
+            return torch.zeros((1, D), dtype=dtype, device=device)
+
+        axis = torch.arange(-W, W + 1, dtype=dtype, device=device)
+        parts: list[torch.Tensor] = []
+
+        for j in range(D):
+            if D - 1 == 0:
+                other = torch.empty((1, 0), dtype=dtype, device=device)
+            else:
+                other_axes = [axis for _ in range(D - 1)]
+                other = torch.cartesian_prod(*other_axes)
+                if other.dim() == 1:
+                    other = other.view(-1, 1)
+
+            if j == 0:
+                left = torch.empty((other.shape[0], 0), dtype=dtype, device=device)
+                right = other
+            elif j == D - 1:
+                left = other
+                right = torch.empty((other.shape[0], 0), dtype=dtype, device=device)
+            else:
+                left = other[:, :j]
+                right = other[:, j:]
+
+            if left.numel() == 0:
+                base_mask = torch.ones(
+                    (other.shape[0],), dtype=torch.bool, device=device
+                )
+            else:
+                base_mask = left.abs().amax(dim=1) < W
+
+            for s in (-1, 1):
+                x = torch.empty((other.shape[0], D), dtype=dtype, device=device)
+
+                if left.numel() > 0:
+                    x[:, :j] = left
+
+                x[:, j] = s * W
+
+                if right.numel() > 0:
+                    x[:, j + 1 :] = right
+
+                x = x[base_mask]
+                parts.append(x)
+
+        if not parts:
+            return torch.empty((0, D), dtype=dtype, device=device)
+
+        return torch.cat(parts, dim=0)
+
+    @staticmethod
+    def _canonical_device(
+        *,
+        device: Optional[torch.device],
+    ) -> torch.device:
+        return torch.device("cpu") if device is None else device
+
+    @staticmethod
+    def _device_key(
+        *,
+        device: torch.device,
+    ) -> Tuple[str, int]:
+        return (device.type, -1 if device.index is None else int(device.index))
+
+    def _should_cache(
+        self,
+        *,
+        t: torch.Tensor,
+    ) -> bool:
+        if not self.enable_cache or t.numel() == 0:
+            return False
+
+        est_bytes = int(t.numel()) * int(t.element_size())
+
+        return est_bytes <= self.max_cache_bytes_per_tensor
+
+    def _lru_get(
+        self,
+        *,
+        lru: "OrderedDict[Tuple[int, int, Tuple[str, int]], torch.Tensor]",
+        key: Tuple[int, int, Tuple[str, int]],
+    ) -> Optional[torch.Tensor]:
+        if not self.enable_cache:
+            return None
+
+        if key in lru:
+            t = lru.pop(key)
+            lru[key] = t
+            return t
+
+        return None
+
+    def _lru_put(
+        self,
+        *,
+        lru: "OrderedDict[Tuple[int, int, Tuple[str, int]], torch.Tensor]",
+        key: Tuple[int, int, Tuple[str, int]],
+        value: torch.Tensor,
+    ) -> None:
+        if not self.enable_cache:
+            return
+
+        lru[key] = value
+
+        while len(lru) > self.max_cache_entries:
+            lru.popitem(last=False)
