@@ -31,6 +31,15 @@ def _has_unique_rows(x: torch.Tensor) -> bool:
     return uniq.shape[0] == x.shape[0]
 
 
+def _is_lex_sorted(x: torch.Tensor) -> bool:
+    """Return True if rows of x are lexicographically non-decreasing."""
+    if x.shape[0] <= 1:
+        return True
+    # compare on CPU tuples for simplicity; cost is negligible in tests
+    rows = [tuple(int(v) for v in r) for r in x.to("cpu").tolist()]
+    return all(rows[i - 1] <= rows[i] for i in range(1, len(rows)))
+
+
 # =========================
 # P01 — ctor & dtype validation
 # =========================
@@ -703,6 +712,175 @@ def test_P29_cuda_iter_packed_parity(N, W, target):
 
     for _, _, P in packs_gpu:
         assert P.device.type == "cuda"
+
+
+# =========================
+# P30 — window/shell with sorted=True: lex order + content equality
+# =========================
+@pytest.mark.parametrize("N", NS)
+@pytest.mark.parametrize("W", WS)
+def test_P30_sorted_window_shell(N, W):
+    g = CPSFPeriodization()
+    dev = TARGET_DEVICE
+
+    win_uns = g.window(N=N, W=W, device=dev, sorted=False)
+    win_s = g.window(N=N, W=W, device=dev, sorted=True)
+    assert _as_set(win_uns) == _as_set(win_s)
+    assert _is_lex_sorted(win_s)
+
+    sh_uns = g.shell(N=N, W=W, device=dev, sorted=False)
+    sh_s = g.shell(N=N, W=W, device=dev, sorted=True)
+    assert _as_set(sh_uns) == _as_set(sh_s)
+    assert _is_lex_sorted(sh_s)
+
+
+# =========================
+# P31 — iter_shells with sorted=True: each shell lex-sorted + content equality
+# =========================
+@pytest.mark.parametrize("N", NS)
+@pytest.mark.parametrize("maxr", [0, 1, 2])
+def test_P31_sorted_iter_shells(N, maxr):
+    g = CPSFPeriodization()
+    dev = TARGET_DEVICE
+
+    uns = list(
+        g.iter_shells(
+            N=N,
+            start_radius=0,
+            max_radius=maxr,
+            device=dev,
+            sorted=False,
+        )
+    )
+    srt = list(
+        g.iter_shells(
+            N=N,
+            start_radius=0,
+            max_radius=maxr,
+            device=dev,
+            sorted=True,
+        )
+    )
+
+    assert [w for (w, _) in uns] == [w for (w, _) in srt]
+    for (_, a), (_, b) in zip(uns, srt):
+        assert _as_set(a) == _as_set(b)
+        assert _is_lex_sorted(b)
+
+
+# =========================
+# P32 — pack_offsets with sorted=True: per-shell lex order + lengths match
+# =========================
+@pytest.mark.parametrize("N", NS)
+@pytest.mark.parametrize("W", WS)
+def test_P32_sorted_pack_offsets(N, W):
+    g = CPSFPeriodization()
+    dev = TARGET_DEVICE
+
+    off_uns, len_uns = g.pack_offsets(N=N, max_radius=W, device=dev, sorted=False)
+    off_s, len_s = g.pack_offsets(N=N, max_radius=W, device=dev, sorted=True)
+
+    assert _as_set(off_uns) == _as_set(off_s)
+    assert torch.equal(len_uns.cpu(), len_s.cpu())
+
+    start = 0
+    for w in range(W + 1):
+        seg = off_s[start : start + len_s[w].item()]
+        assert _is_lex_sorted(seg), f"Shell segment W={w} not lex-sorted"
+        start += len_s[w].item()
+
+
+# =========================
+# P33 — iter_packed with sorted=True: each pack lex-sorted + coverage/content
+# =========================
+@pytest.mark.parametrize("N", NS)
+@pytest.mark.parametrize("W", [1, 2])
+@pytest.mark.parametrize("target", [10, 1000])
+def test_P33_sorted_iter_packed(N, W, target):
+    g = CPSFPeriodization()
+    dev = TARGET_DEVICE
+
+    packs_uns = list(
+        g.iter_packed(
+            N=N,
+            target_points_per_pack=target,
+            start_radius=0,
+            max_radius=W,
+            device=dev,
+            sorted=False,
+        )
+    )
+    packs_s = list(
+        g.iter_packed(
+            N=N,
+            target_points_per_pack=target,
+            start_radius=0,
+            max_radius=W,
+            device=dev,
+            sorted=True,
+        )
+    )
+
+    assert [(a, b) for (a, b, _) in packs_uns] == [(a, b) for (a, b, _) in packs_s]
+
+    cov_uns, cov_s = set(), set()
+    for a, b, _ in packs_uns:
+        cov_uns.update(range(a, b + 1))
+    for a, b, _ in packs_s:
+        cov_s.update(range(a, b + 1))
+    assert cov_uns == cov_s == set(range(0, W + 1))
+
+    union_uns = (
+        set().union(*(_as_set(P) for _, _, P in packs_uns)) if packs_uns else set()
+    )
+    union_s = set().union(*(_as_set(P) for _, _, P in packs_s)) if packs_s else set()
+    assert union_uns == union_s
+
+    for _, _, P in packs_s:
+        assert _is_lex_sorted(P)
+
+
+# =========================
+# P34 — determinism with sorted=True (content)
+# =========================
+@pytest.mark.parametrize("N", NS)
+@pytest.mark.parametrize("W", WS)
+def test_P34_determinism_sorted(N, W):
+    g = CPSFPeriodization()
+    dev = TARGET_DEVICE
+
+    w1 = g.window(N=N, W=W, device=dev, sorted=True)
+    w2 = g.window(N=N, W=W, device=dev, sorted=True)
+    s1 = g.shell(N=N, W=W, device=dev, sorted=True)
+    s2 = g.shell(N=N, W=W, device=dev, sorted=True)
+
+    assert _as_set(w1) == _as_set(w2)
+    assert _as_set(s1) == _as_set(s2)
+    assert _is_lex_sorted(w1) and _is_lex_sorted(w2)
+    assert _is_lex_sorted(s1) and _is_lex_sorted(s2)
+
+
+# =========================
+# P35 — CUDA parity with sorted=True (when available)
+# =========================
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA not available")
+@pytest.mark.parametrize("N", [1, 2])
+@pytest.mark.parametrize("W", [0, 2])
+def test_P35_cuda_sorted_parity_window_shell(N, W):
+    g = CPSFPeriodization()
+    cpu = torch.device("cpu")
+    gpu = torch.device("cuda")
+
+    win_cpu = g.window(N=N, W=W, device=cpu, sorted=True)
+    win_gpu = g.window(N=N, W=W, device=gpu, sorted=True)
+    sh_cpu = g.shell(N=N, W=W, device=cpu, sorted=True)
+    sh_gpu = g.shell(N=N, W=W, device=gpu, sorted=True)
+
+    assert _as_set(win_cpu) == _as_set(win_gpu.to("cpu"))
+    assert _as_set(sh_cpu) == _as_set(sh_gpu.to("cpu"))
+    assert _is_lex_sorted(win_cpu) and _is_lex_sorted(win_gpu)
+    assert _is_lex_sorted(sh_cpu) and _is_lex_sorted(sh_gpu)
+    assert win_gpu.device.type == "cuda" and sh_gpu.device.type == "cuda"
 
 
 # =========================
