@@ -104,6 +104,16 @@ class CPSFPeriodization:
         device: Optional[torch.device] = None,
         sorted: bool = False,
     ) -> torch.Tensor:
+        """
+        Return the full L∞ window in Z^{2N} as an [M, 2N] integer tensor.
+
+        Row order is non-contractual and may vary across devices/implementations.
+
+        If `sorted=True`, rows are lexicographically sorted; otherwise order is arbitrary.
+
+        Note: sorting adds an O(M log M) extra pass.
+        """
+
         if type(N) is not int or N < 1:
             raise ValueError("window: N must be int >= 1 (complex dimension).")
         if type(W) is not int or W < 0:
@@ -149,6 +159,16 @@ class CPSFPeriodization:
         device: Optional[torch.device] = None,
         sorted: bool = False,
     ) -> torch.Tensor:
+        """
+        Return the L∞ shell at radius W in Z^{2N} as an [M_w, 2N] integer tensor.
+
+        Row order is non-contractual and may vary across devices/implementations.
+
+        If `sorted=True`, rows are lexicographically sorted; otherwise order is arbitrary.
+
+        Note: sorting adds an O(M_w log M_w) extra pass.
+        """
+
         if type(N) is not int or N < 1:
             raise ValueError("shell: N must be int >= 1 (complex dimension).")
         if type(W) is not int or W < 0:
@@ -192,6 +212,16 @@ class CPSFPeriodization:
         device: Optional[torch.device] = None,
         sorted: bool = False,
     ) -> Generator[Tuple[int, torch.Tensor], None, None]:
+        """
+        Yield (W, shell) for W in [start_radius..max_radius] in increasing W.
+
+        Row order inside each yielded shell is non-contractual.
+
+        If `sorted=True`, each shell is lexicographically sorted before yielding.
+
+        Sorting affects only per-shell ordering; coverage and W-order are unchanged.
+        """
+
         if type(N) is not int or N < 1:
             raise ValueError("iter_shells: N must be int >= 1 (complex dimension).")
         if type(start_radius) is not int or start_radius < 0:
@@ -241,6 +271,16 @@ class CPSFPeriodization:
         device: Optional[torch.device] = None,
         sorted: bool = False,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        Concatenate shells W=0..max_radius into a single [M, 2N] tensor and return (offsets, lengths).
+
+        Row order inside each shell segment is non-contractual.
+
+        If `sorted=True`, each shell segment is lexicographically sorted before concatenation.
+
+        `lengths[w]` always corresponds to radius W and is unaffected by sorting.
+        """
+
         if type(N) is not int or N < 1:
             raise ValueError("pack_offsets: N must be int >= 1 (complex dimension).")
         if type(max_radius) is not int or max_radius < 0:
@@ -285,6 +325,16 @@ class CPSFPeriodization:
         device: Optional[torch.device] = None,
         sorted: bool = False,
     ) -> Generator[Tuple[int, int, torch.Tensor], None, None]:
+        """
+        Yield (w_start, w_end, pack) covering shells in increasing W, packed up to the target size.
+
+        Row order inside each yielded pack is non-contractual.
+
+        If `sorted=True`, each pack is lexicographically sorted before yielding.
+
+        Sorting changes only intra-pack order; coverage and (w_start..w_end) boundaries remain unchanged.
+        """
+
         if type(N) is not int or N < 1:
             raise ValueError("iter_packed: N must be int >= 1 (complex dimension).")
         if type(target_points_per_pack) is not int or target_points_per_pack <= 0:
