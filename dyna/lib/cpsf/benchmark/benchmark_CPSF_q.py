@@ -3,7 +3,7 @@
 # For full stats:
 # > python -m dyna.lib.cpsf.benchmark.benchmark_CPSF_q --N 16 --batch 65536 --dtype c64 --device cuda --iters 100 --warmup 10 --profile --verify_devices
 
-import argparse, time, math, torch
+import argparse, time, torch
 from ..functional.core_math import R, R_ext, q
 
 
