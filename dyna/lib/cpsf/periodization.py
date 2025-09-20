@@ -102,15 +102,18 @@ class CPSFPeriodization:
         N: int,
         W: int,
         device: Optional[torch.device] = None,
+        sorted: bool = False,
     ) -> torch.Tensor:
         if type(N) is not int or N < 1:
             raise ValueError("window: N must be int >= 1 (complex dimension).")
         if type(W) is not int or W < 0:
             raise ValueError("window: W must be int >= 0.")
+        if type(sorted) is not bool:
+            raise ValueError("window: sorted must be boolean.")
 
         D = 2 * N
         device = self._canonical_device(device=device)
-        key = (D, W, self._device_key(device=device))
+        key = (D, W, self._device_key(device=device), bool(sorted))
 
         if self.enable_cache:
             cached = self._lru_get(
@@ -122,27 +125,19 @@ class CPSFPeriodization:
 
         if W == 0:
             out = torch.zeros((1, D), dtype=self.dtype, device=device)
-            if self._should_cache(t=out):
-                self._lru_put(
-                    lru=self._cache_window,
-                    key=key,
-                    value=out,
-                )
-            return out
+        else:
+            out = self._cartesian_window_points(
+                D=D,
+                W=W,
+                device=device,
+                dtype=self.dtype,
+            ).contiguous()
 
-        out = self._cartesian_window_points(
-            D=D,
-            W=W,
-            device=device,
-            dtype=self.dtype,
-        ).contiguous()
+        if sorted:
+            out = self._lexsort_rows(x=out)
 
         if self._should_cache(t=out):
-            self._lru_put(
-                lru=self._cache_window,
-                key=key,
-                value=out,
-            )
+            self._lru_put(lru=self._cache_window, key=key, value=out)
 
         return out
 
@@ -152,15 +147,18 @@ class CPSFPeriodization:
         N: int,
         W: int,
         device: Optional[torch.device] = None,
+        sorted: bool = False,
     ) -> torch.Tensor:
         if type(N) is not int or N < 1:
             raise ValueError("shell: N must be int >= 1 (complex dimension).")
         if type(W) is not int or W < 0:
             raise ValueError("shell: W must be int >= 0.")
+        if type(sorted) is not bool:
+            raise ValueError("window: sorted must be boolean.")
 
         D = 2 * N
         device = self._canonical_device(device=device)
-        key = (D, W, self._device_key(device=device))
+        key = (D, W, self._device_key(device=device), bool(sorted))
 
         if self.enable_cache:
             cached = self._lru_get(lru=self._cache_shell, key=key)
@@ -169,11 +167,16 @@ class CPSFPeriodization:
 
         if W == 0:
             out = torch.zeros((1, D), dtype=self.dtype, device=device)
-            if self._should_cache(t=out):
-                self._lru_put(lru=self._cache_shell, key=key, value=out)
-            return out
+        else:
+            out = self._shell_points(
+                D=D,
+                W=W,
+                device=device,
+                dtype=self.dtype,
+            ).contiguous()
 
-        out = self._shell_points(D=D, W=W, device=device, dtype=self.dtype).contiguous()
+        if sorted:
+            out = self._lexsort_rows(x=out)
 
         if self._should_cache(t=out):
             self._lru_put(lru=self._cache_shell, key=key, value=out)
@@ -187,6 +190,7 @@ class CPSFPeriodization:
         start_radius: int = 0,
         max_radius: Optional[int] = None,
         device: Optional[torch.device] = None,
+        sorted: bool = False,
     ) -> Generator[Tuple[int, torch.Tensor], None, None]:
         if type(N) is not int or N < 1:
             raise ValueError("iter_shells: N must be int >= 1 (complex dimension).")
@@ -194,6 +198,8 @@ class CPSFPeriodization:
             raise ValueError("iter_shells: start_radius must be int >= 0.")
         if max_radius is not None and (type(max_radius) is not int or max_radius < 0):
             raise ValueError("iter_shells: max_radius must be int >= 0 or None.")
+        if type(sorted) is not bool:
+            raise ValueError("window: sorted must be boolean.")
 
         device = self._canonical_device(device=device)
 
@@ -213,12 +219,16 @@ class CPSFPeriodization:
             for W in range(start_radius, max_radius + 1):
                 m = absmax == W
                 shell = win[m]
+
+                if sorted:
+                    shell = self._lexsort_rows(x=shell)
+
                 yield W, shell.contiguous()
             return
 
         W = start_radius
         while True:
-            yield W, self.shell(N=N, W=W, device=device)
+            yield W, self.shell(N=N, W=W, device=device, sorted=sorted)
             if max_radius is not None and W >= max_radius:
                 break
             W += 1
@@ -229,11 +239,14 @@ class CPSFPeriodization:
         N: int,
         max_radius: int,
         device: Optional[torch.device] = None,
+        sorted: bool = False,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         if type(N) is not int or N < 1:
             raise ValueError("pack_offsets: N must be int >= 1 (complex dimension).")
         if type(max_radius) is not int or max_radius < 0:
             raise ValueError("pack_offsets: max_radius must be int >= 0.")
+        if type(sorted) is not bool:
+            raise ValueError("window: sorted must be boolean.")
 
         device = self._canonical_device(device=device)
         D = 2 * N
@@ -246,6 +259,7 @@ class CPSFPeriodization:
             start_radius=0,
             max_radius=max_radius,
             device=device,
+            sorted=sorted,
         ):
             shells.append(S)
             lengths.append(S.shape[0])
@@ -269,6 +283,7 @@ class CPSFPeriodization:
         start_radius: int = 0,
         max_radius: Optional[int] = None,
         device: Optional[torch.device] = None,
+        sorted: bool = False,
     ) -> Generator[Tuple[int, int, torch.Tensor], None, None]:
         if type(N) is not int or N < 1:
             raise ValueError("iter_packed: N must be int >= 1 (complex dimension).")
@@ -278,6 +293,8 @@ class CPSFPeriodization:
             raise ValueError("iter_packed: start_radius must be int >= 0.")
         if max_radius is not None and (type(max_radius) is not int or max_radius < 0):
             raise ValueError("iter_packed: max_radius must be int >= 0 or None.")
+        if type(sorted) is not bool:
+            raise ValueError("window: sorted must be boolean.")
 
         device = self._canonical_device(device=device)
 
@@ -295,9 +312,14 @@ class CPSFPeriodization:
             start_radius=start_radius,
             max_radius=max_radius,
             device=device,
+            sorted=sorted,
         ):
             if acc_count > 0 and acc_count + S.shape[0] > target_points_per_pack:
                 pack = torch.cat(acc, dim=0).contiguous()
+
+                if sorted:
+                    pack = self._lexsort_rows(x=pack)
+
                 assert w_start is not None and w_last is not None
                 yield (w_start, w_last, pack)
                 acc.clear()
@@ -314,6 +336,10 @@ class CPSFPeriodization:
 
         if acc_count > 0:
             pack = torch.cat(acc, dim=0).contiguous()
+
+            if sorted:
+                pack = self._lexsort_rows(x=pack)
+
             assert w_start is not None and w_last is not None
             yield (w_start, w_last, pack)
 
@@ -475,3 +501,20 @@ class CPSFPeriodization:
 
         while len(lru) > self.max_cache_entries:
             lru.popitem(last=False)
+
+    @staticmethod
+    def _lexsort_rows(
+        *,
+        x: torch.Tensor,
+    ) -> torch.Tensor:
+        if x.numel() == 0 or x.shape[0] <= 1:
+            return x
+
+        idx = torch.arange(x.shape[0], device=x.device)
+
+        for k in range(x.shape[1] - 1, -1, -1):
+            vals = x[idx, k]
+            _, order = torch.sort(vals, stable=True)
+            idx = idx[order]
+
+        return x[idx]
