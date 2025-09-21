@@ -25,23 +25,23 @@ class CPSFPeriodization:
         dtype: torch.dtype = torch.long,
     ) -> None:
         if not isinstance(dtype, torch.dtype):
-            raise ValueError("dtype: must be a torch.dtype.")
+            raise ValueError("dtype must be a torch.dtype.")
 
         if dtype not in _INT_DTYPES or dtype is torch.bool:
-            raise ValueError("dtype: must be an integer dtype (int8/16/32/64).")
+            raise ValueError("dtype must be an integer dtype (int8/16/32/64).")
 
         if not isinstance(enable_cache, (bool, int)):
-            raise ValueError("enable_cache: must be bool.")
+            raise ValueError("enable_cache must be bool.")
 
         if not isinstance(max_cache_entries_per_kind, int):
-            raise ValueError("max_cache_entries_per_kind: must be an integer.")
+            raise ValueError("max_cache_entries_per_kind must be an integer.")
         if max_cache_entries_per_kind < 0:
-            raise ValueError("max_cache_entries_per_kind: must be >= 0.")
+            raise ValueError("max_cache_entries_per_kind must be >= 0.")
 
         if not isinstance(max_cache_bytes_per_tensor, int):
-            raise ValueError("max_cache_bytes_per_tensor: must be an integer.")
+            raise ValueError("max_cache_bytes_per_tensor must be an integer.")
         if max_cache_bytes_per_tensor < 0:
-            raise ValueError("max_cache_bytes_per_tensor: must be >= 0.")
+            raise ValueError("max_cache_bytes_per_tensor must be >= 0.")
 
         self.enable_cache = bool(enable_cache)
         self.max_cache_entries = int(max_cache_entries_per_kind)
@@ -53,7 +53,7 @@ class CPSFPeriodization:
         if self.enable_cache:
             if self.max_cache_bytes_per_tensor < self._elem_size_bytes:
                 raise ValueError(
-                    "max_cache_bytes_per_tensor: is too small for chosen dtype."
+                    "max_cache_bytes_per_tensor is too small for chosen dtype."
                 )
 
         self._cache_window: LRUCache = OrderedDict()
@@ -229,7 +229,7 @@ class CPSFPeriodization:
         if max_radius is not None and (type(max_radius) is not int or max_radius < 0):
             raise ValueError("iter_shells: max_radius must be int >= 0 or None.")
         if type(sorted) is not bool:
-            raise ValueError("window: sorted must be bool.")
+            raise ValueError("iter_shells: sorted must be bool.")
 
         device = self._canonical_device(device=device)
 
@@ -286,7 +286,7 @@ class CPSFPeriodization:
         if type(max_radius) is not int or max_radius < 0:
             raise ValueError("pack_offsets: max_radius must be int >= 0.")
         if type(sorted) is not bool:
-            raise ValueError("window: sorted must be bool.")
+            raise ValueError("pack_offsets: sorted must be bool.")
 
         device = self._canonical_device(device=device)
         D = 2 * N
@@ -344,7 +344,7 @@ class CPSFPeriodization:
         if max_radius is not None and (type(max_radius) is not int or max_radius < 0):
             raise ValueError("iter_packed: max_radius must be int >= 0 or None.")
         if type(sorted) is not bool:
-            raise ValueError("window: sorted must be bool.")
+            raise ValueError("iter_packed: sorted must be bool.")
 
         device = self._canonical_device(device=device)
 
