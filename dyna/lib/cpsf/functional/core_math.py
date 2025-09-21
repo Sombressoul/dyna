@@ -1112,16 +1112,16 @@ def psi_over_offsets(
     What it does
     ------------
     - Computes the torus-periodized envelope per contributor j by summing
-    eta = rho(q(iota(dz + n, dd))) over the provided integer offsets n.
-    - Offsets are applied to the REAL part of dz only; Im(dz) is left unchanged.
-    - Broadcasts over contributors and offsets, returns the sum over offsets:
-    eta_sum_j with shape [..., M].
+      eta = rho(q(iota(dz + n, dd))) over the provided integer offsets n.
+    - Offsets implement the FULL complex-lattice periodization: both Re and Im
+      parts of dz are shifted. Concretely, offsets encode n = (n_R, n_I).
 
     Where it is used
     ----------------
     - Core building block for the two classic backends:
-    T_classic_window (one-shot window) and T_classic_full (streaming shells).
-    - Neutral to the periodization policy: accepts any [O, N] batch of offsets.
+      T_classic_window (one-shot window) and T_classic_full (streaming shells).
+    - Neutral to the periodization policy: accepts any [O, 2N] batch of offsets
+      (Z^{2N}); upstream may use non-contract row order and optional sorting.
 
     Why no runtime checks here
     --------------------------
@@ -1135,7 +1135,7 @@ def psi_over_offsets(
     - vec_d:    [..., N] complex
     - vec_d_j:  [..., M, N] complex (or broadcastable)
     - sigma_par, sigma_perp: real, broadcastable
-    - offsets:  [O, N] long (on the target device)
+    - offsets:  [O, 2N] long (first N = n_R, next N = n_I), on target device
     - R_j:      optional precomputed geometry (broadcastable to [..., M, N, 2])
     - q_max:    optional scalar clamp for q before rho
 
@@ -1146,25 +1146,33 @@ def psi_over_offsets(
     Strengths
     ---------
     - Fully vectorized over contributors and offsets (high throughput).
-    - Simple contract; re-usable across periodization strategies.
+    - Simple contract; reusable across periodization strategies.
 
     Weaknesses
     ----------
     - Temporarily materializes eta[..., M, O] before reduction over O.
-    Memory scales as O(M * O); prefer calling it from a streaming loop with
-    small shells/batches of offsets when O is large.
+      Memory scales as O(M * O); prefer calling it from a streaming loop with
+      small shells/batches of offsets when O is large.
     """
 
     device = z.device
     r_dtype = z.real.dtype
+
     dz = lift(z) - lift(z_j)
     dd = delta_vec_d(vec_d, vec_d_j)
+
     Rmat = R(vec_d_j) if R_j is None else R_j
     Rext = R_ext(Rmat)
-    off_r = offsets.to(device=device, dtype=r_dtype)
-    dz_re = dz.real.unsqueeze(-2) + off_r.unsqueeze(-3)
-    dz_im = dz.imag.unsqueeze(-2)
-    dzb = torch.complex(dz_re, dz_im)
+
+    N = dz.shape[-1]
+    off = offsets.to(device=device, dtype=r_dtype)
+    n_r = off[..., :N]
+    n_i = off[..., N:]
+
+    dz_re = dz.real.unsqueeze(-2) + n_r.unsqueeze(-3)
+    dz_im = dz.imag.unsqueeze(-2) + n_i.unsqueeze(-3)
+    dzb   = torch.complex(dz_re, dz_im)
+
     dd_b = dd.unsqueeze(-2).expand_as(dzb)
     w = iota(dzb, dd_b)
     qv = q(
@@ -1173,6 +1181,7 @@ def psi_over_offsets(
         sigma_par[..., None],
         sigma_perp[..., None],
     )
+
     eta = rho(qv, q_max=q_max)
     eta_sum_j = eta.sum(dim=-1)
 
