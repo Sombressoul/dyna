@@ -1400,6 +1400,110 @@ def test_T17_boundary_continuity_small_eps(device, N, dtype_z, dtype_T):
 
 
 # =========================
+# T18 — gradcheck / gradgradcheck on small problem (complex128)
+# =========================
+def test_T18_gradcheck_and_gradgradcheck_small_complex128():
+    device = torch.device("cpu")
+    B, N, M, S = 1, 2, 2, 2
+    dtype_z = torch.complex128
+    dtype_T = torch.complex128
+    REAL = DTYPES_REAL[dtype_z]
+
+    z, z_j, vec_d, vec_d_j, T_hat_j, alpha_j, sp, sq = make_problem_T(
+        B=B, N=N, M=M, S=S, dtype_z=dtype_z, dtype_T=dtype_T, device=device
+    )
+
+    per = CPSFPeriodization()
+    offsets = per.window(N=N, W=1, device=device, sorted=False)
+    packs = _chunk_offsets_even(offsets, num_chunks=3)
+
+    z_g = z.clone().detach().requires_grad_(True)
+    z_j_g = z_j.clone().detach().requires_grad_(True)
+    vec_d_g = vec_d.clone().detach().requires_grad_(True)
+    vec_d_j_g = vec_d_j.clone().detach().requires_grad_(True)
+    T_hat_g = T_hat_j.clone().detach().requires_grad_(True)
+    alpha_g = alpha_j.detach().to(REAL).clone().requires_grad_(True)
+    sp_g = sp.detach().to(REAL).clone().requires_grad_(True)
+    sq_g = sq.detach().to(REAL).clone().requires_grad_(True)
+
+    def f_window(z_, z_j_, vd_, vdj_, That_, a_, sp_, sq_):
+        T = T_classic_window(z_, z_j_, vd_, vdj_, That_, a_, sp_, sq_, offsets)
+        return T.real.sum()
+
+    def f_full(z_, z_j_, vd_, vdj_, That_, a_, sp_, sq_):
+        T = T_classic_full(z_, z_j_, vd_, vdj_, That_, a_, sp_, sq_, packs)
+        return T.real.sum()
+
+    inputs = (z_g, z_j_g, vec_d_g, vec_d_j_g, T_hat_g, alpha_g, sp_g, sq_g)
+
+    gc_eps = 5e-6
+    gc_atol = 1e-6
+    gc_rtol = 1e-4
+
+    assert torch.autograd.gradcheck(
+        f_window, inputs, eps=gc_eps, atol=gc_atol, rtol=gc_rtol
+    )
+    assert torch.autograd.gradgradcheck(
+        f_window, inputs, eps=gc_eps, atol=gc_atol, rtol=gc_rtol
+    )
+
+    assert torch.autograd.gradcheck(
+        f_full, inputs, eps=gc_eps, atol=gc_atol, rtol=gc_rtol
+    )
+    assert torch.autograd.gradgradcheck(
+        f_full, inputs, eps=gc_eps, atol=gc_atol, rtol=gc_rtol
+    )
+
+
+# =========================
+# T19 — Tail stability: gradient decays with distance (farther shells)
+# =========================
+@pytest.mark.parametrize("device", [torch.device("cpu")])
+@pytest.mark.parametrize("N", NS)
+@pytest.mark.parametrize("dtype_z", DTYPES_C)
+@pytest.mark.parametrize("dtype_T", DTYPES_C)
+def test_T19_tail_gradient_decay(device, N, dtype_z, dtype_T):
+    B, M, S = 1, 3, 2
+
+    z, z_j, vec_d, vec_d_j, T_hat_j, alpha_j, sp, sq = make_problem_T(
+        B=B, N=N, M=M, S=S, dtype_z=dtype_z, dtype_T=dtype_T, device=device
+    )
+
+    if dtype_z == torch.complex64:
+        K_seq = [3, 5, 7]
+        slack = 5e-3
+        decay_min = 0.3
+    else:
+        K_seq = [3, 5, 7]
+        slack = 1e-8
+        decay_min = 0.2
+
+    def grad_norm_for_K(K):
+        offs = torch.zeros(1, 2 * N, dtype=torch.long, device=device)
+        offs[:, 0] = K
+        z_var = z.clone().detach().requires_grad_(True)
+        T = T_classic_window(z_var, z_j, vec_d, vec_d_j, T_hat_j, alpha_j, sp, sq, offs)
+        L = (T.conj() * T).real.sum()
+        (gz,) = torch.autograd.grad(
+            L, z_var, create_graph=False, retain_graph=False, allow_unused=False
+        )
+        return torch.linalg.vector_norm(gz).item()
+
+    G = [grad_norm_for_K(K) for K in K_seq]
+
+    tiny = 1e-30
+    for i in range(1, len(G)):
+        assert (
+            G[i] <= G[i - 1] * (1.0 + slack) + tiny
+        ), f"Gradient grew from K={K_seq[i-1]} to K={K_seq[i]}: {G[i-1]} -> {G[i]}"
+
+    if G[0] > 1e-20:
+        assert (
+            G[-1] <= G[0] * decay_min * (1.0 + slack) + tiny
+        ), f"Insufficient decay: G(K={K_seq[-1]})={G[-1]} vs G(K={K_seq[0]})={G[0]}"
+
+
+# =========================
 # Direct run help.
 # =========================
 if __name__ == "__main__":
