@@ -881,7 +881,7 @@ def cholesky_spd(
             raise ValueError(f"cholesky_spd: failed even with jitter: {e2}") from e2
 
 
-def Tau_nearest_INCORRECT(
+def Tau_nearest(
     z: torch.Tensor,
     z_j: torch.Tensor,
     vec_d: torch.Tensor,
@@ -929,6 +929,8 @@ def Tau_nearest_INCORRECT(
     - No intrinsic tail control (decision belongs to the router).
     """
 
+    raise NotImplementedError("Incorrect implementation. Invalidated.")
+
     r_dtype = z.real.dtype
     c_dtype = z.dtype
     dz = lift(z) - lift(z_j)
@@ -946,7 +948,7 @@ def Tau_nearest_INCORRECT(
     return T
 
 
-def Tau_dual_INCORRECT(
+def Tau_dual(
     z: torch.Tensor,
     z_j: torch.Tensor,
     vec_d: torch.Tensor,
@@ -1052,6 +1054,8 @@ def Tau_dual_INCORRECT(
         T_hat_j with real weights (alpha_j * eta_j).
 
     """
+
+    raise NotImplementedError("Incorrect implementation. Invalidated.")
 
     device = z.device
     c_dtype = z.dtype
