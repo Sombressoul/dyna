@@ -1254,6 +1254,9 @@ def T_classic_window(
     - Peak memory ~ O(M * O) due to temporary per-offset accumulation.
     """
 
+    B, M, N = vec_d_j.shape
+    vec_d = vec_d.unsqueeze(1).expand(B, M, N)
+
     eta_sum_j = psi_over_offsets(
         z=z,
         z_j=z_j,
@@ -1345,6 +1348,9 @@ def T_classic_full(
     -----
     - Peak memory ~ O(M * max_k O_k) since only the current pack is materialized.
     """
+
+    B, M, N = vec_d_j.shape
+    vec_d = vec_d.unsqueeze(1).expand(B, M, N)
 
     T_acc = torch.zeros_like(T_hat_j[..., 0, :])
     below_count = 0
