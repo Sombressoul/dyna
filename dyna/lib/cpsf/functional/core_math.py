@@ -1,7 +1,7 @@
 import torch
 import math
 
-from typing import Optional, Union
+from typing import Optional, Union, Iterable, Tuple
 
 
 def R(
@@ -1221,10 +1221,6 @@ def T_classic_window(
     T = (weight.unsqueeze(-1) * T_hat_j.to(c_dtype)).sum(dim=-2)
 
     return T
-
-
-from typing import Iterable, Tuple, Optional
-import torch
 
 
 def T_classic_full(
