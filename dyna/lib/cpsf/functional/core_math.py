@@ -1207,7 +1207,52 @@ def T_classic_window(
     R_j: Optional[torch.Tensor] = None,
     q_max: Optional[float] = None,
 ) -> torch.Tensor:
-    c_dtype = z.dtype
+    """
+    Classic CPSF field via WINDOW periodization (single-shot over a fixed offsets batch).
+
+    Purpose
+    -------
+    Computes T(z, vec_d) by summing psi over a finite complex-lattice window and
+    linearly combining with T_hat_j. Offsets are passed as a single fixed batch.
+
+    Shapes and Dtypes
+    -----------------
+    Let:
+    - B: batch dimension
+    - N: ambient dimension
+    - M: number of contributions (atoms)
+    - S: output channels / field dimension
+    - O: number of lattice offsets in the window
+
+    Required tensor shapes:
+    - z             : [B, N]            (complex)
+    - z_j           : [B, M, N]         (complex)
+    - vec_d         : [B, N]            (same dtype as z)
+    - vec_d_j       : [B, M, N]         (same dtype as z)
+    - T_hat_j       : [B, M, S]         (complex, contributes to final T)
+    - alpha_j       : [B, M]            (real)
+    - sigma_par     : [B, M]            (real; parallel scale)
+    - sigma_perp    : [B, M]            (real; perpendicular scale)
+    - offsets       : [O, 2N]           (LongTensor; integer lattice in Z^{2N};
+                                            first N columns -> real shifts, last N -> imaginary)
+    - R_j (opt)     : [B, M, N, N]      (dtype compatible with q())
+    - q_max (opt)   : float or None
+
+    Semantics
+    ---------
+    - Full complex periodization: both Re and Im parts are shifted using `offsets`
+    in Z^{2N} (handled inside `psi_over_offsets`).
+    - Row order of `offsets` is non-contractual; sorting affects only order, not coverage.
+    - One-shot vectorized execution over the provided window.
+
+    Returns
+    -------
+    T : [B, S] (complex, T_hat_j dtype)
+
+    Notes
+    -----
+    - Peak memory ~ O(M * O) due to temporary per-offset accumulation.
+    """
 
     eta_sum_j = psi_over_offsets(
         z=z,
@@ -1221,8 +1266,9 @@ def T_classic_window(
         q_max=q_max,
     )
 
-    weight = (alpha_j.to(eta_sum_j.real.dtype) * eta_sum_j.real).to(c_dtype)
-    T = (weight.unsqueeze(-1) * T_hat_j.to(c_dtype)).sum(dim=-2)
+    w = alpha_j.to(eta_sum_j.real.dtype) * eta_sum_j.real
+    w = w.to(T_hat_j.real.dtype)
+    T = (w.unsqueeze(-1).to(T_hat_j.dtype) * T_hat_j).sum(dim=-2)
 
     return T
 
@@ -1243,12 +1289,66 @@ def T_classic_full(
     tol_rel: Optional[float] = None,
     consecutive_below: int = 1,
 ) -> torch.Tensor:
-    c_dtype = z.dtype
-    device = z.device
+    """
+    Classic CPSF field via FULL periodization (streaming over packed offset batches).
 
-    T_acc = torch.zeros_like(T_hat_j[..., 0, :].to(c_dtype))
+    Purpose
+    -------
+    Streams complex-lattice offsets in packs and accumulates T(z, vec_d) incrementally;
+    optionally applies early stopping by absolute/relative tolerances.
+
+    Shapes and Dtypes
+    -----------------
+    Let:
+    - B: batch dimension
+    - N: ambient dimension
+    - M: number of contributions (atoms)
+    - S: output channels / field dimension
+    - O_k: number of lattice offsets in the k-th pack
+
+    Required tensor shapes:
+    - z             : [B, N]            (complex)
+    - z_j           : [B, M, N]         (complex)
+    - vec_d         : [B, N]            (same dtype as z)
+    - vec_d_j       : [B, M, N]         (same dtype as z)
+    - T_hat_j       : [B, M, S]         (complex, contributes to final T)
+    - alpha_j       : [B, M]            (real)
+    - sigma_par     : [B, M]            (real; parallel scale)
+    - sigma_perp    : [B, M]            (real; perpendicular scale)
+    - packs         : Iterable of (meta_a: int, meta_b: int, offsets_2N: LongTensor),
+                    where offsets_2N has shape [O_k, 2N] and encodes integer lattice
+                    in Z^{2N}; first N columns -> real shifts, last N -> imaginary.
+                    The two integers are opaque pack metadata and are not used here.
+    - R_j (opt)     : [B, M, N, N]      (dtype compatible with q())
+    - q_max (opt)   : float or None
+    - tol_abs (opt) : float or None
+    - tol_rel (opt) : float or None
+    - consecutive_below : int >= 1
+
+    Semantics
+    ---------
+    - Full complex periodization: both Re and Im parts are shifted using offsets_2N
+    in Z^{2N} (handled inside `psi_over_offsets`).
+    - Streaming reduction: per-pack contribution is immediately accumulated into T_acc.
+    - Early stopping: if the pack max-norm is below tol_abs or below
+    tol_rel * (accumulated max-norm), a consecutive-below counter is increased;
+    once it reaches `consecutive_below`, streaming stops.
+    - Row order inside each offsets_2N is non-contractual; sorting affects only order.
+    - No assumptions about pack order; effectiveness of early stopping depends on
+    how packs are arranged upstream.
+
+    Returns
+    -------
+    T : [B, S] (complex, T_hat_j dtype)
+
+    Notes
+    -----
+    - Peak memory ~ O(M * max_k O_k) since only the current pack is materialized.
+    """
+
+    T_acc = torch.zeros_like(T_hat_j[..., 0, :])
     below_count = 0
-    accum_norm = torch.tensor(0.0, device=device, dtype=z.real.dtype)
+    accum_norm = torch.tensor(0.0, device=T_hat_j.device, dtype=T_hat_j.real.dtype)
 
     for _, _, offsets_2N in packs:
         eta_sum_j = psi_over_offsets(
@@ -1263,8 +1363,9 @@ def T_classic_full(
             q_max=q_max,
         )
 
-        weight_pack = (alpha_j.to(eta_sum_j.real.dtype) * eta_sum_j.real).to(c_dtype)
-        T_pack = (weight_pack.unsqueeze(-1) * T_hat_j.to(c_dtype)).sum(dim=-2)
+        w = alpha_j.to(eta_sum_j.real.dtype) * eta_sum_j.real
+        w = w.to(T_hat_j.real.dtype)
+        T_pack = (w.unsqueeze(-1).to(T_hat_j.dtype) * T_hat_j).sum(dim=-2)
         T_acc = T_acc + T_pack
 
         if (tol_abs is None) and (tol_rel is None):
@@ -1275,11 +1376,11 @@ def T_classic_full(
 
         cond_abs = (tol_abs is not None) and (
             shell_norm
-            <= torch.as_tensor(tol_abs, device=device, dtype=shell_norm.dtype)
+            <= torch.as_tensor(tol_abs, device=T_hat_j.device, dtype=shell_norm.dtype)
         )
         cond_rel = (tol_rel is not None) and (
             shell_norm
-            <= torch.as_tensor(tol_rel, device=device, dtype=shell_norm.dtype)
+            <= torch.as_tensor(tol_rel, device=T_hat_j.device, dtype=shell_norm.dtype)
             * (accum_norm + 1e-30)
         )
 
