@@ -1,8 +1,7 @@
 import torch
 
-from typing import Optional, Union
+from typing import Optional, Union, Iterable, Tuple
 
-from dyna.lib.cpsf.structures import CPSFPsiOffsetsIterator
 from dyna.lib.cpsf.functional.core_math import (
     # CPSF core math
     delta_vec_d,
@@ -221,7 +220,7 @@ class CPSFCore:
         alpha_j: torch.Tensor,
         sigma_par: torch.Tensor,
         sigma_perp: torch.Tensor,
-        offsets_iterator: CPSFPsiOffsetsIterator,
+        offsets: torch.Tensor,
         R_j: Optional[torch.Tensor] = None,
         q_max: Optional[float] = None,
     ) -> torch.Tensor:
@@ -234,7 +233,7 @@ class CPSFCore:
             alpha_j=alpha_j,
             sigma_par=sigma_par,
             sigma_perp=sigma_perp,
-            offsets_iterator=offsets_iterator,
+            offsets=offsets,
             R_j=R_j,
             q_max=q_max,
         )
@@ -249,7 +248,7 @@ class CPSFCore:
         alpha_j: torch.Tensor,
         sigma_par: torch.Tensor,
         sigma_perp: torch.Tensor,
-        offsets_iterator: CPSFPsiOffsetsIterator,
+        packs: Iterable[Tuple[int, int, torch.Tensor]],
         R_j: Optional[torch.Tensor] = None,
         q_max: Optional[float] = None,
         tol_abs: Optional[float] = None,
@@ -265,7 +264,7 @@ class CPSFCore:
             alpha_j=alpha_j,
             sigma_par=sigma_par,
             sigma_perp=sigma_perp,
-            offsets_iterator=offsets_iterator,
+            packs=packs,
             R_j=R_j,
             q_max=q_max,
             tol_abs=tol_abs,

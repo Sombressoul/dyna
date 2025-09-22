@@ -3,8 +3,6 @@ import math
 
 from typing import Optional, Union
 
-from dyna.lib.cpsf.structures import CPSFPsiOffsetsIterator
-
 
 def R(
     vec_d: torch.Tensor,
@@ -883,7 +881,7 @@ def cholesky_spd(
             raise ValueError(f"cholesky_spd: failed even with jitter: {e2}") from e2
 
 
-def Tau_nearest(
+def Tau_nearest_INCORRECT(
     z: torch.Tensor,
     z_j: torch.Tensor,
     vec_d: torch.Tensor,
@@ -896,6 +894,8 @@ def Tau_nearest(
     q_max: Optional[float] = None,
 ) -> torch.Tensor:
     """
+    # INCORRECT, NON-CANONICAL IMPLEMENTATION!
+
     Tau backend: nearest-image approximation.
 
     What it does
@@ -946,7 +946,7 @@ def Tau_nearest(
     return T
 
 
-def Tau_dual(
+def Tau_dual_INCORRECT(
     z: torch.Tensor,
     z_j: torch.Tensor,
     vec_d: torch.Tensor,
@@ -959,6 +959,8 @@ def Tau_dual(
     R_j: Optional[torch.Tensor] = None,
 ) -> torch.Tensor:
     """
+    # INCORRECT, NON-CANONICAL IMPLEMENTATION!
+
     Tau backend: dual (Poisson) summation over integer frequencies, with complex
     spectral coordinates support (handles Im(z)).
 
@@ -1171,7 +1173,7 @@ def psi_over_offsets(
 
     dz_re = dz.real.unsqueeze(-2) + n_r.unsqueeze(-3)
     dz_im = dz.imag.unsqueeze(-2) + n_i.unsqueeze(-3)
-    dzb   = torch.complex(dz_re, dz_im)
+    dzb = torch.complex(dz_re, dz_im)
 
     dd_b = dd.unsqueeze(-2).expand_as(dzb)
     w = iota(dzb, dd_b)
@@ -1197,44 +1199,12 @@ def T_classic_window(
     alpha_j: torch.Tensor,
     sigma_par: torch.Tensor,
     sigma_perp: torch.Tensor,
-    offsets_iterator: CPSFPsiOffsetsIterator,
+    offsets: torch.Tensor,
     R_j: Optional[torch.Tensor] = None,
     q_max: Optional[float] = None,
 ) -> torch.Tensor:
-    """
-    Classic CPSF field via WINDOW periodization (single-batch offsets).
+    c_dtype = z.dtype
 
-    What it does
-    ------------
-    - Obtains exactly one batch of integer offsets [O, N] from offsets_iterator
-    (e.g. produced by CPSFPeriodization(kind=WINDOW)).
-    - Calls psi_over_offsets to sum eta over the window and aggregates
-    T(z, vec_d) = sum_j (alpha_j * eta_j) * T_hat_j.
-
-    Where it is used
-    ----------------
-    - Small-to-moderate N and window radius W so the full cube |n|_inf <= W
-    fits into one vectorized pass.
-
-    Why no runtime checks here
-    --------------------------
-    - Iterator discipline (exactly one batch) and input validations are handled
-    by the router; this function assumes canonical inputs.
-
-    Strengths
-    ---------
-    - One-shot execution; maximum vectorization; minimal Python overhead.
-    - Accurate for the provided window.
-
-    Weaknesses
-    ----------
-    - Peak memory ~ O(M * O) with O = (2W+1)^N due to temporary eta[..., M, O].
-    - Accuracy depends on W: tails outside the window are truncated.
-    Prefer FULL when you need robust tail control.
-    """
-
-    N = z.shape[-1]
-    device = z.device
     eta_sum_j = psi_over_offsets(
         z=z,
         z_j=z_j,
@@ -1242,16 +1212,19 @@ def T_classic_window(
         vec_d_j=vec_d_j,
         sigma_par=sigma_par,
         sigma_perp=sigma_perp,
-        offsets=next(offsets_iterator(N=N, device=device)),
+        offsets=offsets,
         R_j=R_j,
         q_max=q_max,
     )
-    c_dtype = z.dtype
+
     weight = (alpha_j.to(eta_sum_j.real.dtype) * eta_sum_j.real).to(c_dtype)
-    weight = weight.unsqueeze(-1)
-    T = (weight * T_hat_j.to(c_dtype)).sum(dim=-2)
+    T = (weight.unsqueeze(-1) * T_hat_j.to(c_dtype)).sum(dim=-2)
 
     return T
+
+
+from typing import Iterable, Tuple, Optional
+import torch
 
 
 def T_classic_full(
@@ -1263,56 +1236,21 @@ def T_classic_full(
     alpha_j: torch.Tensor,
     sigma_par: torch.Tensor,
     sigma_perp: torch.Tensor,
-    offsets_iterator: CPSFPsiOffsetsIterator,
+    packs: Iterable[Tuple[int, int, torch.Tensor]],
     R_j: Optional[torch.Tensor] = None,
     q_max: Optional[float] = None,
     tol_abs: Optional[float] = None,
     tol_rel: Optional[float] = None,
     consecutive_below: int = 1,
 ) -> torch.Tensor:
-    """
-    Classic CPSF field via FULL periodization (streaming over shells).
-
-    What it does
-    ------------
-    - Streams successive infinity-norm shells ||n||_inf = W from offsets_iterator
-    (e.g. CPSFPeriodization(kind=FULL)).
-    - For each shell, computes and immediately reduces psi_over_offsets.
-    - Optionally applies early stopping via tol_abs / tol_rel when the shell
-    contribution becomes negligible.
-    - Returns accumulated T(z, vec_d).
-
-    Where it is used
-    ----------------
-    - Default robust classic backend when window size is unknown or large,
-    memory is tight, or evaluation is near torus boundaries.
-
-    Why no runtime checks here
-    --------------------------
-    - The router validates iterator semantics and parameters; this function
-    focuses on lean streaming accumulation.
-
-    Strengths
-    ---------
-    - No thick materialization: peak memory ~ O(M * O_W) for the current shell.
-    - Natural place for tolerance-based early stop; robust near boundaries.
-    - Works uniformly across configurations (safe fallback).
-
-    Weaknesses
-    ----------
-    - Runtime grows with the number of shells; in high dimensions shell size
-    grows roughly as (2W+1)^N - (2W-1)^N ~ O(W^(N-1)).
-    - Needs a meaningful tol_* or a finite max_radius to avoid oversumming.
-    """
-
-    N = z.shape[-1]
-    device = z.device
     c_dtype = z.dtype
+    device = z.device
+
     T_acc = torch.zeros_like(T_hat_j[..., 0, :].to(c_dtype))
     below_count = 0
     accum_norm = torch.tensor(0.0, device=device, dtype=z.real.dtype)
 
-    for offsets in offsets_iterator(N=N, device=device):
+    for _, _, offsets_2N in packs:
         eta_sum_j = psi_over_offsets(
             z=z,
             z_j=z_j,
@@ -1320,36 +1258,36 @@ def T_classic_full(
             vec_d_j=vec_d_j,
             sigma_par=sigma_par,
             sigma_perp=sigma_perp,
-            offsets=offsets,
+            offsets=offsets_2N,
             R_j=R_j,
             q_max=q_max,
         )
 
-        weight_shell = (alpha_j.to(eta_sum_j.real.dtype) * eta_sum_j.real).to(c_dtype)
-        T_shell = (weight_shell.unsqueeze(-1) * T_hat_j.to(c_dtype)).sum(dim=-2)
-        T_acc = T_acc + T_shell
+        weight_pack = (alpha_j.to(eta_sum_j.real.dtype) * eta_sum_j.real).to(c_dtype)
+        T_pack = (weight_pack.unsqueeze(-1) * T_hat_j.to(c_dtype)).sum(dim=-2)
+        T_acc = T_acc + T_pack
 
-        if tol_abs is None and tol_rel is None:
+        if (tol_abs is None) and (tol_rel is None):
             continue
 
-        shell_norm = T_shell.abs().max()
+        shell_norm = T_pack.abs().max()
         accum_norm = torch.maximum(accum_norm, T_acc.abs().max())
+
         cond_abs = (tol_abs is not None) and (
             shell_norm
             <= torch.as_tensor(tol_abs, device=device, dtype=shell_norm.dtype)
         )
         cond_rel = (tol_rel is not None) and (
             shell_norm
-            <= (
-                torch.as_tensor(tol_rel, device=device, dtype=shell_norm.dtype)
-                * (accum_norm + 1e-30)
-            )
+            <= torch.as_tensor(tol_rel, device=device, dtype=shell_norm.dtype)
+            * (accum_norm + 1e-30)
         )
 
         if cond_abs or cond_rel:
             below_count += 1
         else:
             below_count = 0
+
         if below_count >= consecutive_below:
             break
 
