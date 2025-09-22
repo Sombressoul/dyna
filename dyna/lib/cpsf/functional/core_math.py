@@ -1255,6 +1255,7 @@ def T_classic_window(
     """
 
     B, M, N = vec_d_j.shape
+    z = z.unsqueeze(1).expand(B, M, N)
     vec_d = vec_d.unsqueeze(1).expand(B, M, N)
 
     eta_sum_j = psi_over_offsets(
@@ -1350,6 +1351,7 @@ def T_classic_full(
     """
 
     B, M, N = vec_d_j.shape
+    z = z.unsqueeze(1).expand(B, M, N)
     vec_d = vec_d.unsqueeze(1).expand(B, M, N)
 
     T_acc = torch.zeros_like(T_hat_j[..., 0, :])
