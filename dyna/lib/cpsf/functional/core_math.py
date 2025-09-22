@@ -1349,6 +1349,11 @@ def T_classic_full(
     T_acc = torch.zeros_like(T_hat_j[..., 0, :])
     below_count = 0
     accum_norm = torch.tensor(0.0, device=T_hat_j.device, dtype=T_hat_j.real.dtype)
+    tiny = torch.as_tensor(
+        torch.finfo(T_hat_j.dtype).tiny,
+        device=T_hat_j.device,
+        dtype=T_hat_j.real.dtype,
+    )
 
     for _, _, offsets_2N in packs:
         eta_sum_j = psi_over_offsets(
@@ -1381,7 +1386,7 @@ def T_classic_full(
         cond_rel = (tol_rel is not None) and (
             shell_norm
             <= torch.as_tensor(tol_rel, device=T_hat_j.device, dtype=shell_norm.dtype)
-            * (accum_norm + 1e-30)
+            * (accum_norm + tiny)
         )
 
         if cond_abs or cond_rel:
