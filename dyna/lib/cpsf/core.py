@@ -16,8 +16,6 @@ from dyna.lib.cpsf.functional.core_math import (
     psi_over_offsets,
     T_classic_full,
     T_classic_window,
-    Tau_nearest,
-    Tau_dual,
     # Math helpers
     cholesky_spd,
     hermitianize,
@@ -132,58 +130,6 @@ class CPSFCore:
             A=A,
             eps=eps,
             use_jitter=use_jitter,
-        )
-
-    def Tau_nearest(
-        self,
-        z: torch.Tensor,
-        z_j: torch.Tensor,
-        vec_d: torch.Tensor,
-        vec_d_j: torch.Tensor,
-        T_hat_j: torch.Tensor,
-        alpha_j: torch.Tensor,
-        sigma_par: torch.Tensor,
-        sigma_perp: torch.Tensor,
-        R_j: Optional[torch.Tensor] = None,
-        q_max: Optional[float] = None,
-    ) -> torch.Tensor:
-        return Tau_nearest(
-            z=z,
-            z_j=z_j,
-            vec_d=vec_d,
-            vec_d_j=vec_d_j,
-            T_hat_j=T_hat_j,
-            alpha_j=alpha_j,
-            sigma_par=sigma_par,
-            sigma_perp=sigma_perp,
-            R_j=R_j,
-            q_max=q_max,
-        )
-
-    def Tau_dual(
-        self,
-        z: torch.Tensor,
-        z_j: torch.Tensor,
-        vec_d: torch.Tensor,
-        vec_d_j: torch.Tensor,
-        T_hat_j: torch.Tensor,
-        alpha_j: torch.Tensor,
-        sigma_par: torch.Tensor,
-        sigma_perp: torch.Tensor,
-        k: torch.Tensor,
-        R_j: Optional[torch.Tensor] = None,
-    ) -> torch.Tensor:
-        return Tau_dual(
-            z=z,
-            z_j=z_j,
-            vec_d=vec_d,
-            vec_d_j=vec_d_j,
-            T_hat_j=T_hat_j,
-            alpha_j=alpha_j,
-            sigma_par=sigma_par,
-            sigma_perp=sigma_perp,
-            k=k,
-            R_j=R_j,
         )
 
     def psi_over_offsets(

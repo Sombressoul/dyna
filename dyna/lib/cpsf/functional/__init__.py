@@ -15,8 +15,6 @@ from dyna.lib.cpsf.functional.core_math import (
     Sigma,
     T_classic_full,
     T_classic_window,
-    Tau_dual,
-    Tau_nearest,
     # Math helpers
     hermitianize,
     cholesky_spd,
@@ -37,8 +35,6 @@ __all__ = [
     "Sigma",
     "T_classic_full",
     "T_classic_window",
-    "Tau_dual",
-    "Tau_nearest",
     # Stand-alone backend(s)
     "T_PHC_Fused",
     "T_PHC_Batched",

@@ -133,7 +133,7 @@ class CPSFModule:
         active_overlay = storage_flags.active_overlay
 
         # TODO: Implement CPSFRouter to route contributions between T-field reading
-        #       backends (T_classic_full, T_classic_window, Tau_dual and Tau_nearest).
+        #       backends (T_classic_full, T_classic_window, other...).
 
         raise NotImplementedError("TODO")
 
