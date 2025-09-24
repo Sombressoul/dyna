@@ -26,6 +26,85 @@ def T_PD_window(
     t: float = 1.0,  # Poisson/Ewald scale, for any t>0 - exact
     R_j: Optional[torch.Tensor] = None,
 ) -> torch.Tensor:
+    """
+    CPSF field via Poisson-dual (PD) WINDOW over k-modes (single-shot fixed batch).
+
+    Purpose
+    -------
+    Computes T(z, vec_d) using the Poisson-dual representation of the positional
+    lattice sum and a closed-form directional Gaussian factor. Offsets are k-modes
+    in Z^{2N} passed as a single fixed batch. The scale t>0 is the Poisson/Ewald
+    parameter (the infinite sum is t-invariant; with a finite window, t trades off
+    decay between real/dual sides).
+
+    Shapes and Dtypes
+    -----------------
+    Let:
+    - B: batch dimension
+    - N: ambient dimension
+    - M: number of contributions (atoms)
+    - S: output channels / field dimension
+    - O: number of dual k-modes in the window
+
+    Required tensor shapes:
+    - z             : [B, N]            (complex)
+    - z_j           : [B, M, N]         (complex)
+    - vec_d         : [B, N]            (same dtype as z)
+    - vec_d_j       : [B, M, N]         (same dtype as z)
+    - T_hat_j       : [B, M, S]         (complex, contributes to final T)
+    - alpha_j       : [B, M]            (real)
+    - sigma_par     : [B, M]            (real; parallel scale)
+    - sigma_perp    : [B, M]            (real; perpendicular scale)
+    - offsets       : [O, 2N]           (LongTensor; integer k in Z^{2N};
+                                         first N columns -> real part, last N -> imag)
+    - R_j (opt)     : [B, M, N, N]      (dtype compatible with q())
+    - t (opt)       : float > 0         (Poisson/Ewald scale)
+
+    Semantics
+    ---------
+    - Only the positional block is periodized/summed. The directional block is NOT
+      periodized; it contributes a multiplicative Gaussian factor:
+
+        C_dir = exp(-pi * q([0, delta_vec_d]))
+        with Sigma built from (sigma_par, sigma_perp) and R_ext(R(vec_d_j)).
+
+    - Positional sum is evaluated in the dual (k) domain:
+
+        y = R(vec_d_j)^H * k  (complex N-vector per k),
+        quad_k = sigma_perp * sum(|y_i|^2) + (sigma_par - sigma_perp) * |y_0|^2,
+        phase = exp(2*pi*i * k dot frac(delta_z)),
+        Theta_pos = (sigma_par * sigma_perp^(N-1) / t^N) * sum_k exp(-(pi/t)*quad_k) * phase.
+
+        Here frac(delta_z) is taken componentwise on the unit torus.
+
+    - The contribution is eta_j = C_dir * Theta_pos; the field is
+
+        T = sum_j (alpha_j * Re(eta_j)) * T_hat_j.
+
+    - Row order of `offsets` is non-contractual; sorting changes only order, not coverage.
+      Execution is one-shot vectorized over the provided k-window.
+
+    Returns
+    -------
+    T : [B, S] (complex, same dtype as T_hat_j)
+
+    Notes
+    -----
+    - Exact w.r.t. the infinite lattice for any t>0. With a finite k-window, accuracy
+      depends on the window size and t (standard Ewald trade-off).
+    - Peak memory ~ O(B * M * O) due to per-k accumulation.
+
+    Implements:
+    -----------
+    $$
+    \eta_j(z,\vec d)=\underbrace{e^{-\pi\,\delta d^\dagger A_{\rm dir}\,\delta d}}_{C_{\rm dir}}
+    \cdot
+    \underbrace{\frac{1}{t^{N}\sqrt{\det_{\mathbb R} A_{\rm pos}}}
+    \sum_{k\in\mathbb Z^{2N}} e^{-\pi\,k^\top A_{\rm pos}^{-1}k/t}\,e^{2\pi i\,k\cdot b_{\rm pos}}}_{\Theta^{(\mathrm{pos})}(t,b_{\rm pos})},
+    $$
+
+    with $\frac{1}{\sqrt{\det_{\mathbb R} A_{\rm pos}}}=\det_{\mathbb C}(\Sigma_{\rm pos})=\sigma_\parallel\sigma_\perp^{N-1}$.
+    """
     if t <= 0.0:
         raise ValueError("T_PD_window: t must be > 0.")
 
