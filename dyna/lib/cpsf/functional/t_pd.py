@@ -1,6 +1,6 @@
 import torch, math
 
-from typing import Optional
+from typing import Optional, Iterable, Tuple
 
 from dyna.lib.cpsf.functional.core_math import (
     lift,
@@ -93,17 +93,6 @@ def T_PD_window(
     - Exact w.r.t. the infinite lattice for any t>0. With a finite k-window, accuracy
       depends on the window size and t (standard Ewald trade-off).
     - Peak memory ~ O(B * M * O) due to per-k accumulation.
-
-    Implements:
-    -----------
-    $$
-    \eta_j(z,\vec d)=\underbrace{e^{-\pi\,\delta d^\dagger A_{\rm dir}\,\delta d}}_{C_{\rm dir}}
-    \cdot
-    \underbrace{\frac{1}{t^{N}\sqrt{\det_{\mathbb R} A_{\rm pos}}}
-    \sum_{k\in\mathbb Z^{2N}} e^{-\pi\,k^\top A_{\rm pos}^{-1}k/t}\,e^{2\pi i\,k\cdot b_{\rm pos}}}_{\Theta^{(\mathrm{pos})}(t,b_{\rm pos})},
-    $$
-
-    with $\frac{1}{\sqrt{\det_{\mathbb R} A_{\rm pos}}}=\det_{\mathbb C}(\Sigma_{\rm pos})=\sigma_\parallel\sigma_\perp^{N-1}$.
     """
     if t <= 0.0:
         raise ValueError("T_PD_window: t must be > 0.")
@@ -177,3 +166,117 @@ def T_PD_window(
     T_out = T.sum(dim=1)  # [B,S]
 
     return T_out
+
+
+def T_PD_full(
+    *,
+    z: torch.Tensor,
+    z_j: torch.Tensor,
+    vec_d: torch.Tensor,
+    vec_d_j: torch.Tensor,
+    T_hat_j: torch.Tensor,
+    alpha_j: torch.Tensor,
+    sigma_par: torch.Tensor,
+    sigma_perp: torch.Tensor,
+    packs: Iterable[Tuple[int, int, torch.Tensor]],
+    R_j: Optional[torch.Tensor] = None,
+    t: float = 1.0,
+    tol_abs: Optional[float] = None,
+    tol_rel: Optional[float] = None,
+    consecutive_below: int = 1,
+) -> torch.Tensor:
+    if t <= 0.0:
+        raise ValueError("T_PD_full: t must be > 0.")
+
+    device = z.device
+    r_dtype = z.real.dtype
+    B, M, N = vec_d_j.shape
+
+    # Broadcast inputs
+    z = z.unsqueeze(1).expand(B, M, N)
+    vec_d = vec_d.unsqueeze(1).expand(B, M, N)
+
+    # Geometric deltas
+    dz = lift(z) - lift(z_j)  # [B,M,N] complex
+    dd = delta_vec_d(vec_d, vec_d_j)  # [B,M,N] complex
+
+    # Frames
+    Rmat = R(vec_d_j) if R_j is None else R_j  # [B,M,N,N]
+    RH = Rmat.conj().transpose(-2, -1)  # [B,M,N,N]
+    Rext = R_ext(Rmat)
+
+    # Const
+    pi = torch.tensor(math.pi, dtype=r_dtype, device=device)
+
+    # Directional Gaussian (no lattice in dir)
+    zeros_u = torch.zeros_like(dd)  # [B,M,N]
+    w_dir = iota(zeros_u, dd)  # [B,M,N]
+    q_dir = q(w=w_dir, R_ext=Rext, sigma_par=sigma_par, sigma_perp=sigma_perp)  # [B,M]
+    C_dir_j = torch.exp(-pi * q_dir)  # [B,M]
+
+    # Phase base (torus fractional coords)
+    dz_re_frac = torch.remainder(dz.real, 1.0)  # [B,M,N]
+    dz_im_frac = torch.remainder(dz.imag, 1.0)  # [B,M,N]
+
+    # Prefactor (complex-N convention): det_C(Sigma_pos) / t^N
+    prefac = (sigma_par * (sigma_perp ** (N - 1))) / (t**N)  # [B,M], no sqrt
+
+    # Accumulators
+    T_acc = torch.zeros(B, T_hat_j.shape[-1], dtype=T_hat_j.dtype, device=device)
+    below = 0
+
+    # Early stopping flags
+    use_abs = tol_abs is not None
+    use_rel = (tol_rel is not None) and (tol_rel >= 0.0)
+
+    for _, _, offsets in packs:
+        # k on Z^{2N}
+        k_r = offsets[:, :N].to(device=device, dtype=r_dtype)  # [O,N]
+        k_i = offsets[:, N:].to(device=device, dtype=r_dtype)  # [O,N]
+        k_c = torch.complex(k_r, k_i)  # [O,N]
+
+        # Dual quadratic form: k^T A_pos^{-1} k = sigma_perp*||y||^2 + (sigma_par-sigma_perp)*|y_0|^2
+        # where y = R^H k
+        y = torch.einsum("bmnk,ok->bmon", RH, k_c)  # [B,M,O,N]
+        y_abs2 = (y.real**2) + (y.imag**2)
+        s = y_abs2.sum(dim=-1)  # [B,M,O]
+        p_abs2 = y_abs2[..., 0]  # [B,M,O]
+        quad_k = (sigma_perp.unsqueeze(-1) * s) + (
+            (sigma_par - sigma_perp).unsqueeze(-1) * p_abs2
+        )  # [B,M,O]
+
+        # Phase: exp(2π i k · frac(dz))
+        dot = (k_r.unsqueeze(0).unsqueeze(0) * dz_re_frac.unsqueeze(2)).sum(dim=-1) + (
+            k_i.unsqueeze(0).unsqueeze(0) * dz_im_frac.unsqueeze(2)
+        ).sum(
+            dim=-1
+        )  # [B,M,O]
+        ang = (2.0 * pi).to(dot.dtype) * dot
+        phase = torch.polar(torch.ones_like(ang), ang)  # [B,M,O] complex (unit modulus)
+
+        # Weight and per-pack positional theta contribution
+        weight = torch.exp(-(pi / t) * quad_k) * phase  # [B,M,O]
+        Theta_pos_pack = (prefac.unsqueeze(-1) * weight).sum(dim=-1)  # [B,M] complex
+
+        # eta_j contribution from this pack
+        eta_pack = (C_dir_j * Theta_pos_pack).real.to(T_hat_j.real.dtype)  # [B,M]
+        w = (alpha_j.to(T_hat_j.real.dtype) * eta_pack).unsqueeze(-1)  # [B,M,1]
+        T_delta = (w * T_hat_j).sum(dim=1)  # [B,S] complex
+
+        # Accumulate
+        T_acc = T_acc + T_delta
+
+        # Early stopping bookkeeping
+        if use_abs or use_rel:
+            pack_max = T_delta.abs().amax().item()
+            acc_max = T_acc.abs().amax().item()
+            below_abs = use_abs and (pack_max <= tol_abs)
+            below_rel = use_rel and (acc_max > 0.0) and (pack_max <= tol_rel * acc_max)
+            if below_abs or below_rel:
+                below += 1
+                if below >= consecutive_below:
+                    break
+            else:
+                below = 0
+
+    return T_acc
