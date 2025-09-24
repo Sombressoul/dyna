@@ -1,15 +1,23 @@
 # Run as (example):
 # > pytest -q dyna/lib/cpsf/pytest/test_CPSF_T_PD.py
 
+import math
 import torch
 import pytest
 from typing import Tuple, List
 
 from dyna.lib.cpsf.functional.core_math import (
-    T_classic_full,
     psi_over_offsets,
+    R,
+    R_ext,
+    iota,
+    delta_vec_d,
+    q,
 )
-from dyna.lib.cpsf.functional.t_pd import T_PD_window
+from dyna.lib.cpsf.functional.t_pd import (
+    T_PD_window,
+    T_PD_full,
+)
 from dyna.lib.cpsf.periodization import CPSFPeriodization
 
 
@@ -229,8 +237,28 @@ def test_T1_joint_integer_shift_invariance(device, N, dtype_z, dtype_T):
     assert T0_w.dtype == dtype_T and T1_w.dtype == dtype_T
     assert torch.allclose(T0_w, T1_w, rtol=rtol, atol=atol)
 
-    T0_f = T_classic_full(z, z_j, vec_d, vec_d_j, T_hat_j, alpha_j, sp, sq, packs)
-    T1_f = T_classic_full(z_s, zjs, vec_d, vec_d_j, T_hat_j, alpha_j, sp, sq, packs)
+    T0_f = T_PD_full(
+        z=z,
+        z_j=z_j,
+        vec_d=vec_d,
+        vec_d_j=vec_d_j,
+        T_hat_j=T_hat_j,
+        alpha_j=alpha_j,
+        sigma_par=sp,
+        sigma_perp=sq,
+        packs=packs,
+    )
+    T1_f = T_PD_full(
+        z=z_s,
+        z_j=zjs,
+        vec_d=vec_d,
+        vec_d_j=vec_d_j,
+        T_hat_j=T_hat_j,
+        alpha_j=alpha_j,
+        sigma_par=sp,
+        sigma_perp=sq,
+        packs=packs,
+    )
     assert T0_f.dtype == dtype_T and T1_f.dtype == dtype_T
     assert torch.allclose(T0_f, T1_f, rtol=rtol, atol=atol)
 
@@ -301,8 +329,28 @@ def test_T2_offsets_require_imag_part(device, N, dtype_z, dtype_T):
             (a, b, torch.cat([off[:, :N], torch.zeros_like(off[:, :N])], dim=-1))
         )
 
-    T_fullZ_F = T_classic_full(z, z_j, vec_d, vec_d_j, T_hat_j, alpha_j, sp, sq, packs)
-    T_reZ_F = T_classic_full(z, z_j, vec_d, vec_d_j, T_hat_j, alpha_j, sp, sq, packs_re)
+    T_fullZ_F = T_PD_full(
+        z=z,
+        z_j=z_j,
+        vec_d=vec_d,
+        vec_d_j=vec_d_j,
+        T_hat_j=T_hat_j,
+        alpha_j=alpha_j,
+        sigma_par=sp,
+        sigma_perp=sq,
+        packs=packs,
+    )
+    T_reZ_F = T_PD_full(
+        z=z,
+        z_j=z_j,
+        vec_d=vec_d,
+        vec_d_j=vec_d_j,
+        T_hat_j=T_hat_j,
+        alpha_j=alpha_j,
+        sigma_par=sp,
+        sigma_perp=sq,
+        packs=packs_re,
+    )
     assert T_fullZ_F.dtype == dtype_T and T_reZ_F.dtype == dtype_T
     assert not torch.allclose(
         T_fullZ_F, T_reZ_F, rtol=rtol, atol=atol
@@ -417,7 +465,17 @@ def test_T4_window_full_identity_same_offsets(device, N, dtype_z, dtype_T):
         sigma_perp=sq,
         offsets=offsets,
     )
-    T_full = T_classic_full(z, z_j, vec_d, vec_d_j, T_hat_j, alpha_j, sp, sq, packs)
+    T_full = T_PD_full(
+        z=z,
+        z_j=z_j,
+        vec_d=vec_d,
+        vec_d_j=vec_d_j,
+        T_hat_j=T_hat_j,
+        alpha_j=alpha_j,
+        sigma_par=sp,
+        sigma_perp=sq,
+        packs=packs,
+    )
 
     assert T_win.shape == (B, S) and T_full.shape == (B, S)
     assert T_win.dtype == dtype_T and T_full.dtype == dtype_T
@@ -568,7 +626,7 @@ def test_T6_full_early_stop_semantics(device, N, dtype_z, dtype_T, mode):
                 break
         assert stop_idx is not None, "Early stop must trigger with chosen tol_abs"
 
-        T_full = T_classic_full(
+        T_full = T_PD_full(
             z=z,
             z_j=z_j,
             vec_d=vec_d,
@@ -579,7 +637,6 @@ def test_T6_full_early_stop_semantics(device, N, dtype_z, dtype_T, mode):
             sigma_perp=sq,
             packs=packs,
             R_j=None,
-            q_max=None,
             tol_abs=tol_abs,
             tol_rel=None,
             consecutive_below=consecutive_below,
@@ -623,7 +680,7 @@ def test_T6_full_early_stop_semantics(device, N, dtype_z, dtype_T, mode):
                 break
         assert stop_idx is not None, "Early stop must trigger with chosen tol_rel"
 
-        T_full = T_classic_full(
+        T_full = T_PD_full(
             z=z,
             z_j=z_j,
             vec_d=vec_d,
@@ -634,7 +691,6 @@ def test_T6_full_early_stop_semantics(device, N, dtype_z, dtype_T, mode):
             sigma_perp=sq,
             packs=packs,
             R_j=None,
-            q_max=None,
             tol_abs=None,
             tol_rel=tol_rel,
             consecutive_below=consecutive_below,
@@ -687,7 +743,7 @@ def test_T7_full_pack_row_order_invariance(device, N, dtype_z, dtype_T):
         )
     )
 
-    T_uns = T_classic_full(
+    T_uns = T_PD_full(
         z=z,
         z_j=z_j,
         vec_d=vec_d,
@@ -698,12 +754,11 @@ def test_T7_full_pack_row_order_invariance(device, N, dtype_z, dtype_T):
         sigma_perp=sq,
         packs=packs_unsorted,
         R_j=None,
-        q_max=None,
         tol_abs=None,
         tol_rel=None,
         consecutive_below=1,
     )
-    T_srt = T_classic_full(
+    T_srt = T_PD_full(
         z=z,
         z_j=z_j,
         vec_d=vec_d,
@@ -714,7 +769,6 @@ def test_T7_full_pack_row_order_invariance(device, N, dtype_z, dtype_T):
         sigma_perp=sq,
         packs=packs_sorted,
         R_j=None,
-        q_max=None,
         tol_abs=None,
         tol_rel=None,
         consecutive_below=1,
@@ -735,7 +789,7 @@ def test_T7_full_pack_row_order_invariance(device, N, dtype_z, dtype_T):
             off_p = off
         packs_perm.append((a, b, off_p))
 
-    T_perm = T_classic_full(
+    T_perm = T_PD_full(
         z=z,
         z_j=z_j,
         vec_d=vec_d,
@@ -746,7 +800,6 @@ def test_T7_full_pack_row_order_invariance(device, N, dtype_z, dtype_T):
         sigma_perp=sq,
         packs=packs_perm,
         R_j=None,
-        q_max=None,
         tol_abs=None,
         tol_rel=None,
         consecutive_below=1,
@@ -1013,8 +1066,16 @@ def test_T10_output_dtype_and_z_dtype_independence(N, dtype_z_pair, dtype_T):
             sigma_perp=sq,
             offsets=offsets,
         )
-        T_f = T_classic_full(
-            z, z_j, vec_d, vec_dj, T_hat, alpha_base.to(REAL_T), sp, sq, packs
+        T_f = T_PD_full(
+            z=z,
+            z_j=z_j,
+            vec_d=vec_d,
+            vec_d_j=vec_dj,
+            T_hat_j=T_hat,
+            alpha_j=alpha_base.to(REAL_T),
+            sigma_par=sp,
+            sigma_perp=sq,
+            packs=packs,
         )
         return T_w, T_f
 
@@ -1086,9 +1147,27 @@ def test_T11_permutation_invariance_over_j(device, N, dtype_z, dtype_T):
     )
     assert torch.allclose(T0, T1, rtol=rtol, atol=atol)
 
-    U0 = T_classic_full(z, z_j, vec_d, vec_d_j, T_hat_j, alpha_j, sp, sq, packs)
-    U1 = T_classic_full(
-        z, z_j_p, vec_d, vec_d_j_p, T_hat_j_p, alpha_j_p, sp_p, sq_p, packs
+    U0 = T_PD_full(
+        z=z,
+        z_j=z_j,
+        vec_d=vec_d,
+        vec_d_j=vec_d_j,
+        T_hat_j=T_hat_j,
+        alpha_j=alpha_j,
+        sigma_par=sp,
+        sigma_perp=sq,
+        packs=packs,
+    )
+    U1 = T_PD_full(
+        z=z,
+        z_j=z_j_p,
+        vec_d=vec_d,
+        vec_d_j=vec_d_j_p,
+        T_hat_j=T_hat_j_p,
+        alpha_j=alpha_j_p,
+        sigma_par=sp_p,
+        sigma_perp=sq_p,
+        packs=packs,
     )
     assert torch.allclose(U0, U1, rtol=rtol, atol=atol)
 
@@ -1157,18 +1236,38 @@ def test_T12_linearity(device, N, dtype_z, dtype_T):
     )
     assert torch.allclose(T_C_w, c1 * T_A_w + c2 * T_B_w, rtol=rtol, atol=atol)
 
-    T_A_f = T_classic_full(z, z_j, vec_d, vec_d_j, T_hat_j_A, alpha_j_A, sp, sq, packs)
-    T_B_f = T_classic_full(z, z_j, vec_d, vec_d_j, T_hat_j_B, alpha_j_A, sp, sq, packs)
-    T_C_f = T_classic_full(
-        z,
-        z_j,
-        vec_d,
-        vec_d_j,
-        c1 * T_hat_j_A + c2 * T_hat_j_B,
-        alpha_j_A,
-        sp,
-        sq,
-        packs,
+    T_A_f = T_PD_full(
+        z=z,
+        z_j=z_j,
+        vec_d=vec_d,
+        vec_d_j=vec_d_j,
+        T_hat_j=T_hat_j_A,
+        alpha_j=alpha_j_A,
+        sigma_par=sp,
+        sigma_perp=sq,
+        packs=packs,
+    )
+    T_B_f = T_PD_full(
+        z=z,
+        z_j=z_j,
+        vec_d=vec_d,
+        vec_d_j=vec_d_j,
+        T_hat_j=T_hat_j_B,
+        alpha_j=alpha_j_A,
+        sigma_par=sp,
+        sigma_perp=sq,
+        packs=packs,
+    )
+    T_C_f = T_PD_full(
+        z=z,
+        z_j=z_j,
+        vec_d=vec_d,
+        vec_d_j=vec_d_j,
+        T_hat_j=c1 * T_hat_j_A + c2 * T_hat_j_B,
+        alpha_j=alpha_j_A,
+        sigma_par=sp,
+        sigma_perp=sq,
+        packs=packs,
     )
     assert torch.allclose(T_C_f, c1 * T_A_f + c2 * T_B_f, rtol=rtol, atol=atol)
 
@@ -1207,18 +1306,38 @@ def test_T12_linearity(device, N, dtype_z, dtype_T):
     )
     assert torch.allclose(T_c_w, c1 * T_a_w + c2 * T_b_w, rtol=rtol, atol=atol)
 
-    T_a_f = T_classic_full(z, z_j, vec_d, vec_d_j, T_hat_j_A, alpha_j_A, sp, sq, packs)
-    T_b_f = T_classic_full(z, z_j, vec_d, vec_d_j, T_hat_j_A, alpha_j_B, sp, sq, packs)
-    T_c_f = T_classic_full(
-        z,
-        z_j,
-        vec_d,
-        vec_d_j,
-        T_hat_j_A,
-        c1 * alpha_j_A + c2 * alpha_j_B,
-        sp,
-        sq,
-        packs,
+    T_a_f = T_PD_full(
+        z=z,
+        z_j=z_j,
+        vec_d=vec_d,
+        vec_d_j=vec_d_j,
+        T_hat_j=T_hat_j_A,
+        alpha_j=alpha_j_A,
+        sigma_par=sp,
+        sigma_perp=sq,
+        packs=packs,
+    )
+    T_b_f = T_PD_full(
+        z=z,
+        z_j=z_j,
+        vec_d=vec_d,
+        vec_d_j=vec_d_j,
+        T_hat_j=T_hat_j_A,
+        alpha_j=alpha_j_B,
+        sigma_par=sp,
+        sigma_perp=sq,
+        packs=packs,
+    )
+    T_c_f = T_PD_full(
+        z=z,
+        z_j=z_j,
+        vec_d=vec_d,
+        vec_d_j=vec_d_j,
+        T_hat_j=T_hat_j_A,
+        alpha_j=c1 * alpha_j_A + c2 * alpha_j_B,
+        sigma_par=sp,
+        sigma_perp=sq,
+        packs=packs,
     )
     assert torch.allclose(T_c_f, c1 * T_a_f + c2 * T_b_f, rtol=rtol, atol=atol)
 
@@ -1275,31 +1394,39 @@ def test_T13_cpu_gpu_isomorphism(N, dtype_z, dtype_T):
     )
     assert torch.allclose(T_cpu_w.to(cpu), T_gpu_w.to(cpu), rtol=rtol, atol=atol)
 
-    T_cpu_f = T_classic_full(
-        z, z_j, vec_d, vec_d_j, T_hat_j, alpha_j, sp, sq, packs_cpu
+    T_cpu_f = T_PD_full(
+        z=z,
+        z_j=z_j,
+        vec_d=vec_d,
+        vec_d_j=vec_d_j,
+        T_hat_j=T_hat_j,
+        alpha_j=alpha_j,
+        sigma_par=sp,
+        sigma_perp=sq,
+        packs=packs_cpu,
     )
-    T_gpu_f = T_classic_full(
-        z.to(cuda),
-        z_j.to(cuda),
-        vec_d.to(cuda),
-        vec_d_j.to(cuda),
-        T_hat_j.to(cuda),
-        alpha_j.to(cuda),
-        sp.to(cuda),
-        sq.to(cuda),
-        _move_packs(packs_cpu, cuda),
+    T_gpu_f = T_PD_full(
+        z=z.to(cuda),
+        z_j=z_j.to(cuda),
+        vec_d=vec_d.to(cuda),
+        vec_d_j=vec_d_j.to(cuda),
+        T_hat_j=T_hat_j.to(cuda),
+        alpha_j=alpha_j.to(cuda),
+        sigma_par=sp.to(cuda),
+        sigma_perp=sq.to(cuda),
+        packs=_move_packs(packs_cpu, cuda),
     )
     assert torch.allclose(T_cpu_f.to(cpu), T_gpu_f.to(cpu), rtol=rtol, atol=atol)
 
 
 # =========================
-# T14 — Periodicity at the boundary via proper reindexing of offsets
+# T14 — Periodicity at the boundary (dual form: no k reindexing)
 # =========================
 @pytest.mark.parametrize("device", available_devices())
 @pytest.mark.parametrize("N", NS)
 @pytest.mark.parametrize("dtype_z", DTYPES_C)
 @pytest.mark.parametrize("dtype_T", DTYPES_C)
-def test_T14_boundary_periodicity_with_reindexed_offsets(device, N, dtype_z, dtype_T):
+def test_T14_boundary_periodicity_dual_no_reindex(device, N, dtype_z, dtype_T):
     B, M, S = 1, 5, 4
     rtol, atol = _get_tols(dtype_z)
     REAL = DTYPES_REAL[dtype_z]
@@ -1314,6 +1441,7 @@ def test_T14_boundary_periodicity_with_reindexed_offsets(device, N, dtype_z, dty
             torch.as_tensor(i, device=device, dtype=REAL),
         )
 
+    # Left/right points on the boundary: frac(+0.5) == frac(-0.5) == 0.5
     z_left = z.clone()
     z_right = z.clone()
     z_left[..., 0] = _cplx(0.5)
@@ -1321,9 +1449,9 @@ def test_T14_boundary_periodicity_with_reindexed_offsets(device, N, dtype_z, dty
 
     per = CPSFPeriodization()
     W = 3
+
+    # --- WINDOW (dual form): same k-offsets for both sides; no reindexing ---
     offsets = per.window(N=N, W=W, device=device, sorted=False)
-    offsets_shifted = offsets.clone()
-    offsets_shifted[:, 0] += 1
 
     T_L_w = T_PD_window(
         z=z_left,
@@ -1345,10 +1473,11 @@ def test_T14_boundary_periodicity_with_reindexed_offsets(device, N, dtype_z, dty
         alpha_j=alpha_j,
         sigma_par=sp,
         sigma_perp=sq,
-        offsets=offsets_shifted,
+        offsets=offsets,  # <-- no reindex for dual modes
     )
     assert torch.allclose(T_L_w, T_R_w, rtol=rtol, atol=atol)
 
+    # --- FULL/streaming (dual form): same packs; no reindexing ---
     packs = list(
         per.iter_packed(
             N=N,
@@ -1359,27 +1488,40 @@ def test_T14_boundary_periodicity_with_reindexed_offsets(device, N, dtype_z, dty
             sorted=False,
         )
     )
-    packs_shifted = []
-    for a, b, off in packs:
-        off_s = off.clone()
-        off_s[:, 0] += 1
-        packs_shifted.append((a, b, off_s))
 
-    T_L_f = T_classic_full(z_left, z_j, vec_d, vec_d_j, T_hat_j, alpha_j, sp, sq, packs)
-    T_R_f = T_classic_full(
-        z_right, z_j, vec_d, vec_d_j, T_hat_j, alpha_j, sp, sq, packs_shifted
+    T_L_f = T_PD_full(
+        z=z_left,
+        z_j=z_j,
+        vec_d=vec_d,
+        vec_d_j=vec_d_j,
+        T_hat_j=T_hat_j,
+        alpha_j=alpha_j,
+        sigma_par=sp,
+        sigma_perp=sq,
+        packs=packs,  # <-- unchanged
+    )
+    T_R_f = T_PD_full(
+        z=z_right,
+        z_j=z_j,
+        vec_d=vec_d,
+        vec_d_j=vec_d_j,
+        T_hat_j=T_hat_j,
+        alpha_j=alpha_j,
+        sigma_par=sp,
+        sigma_perp=sq,
+        packs=packs,  # <-- unchanged
     )
     assert torch.allclose(T_L_f, T_R_f, rtol=rtol, atol=atol)
 
 
 # =========================
-# T15 — Zero-radius/center window equals non-periodized central image
+# T15 — Dual W=0 (k=0 mode) equals its closed-form (not the primal central image)
 # =========================
 @pytest.mark.parametrize("device", available_devices())
 @pytest.mark.parametrize("N", NS)
 @pytest.mark.parametrize("dtype_z", DTYPES_C)
 @pytest.mark.parametrize("dtype_T", DTYPES_C)
-def test_T15_zero_radius_center_equals_central_image(device, N, dtype_z, dtype_T):
+def test_T15_dual_zero_mode_closed_form(device, N, dtype_z, dtype_T):
     B, M, S = 1, 4, 3
     rtol, atol = _get_tols(dtype_T)
 
@@ -1388,26 +1530,9 @@ def test_T15_zero_radius_center_equals_central_image(device, N, dtype_z, dtype_T
     )
 
     per = CPSFPeriodization()
-    off0 = per.window(N=N, W=0, device=device, sorted=False)
+    off0 = per.window(N=N, W=0, device=device, sorted=False)  # k = 0 only
 
-    B_, M_, N_ = z_j.shape
-    z_exp = z.unsqueeze(1).expand(B_, M_, N_)
-    vecd_exp = vec_d.unsqueeze(1).expand(B_, M_, N_)
-    eta0 = psi_over_offsets(
-        z=z_exp,
-        z_j=z_j,
-        vec_d=vecd_exp,
-        vec_d_j=vec_d_j,
-        sigma_par=sp,
-        sigma_perp=sq,
-        offsets=off0,
-        R_j=None,
-        q_max=None,
-    )
-    w = alpha_j.to(eta0.real.dtype) * eta0.real
-    w = w.to(T_hat_j.real.dtype)
-    T_exp = (w.unsqueeze(-1).to(T_hat_j.dtype) * T_hat_j).sum(dim=-2)
-
+    # PD result (window)
     T_w = T_PD_window(
         z=z,
         z_j=z_j,
@@ -1418,10 +1543,11 @@ def test_T15_zero_radius_center_equals_central_image(device, N, dtype_z, dtype_T
         sigma_par=sp,
         sigma_perp=sq,
         offsets=off0,
+        # t=1.0 by default
     )
     assert T_w.dtype == dtype_T
-    assert torch.allclose(T_w, T_exp, rtol=rtol, atol=atol)
 
+    # PD result (full/streaming) with a single pack {k=0}
     packs0 = list(
         per.iter_packed(
             N=N,
@@ -1433,8 +1559,40 @@ def test_T15_zero_radius_center_equals_central_image(device, N, dtype_z, dtype_T
         )
     )
     assert len(packs0) == 1
-    T_f = T_classic_full(z, z_j, vec_d, vec_d_j, T_hat_j, alpha_j, sp, sq, packs0)
-    assert torch.allclose(T_f, T_exp, rtol=rtol, atol=atol)
+    T_f = T_PD_full(
+        z=z,
+        z_j=z_j,
+        vec_d=vec_d,
+        vec_d_j=vec_d_j,
+        T_hat_j=T_hat_j,
+        alpha_j=alpha_j,
+        sigma_par=sp,
+        sigma_perp=sq,
+        packs=packs0,
+        # t=1.0 by default
+    )
+
+    # Closed form for the dual zero mode:
+    # eta_j = C_dir_j * (sigma_par * sigma_perp^(N-1)) / t^N, with t=1
+    B_, M_, N_ = z_j.shape
+    vecd_exp = vec_d.unsqueeze(1).expand(B_, M_, N_)
+
+    Rmat = R(vec_d_j)
+    Rext = R_ext(Rmat)
+
+    zeros_u = torch.zeros_like(vecd_exp)
+    dd = delta_vec_d(vecd_exp, vec_d_j)
+    q_dir = q(w=iota(zeros_u, dd), R_ext=Rext, sigma_par=sp, sigma_perp=sq)  # [B,M]
+    C_dir = torch.exp(-math.pi * q_dir)  # [B,M]
+
+    prefac = sp * (sq ** (N - 1))  # t = 1
+    eta0 = (C_dir * prefac).real.to(T_hat_j.real.dtype)  # [B,M]
+
+    w = (alpha_j.to(eta0.dtype) * eta0).unsqueeze(-1)  # [B,M,1]
+    T_exp_dual0 = (w.to(T_hat_j.dtype) * T_hat_j).sum(dim=-2)  # [B,S]
+
+    assert torch.allclose(T_w, T_exp_dual0, rtol=rtol, atol=atol)
+    assert torch.allclose(T_f, T_exp_dual0, rtol=rtol, atol=atol)
 
 
 # =========================
@@ -1467,7 +1625,17 @@ def test_T16_edge_forms_small_dimensions(device, N, dtype_z, dtype_T):
         sigma_perp=sq,
         offsets=offsets,
     )
-    T_f = T_classic_full(z, z_j, vec_d, vec_d_j, T_hat_j, alpha_j, sp, sq, packs)
+    T_f = T_PD_full(
+        z=z,
+        z_j=z_j,
+        vec_d=vec_d,
+        vec_d_j=vec_d_j,
+        T_hat_j=T_hat_j,
+        alpha_j=alpha_j,
+        sigma_par=sp,
+        sigma_perp=sq,
+        packs=packs,
+    )
 
     assert T_w.shape == (B, S) and T_f.shape == (B, S)
     assert T_w.dtype == dtype_T and T_f.dtype == dtype_T
@@ -1541,11 +1709,27 @@ def test_T17_boundary_continuity_small_eps(device, N, dtype_z, dtype_T):
         )
         D_w = (T_w_L - T_w_R).abs().max().item()
 
-        T_f_L = T_classic_full(
-            z_left, z_j, vec_d, vec_d_j, T_hat_j, alpha_j, sp, sq, packs
+        T_f_L = T_PD_full(
+            z=z_left,
+            z_j=z_j,
+            vec_d=vec_d,
+            vec_d_j=vec_d_j,
+            T_hat_j=T_hat_j,
+            alpha_j=alpha_j,
+            sigma_par=sp,
+            sigma_perp=sq,
+            packs=packs,
         )
-        T_f_R = T_classic_full(
-            z_right_period, z_j, vec_d, vec_d_j, T_hat_j, alpha_j, sp, sq, packs
+        T_f_R = T_PD_full(
+            z=z_right_period,
+            z_j=z_j,
+            vec_d=vec_d,
+            vec_d_j=vec_d_j,
+            T_hat_j=T_hat_j,
+            alpha_j=alpha_j,
+            sigma_par=sp,
+            sigma_perp=sq,
+            packs=packs,
         )
         D_f = (T_f_L - T_f_R).abs().max().item()
         return max(D_w, D_f)
@@ -1604,7 +1788,17 @@ def test_T18_gradcheck_and_gradgradcheck_small_complex128():
         return T.real.sum()
 
     def f_full(z_, z_j_, vd_, vdj_, That_, a_, sp_, sq_):
-        T = T_classic_full(z_, z_j_, vd_, vdj_, That_, a_, sp_, sq_, packs)
+        T = T_PD_full(
+            z=z_,
+            z_j=z_j_,
+            vec_d=vd_,
+            vec_d_j=vdj_,
+            T_hat_j=That_,
+            alpha_j=a_,
+            sigma_par=sp_,
+            sigma_perp=sq_,
+            packs=packs,
+        )
         return T.real.sum()
 
     inputs = (z_g, z_j_g, vec_d_g, vec_d_j_g, T_hat_g, alpha_g, sp_g, sq_g)
