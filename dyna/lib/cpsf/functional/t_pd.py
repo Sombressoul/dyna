@@ -22,7 +22,7 @@ def T_PD_window(
     alpha_j: torch.Tensor,
     sigma_par: torch.Tensor,
     sigma_perp: torch.Tensor,
-    offsets: torch.Tensor,
+    offsets: torch.Tensor,  # Dual-space k modes on Z^{2N}
     t: float = 1.0,  # Poisson/Ewald scale, t > 0
     R_j: Optional[torch.Tensor] = None,
     q_max: Optional[float] = None,  # Warning: introduces positive bias
@@ -54,10 +54,11 @@ def T_PD_window(
     quad_k = (sigma_perp.unsqueeze(-1) * s) + (
         (sigma_par - sigma_perp).unsqueeze(-1) * p_abs2
     )
-    dot = (k_r.unsqueeze(0).unsqueeze(0) * dz.real.unsqueeze(2)).sum(dim=-1) + (
-        k_i.unsqueeze(0).unsqueeze(0) * dz.imag.unsqueeze(2)
-    ).sum(dim=-1)
-    phase = torch.exp(2j * pi * dot)
+    dot = (k_r.unsqueeze(0).unsqueeze(0) * torch.frac(dz.real).unsqueeze(2)).sum(
+        dim=-1
+    ) + (k_i.unsqueeze(0).unsqueeze(0) * torch.frac(dz.imag).unsqueeze(2)).sum(dim=-1)
+    two_pi_i = (2.0 * pi).to(dot.dtype) * 1j
+    phase = torch.exp(two_pi_i * dot)
     prefac = (sigma_par * (sigma_perp ** (N - 1))) / (t**N)
     weight = torch.exp(-(pi / t) * quad_k) * phase
     Theta_pos = (prefac.unsqueeze(-1) * weight).sum(dim=-1)
