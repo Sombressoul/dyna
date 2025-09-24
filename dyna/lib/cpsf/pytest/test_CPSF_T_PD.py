@@ -9,7 +9,7 @@ from dyna.lib.cpsf.functional.core_math import (
     T_classic_full,
     psi_over_offsets,
 )
-from dyna.lib.cpsf.functional.t_pd import T_PD_window_dual
+from dyna.lib.cpsf.functional.t_pd import T_PD_window
 from dyna.lib.cpsf.periodization import CPSFPeriodization
 
 
@@ -204,7 +204,7 @@ def test_T1_joint_integer_shift_invariance(device, N, dtype_z, dtype_T):
     z_s = z + lam
     zjs = z_j + lam.view(1, 1, N)
 
-    T0_w = T_PD_window_dual(
+    T0_w = T_PD_window(
         z=z,
         z_j=z_j,
         vec_d=vec_d,
@@ -215,7 +215,7 @@ def test_T1_joint_integer_shift_invariance(device, N, dtype_z, dtype_T):
         sigma_perp=sq,
         offsets=offsets,
     )
-    T1_w = T_PD_window_dual(
+    T1_w = T_PD_window(
         z=z_s,
         z_j=zjs,
         vec_d=vec_d,
@@ -257,7 +257,7 @@ def test_T2_offsets_require_imag_part(device, N, dtype_z, dtype_T):
     offsets_re_only = torch.cat([offsets[:, :N], zeros], dim=-1)
 
     # WINDOW: canonical vs re-only must not be allclose
-    T_fullZ = T_PD_window_dual(
+    T_fullZ = T_PD_window(
         z=z,
         z_j=z_j,
         vec_d=vec_d,
@@ -268,7 +268,7 @@ def test_T2_offsets_require_imag_part(device, N, dtype_z, dtype_T):
         sigma_perp=sq,
         offsets=offsets,
     )
-    T_reZ = T_PD_window_dual(
+    T_reZ = T_PD_window(
         z=z,
         z_j=z_j,
         vec_d=vec_d,
@@ -406,7 +406,7 @@ def test_T4_window_full_identity_same_offsets(device, N, dtype_z, dtype_T):
 
     packs = _chunk_offsets_even(offsets, num_chunks=3)
 
-    T_win = T_PD_window_dual(
+    T_win = T_PD_window(
         z=z,
         z_j=z_j,
         vec_d=vec_d,
@@ -538,7 +538,7 @@ def test_T6_full_early_stop_semantics(device, N, dtype_z, dtype_T, mode):
     T_packs = []
     norms = []
     for _, _, off in packs:
-        T_pack = T_PD_window_dual(
+        T_pack = T_PD_window(
             z=z,
             z_j=z_j,
             vec_d=vec_d,
@@ -1002,7 +1002,7 @@ def test_T10_output_dtype_and_z_dtype_independence(N, dtype_z_pair, dtype_T):
         vec_dj = vec_dj_base.to(dtype_z)
         sp = sigma_base.to(DTYPES_REAL[dtype_z])
         sq = sigma_base.to(DTYPES_REAL[dtype_z])
-        T_w = T_PD_window_dual(
+        T_w = T_PD_window(
             z=z,
             z_j=z_j,
             vec_d=vec_d,
@@ -1062,7 +1062,7 @@ def test_T11_permutation_invariance_over_j(device, N, dtype_z, dtype_T):
     sp_p = sp.index_select(dim=1, index=perm)
     sq_p = sq.index_select(dim=1, index=perm)
 
-    T0 = T_PD_window_dual(
+    T0 = T_PD_window(
         z=z,
         z_j=z_j,
         vec_d=vec_d,
@@ -1073,7 +1073,7 @@ def test_T11_permutation_invariance_over_j(device, N, dtype_z, dtype_T):
         sigma_perp=sq,
         offsets=offsets,
     )
-    T1 = T_PD_window_dual(
+    T1 = T_PD_window(
         z=z,
         z_j=z_j_p,
         vec_d=vec_d,
@@ -1122,7 +1122,7 @@ def test_T12_linearity(device, N, dtype_z, dtype_T):
     offsets = per.window(N=N, W=3, device=device, sorted=False)
     packs = _chunk_offsets_even(offsets, num_chunks=3)
 
-    T_A_w = T_PD_window_dual(
+    T_A_w = T_PD_window(
         z=z,
         z_j=z_j,
         vec_d=vec_d,
@@ -1133,7 +1133,7 @@ def test_T12_linearity(device, N, dtype_z, dtype_T):
         sigma_perp=sq,
         offsets=offsets,
     )
-    T_B_w = T_PD_window_dual(
+    T_B_w = T_PD_window(
         z=z,
         z_j=z_j,
         vec_d=vec_d,
@@ -1144,7 +1144,7 @@ def test_T12_linearity(device, N, dtype_z, dtype_T):
         sigma_perp=sq,
         offsets=offsets,
     )
-    T_C_w = T_PD_window_dual(
+    T_C_w = T_PD_window(
         z=z,
         z_j=z_j,
         vec_d=vec_d,
@@ -1172,7 +1172,7 @@ def test_T12_linearity(device, N, dtype_z, dtype_T):
     )
     assert torch.allclose(T_C_f, c1 * T_A_f + c2 * T_B_f, rtol=rtol, atol=atol)
 
-    T_a_w = T_PD_window_dual(
+    T_a_w = T_PD_window(
         z=z,
         z_j=z_j,
         vec_d=vec_d,
@@ -1183,7 +1183,7 @@ def test_T12_linearity(device, N, dtype_z, dtype_T):
         sigma_perp=sq,
         offsets=offsets,
     )
-    T_b_w = T_PD_window_dual(
+    T_b_w = T_PD_window(
         z=z,
         z_j=z_j,
         vec_d=vec_d,
@@ -1194,7 +1194,7 @@ def test_T12_linearity(device, N, dtype_z, dtype_T):
         sigma_perp=sq,
         offsets=offsets,
     )
-    T_c_w = T_PD_window_dual(
+    T_c_w = T_PD_window(
         z=z,
         z_j=z_j,
         vec_d=vec_d,
@@ -1251,7 +1251,7 @@ def test_T13_cpu_gpu_isomorphism(N, dtype_z, dtype_T):
             out.append((a, b, off.to(device)))
         return out
 
-    T_cpu_w = T_PD_window_dual(
+    T_cpu_w = T_PD_window(
         z=z,
         z_j=z_j,
         vec_d=vec_d,
@@ -1262,7 +1262,7 @@ def test_T13_cpu_gpu_isomorphism(N, dtype_z, dtype_T):
         sigma_perp=sq,
         offsets=offsets_cpu,
     )
-    T_gpu_w = T_PD_window_dual(
+    T_gpu_w = T_PD_window(
         z=z.to(cuda),
         z_j=z_j.to(cuda),
         vec_d=vec_d.to(cuda),
@@ -1325,7 +1325,7 @@ def test_T14_boundary_periodicity_with_reindexed_offsets(device, N, dtype_z, dty
     offsets_shifted = offsets.clone()
     offsets_shifted[:, 0] += 1
 
-    T_L_w = T_PD_window_dual(
+    T_L_w = T_PD_window(
         z=z_left,
         z_j=z_j,
         vec_d=vec_d,
@@ -1336,7 +1336,7 @@ def test_T14_boundary_periodicity_with_reindexed_offsets(device, N, dtype_z, dty
         sigma_perp=sq,
         offsets=offsets,
     )
-    T_R_w = T_PD_window_dual(
+    T_R_w = T_PD_window(
         z=z_right,
         z_j=z_j,
         vec_d=vec_d,
@@ -1408,7 +1408,7 @@ def test_T15_zero_radius_center_equals_central_image(device, N, dtype_z, dtype_T
     w = w.to(T_hat_j.real.dtype)
     T_exp = (w.unsqueeze(-1).to(T_hat_j.dtype) * T_hat_j).sum(dim=-2)
 
-    T_w = T_PD_window_dual(
+    T_w = T_PD_window(
         z=z,
         z_j=z_j,
         vec_d=vec_d,
@@ -1456,7 +1456,7 @@ def test_T16_edge_forms_small_dimensions(device, N, dtype_z, dtype_T):
     offsets = per.window(N=N, W=W, device=device, sorted=False)
     packs = _chunk_offsets_even(offsets, num_chunks=2)
 
-    T_w = T_PD_window_dual(
+    T_w = T_PD_window(
         z=z,
         z_j=z_j,
         vec_d=vec_d,
@@ -1517,7 +1517,7 @@ def test_T17_boundary_continuity_small_eps(device, N, dtype_z, dtype_T):
         e1[..., 0] = _cplx(1.0)
         z_right_period = z_right + e1
 
-        T_w_L = T_PD_window_dual(
+        T_w_L = T_PD_window(
             z=z_left,
             z_j=z_j,
             vec_d=vec_d,
@@ -1528,7 +1528,7 @@ def test_T17_boundary_continuity_small_eps(device, N, dtype_z, dtype_T):
             sigma_perp=sq,
             offsets=offsets,
         )
-        T_w_R = T_PD_window_dual(
+        T_w_R = T_PD_window(
             z=z_right_period,
             z_j=z_j,
             vec_d=vec_d,
@@ -1590,7 +1590,7 @@ def test_T18_gradcheck_and_gradgradcheck_small_complex128():
     sq_g = sq.detach().to(REAL).clone().requires_grad_(True)
 
     def f_window(z_, z_j_, vd_, vdj_, That_, a_, sp_, sq_):
-        T = T_PD_window_dual(
+        T = T_PD_window(
             z=z_,
             z_j=z_j_,
             vec_d=vd_,
@@ -1655,7 +1655,7 @@ def test_T19_tail_gradient_decay(device, N, dtype_z, dtype_T):
         offs = torch.zeros(1, 2 * N, dtype=torch.long, device=device)
         offs[:, 0] = K
         z_var = z.clone().detach().requires_grad_(True)
-        T = T_PD_window_dual(
+        T = T_PD_window(
             z=z_var,
             z_j=z_j,
             vec_d=vec_d,

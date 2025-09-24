@@ -12,7 +12,7 @@ from dyna.lib.cpsf.functional.core_math import (
 )
 
 
-def T_PD_window_dual(
+def T_PD_window(
     *,
     z: torch.Tensor,
     z_j: torch.Tensor,
