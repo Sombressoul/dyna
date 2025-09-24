@@ -1,162 +1,202 @@
-# CPSF — Appendix A: Ray–Trace Operator $\tau$
+#  CPSF — Appendix A: Poisson–dual computation of the CPSF field
 
-## A.0. Conventions (from Canon)
+## A.0. Data, operators, constraints
 
-* Dimension: $N\ge 2$; domain $(\mathbb C/\mathbb Z)^N$ with unit periods componentwise.
-* Ray: $\ell=(z,\vec d)$ with $z\in\mathbb C^N$, $|\vec d|=1$.
-* Contribution: $C_j=(\ell_j,\hat T_j,\sigma_j^{\parallel},\sigma_j^{\perp},\alpha_j)$ with $\ell_j=(z_j,\vec d_j)$, $\hat T_j\in\mathbb C^S$, $\sigma_j^{\parallel},\sigma_j^{\perp}>0$, $\alpha_j\in\mathbb R$.
-* Lift/wrap: $\mathrm{lift}$ to $\mathbb C^N$; **wrap applies to $\Re(\cdot)$ only**, mapping each real coordinate to $[-\tfrac12,\tfrac12)$; $\Im(\cdot)$ is free (non-periodized).
-* Directional offset: $\delta_{\vec d}(\vec d,\vec d_j)\in\mathbb C^N$, smooth in $(\vec d,\vec d_j)$, tangent to $\vec d_j$, vanishes for $\vec d\parallel\vec d_j$.
-* Frame: $R(\vec d_j)\in U(N)$; first column $b$ aligned with $\vec d_j$. Extended $R_{\mathrm{ext}}=\mathrm{diag}(R,R)\in U(2N)$.
-* Spatial covariance block (per $j$):
-
-  $$
-  S_{0,j}=\sigma_j^{\perp}I_N+(\sigma_j^{\parallel}-\sigma_j^{\perp})\,b\,b^{*},\qquad
-  \Sigma_j=\mathrm{diag}(S_{0,j},S_{0,j}).
-  $$
-* Quadratic form and Gaussian: $q(w)=\langle \Sigma_j^{-1}w,w\rangle$, $\rho(q)=e^{-\pi q}$. Hermitian inner products; batch broadcasting implicit. &#x20;
-
----
-
-## A.1. Torus–Periodic Spatial Kernel
-
-Let $\Delta z:=\mathrm{lift}(z)-\mathrm{lift}(z_j)\in\mathbb C^N$ and $\delta:=\delta_{\vec d}(\vec d,\vec d_j)$. Define the periodized spatial Gaussian
+Let $N\ge 2$. For each index $j$ the data are
 
 $$
-G_j^{\mathbb T}(\Delta z):=\sum_{n\in\mathbb Z^N}\exp\!\Big(-\pi\,(\Delta z+n)^{*}S_{0,j}^{-1}(\Delta z+n)\Big),\quad S_{0,j}\succ 0.
+z\in\mathbb C^N,\quad z_j\in\mathbb C^N,\quad \vec d\in\mathbb C^N,\quad \vec d_j\in\mathbb C^N,\quad
+\alpha_j\in\mathbb R_{>0},\quad \sigma_{\parallel j},\sigma_{\perp j}\in\mathbb R_{>0},\quad \hat T_j\in\mathbb C^S.
 $$
 
-The series converges absolutely and uniformly on compact sets; $G_j^{\mathbb T}$ is smooth and $1$-periodic in $\Re(\Delta z)$. &#x20;
-
----
-
-## A.2. Ray–Trace Operator
-
-Given $\mathcal C=\{C_j\}$ and $\ell=(z,\vec d)$, define
-
-$$
-\boxed{\;\tau(\ell\mid\mathcal C)=\sum_j \alpha_j\,\eta_j(\ell)\,\hat T_j\in\mathbb C^S\;}
-$$
-
-with the exact envelope
-
-$$
-\eta_j(\ell)=\sum_{n\in\mathbb Z^N}\rho\!\Big(q\big(\iota(\Delta z+n,\delta)\big)\Big),\qquad
-q\big(\iota(u,\delta)\big)=u^{*}S_{0,j}^{-1}u+\delta^{*}S_{0,j}^{-1}\delta.
-$$
-
-Absolute convergence (for $S_{0,j}\succ0$) justifies factoring the $\delta$-term. &#x20;
-
----
-
-## A.3. Dual (Poisson) Representation with Complex Coordinates
-
-Poisson summation in $\mathbb Z^N$ yields
-
-$$
-G_j^{\mathbb T}(\Delta z)=(\det S_{0,j}^{-1})^{-\tfrac12}\sum_{k\in\mathbb Z^N}
-\exp\!\Big(-\pi\,k^{*}S_{0,j}k\Big)\,\exp\!\big(2\pi i\langle k,\Delta z\rangle\big).
-$$
-
-Write $a_j=\sigma_j^{\perp}{}^{-1}$, $c_{\mathrm{ang},j}=(\sigma_j^{\parallel}-\sigma_j^{\perp})/(\sigma_j^{\parallel}\sigma_j^{\perp})=1/\sigma_j^{\perp}-1/\sigma_j^{\parallel}$,
-$u=\Im(\Delta z)$, and $x=\Re(\Delta z)$. Then
-
-$$
-\begin{aligned}
-\eta_j(\ell)
-&=\exp\!\big(-\pi\,\delta^{*}S_{0,j}^{-1}\delta\big)\,(\det S_{0,j}^{-1})^{-\tfrac12}
-\sum_{k\in\mathbb Z^N}\exp\!\big(-\pi\,k^{*}S_{0,j}k\big)\,e^{2\pi i\langle k,x\rangle}\;\cdot\; \Xi_j(u),\\[2mm]
-\Xi_j(u)
-&=\exp\!\Big(-\pi\,a_j\,\|u\|^2+\pi\,c_{\mathrm{ang},j}\,\big|\langle b,u\rangle\big|^2\Big),
-\end{aligned}
-$$
-
-i.e. **only $\Re(\Delta z)$** enters the oscillatory factor; the **free imaginary coordinate** contributes via the real Gaussian multiplier $\Xi_j(u)$. &#x20;
-
----
-
-## A.4. Equivalence to the Canonical Periodized Field
-
-Let $\psi_j^{\mathbb T}(z,\vec d)$ be the canonical periodized contribution. For $S_{0,j}\succ0$ and absolute convergence of the Gaussian periodization,
-
-$$
-\boxed{\;T(z,\vec d)=\sum_j \alpha_j\,\psi_j^{\mathbb T}(z,\vec d)\,\hat T_j\equiv \tau(\ell\mid\mathcal C),\quad \ell=(z,\vec d).\;}
-$$
-
-Sketch: $q(\iota(u,\delta))=u^{*}S_{0,j}^{-1}u+\delta^{*}S_{0,j}^{-1}\delta$ implies $\psi_j^{\mathbb T}=\exp(-\pi\,\delta^{*}S_{0,j}^{-1}\delta)\,G_j^{\mathbb T}$, and Poisson gives A.3. Linearity in $j$ completes the identity. &#x20;
-
----
-
-## A.5. Nearest–Image Approximation
-
-Let $x^{\mathbb T}=\mathrm{wrap}(x)\in[-\tfrac12,\tfrac12)^N$. The nearest–image envelope evaluates the non-periodized Gaussian at $(x^{\mathbb T},u)$:
-
-$$
-\eta_j^{\mathrm{near}}(\ell)=\exp\!\big(-\pi\,\delta^{*}S_{0,j}^{-1}\delta\big)\,
-\exp\!\Big(-\pi\,\big((x^{\mathbb T})^{*}S_{0,j}^{-1}x^{\mathbb T}+u^{*}S_{0,j}^{-1}u\big)\Big).
-$$
-
+Define $\delta z:=z-z_j$, $\delta\vec d:=\mathrm{delta\_vec\_d}(\vec d,\vec d_j)$. Let $R(\vec d_j)\in\mathrm U(N)$ and
+$\mathcal R(\vec d_j):=\mathrm{diag}(R(\vec d_j),R(\vec d_j))$.
 Let
 
 $$
-\Delta q_{\min}:=\min_{n\in\mathbb Z^N\setminus\{0\}}
-\Big[(x+n)^{*}S_{0,j}^{-1}(x+n)-x^{*}S_{0,j}^{-1}x\Big].
+D_j=\mathrm{diag}(\sigma_{\parallel j},\sigma_{\perp j},\dots;\ \sigma_{\parallel j},\sigma_{\perp j},\dots),
+\quad
+\Sigma_j=\mathcal R(\vec d_j)^\dagger D_j\,\mathcal R(\vec d_j),
 $$
 
-Then there exists $\Theta(S_{0,j})<\infty$ such that
+and for $w\in\mathbb C^{2N}$ set $q_j(w)=\langle \Sigma_j^{-1}w,w\rangle$, $\rho_j(q)=e^{-\pi q}$.
+Only the positional block is periodized. The periodization lattice is $\mathbb Z^{2N}$ acting on $\delta z$ by complex–componentwise integer shifts; $\delta\vec d$ is not periodized.&#x20;
+
+Denote the complex concatenation $\iota(u,v)=[u;v]\in\mathbb C^{2N}$.&#x20;
+
+## A.1. Canonical field and block factorization
+
+The canonical (toroidal) contribution is
 
 $$
-\big|\eta_j(\ell)-\eta_j^{\mathrm{near}}(\ell)\big|
-\;\le\;\Theta(S_{0,j})\,e^{-\pi\,\Delta q_{\min}}.
+\eta_j(z,\vec d)=\sum_{n\in\mathbb Z^{2N}}\rho_j\!\Big(q_j\big(\iota(\delta z+n,\ \delta\vec d)\big)\Big).
+\tag{A.1}
 $$
 
-Thus the nearest–image error is $\le\varepsilon$ whenever $\Delta q_{\min}\ge \pi^{-1}\log(1/\varepsilon)$. &#x20;
-
----
-
-## A.6. Dual Truncation
-
-For $\varepsilon\in(0,1)$ define the truncation set
+Since $\Sigma_j^{-1}$ is block–diagonal, $\Sigma_j^{-1}=\mathrm{diag}(A^{(\mathrm{pos})}_j,A^{(\mathrm{dir})}_j)$ with
 
 $$
-\mathcal K_{\varepsilon}:=\Big\{k\in\mathbb Z^N:\;k^{*}S_{0,j}k\le \pi^{-1}\log(1/\varepsilon)\Big\}.
+A^{(\mathrm{pos})}_j=A^{(\mathrm{dir})}_j
+=R(\vec d_j)\,\mathrm{diag}(\sigma_{\parallel j}^{-1},\sigma_{\perp j}^{-1},\dots)\,R(\vec d_j)^\dagger,
 $$
 
-Then
+one has
 
 $$
-\sum_{k\notin\mathcal K_{\varepsilon}}
-\exp\!\big(-\pi\,k^{*}S_{0,j}k\big)
-\;\le\;\mathcal O(\varepsilon),
+q_j\big(\iota(\delta z+n,\ \delta\vec d)\big)
+=(\delta z+n)^\dagger A^{(\mathrm{pos})}_j(\delta z+n)+\delta\vec d^\dagger A^{(\mathrm{dir})}_j\,\delta\vec d,
 $$
 
-and the truncated dual series attains $\mathcal O(\varepsilon)$ error. For fixed $\varepsilon$, $|\mathcal K_{\varepsilon}|$ grows polynomially in $N$. &#x20;
-
----
-
-## A.7. Structural Properties
-
-1. **Toroidality:** $\tau(\ell)$ is invariant under $z\mapsto z+n$, $n\in\mathbb Z^N$.
-2. **Linearity:** Linear in $\hat T_j$ and $\alpha_j$.
-3. **Axial anisotropy:** Controlled by $(\sigma_j^{\parallel},\sigma_j^{\perp})$ via $S_{0,j}$. Isotropic limit $\sigma_j^{\parallel}=\sigma_j^{\perp}$.
-4. **Frame equivariance:** $R\mapsto R\cdot\mathrm{diag}(e^{i\phi},U)$, $U\in U(N-1)$, leaves $S_{0,j}$ and $\tau$ invariant.
-5. **Angular smoothness:** $\delta_{\vec d}$ is smooth, $\delta_{\vec d}=0$ for $\vec d\parallel\vec d_j$; hence $\eta_j$ is smooth in $(z,\vec d)$. &#x20;
-
----
-
-## A.8. Line–Integral Variant
-
-For $[a,b]\subset\mathbb R$,
+and hence the exact factorization
 
 $$
-\mathcal T(\ell;[a,b])=\int_a^b \tau\big((z+t\vec d)\mid\mathcal C\big)\,dt.
+\eta_j
+=
+\underbrace{e^{-\pi\,\delta\vec d^\dagger A^{(\mathrm{dir})}_j\,\delta\vec d}}_{C^{(\mathrm{dir})}_j}
+\cdot
+\underbrace{\sum_{n\in\mathbb Z^{2N}} e^{-\pi\,(\delta z+n)^\dagger A^{(\mathrm{pos})}_j(\delta z+n)}}_{\Theta^{(\mathrm{pos})}_j}.
+\tag{A.2}
 $$
 
-With Gaussian envelopes the integral admits error-function forms or low-order quadrature; the definition of $\tau$ is unchanged. &#x20;
 
----
 
-## A.9. Complexity (Backends)
+The CPSF field is
 
-* Nearest–image: $\mathcal O(M)$ per query; no frequency set; recommended when $\Delta q_{\min}$ is large.
-* Dual (Poisson): $\mathcal O\big(M(|\mathcal K_{\varepsilon}|+N)\big)$ with symmetric $k$-set; recommended for broad kernels (fast spectral decay). &#x20;
+$$
+T(z,\vec d)=\sum_j\big(\alpha_j\,\mathrm{Re}\,\eta_j(z,\vec d)\big)\,\hat T_j.
+\tag{A.3}
+$$
+
+
+
+## A.2. Poisson–dual representation of the positional sum
+
+For $d=2N$ and any $t>0$ the Poisson identity yields
+
+$$
+\Theta^{(\mathrm{pos})}_j
+=\frac{1}{t^{d/2}\sqrt{\det A^{(\mathrm{pos})}_j}}\;
+\sum_{k\in\mathbb Z^{2N}}
+\exp\!\Big(-\tfrac{\pi}{t}\,k^\top (A^{(\mathrm{pos})}_j)^{-1}k\Big)\,
+e^{\,2\pi i\,k\cdot b_{\mathrm{pos}}},
+\quad
+b_{\mathrm{pos}}:=\mathrm{frac}(\delta z),
+\tag{A.4}
+$$
+
+where $\mathrm{frac}(\cdot)$ is the componentwise reduction to the unit torus. Equivalently, the real–space form is
+
+$$
+\Theta^{(\mathrm{pos})}_j
+=\sum_{n\in\mathbb Z^{2N}} e^{-\pi\,t\,(\delta z+n)^\dagger A^{(\mathrm{pos})}_j(\delta z+n)}.
+\tag{A.5}
+$$
+
+The two series are equal for all $t>0$.&#x20;
+
+In the CPSF implementation, the dual quadratic form and phase are realized via
+
+$$
+y=R(\vec d_j)^\dagger k\in\mathbb C^N,\qquad
+\mathsf{quad}_k=\sigma_{\perp j}\sum_{i=1}^N |y_i|^2+(\sigma_{\parallel j}-\sigma_{\perp j})\,|y_1|^2,
+$$
+
+$$
+\mathrm{phase}(k)=\exp\!\big(2\pi i\,k\cdot \mathrm{frac}(\delta z)\big),
+$$
+
+so that (A.4) is computed as
+
+$$
+\Theta^{(\mathrm{pos})}_j
+=\Big(\sigma_{\parallel j}\,\sigma_{\perp j}^{\,N-1}\Big)\,t^{-N}
+\sum_{k\in\mathbb Z^{2N}} \exp\!\big(-(\pi/t)\,\mathsf{quad}_k\big)\,\mathrm{phase}(k),
+\tag{A.6}
+$$
+
+using the complex–$N$ convention $\big(\det_{\mathbb R}A^{(\mathrm{pos})}_j\big)^{-1/2}=\det_{\mathbb C}\Sigma^{(\mathrm{pos})}_j=\sigma_{\parallel j}\sigma_{\perp j}^{N-1}$.&#x20;
+
+## A.3. Directional factor
+
+The non–periodized directional factor is
+
+$$
+C^{(\mathrm{dir})}_j
+=\exp\!\Big(-\pi\,q_j\big(\iota(0,\delta\vec d)\big)\Big)
+=\exp\!\big(-\pi\,\delta\vec d^\dagger A^{(\mathrm{dir})}_j\,\delta\vec d\big).
+\tag{A.7}
+$$
+
+This factor has no lattice sum.&#x20;
+
+## A.4. Final Poisson–dual formula for $\eta_j$ and $T$
+
+Combining (A.2), (A.6), (A.7),
+
+$$
+\eta_j(z,\vec d)
+=
+\bigg[\exp\!\big(-\pi\,\delta\vec d^\dagger A^{(\mathrm{dir})}_j\,\delta\vec d\big)\bigg]\,
+\bigg[\Big(\sigma_{\parallel j}\,\sigma_{\perp j}^{\,N-1}\Big)\,t^{-N}
+\sum_{k\in\mathbb Z^{2N}} e^{-(\pi/t)\,\mathsf{quad}_k}\,e^{2\pi i\,k\cdot \mathrm{frac}(\delta z)}\bigg],
+\tag{A.8}
+$$
+
+and
+
+$$
+T(z,\vec d)=\sum_j\big(\alpha_j\,\mathrm{Re}\,\eta_j(z,\vec d)\big)\,\hat T_j.
+\tag{A.9}
+$$
+
+Equations (A.8)–(A.9) are the source–of–truth for the procedures `T_PD_window` and `T_PD_full`.&#x20;
+
+## A.5. Discrete truncation bounds (L∞ windows)
+
+Let $d=2N$, $A_d(m)=(2m{+}1)^d-(2m{-}1)^d$. For a dual L∞ window $\|k\|_\infty\le L$,
+
+$$
+\sum_{\|k\|_\infty>L}\exp\!\Big(-\tfrac{\pi}{t}\,k^\top (A^{(\mathrm{pos})}_j)^{-1}k\Big)
+\ \le\
+\sum_{m=L+1}^\infty A_{d}(m)\,\exp\!\Big(-\tfrac{\pi}{t}\,\sigma_{\min j}\,m^2\Big),
+\quad \sigma_{\min j}=\min(\sigma_{\parallel j},\sigma_{\perp j}).
+\tag{A.10}
+$$
+
+For a real L∞ window $\|n\|_\infty\le L$,
+
+$$
+\sum_{\|n\|_\infty>L} e^{-\pi\,t\,(\delta z+n)^\dagger A^{(\mathrm{pos})}_j(\delta z+n)}
+\ \le\
+\sum_{m=L+1}^\infty A_{d}(m)\,\exp\!\Big(-\pi\,t\,\tfrac{m^2}{\sigma_{\max j}}\Big),
+\quad \sigma_{\max j}=\max(\sigma_{\parallel j},\sigma_{\perp j}).
+\tag{A.11}
+$$
+
+These bounds control truncation errors for either representation; no lattice appears in the directional factor.&#x20;
+
+## A.6. Invariance properties
+
+(i) Torus periodicity: replacing $\delta z$ by $\delta z+n_0$, $n_0\in\mathbb Z^{2N}$, leaves $\eta_j$ invariant (phase $e^{2\pi i k\cdot n_0}\equiv 1$).
+(ii) No directional lattice: $C^{(\mathrm{dir})}_j$ depends solely on $\delta\vec d$.
+(iii) $t$–invariance for the infinite sums: (A.4)=(A.5) for all $t>0$.&#x20;
+
+## A.7. Algorithmic form (streamed over packs)
+
+Let packs be $\{(\_,\_,\mathcal K_\nu)\}_\nu$ with $\mathcal K_\nu\subset\mathbb Z^{2N}$ finite. For each $\nu$,
+
+$$
+\Theta^{(\mathrm{pos})}_j[\nu]
+=\Big(\sigma_{\parallel j}\,\sigma_{\perp j}^{\,N-1}\Big)\,t^{-N}
+\sum_{k\in\mathcal K_\nu} e^{-(\pi/t)\,\mathsf{quad}_k}\,e^{2\pi i\,k\cdot \mathrm{frac}(\delta z)},
+\quad
+\eta_j[\nu]=C^{(\mathrm{dir})}_j\,\Theta^{(\mathrm{pos})}_j[\nu],
+$$
+
+$$
+T_\nu=\sum_j \big(\alpha_j\,\mathrm{Re}\,\eta_j[\nu]\big)\,\hat T_j,\qquad
+T=\sum_\nu T_\nu.
+\tag{A.12}
+$$
+
+Optional early–stopping decisions are applied on $\{T_\nu\}$ via absolute/relative pack norms; the mathematical sum is order–invariant when no stopping is applied. This streaming realization corresponds to `T_PD_full`.&#x20;
