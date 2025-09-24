@@ -1,9 +1,9 @@
 # Run examples:
-# > python -m dyna.lib.cpsf.benchmark.benchmark_CPSF_T_PD_window_vs_T_classic_window --N 4 --M 8 --S 16 --W 2 --batch 8 --dtype_z c64 --dtype_T c64 --device cuda --iters 25 --warmup 5
-# > python -m dyna.lib.cpsf.benchmark.benchmark_CPSF_T_PD_window_vs_T_classic_window --N 4 --M 4 --S 16 --W 3 --batch 2 --dtype_z c64 --dtype_T c64 --device cuda --iters 25 --warmup 5
+# > python -m dyna.lib.cpsf.benchmark.benchmark_CPSF_T_PD_window_dual_vs_T_classic_window --N 4 --M 8 --S 16 --W 2 --batch 8 --dtype_z c64 --dtype_T c64 --device cuda --iters 25 --warmup 5
+# > python -m dyna.lib.cpsf.benchmark.benchmark_CPSF_T_PD_window_dual_vs_T_classic_window --N 4 --M 4 --S 16 --W 3 --batch 2 --dtype_z c64 --dtype_T c64 --device cuda --iters 25 --warmup 5
 #
 # Notes:
-# - Compares monolithic window modes: T_classic_window() vs T_PD_window() on equally-sized index sets.
+# - Compares monolithic window modes: T_classic_window() vs T_PD_window_dual() on equally-sized index sets.
 # - "Offsets" for classic are positional lattice shifts n in Z^{2N}; for PD they are dual modes k in Z^{2N}.
 # - Throughput is reported as eta-terms/s = (B * M * O) / (avg_time_seconds).
 
@@ -11,7 +11,7 @@ import argparse, time, torch
 from torch.profiler import profile, ProfilerActivity, schedule
 
 from dyna.lib.cpsf.functional.core_math import T_classic_window
-from dyna.lib.cpsf.functional.t_pd import T_PD_window
+from dyna.lib.cpsf.functional.t_pd import T_PD_window_dual
 from dyna.lib.cpsf.periodization import CPSFPeriodization
 
 def _fmt_bytes(x: int) -> str:
@@ -178,7 +178,7 @@ def main():
 
     def warmup_pd():
         for _ in range(args.warmup):
-            _ = T_PD_window(
+            _ = T_PD_window_dual(
                 z=z,
                 z_j=z_j,
                 vec_d=vec_d,
@@ -206,7 +206,7 @@ def main():
         _profile_block(
             dev,
             steps=5,
-            body=lambda: T_PD_window(
+            body=lambda: T_PD_window_dual(
                 z=z,
                 z_j=z_j,
                 vec_d=vec_d,
@@ -274,7 +274,7 @@ def main():
         for _ in range(args.iters):
             dt_ms, peak, alloc, out = _time_block(
                 dev,
-                lambda: T_PD_window(
+                lambda: T_PD_window_dual(
                     z=z,
                     z_j=z_j,
                     vec_d=vec_d,
@@ -298,7 +298,7 @@ def main():
         secs = avg / 1e3
         thr_terms = (B * M * O) / secs
         thr_points = B / secs
-        print("\n=== T_PD_window (dual positional modes) ===")
+        print("\n=== T_PD_window_dual (dual positional modes) ===")
         print(f"O={O:,} k-modes, B={B:,}, M={M:,}, S={S:,}, t={args.t}")
         print(f"Avg time/iter: {avg:.3f} ms  (± {std:.3f} ms)")
         print(f"Throughput:    {thr_terms:,.0f} eta-terms/s   (B*M*O)")

@@ -12,7 +12,7 @@ from dyna.lib.cpsf.functional.core_math import (
 )
 
 
-def T_PD_window(
+def T_PD_window_dual(
     *,
     z: torch.Tensor,
     z_j: torch.Tensor,
@@ -23,7 +23,7 @@ def T_PD_window(
     sigma_par: torch.Tensor,
     sigma_perp: torch.Tensor,
     offsets: torch.Tensor,  # Dual-space k modes on Z^{2N}
-    t: float = 1.0,  # Poisson/Ewald scale, t > 0
+    t: float = 1.0,  # Poisson/Ewald scale, for any t>0 - exact
     R_j: Optional[torch.Tensor] = None,
 ) -> torch.Tensor:
     if t <= 0.0:
