@@ -85,7 +85,7 @@ def T_PD_window(
     ang = (2.0 * pi).to(dot.dtype) * dot
     phase = torch.polar(torch.ones_like(ang), ang)
 
-    # Prefactor: det(Sigma_pos) / t^N  (complex-N convention)
+    # Prefactor: det(A_pos) / t^N  (complex-N convention)
     prefac = (sigma_par * (sigma_perp ** (N - 1))) / (
         t**N
     )  # [B, M] - No sqrt! C^{N}, not R^{2N}
