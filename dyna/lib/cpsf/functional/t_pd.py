@@ -30,6 +30,7 @@ def T_PD_window(
     if t <= 0.0:
         raise ValueError("T_PD_window: t must be > 0.")
 
+    device = z.device
     r_dtype = z.real.dtype
     B, M, N = vec_d_j.shape
 
@@ -40,9 +41,10 @@ def T_PD_window(
     dd = delta_vec_d(vec_d, vec_d_j)
 
     Rmat = R(vec_d_j) if R_j is None else R_j
+    pi = torch.tensor(math.pi, dtype=r_dtype, device=device)
 
-    k_r = offsets[:, :N].to(r_dtype)
-    k_i = offsets[:, N:].to(r_dtype)
+    k_r = offsets[:, :N].to(device=device, dtype=r_dtype)
+    k_i = offsets[:, N:].to(device=device, dtype=r_dtype)
     k_c = torch.complex(k_r, k_i)
     RH = Rmat.conj().transpose(-2, -1)
     y = torch.einsum("bmnk,ok->bmon", RH, k_c)
@@ -55,9 +57,9 @@ def T_PD_window(
     dot = (k_r.unsqueeze(0).unsqueeze(0) * dz.real.unsqueeze(2)).sum(dim=-1) + (
         k_i.unsqueeze(0).unsqueeze(0) * dz.imag.unsqueeze(2)
     ).sum(dim=-1)
-    phase = torch.exp(2j * math.pi * dot)
+    phase = torch.exp(2j * pi * dot)
     prefac = (sigma_par * (sigma_perp ** (N - 1))) / (t**N)
-    weight = torch.exp(-(math.pi / t) * quad_k) * phase
+    weight = torch.exp(-(pi / t) * quad_k) * phase
     Theta_pos = (prefac.unsqueeze(-1) * weight).sum(dim=-1)
 
     Rext = R_ext(Rmat)
@@ -74,9 +76,9 @@ def T_PD_window(
         q_cap = torch.as_tensor(q_max, dtype=q_dir.dtype, device=q_dir.device)
         q_dir = torch.clamp(q_dir, max=q_cap)
 
-    C_dir_j = torch.exp(-math.pi * q_dir)
-    eta_j = C_dir_j * Theta_pos
-    w = (alpha_j.to(T_hat_j.real.dtype) * eta_j.real).unsqueeze(-1)
+    C_dir_j = torch.exp(-pi * q_dir)
+    eta_j = (C_dir_j * Theta_pos).real.to(T_hat_j.real.dtype)
+    w = (alpha_j.to(T_hat_j.real.dtype) * eta_j).unsqueeze(-1)
     T = w * T_hat_j
     T_out = T.sum(dim=1)
 
