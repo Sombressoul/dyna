@@ -25,7 +25,6 @@ def T_PD_window(
     offsets: torch.Tensor,  # Dual-space k modes on Z^{2N}
     t: float = 1.0,  # Poisson/Ewald scale, t > 0
     R_j: Optional[torch.Tensor] = None,
-    q_max: Optional[float] = None,  # Warning: introduces positive bias
 ) -> torch.Tensor:
     if t <= 0.0:
         raise ValueError("T_PD_window: t must be > 0.")
@@ -78,11 +77,6 @@ def T_PD_window(
         sigma_par=sigma_par,
         sigma_perp=sigma_perp,
     )
-
-    if q_max is not None:
-        q_cap = torch.as_tensor(q_max, dtype=q_dir.dtype, device=q_dir.device)
-        q_dir = torch.clamp(q_dir, max=q_cap)
-
     C_dir_j = torch.exp(-pi * q_dir)
     eta_j = (C_dir_j * Theta_pos).real.to(T_hat_j.real.dtype)
     w = (alpha_j.to(T_hat_j.real.dtype) * eta_j).unsqueeze(-1)
