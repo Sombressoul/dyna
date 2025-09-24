@@ -94,6 +94,7 @@ def T_PD_window(
       depends on the window size and t (standard Ewald trade-off).
     - Peak memory ~ O(B * M * O) due to per-k accumulation.
     """
+
     if t <= 0.0:
         raise ValueError("T_PD_window: t must be > 0.")
 
@@ -185,6 +186,107 @@ def T_PD_full(
     tol_rel: Optional[float] = None,
     consecutive_below: int = 1,
 ) -> torch.Tensor:
+    """
+    CPSF field via Poisson-dual (PD) FULL streaming over k-mode packs.
+
+    Purpose
+    -------
+    Streams dual k-modes (integer lattice in Z^{2N}) in packs and accumulates
+    T(z, vec_d) using the Poisson-dual representation of the positional lattice
+    sum and a closed-form directional Gaussian factor. Supports optional early
+    stopping by absolute/relative tolerances. The scale t>0 is the Poisson/Ewald
+    parameter (the infinite sum is t-invariant; with finite packs, t trades off
+    decay between real/dual sides).
+
+    Shapes and Dtypes
+    -----------------
+    Let:
+    - B: batch dimension
+    - N: ambient dimension
+    - M: number of contributions (atoms)
+    - S: output channels / field dimension
+    - O_k: number of dual k-modes in the k-th pack
+
+    Required tensor shapes:
+    - z             : [B, N]            (complex)
+    - z_j           : [B, M, N]         (complex)
+    - vec_d         : [B, N]            (same dtype as z)
+    - vec_d_j       : [B, M, N]         (same dtype as z)
+    - T_hat_j       : [B, M, S]         (complex, contributes to final T)
+    - alpha_j       : [B, M]            (real)
+    - sigma_par     : [B, M]            (real; parallel scale)
+    - sigma_perp    : [B, M]            (real; perpendicular scale)
+    - packs         : iterable of (meta_a: int, meta_b: int, offsets_2N: LongTensor),
+                      where offsets_2N has shape [O_k, 2N] and encodes integer k in Z^{2N};
+                      first N columns -> real part, last N -> imaginary.
+                      The two integers are opaque pack metadata (not used here).
+    - R_j (opt)     : [B, M, N, N]      (dtype compatible with q())
+    - t (opt)       : float > 0         (Poisson/Ewald scale)
+    - tol_abs (opt) : float or None     (absolute pack stopping threshold)
+    - tol_rel (opt) : float or None     (relative-to-accumulated threshold)
+    - consecutive_below : int >= 1      (number of consecutive "small" packs to stop)
+
+    Semantics
+    ---------
+    - Only the positional block is periodized/summed. The directional block is NOT
+      periodized; it contributes a multiplicative Gaussian factor:
+
+        C_dir = exp(-pi * q([0, delta_vec_d]))
+        with Sigma built from (sigma_par, sigma_perp) and R_ext(R(vec_d_j)).
+
+    - Positional sum is evaluated in the dual (k) domain per pack:
+
+        y = R(vec_d_j)^H * k            (complex N-vector per k),
+        quad_k = sigma_perp * sum_i |y_i|^2 + (sigma_par - sigma_perp) * |y_0|^2,
+        phase  = exp(2*pi*i * k dot frac(delta_z)),
+        Theta_pos(pack) = (sigma_par * sigma_perp^(N-1) / t^N) *
+                          sum_{k in pack} exp(-(pi/t)*quad_k) * phase.
+
+        Here frac(delta_z) is taken componentwise on the unit torus.
+
+    - Contribution per pack:
+
+        eta_pack = C_dir * Theta_pos(pack),
+        T_delta  = sum_j (alpha_j * Re(eta_pack)) * T_hat_j.
+
+    - Streaming reduction:
+
+        T_acc <- T_acc + T_delta for each pack, in input order.
+
+    - Early stopping (optional):
+
+        Let pack_max = max-norm of T_delta over [B,S], acc_max = max-norm of T_acc.
+        A pack counts as "below" if either:
+
+          (tol_abs is not None and pack_max <= tol_abs), or
+          (tol_rel is not None and acc_max > 0 and pack_max <= tol_rel * acc_max).
+
+        Stop once "below" has occurred consecutively `consecutive_below` times.
+        Effectiveness depends on upstream pack ordering; mathematical sum is order
+        invariant when early stopping is disabled.
+
+    - Row order inside each offsets_2N is non-contractual; sorting affects only order.
+      No assumptions are made about pack order.
+
+    Returns
+    -------
+    T : [B, S] (complex, same dtype as T_hat_j)
+
+    Notes
+    -----
+    - Exact w.r.t. the infinite lattice for any t>0. With finite packs/windows,
+      accuracy depends on total k-coverage and on t (standard Ewald trade-off).
+    - Peak memory ~ O(B * M * max_k O_k) since only the current pack is materialized.
+
+    Algorithm (brief)
+    -----------------
+    1) Build the directional factor C_dir via q([0, delta_vec_d]) with R_ext and sigmas.
+    2) For each pack of k, rotate k by R^H, form quad_k and the torus phase, accumulate
+       Theta_pos(pack) with the prefactor (sigma_par * sigma_perp^(N-1) / t^N).
+    3) Multiply by C_dir, take real part of eta, weight by alpha_j and T_hat_j, stream
+       into T_acc; optionally apply early stopping based on pack/accumulator norms.
+    """
+
     if t <= 0.0:
         raise ValueError("T_PD_full: t must be > 0.")
 
@@ -218,8 +320,8 @@ def T_PD_full(
     dz_re_frac = torch.remainder(dz.real, 1.0)  # [B,M,N]
     dz_im_frac = torch.remainder(dz.imag, 1.0)  # [B,M,N]
 
-    # Prefactor (complex-N convention): det_C(Sigma_pos) / t^N
-    prefac = (sigma_par * (sigma_perp ** (N - 1))) / (t**N)  # [B,M], no sqrt
+    # Prefactor (complex-N convention)
+    prefac = (sigma_par * (sigma_perp ** (N - 1))) / (t**N)  # [B,M], complex, no sqrt
 
     # Accumulators
     T_acc = torch.zeros(B, T_hat_j.shape[-1], dtype=T_hat_j.dtype, device=device)
@@ -235,8 +337,7 @@ def T_PD_full(
         k_i = offsets[:, N:].to(device=device, dtype=r_dtype)  # [O,N]
         k_c = torch.complex(k_r, k_i)  # [O,N]
 
-        # Dual quadratic form: k^T A_pos^{-1} k = sigma_perp*||y||^2 + (sigma_par-sigma_perp)*|y_0|^2
-        # where y = R^H k
+        # y = R^H k
         y = torch.einsum("bmnk,ok->bmon", RH, k_c)  # [B,M,O,N]
         y_abs2 = (y.real**2) + (y.imag**2)
         s = y_abs2.sum(dim=-1)  # [B,M,O]
@@ -245,7 +346,7 @@ def T_PD_full(
             (sigma_par - sigma_perp).unsqueeze(-1) * p_abs2
         )  # [B,M,O]
 
-        # Phase: exp(2π i k · frac(dz))
+        # Phase
         dot = (k_r.unsqueeze(0).unsqueeze(0) * dz_re_frac.unsqueeze(2)).sum(dim=-1) + (
             k_i.unsqueeze(0).unsqueeze(0) * dz_im_frac.unsqueeze(2)
         ).sum(
