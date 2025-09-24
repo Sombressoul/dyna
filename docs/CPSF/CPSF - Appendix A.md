@@ -177,9 +177,11 @@ These bounds control truncation errors for either representation; no lattice app
 
 ## A.6. Invariance properties
 
-(i) Torus periodicity: replacing $\delta z$ by $\delta z+n_0$, $n_0\in\mathbb Z^{2N}$, leaves $\eta_j$ invariant (phase $e^{2\pi i k\cdot n_0}\equiv 1$).
-(ii) No directional lattice: $C^{(\mathrm{dir})}_j$ depends solely on $\delta\vec d$.
-(iii) $t$–invariance for the infinite sums: (A.4)=(A.5) for all $t>0$.&#x20;
+(i) Torus periodicity: replacing $\delta z$ by $\delta z+n_0$, $n_0\in\mathbb Z^{2N}$, leaves $\eta_j$ invariant (phase $e^{2\pi i k\cdot n_0}\equiv 1$). 
+
+(ii) No directional lattice: $C^{(\mathrm{dir})}_j$ depends solely on $\delta\vec d$. 
+
+(iii) $t$–invariance for the infinite sums: (A.4)=(A.5) for all $t>0$.&#x20; 
 
 ## A.7. Algorithmic form (streamed over packs)
 
