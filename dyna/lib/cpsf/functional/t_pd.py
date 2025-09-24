@@ -57,7 +57,7 @@ def T_PD_window(
     dot = (k_r.unsqueeze(0).unsqueeze(0) * torch.frac(dz.real).unsqueeze(2)).sum(
         dim=-1
     ) + (k_i.unsqueeze(0).unsqueeze(0) * torch.frac(dz.imag).unsqueeze(2)).sum(dim=-1)
-    two_pi_i = (2.0 * pi).to(dot.dtype) * 1j
+    two_pi_i = ((2.0 * pi).to(dot.dtype) * 1j).to(k_c.dtype)
     phase = torch.exp(two_pi_i * dot)
     prefac = (sigma_par * (sigma_perp ** (N - 1))) / (t**N)
     weight = torch.exp(-(pi / t) * quad_k) * phase
