@@ -28,7 +28,7 @@ def T_PD_window(
     q_max: Optional[float] = None,  # Warning: introduces positive bias
 ) -> torch.Tensor:
     if t <= 0.0:
-        raise ValueError("T_positional_dual_window: t must be > 0.")
+        raise ValueError("T_PD_window: t must be > 0.")
 
     r_dtype = z.real.dtype
     B, M, N = vec_d_j.shape
