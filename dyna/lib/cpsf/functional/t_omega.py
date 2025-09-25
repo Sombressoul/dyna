@@ -5,7 +5,7 @@ from dyna.lib.cpsf.functional.core_math import (
 )
 
 
-def T_Omega_ZFrame(
+def _t_omega_zero_frame(
     *,
     z: torch.Tensor,  # [B, M, N] (complex)
     z_j: torch.Tensor,  # [B, M, N] (complex)
@@ -61,7 +61,7 @@ def T_Omega(
     vec_d = vec_d.unsqueeze(1).expand(B, M, N)
 
     # Get 0-frame
-    zero_frame = T_Omega_ZFrame(
+    zero_frame = _t_omega_zero_frame(
         z=z,
         z_j=z_j,
         vec_d=vec_d,
