@@ -153,4 +153,5 @@ def _hyp1f1_half_negx_gauss_jacobi(
         y[m_neg] = y_neg
     if m_pos.any():
         y[m_pos] = y_pos
+
     return y
