@@ -1,15 +1,18 @@
-# Run examples:
-# > python -m dyna.lib.cpsf.benchmark.benchmark_CPSF_T_Omega_vs_T_classic_window_Tail --N 4 --M 8 --S 16 --batch 8 --W 1 --sp_mean 0.9 --sq_mean 0.5 --dtype_z c64 --dtype_T c64 --device cuda --iters 25 --warmup 5
+# > python -m dyna.lib.cpsf.benchmark.benchmark_CPSF_T_Omega_vs_T_classic_window_Tail --N 3 --M 8 --S 16 --batch 8 --W 3 --sp_mean 2.5 --sq_mean 0.5 --dtype_z c64 --dtype_T c64 --device cuda --iters 100 --warmup 10
+# > python -m dyna.lib.cpsf.benchmark.benchmark_CPSF_T_Omega_vs_T_classic_window_Tail --N 3 --M 8 --S 16 --batch 8 --W 3 --sp_mean 0.75 --sq_mean 0.25 --dtype_z c64 --dtype_T c64 --device cuda --iters 100 --warmup 10
+# > python -m dyna.lib.cpsf.benchmark.benchmark_CPSF_T_Omega_vs_T_classic_window_Tail --N 2 --M 4 --S 16 --batch 2 --W 21 --sp_mean 2.5 --sq_mean 0.5 --dtype_z c64 --dtype_T c64 --device cuda --iters 100 --warmup 10
+# > python -m dyna.lib.cpsf.benchmark.benchmark_CPSF_T_Omega_vs_T_classic_window_Tail --N 2 --M 4 --S 16 --batch 2 --W 21 --sp_mean 0.75 --sq_mean 0.25 --dtype_z c64 --dtype_T c64 --device cuda --iters 100 --warmup 10
 
-import argparse, time, math, torch
+import argparse, time, torch
 
 from dyna.lib.cpsf.periodization import CPSFPeriodization
 from dyna.lib.cpsf.functional.core_math import T_classic_window
 from dyna.lib.cpsf.functional.t_omega import T_Omega
 
 
-def TEST_ZERO_FRAME(*args, **kwargs) -> torch.Tensor:
+def TEST_TAIL(*args, **kwargs) -> torch.Tensor:
     return T_Omega(return_components="tail", *args, **kwargs)
+
 
 def _fmt_bytes(x: int) -> str:
     u = ["B", "KB", "MB", "GB", "TB"]
@@ -72,6 +75,10 @@ def _make_cplx(
     return z
 
 
+def _dtype_name(dt: torch.dtype) -> str:
+    return "torch.complex64" if dt == torch.complex64 else "torch.complex128"
+
+
 @torch.no_grad()
 def main():
     ap = argparse.ArgumentParser()
@@ -84,16 +91,26 @@ def main():
     ap.add_argument("--device", choices=["auto", "cpu", "cuda"], default="auto")
     ap.add_argument("--iters", type=int, default=50)
     ap.add_argument("--warmup", type=int, default=10)
-    ap.add_argument("--W", type=int, default=2, help="window radius for classic comparison")
+    ap.add_argument(
+        "--W", type=int, default=2, help="window radius for classic comparison"
+    )
     ap.add_argument("--sp_mean", type=float, default=0.9, help="sigma_par mean")
     ap.add_argument("--sq_mean", type=float, default=0.5, help="sigma_perp mean")
+    ap.add_argument(
+        "--rtol", type=float, default=None, help="rtol for allclose (default by dtype)"
+    )
+    ap.add_argument(
+        "--atol", type=float, default=None, help="atol for allclose (default by dtype)"
+    )
+    ap.add_argument(
+        "--tail_label",
+        type=str,
+        default="Proposed tail",
+        help="label for proposed method",
+    )
     args = ap.parse_args()
 
     dev = _pick_device(args.device)
-    try:
-        torch.set_default_device(dev.type)
-    except Exception:
-        pass
 
     dtype_z = torch.complex64 if args.dtype_z == "c64" else torch.complex128
     dtype_T = torch.complex64 if args.dtype_T == "c64" else torch.complex128
@@ -107,48 +124,58 @@ def main():
         raise SystemExit("CPSF requires N >= 2.")
 
     print(
-        f"Device={dev.type}, dtype_z={dtype_z}, dtype_T={dtype_T}, B={B}, M={M}, S={S}, N={N}, W={W}, "
-        f"iters={args.iters}, warmup={args.warmup}"
+        f"Device={dev.type}, dtype_z={_dtype_name(dtype_z)}, dtype_T={_dtype_name(dtype_T)}, "
+        f"B={B}, M={M}, S={S}, N={N}, W={W}, iters={args.iters}, warmup={args.warmup}"
     )
     print(f"sigmas: sigma_perp(mean)={args.sq_mean}, sigma_par(mean)={args.sp_mean}")
 
     gen = CPSFPeriodization()
-    offsets_W = gen.window(N=N, W=W, device=dev, sorted=False)   # [O, 2N]
-    offsets_0 = gen.window(N=N, W=0, device=dev, sorted=False)   # [1, 2N]
-    O, O0 = int(offsets_W.shape[0]), 1
-    assert O0 == int(offsets_0.shape[0]) == 1
-    print(f"window size: O(W)={O}, O(0)={O0}")
+    offsets_W = gen.window(N=N, W=W, device=dev, sorted=False)
+    offsets_0 = gen.window(N=N, W=0, device=dev, sorted=False)
+    O, O0 = int(offsets_W.shape[0]), int(offsets_0.shape[0])
+    assert O0 == 1
+    print(f"window size: O(W)={O:,}, O(0)={O0}")
 
-    # Inputs
-    z = _make_cplx(B, N, dtype=dtype_z, device=dev, seed=10, unitize=False)               # [B,N]
-    z_j = _make_cplx(B * M, N, dtype=dtype_z, device=dev, seed=20, unitize=False).view(B, M, N)  # [B,M,N]
-    vec_d = _make_cplx(B, N, dtype=dtype_z, device=dev, seed=30, unitize=True)            # [B,N]
-    vec_d_j = _make_cplx(B * M, N, dtype=dtype_z, device=dev, seed=40, unitize=True).view(B, M, N)  # [B,M,N]
+    z = _make_cplx(B, N, dtype=dtype_z, device=dev, seed=10, unitize=False)
+    z_j = _make_cplx(B * M, N, dtype=dtype_z, device=dev, seed=20, unitize=False).view(
+        B, M, N
+    )
+    vec_d = _make_cplx(B, N, dtype=dtype_z, device=dev, seed=30, unitize=True)
+    vec_d_j = _make_cplx(
+        B * M, N, dtype=dtype_z, device=dev, seed=40, unitize=True
+    ).view(B, M, N)
 
-    alpha_j = 0.2 + 1.3 * torch.rand(B, M, device=dev, dtype=REAL_T)                      # [B,M]
-    sigma_perp = torch.full((B, M), float(args.sq_mean), device=dev, dtype=REAL_z)        # [B,M]
-    sigma_par  = torch.full((B, M), float(args.sp_mean), device=dev, dtype=REAL_z)        # [B,M]
+    alpha_j = 0.2 + 1.3 * torch.rand(B, M, device=dev, dtype=REAL_T)
+    sigma_perp = torch.full((B, M), float(args.sq_mean), device=dev, dtype=REAL_z)
+    sigma_par = torch.full((B, M), float(args.sp_mean), device=dev, dtype=REAL_z)
 
     Tr = torch.randn(B, M, S, device=dev, dtype=REAL_T)
     Ti = torch.randn(B, M, S, device=dev, dtype=REAL_T)
-    T_hat_j = torch.complex(Tr, Ti).to(dtype_T)                                           # [B,M,S]
+    T_hat_j = torch.complex(Tr, Ti).to(dtype_T)
 
-    # Precompute zero-frame via classic W=0 (reference part)
     ref_zero = T_classic_window(
         z, z_j, vec_d, vec_d_j, T_hat_j, alpha_j, sigma_par, sigma_perp, offsets_0
-    )  # [B,S]
+    )
 
     def warmup_classic_tails():
         for _ in range(args.warmup):
             out_W = T_classic_window(
-                z, z_j, vec_d, vec_d_j, T_hat_j, alpha_j, sigma_par, sigma_perp, offsets_W
+                z,
+                z_j,
+                vec_d,
+                vec_d_j,
+                T_hat_j,
+                alpha_j,
+                sigma_par,
+                sigma_perp,
+                offsets_W,
             )
             _ = (out_W - ref_zero).real.sum().item()
         _sync(dev)
 
     def warmup_tail():
         for _ in range(args.warmup):
-            _ = TEST_ZERO_FRAME(
+            _ = TEST_TAIL(
                 z=z,
                 z_j=z_j,
                 vec_d=vec_d,
@@ -167,17 +194,25 @@ def main():
             torch.cuda.empty_cache()
             torch.cuda.reset_peak_memory_stats()
         for _ in range(args.iters):
-            dt_ms, peak, alloc, out = _time_block(
+            dt_ms, peak, alloc, outW = _time_block(
                 dev,
                 lambda: T_classic_window(
-                    z, z_j, vec_d, vec_d_j, T_hat_j, alpha_j, sigma_par, sigma_perp, offsets_W
+                    z,
+                    z_j,
+                    vec_d,
+                    vec_d_j,
+                    T_hat_j,
+                    alpha_j,
+                    sigma_par,
+                    sigma_perp,
+                    offsets_W,
                 ),
             )
-            _ = (out - ref_zero).real.sum().item()
+            _ = (outW - ref_zero).real.sum().item()
             times.append(dt_ms)
-            if peak:
+            if peak is not None:
                 peak_max = max(peak_max, peak)
-            if alloc:
+            if alloc is not None:
                 alloc_max = max(alloc_max, alloc)
         avg = sum(times) / len(times)
         std = (sum((t - avg) ** 2 for t in times) / max(1, len(times) - 1)) ** 0.5
@@ -185,14 +220,14 @@ def main():
         thr_terms = (B * M * max(0, O - O0)) / max(1e-12, secs)
         thr_points = B / max(1e-12, secs)
         print("\n=== Classic tails: T_classic_window(W) - T_classic_window(0) ===")
-        print(f"O={O} (W={W}) offsets, tail terms per (B,M): {O-1}")
+        print(f"O={O:,} (W={W}) offsets, tail terms per (B,M): {O - 1:,}")
         print(f"Avg time/iter: {avg:.3f} ms  (± {std:.3f} ms)")
         print(f"Throughput:    {thr_terms:,.0f} terms/s    (B*M*(O-1))")
         print(f"Per-target:    {thr_points:,.0f} points/s  (B)")
         if dev.type == "cuda":
             print(f"CUDA peak mem (max):   {_fmt_bytes(peak_max)}")
             print(f"CUDA alloc Δ (max):    {_fmt_bytes(alloc_max)}")
-        return avg, std, thr_terms, thr_points, out - ref_zero
+        return avg, std, thr_terms, thr_points, (outW - ref_zero)
 
     def bench_tail():
         warmup_tail()
@@ -203,7 +238,7 @@ def main():
         for _ in range(args.iters):
             dt_ms, peak, alloc, out = _time_block(
                 dev,
-                lambda: TEST_ZERO_FRAME(
+                lambda: TEST_TAIL(
                     z=z,
                     z_j=z_j,
                     vec_d=vec_d,
@@ -216,16 +251,16 @@ def main():
             )
             _ = out.real.sum().item()
             times.append(dt_ms)
-            if peak:
+            if peak is not None:
                 peak_max = max(peak_max, peak)
-            if alloc:
+            if alloc is not None:
                 alloc_max = max(alloc_max, alloc)
         avg = sum(times) / len(times)
         std = (sum((t - avg) ** 2 for t in times) / max(1, len(times) - 1)) ** 0.5
         secs = avg / 1e3
-        thr_terms = (B * M) / max(1e-12, secs)  # one tail eval per (B,M)
+        thr_terms = (B * M) / max(1e-12, secs)
         thr_points = B / max(1e-12, secs)
-        print("\n=== Proposed tail (IE1 + no-grid) ===")
+        print(f"\n=== {args.tail_label} ===")
         print(f"O(effective)=1, B={B:,}, M={M:,}, S={S:,}")
         print(f"Avg time/iter: {avg:.3f} ms  (± {std:.3f} ms)")
         print(f"Throughput:    {thr_terms:,.0f} terms/s    (B*M)")
@@ -239,9 +274,9 @@ def main():
     res_classic = bench_classic_tails()
     res_tail = bench_tail()
 
-    # NUMERIC CHECK vs classic window tails (finite W)
-    ref_tail = res_classic[-1]
-    out_tail = res_tail[-1]
+    # NUMERIC CHECK
+    ref_tail = res_classic[-1].to(dtype_T)
+    out_tail = res_tail[-1].to(dtype_T)
 
     abs_diff = (ref_tail - out_tail).abs()
     rel_diff = abs_diff / ref_tail.abs().clamp_min(1e-32)
@@ -249,8 +284,10 @@ def main():
     amean = abs_diff.mean().item()
     rmax = rel_diff.max().item()
     rmean = rel_diff.mean().item()
-    rtol = 1e-5 if dtype_T == torch.complex64 else 1e-12
-    atol = 1e-6 if dtype_T == torch.complex64 else 1e-12
+    default_rtol = 1e-5 if dtype_T == torch.complex64 else 1e-12
+    default_atol = 1e-6 if dtype_T == torch.complex64 else 1e-12
+    rtol = default_rtol if args.rtol is None else float(args.rtol)
+    atol = default_atol if args.atol is None else float(args.atol)
     ok = torch.allclose(ref_tail, out_tail, rtol=rtol, atol=atol)
 
     print("\n=== Numeric equivalence: classic tails (W) vs proposed tail ===")
@@ -258,12 +295,13 @@ def main():
     print(f"Rel diff: max={rmax:.3e}, mean={rmean:.3e}")
     print(f"allclose(rtol={rtol}, atol={atol}) -> {ok}")
 
-    # SPEED SUMMARY
     t_c = res_classic[0]
     t_t = res_tail[0]
     speedup = t_c / max(1e-9, t_t)
     print("\n=== Summary ===")
-    print(f"Classic tails avg: {t_c:.3f} ms | Proposed tail avg: {t_t:.3f} ms | speedup: {speedup:.2f}×")
+    print(
+        f"Classic tails avg: {t_c:.3f} ms | Proposed tail avg: {t_t:.3f} ms | speedup: {speedup:.2f}×"
+    )
 
 
 if __name__ == "__main__":
