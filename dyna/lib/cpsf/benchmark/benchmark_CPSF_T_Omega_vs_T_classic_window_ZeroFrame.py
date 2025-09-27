@@ -7,6 +7,8 @@ from dyna.lib.cpsf.periodization import CPSFPeriodization
 from dyna.lib.cpsf.functional.core_math import T_classic_window
 from dyna.lib.cpsf.functional.t_omega import T_Omega
 
+torch.manual_seed(1337)
+
 
 def TEST_ZERO_FRAME(*args, **kwargs) -> torch.Tensor:
     return T_Omega(return_components="zero", *args, **kwargs)
