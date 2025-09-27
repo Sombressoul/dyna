@@ -5,13 +5,13 @@ import argparse, time, torch
 
 from dyna.lib.cpsf.periodization import CPSFPeriodization
 from dyna.lib.cpsf.functional.core_math import T_classic_window
-from dyna.lib.cpsf.functional.t_omega import T_Omega
+from dyna.lib.cpsf.functional.t_omega import T_Omega, T_Omega_Components
 
 torch.manual_seed(1337)
 
 
 def TEST_ZERO_FRAME(*args, **kwargs) -> torch.Tensor:
-    return T_Omega(return_components="zero", *args, **kwargs)
+    return T_Omega(return_components=T_Omega_Components.ZERO, *args, **kwargs)
 
 
 def _fmt_bytes(x: int) -> str:
