@@ -4,24 +4,6 @@ import torch
 from enum import Enum, auto as enum_auto
 
 from dyna.lib.cpsf.functional.core_math import delta_vec_d
-from dyna.lib.cpsf.functional.t_omega_specials import (
-    _get_real_dtype,
-    _gauss_jacobi_01_nodes,
-    _precompute_gauss_jacobi_for_1f1_half,
-    _hyp1f1_half_negx_gauss_jacobi,
-)
-
-# ============================================================
-#                      NOTES
-# ============================================================
-#
-# Offline:
-#   cache = _precompute_gauss_jacobi_for_1f1_half(N=N, Q_t=8, dtype=torch.float32, device=z.device)
-#
-# Online:
-#   y_1f1 = _hyp1f1_half_negx_gauss_jacobi(x=x, N=N, Q_t=8, dtype=z.real.dtype, device=z.device, cache=cache)
-#
-# ============================================================
 
 
 class T_Omega_Components(Enum):
@@ -84,11 +66,11 @@ def T_Omega(
     # ============================================================
     #                      TAIL
     # ============================================================
-    T_tail = torch.zeros_like(T_zero)  # Placeholder.
+    T_tail = torch.zeros_like(T_zero)
 
     if return_components == T_Omega_Components.TAIL:
         return T_tail
-    elif return_components == T_Omega_Components.TAIL:
+    elif return_components == T_Omega_Components.BOTH:
         return T_zero, T_tail
     elif return_components == T_Omega_Components.UNION:
         return T_zero + T_tail
