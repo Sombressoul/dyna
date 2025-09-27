@@ -14,9 +14,13 @@ from dyna.lib.cpsf.functional.core_math import (
     delta_vec_d,
 )
 from dyna.lib.cpsf.functional.t_omega import (
-    _t_omega_zero_frame,  # [B,S] — n=0 only (no tail), per your definition
+    T_Omega,  # [B,S] — n=0 only (no tail), per your definition
 )
 from dyna.lib.cpsf.periodization import CPSFPeriodization
+
+
+def TEST_ZERO_FRAME(*args, **kwargs) -> torch.Tensor:
+    return T_Omega(return_components="zero", *args, **kwargs)
 
 
 def _wrap_real(xr: torch.Tensor, mode: str) -> torch.Tensor:
@@ -251,10 +255,10 @@ def main():
 
     def warmup_omega():
         for _ in range(args.warmup):
-            _ = _t_omega_zero_frame(
-                z=z.unsqueeze(1).expand_as(z_j),
+            _ = TEST_ZERO_FRAME(
+                z=z,
                 z_j=z_j,
-                vec_d=vec_d.unsqueeze(1).expand_as(vec_d_j),
+                vec_d=vec_d,
                 vec_d_j=vec_d_j,
                 T_hat_j=T_hat_j,
                 alpha_j=alpha_j,
@@ -316,10 +320,10 @@ def main():
         for _ in range(args.iters):
             dt_ms, peak, alloc, out = _time_block(
                 dev,
-                lambda: _t_omega_zero_frame(
-                    z=z.unsqueeze(1).expand_as(z_j),
+                lambda: TEST_ZERO_FRAME(
+                    z=z,
                     z_j=z_j,
-                    vec_d=vec_d.unsqueeze(1).expand_as(vec_d_j),
+                    vec_d=vec_d,
                     vec_d_j=vec_d_j,
                     T_hat_j=T_hat_j,
                     alpha_j=alpha_j,
