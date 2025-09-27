@@ -74,7 +74,6 @@ def T_Omega(
     # ============================================================
     #                      TAIL  (HYBRID)
     # ============================================================
-    # Канон: D=2N, c=N, nu=N-1
     D = 2 * N
     c_val = float(N)
     nu_val = float(N - 1)
@@ -82,7 +81,6 @@ def T_Omega(
     tiny_f32 = torch.finfo(a.dtype).tiny
     tiny_f64 = torch.finfo(torch.float64).tiny
 
-    # -------- инварианты / производные (как в твоём DERIV) --------
     norm2_dj = (dr * dr + di * di).sum(dim=-1)                      # [B,M]
     inv_norm_dj = torch.rsqrt(torch.clamp(norm2_dj, min=tiny_f32))  # [B,M]
     ur = dr * inv_norm_dj.unsqueeze(-1)                             # [B,M,N]
@@ -103,7 +101,6 @@ def T_Omega(
     K_D = (2.0 ** nu_val) * torch.pow(torch.clamp(a, min=tiny_f32), -c_val)  # [B,M]
     beta = (2.0 * math.sqrt(math.pi)) * torch.sqrt(gamma2)          # [B,M]
 
-    # ---------------- DEBUG (коротко) ----------------
     def _stat(name, t):
         tc = t.detach().to("cpu")
         fin = tc[torch.isfinite(tc)]
@@ -121,8 +118,7 @@ def T_Omega(
     _stat("K_D", K_D)
 
     # ============================================================
-    #                JACOBI узлы/веса по t∈[0,1]
-    # вес t^{ν-1/2}(1-t)^{-1/2}; перенос с [-1,1]: умножение на 2^{-ν}
+    #                JACOBI
     # ============================================================
     Q_THETA = 24
     alpha_old = -0.5
@@ -130,28 +126,33 @@ def T_Omega(
 
     x_jac, w_jac = roots_jacobi(Q_THETA, alpha_old, beta_old)            # [Q]
     t_nodes = (x_jac + 1.0) * 0.5                                        # [Q]
-    w_on_01 = w_jac * (2.0 ** (-(alpha_old + beta_old + 1.0)))           # = 2^{-ν} * w_jac
+    # вес на [0,1]: w_on_01 = 2^{-(α+β+1)} w_jac = 2^{-ν} w_jac
+    w_on_01 = w_jac * (2.0 ** (-(alpha_old + beta_old + 1.0)))
 
-    # константа Куммера C_k = Γ(ν+1) / (Γ(ν+1/2) Γ(1/2))
+    # Константа Куммера
     log_Ck = float(gammaln(nu_val + 1.0) - gammaln(nu_val + 0.5) - gammaln(0.5))
+    Ck = float(np.exp(log_Ck))
 
-    t_theta = torch.from_numpy(t_nodes).to(dtype=torch.float64, device=device)   # [Q]
-    w_theta = torch.from_numpy(w_on_01).to(dtype=torch.float64, device=device)   # [Q]
-    t_theta_bm = t_theta.view(1, 1, -1)                                          # [1,1,Q]
-    w_theta_bm = w_theta.view(1, 1, -1)                                          # [1,1,Q]
+    # НОРМИРОВКА: делим на Beta(1/2, nu+1/2), чтобы сумма весов стала ≈ 1
+    B_expected = math.gamma(nu_val + 0.5) * math.gamma(0.5) / math.gamma(nu_val + 1.0)
+    w_on_01_norm = w_on_01 / B_expected
+
+    t_theta = torch.from_numpy(t_nodes).to(dtype=torch.float64, device=device)       # [Q]
+    w_theta = torch.from_numpy(w_on_01_norm).to(dtype=torch.float64, device=device)  # [Q] (нормированные!)
+    t_theta_bm = t_theta.view(1, 1, -1)                                              # [1,1,Q]
+    w_theta_bm = w_theta.view(1, 1, -1)                                              # [1,1,Q]
 
     one64 = torch.tensor(1.0, dtype=torch.float64, device=device)
     lam_theta = one64 + kappa.to(torch.float64)[..., None] * (one64 - t_theta_bm)    # [B,M,Q]
     lam_theta = torch.clamp(lam_theta, min=torch.finfo(torch.float64).tiny)
     beta_theta = beta.to(torch.float64)[..., None] / torch.sqrt(lam_theta)           # [B,M,Q]
 
-    # чек суммы весов: должна быть B(ν+1/2, 1/2)
-    B_expected = math.gamma(nu_val + 0.5) * math.gamma(0.5) / math.gamma(nu_val + 1.0)
     print(f"[JACOBI][params] Q={Q_THETA}, α_old={alpha_old:.3f}, β_old={beta_old:.3f}")
-    print(f"[JACOBI][check] sum w_theta ≈ {w_theta.sum().item():.6e}  (ожидание B={B_expected:.6e})")
+    print(f"[JACOBI][check] sum w_theta(norm) ≈ {w_theta.sum().item():.6e}  (ожидание ≈ 1)")
+
 
     # ============================================================
-    #        Маски: Δ(t) = π(γ^2/λ - q_pos) → где осциллировать
+    #         Masks
     # ============================================================
     dev = z.device
     tiny64 = np.finfo(np.float64).tiny
@@ -160,11 +161,11 @@ def T_Omega(
     beta_t_np = beta_theta.detach().cpu().numpy()                        # [B,M,Q]
     KD_np     = K_D.detach().to(torch.float64).cpu().numpy()             # [B,M]
     wth_np    = w_theta_bm.detach().cpu().numpy()                        # [1,1,Q]
-    Apos_np   = A_pos.detach().to(torch.float64).cpu().numpy()           # [B,M]
     Adir_np   = A_dir.detach().to(torch.float64).cpu().numpy()           # [B,M]
     alpha_np  = alpha_j.detach().to(torch.float64).cpu().numpy()         # [B,M]
-    gamma2_np = gamma2.detach().to(torch.float64).cpu().numpy()          # [B,M]
+    beta_np   = beta.detach().to(torch.float64).cpu().numpy()            # [B,M]
     qpos_np   = q_pos.detach().to(torch.float64).cpu().numpy()           # [B,M]
+    gamma2_np = gamma2.detach().to(torch.float64).cpu().numpy()          # [B,M]
 
     Delta_np  = np.pi * (gamma2_np[..., None] / np.clip(lam_np, tiny64, None) - qpos_np[..., None])  # [B,M,Q]
     mask_J    = (Delta_np > 0.0)
@@ -182,9 +183,7 @@ def T_Omega(
     print(f"[HYBRID][counts] I-branch nodes: {int(mask_I.sum())},  J-branch nodes: {int(mask_J.sum())}")
 
     # ============================================================
-    #                 ВЕТКА I_ν : Gauss–Laguerre (лог-дом)
-    # Интегрируем e^{-u} u^{ν/2} I_ν(β_t √u); стабилизация: −β_t²/4
-    # ВАЖНО: без «добавить назад +β_t²/4». Возврата НЕТ.
+    #                 Branch I_ν : Gauss–Laguerre (log-domein)
     # ============================================================
     Q_RAD = 128
     print(f"[HYBRID][I-branch] Q_RAD={Q_RAD}, nu={nu_val:.1f}")
@@ -196,45 +195,33 @@ def T_Omega(
     logW_L = np.log(np.clip(W_L, tiny64, None))                           # [1,1,1,Qr]
 
     Z_I = np.maximum(beta_t_np[..., None] * np.sqrt(U_L), tiny64)         # [B,M,Q,Qr]
-    # log Iν(z) через ive: log(ive)+z
     z_small = (Z_I <= 1e-12)
     log_I = np.empty_like(Z_I)
+    ive_small = np.clip(ive(nu_val, np.maximum(Z_I[z_small], tiny64)), tiny64, None) if np.any(z_small) else None
+    ive_big   = np.clip(ive(nu_val, np.maximum(Z_I[~z_small], tiny64)), tiny64, None) if np.any(~z_small) else None
     if np.any(z_small):
-        ive_val = np.clip(ive(nu_val, Z_I[z_small]), tiny64, None)
-        log_I[z_small] = np.log(ive_val) + Z_I[z_small]
+        log_I[z_small] = np.log(ive_small) + Z_I[z_small]
     if np.any(~z_small):
-        ive_val = np.clip(ive(nu_val, Z_I[~z_small]), tiny64, None)
-        log_I[~z_small] = np.log(ive_val) + Z_I[~z_small]
+        log_I[~z_small] = np.log(ive_big) + Z_I[~z_small]
 
     beta2_over_4 = 0.25 * (beta_t_np ** 2)                                # [B,M,Q]
-    # ядро: −β_t²/4 внутрь, БЕЗ A_pos внутри
     log_phi_I   = log_I - beta2_over_4[..., None]                         # [B,M,Q,Qr]
     log_sum_u_I = logsumexp(logW_L + log_phi_I, axis=-1)                  # [B,M,Q]
 
-    # возвратные геом. префакторы от подстановок: λ и β (БЕЗ +β_t²/4)
     lam_cl   = np.clip(lam_np, tiny64, None)
-    beta_np  = np.clip(beta.detach().to(torch.float64).cpu().numpy(), tiny64, None)  # [B,M]
     log_lam  = np.log(lam_cl)                                             # [B,M,Q]
-    log_beta = np.log(beta_np)                                            # [B,M]
+    log_pref_I = math.log(0.5) - (nu_val / 2.0 + 1.0) * log_lam           # [B,M,Q]
 
-    # log_pref = −(ν/2+1) log λ  −  ν log β
-    log_pref = -(nu_val / 2.0 + 1.0) * log_lam - nu_val * log_beta[..., None]       # [B,M,Q]
-
-    # ВНИМАНИЕ: A_pos — ТОЛЬКО для нулевого фрейма; в хвосте его НЕТ.
     log_G_I = (log_Ck
                + np.log(np.clip(KD_np, tiny64, None))[..., None]
-               + log_sum_u_I + log_pref
+               + log_sum_u_I + log_pref_I
                + np.log(np.clip(wth_np, tiny64, None))
                + np.log(np.clip(Adir_np, tiny64, None))[..., None]
                + np.log(np.clip(alpha_np, tiny64, None))[..., None]
-               )                                                    # [B,M,Q]
-    print(f"[HYBRID][I: A_pos in tail] forcibly excluded -> contributes 0.0")
-
-    # маскируем: оставляем только I-узлы
+               )                                                          # [B,M,Q]
+    # Mask I
     neg_inf = -1e300
     log_G_I_masked = np.where(mask_I, log_G_I, neg_inf)
-
-    # сумма по углу в логах
     log_gain_I = logsumexp(log_G_I_masked, axis=-1)                        # [B,M]
     gain_I_np  = np.exp(np.clip(log_gain_I, a_min=np.log(tiny64), a_max=None))
 
@@ -243,47 +230,33 @@ def T_Omega(
     _stat_np("I: log gain_I", log_gain_I)
 
     # ============================================================
-    #                 ВЕТКА J_ν : Gauss–Hermite (linear)
-    # R_J(t) = 2 λ^{-(ν/2+1)} β^{-ν} ∑_{y≥0} w_H/2 · y^{ν+1} J_ν( (β/λ) y )
+    #                 Branch J_ν
     # ============================================================
-    Q_H = 64
-    print(f"[HYBRID][J-branch] Q_H={Q_H}, nu={nu_val:.1f}")
+    print(f"[HYBRID][J-branch] closed-form, nu={nu_val:.1f}")
 
-    y_nodes, wH = roots_hermite(Q_H)                                      # [Q_H]
-    Y = np.abs(y_nodes).reshape(1, 1, 1, Q_H)                              # [1,1,1,Q_H]
-    WH = (0.5 * wH).reshape(1, 1, 1, Q_H)                                  # [1,1,1,Q_H]
+    lamJ = lam_cl                                                          # [B,M,Q]
+    beta2_over_4_abs = (beta_np[..., None] ** 2) / (4.0 * lamJ)            # [B,M,Q]
+    coeffJ = (beta_np[..., None] ** nu_val) * np.power(2.0 * lamJ, -(nu_val + 1.0))  # [B,M,Q]
+    R_J = coeffJ * np.exp(-np.clip(beta2_over_4_abs, 0.0, 7.0e2))          # [B,M,Q]
 
-    alpha_t = beta_np[..., None] / lam_cl                                  # [B,M,Q]
-    pref_t  = 2.0 * (lam_cl ** (-(nu_val / 2.0 + 1.0))) * (beta_np[..., None] ** (-nu_val))  # [B,M,Q]
-
-    Y_pow = np.power(Y, nu_val + 1.0)                                      # [1,1,1,Q_H]
-    Jv = jv(nu_val, alpha_t[..., None] * Y)                                # [B,M,Q,Q_H]
-    sum_H = np.sum(WH * Y_pow * Jv, axis=-1)                               # [B,M,Q]
-    R_J   = pref_t * sum_H                                                 # [B,M,Q]
-
-    # полный J-вклад, линейно
-    G_J = (KD_np[..., None] * wth_np *
+    G_J = (Ck * KD_np[..., None] * wth_np *
            Adir_np[..., None] * alpha_np[..., None] * R_J)                 # [B,M,Q]
-    print(f"[HYBRID][J: A_pos in tail] forcibly excluded -> contributes 0.0")
-
     G_J_masked = np.where(mask_J, G_J, 0.0)
     gain_J_np  = np.sum(G_J_masked, axis=-1)                               # [B,M]
 
-    _stat_np("J: alpha_t=beta/lam", alpha_t)
-    _stat_np("J: pref_t", pref_t)
-    _stat_np("J: sum_H", sum_H)
+    _stat_np("J: coeffJ", coeffJ)
+    _stat_np("J: exp(-β^2/(4λ))", np.exp(-np.clip(beta2_over_4_abs, 0.0, 7.0e2)))
     _stat_np("J: R_J(t)", R_J)
     _stat_np("J: G_J(t)", G_J)
     _stat_np("J: gain_J", gain_J_np)
 
     # ============================================================
-    #                Сборка gain_tail и T_tail
+    #                Assembly gain_tail and T_tail
     # ============================================================
     gain_tail_np = gain_I_np + gain_J_np                                   # [B,M]
     gain_tail = torch.from_numpy(gain_tail_np).to(device=device, dtype=torch.float64).to(a.dtype)
     T_tail = (gain_tail.unsqueeze(-1) * T_hat_j).sum(dim=1)                # [B,S]
 
-    # ---------------- DEBUG финал ----------------
     def _stat_t(name, t):
         fin = t[torch.isfinite(t)]
         if fin.numel() == 0:
@@ -294,6 +267,7 @@ def T_Omega(
     _stat_t("gain_tail", gain_tail)
     _stat_t("T_tail.re", T_tail.real)
     _stat_t("T_tail.im", T_tail.imag)
+
 
     if return_components == T_Omega_Components.TAIL:
         return T_tail
