@@ -282,6 +282,10 @@ def main():
 
     abs_diff = (ref_tail - out_tail).abs()
     rel_diff = abs_diff / ref_tail.abs().clamp_min(1e-32)
+    ref_max = ref_tail.abs().max().item()
+    ref_mean = ref_tail.abs().mean().item()
+    out_max = out_tail.abs().max().item()
+    out_mean = out_tail.abs().mean().item()
     amax = abs_diff.max().item()
     amean = abs_diff.mean().item()
     rmax = rel_diff.max().item()
@@ -293,6 +297,8 @@ def main():
     ok = torch.allclose(ref_tail, out_tail, rtol=rtol, atol=atol)
 
     print("\n=== Numeric equivalence: classic tails (W) vs proposed tail ===")
+    print(f"Ref: max={ref_max:.3e}, mean={ref_mean:.3e}")
+    print(f"Out: max={out_max:.3e}, mean={out_mean:.3e}")
     print(f"Abs diff: max={amax:.3e}, mean={amean:.3e}")
     print(f"Rel diff: max={rmax:.3e}, mean={rmean:.3e}")
     print(f"allclose(rtol={rtol}, atol={atol}) -> {ok}")
