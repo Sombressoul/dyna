@@ -4,9 +4,14 @@ import torch
 from enum import Enum, auto as enum_auto
 
 import numpy as np
-from scipy.special import roots_jacobi, roots_genlaguerre, ive, gammaln, logsumexp, roots_hermite, jv
+from scipy.special import roots_genlaguerre, ive, gammaln, logsumexp, roots_hermite, jv
 
-from dyna.lib.cpsf.functional.core_math import delta_vec_d
+from dyna.lib.cpsf.functional.core_math import (
+    delta_vec_d,
+)
+from dyna.lib.cpsf.functional.t_omega_math import (
+    _t_omega_roots_jacobi,
+)
 
 
 class T_Omega_Components(Enum):
@@ -31,6 +36,8 @@ def T_Omega(
     #                      BASE
     # ============================================================
     device = z.device
+    dtype_c = z.dtype
+    dtype_r = z.real.dtype
 
     # ============================================================
     #                      MAIN
@@ -79,7 +86,6 @@ def T_Omega(
     nu_val = float(N - 1)
 
     tiny_f32 = torch.finfo(a.dtype).tiny
-    tiny_f64 = torch.finfo(torch.float64).tiny
 
     norm2_dj = (dr * dr + di * di).sum(dim=-1)                      # [B,M]
     inv_norm_dj = torch.rsqrt(torch.clamp(norm2_dj, min=tiny_f32))  # [B,M]
@@ -124,23 +130,22 @@ def T_Omega(
     alpha_old = -0.5
     beta_old  = float(nu_val - 0.5)
 
-    x_jac, w_jac = roots_jacobi(Q_THETA, alpha_old, beta_old)            # [Q]
-    t_nodes = (x_jac + 1.0) * 0.5                                        # [Q]
-    # вес на [0,1]: w_on_01 = 2^{-(α+β+1)} w_jac = 2^{-ν} w_jac
-    w_on_01 = w_jac * (2.0 ** (-(alpha_old + beta_old + 1.0)))
+    x_jac, w_jac = _t_omega_roots_jacobi(
+        N=Q_THETA,
+        alpha=alpha_old,
+        beta=beta_old,
+        normalize=True,
+        return_weights=True,
+        dtype=dtype_c,
+        device=device,
+    )
 
     # Константа Куммера
     log_Ck = float(gammaln(nu_val + 1.0) - gammaln(nu_val + 0.5) - gammaln(0.5))
     Ck = float(np.exp(log_Ck))
 
-    # НОРМИРОВКА: делим на Beta(1/2, nu+1/2), чтобы сумма весов стала ≈ 1
-    B_expected = math.gamma(nu_val + 0.5) * math.gamma(0.5) / math.gamma(nu_val + 1.0)
-    w_on_01_norm = w_on_01 / B_expected
-
-    t_theta = torch.from_numpy(t_nodes).to(dtype=torch.float64, device=device)       # [Q]
-    w_theta = torch.from_numpy(w_on_01_norm).to(dtype=torch.float64, device=device)  # [Q] (нормированные!)
-    t_theta_bm = t_theta.view(1, 1, -1)                                              # [1,1,Q]
-    w_theta_bm = w_theta.view(1, 1, -1)                                              # [1,1,Q]
+    t_theta_bm = x_jac.view(1, 1, -1)                                              # [1,1,Q]
+    w_theta_bm = w_jac.view(1, 1, -1)                                              # [1,1,Q]
 
     one64 = torch.tensor(1.0, dtype=torch.float64, device=device)
     lam_theta = one64 + kappa.to(torch.float64)[..., None] * (one64 - t_theta_bm)    # [B,M,Q]
@@ -148,7 +153,6 @@ def T_Omega(
     beta_theta = beta.to(torch.float64)[..., None] / torch.sqrt(lam_theta)           # [B,M,Q]
 
     print(f"[JACOBI][params] Q={Q_THETA}, α_old={alpha_old:.3f}, β_old={beta_old:.3f}")
-    print(f"[JACOBI][check] sum w_theta(norm) ≈ {w_theta.sum().item():.6e}  (ожидание ≈ 1)")
 
 
     # ============================================================
