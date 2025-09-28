@@ -25,14 +25,14 @@ def T_Omega(
     return_components: T_Omega_Components = T_Omega_Components.UNION,
 ) -> torch.Tensor:
     # ============================================================
-    #                      BASE
+    # BASE
     # ============================================================
     device = z.device
     dtype_r = z.real.dtype
     tiny = torch.finfo(dtype_r).tiny
 
     # ============================================================
-    #                      MAIN
+    # MAIN
     # ============================================================
     # Broadcast
     B, M, N = vec_d_j.shape
@@ -56,7 +56,7 @@ def T_Omega(
     precision_par_clamped = torch.clamp(precision_par,  min=tiny)  # [B,M]
 
     # ============================================================
-    #                      ZERO-FRAME
+    # ZERO-FRAME
     # ============================================================
     # q_pos: [B,M]
     x_norm_sq = (x.real * x.real + x.imag * x.imag).sum(dim=-1)  # [B,M]
@@ -125,10 +125,10 @@ def T_Omega(
         ]
     ))
 
-    gain_tail     = torch.exp(log_gain_jv)  # [B,M]
+    gain_tail = torch.exp(log_gain_jv)  # [B,M]
 
     # ============================================================
-    #                Assembly gain_tail and T_tail
+    # Assembly T_tail
     # ============================================================
     T_tail = (gain_tail.unsqueeze(-1) * T_hat_j).sum(dim=1)  # [B,S]
 
