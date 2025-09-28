@@ -23,17 +23,17 @@ def T_Omega(
     sigma_perp: torch.Tensor,  # sigma_perp: [B,M] (real)
     return_components: T_Omega_Components = T_Omega_Components.UNION,
 ) -> torch.Tensor:
-    # ============================================================
-    #                      VARIABLES
-    # ============================================================
-    Q_THETA = 24
-    Q_RAD = 128
+    # # ============================================================
+    # #                      VARIABLES
+    # # ============================================================
+    # Q_THETA = 24
+    # Q_RAD = 128
 
     # ============================================================
     #                      BASE
     # ============================================================
     device = z.device
-    dtype_c = z.dtype
+    # dtype_c = z.dtype
     dtype_r = z.real.dtype
     tiny = torch.finfo(dtype_r).tiny
 
@@ -46,15 +46,15 @@ def T_Omega(
     vec_d = vec_d.unsqueeze(1).expand(B, M, N)
 
     # Constants
-    D = torch.tensor(float(2 * N), dtype=dtype_r, device=device)
+    # D = torch.tensor(float(2 * N), dtype=dtype_r, device=device)
     C = torch.tensor(float(N), dtype=dtype_r, device=device)
     NU = torch.tensor(float(N - 1), dtype=dtype_r, device=device)
     PI = torch.tensor(torch.pi, dtype=dtype_r, device=device)
     HALF = torch.tensor(0.5, dtype=dtype_r, device=device)
     LOG2 = torch.tensor(2.0, dtype=dtype_r, device=device).log()
-    TOW_PI = 2.0 * PI
+    # TOW_PI = 2.0 * PI
     FOUR_PI = 4.0 * PI
-    PI2_SQRT = 2.0 * PI.sqrt()
+    # PI2_SQRT = 2.0 * PI.sqrt()
 
     # Common
     x = z - z_j  # [B,M,N] complex
