@@ -93,10 +93,8 @@ def T_Omega(
 
     c_re = (ur * xr + ui * xi).sum(dim=-1)                          # [B,M]
     c_im = (ur * xi - ui * xr).sum(dim=-1)                          # [B,M]
-    inner_abs2_u = c_re * c_re + c_im * c_im                        # [B,M]
 
     kappa = b / torch.clamp(a, min=tiny)                        # [B,M]
-    onepk = 1.0 + kappa                                             # [B,M]
 
     vr = a.unsqueeze(-1) * xr + b.unsqueeze(-1) * (c_re.unsqueeze(-1) * ur - c_im.unsqueeze(-1) * ui)
     vi = a.unsqueeze(-1) * xi + b.unsqueeze(-1) * (c_re.unsqueeze(-1) * ui + c_im.unsqueeze(-1) * ur)
@@ -105,22 +103,6 @@ def T_Omega(
 
     K_D = (2.0 ** nu_val) * torch.pow(torch.clamp(a, min=tiny), -c_val)  # [B,M]
     beta = (2.0 * math.sqrt(math.pi)) * torch.sqrt(gamma2)          # [B,M]
-
-    def _stat(name, t):
-        tc = t.detach().to("cpu")
-        fin = tc[torch.isfinite(tc)]
-        if fin.numel() == 0:
-            print(f"[DERIV][{name}] no finite values")
-        else:
-            print(f"[DERIV][{name}] min={fin.min().item():.3e} max={fin.max().item():.3e} mean={fin.mean().item():.3e}")
-
-    print(f"[DERIV][const] D={D}, c={c_val:.1f}, nu={nu_val:.1f}")
-    _stat("||d_j||^2", norm2_dj)
-    _stat("kappa=b/a", kappa); _stat("1+kappa", onepk)
-    _stat("|<x,u>|^2", inner_abs2_u)
-    _stat("gamma2 (via v)", gamma2)
-    _stat("beta=2√πγ", beta)
-    _stat("K_D", K_D)
 
     # ============================================================
     #                JACOBI
@@ -149,7 +131,6 @@ def T_Omega(
     # ============================================================
     #         Masks
     # ============================================================
-    dev = z.device
     tiny64 = np.finfo(np.float64).tiny
 
     lam_np    = lam_theta.detach().cpu().numpy()                         # [B,M,Q]
@@ -166,22 +147,10 @@ def T_Omega(
     mask_J    = (Delta_np > 0.0)
     mask_I    = ~mask_J
 
-    def _stat_np(name, arr):
-        t = torch.from_numpy(arr).to(dev, dtype=torch.float64)
-        fin = t[torch.isfinite(t)]
-        if fin.numel() == 0:
-            print(f"[HYBRID][{name}] no finite values")
-        else:
-            print(f"[HYBRID][{name}] min={fin.min().item():.3e} max={fin.max().item():.3e} mean={fin.mean().item():.3e}")
-
-    _stat_np("Δ(t)", Delta_np)
-    print(f"[HYBRID][counts] I-branch nodes: {int(mask_I.sum())},  J-branch nodes: {int(mask_J.sum())}")
-
     # ============================================================
     #                 Branch I_ν : Gauss–Laguerre (log-domein)
     # ============================================================
     Q_RAD = 128
-    print(f"[HYBRID][I-branch] Q_RAD={Q_RAD}, nu={nu_val:.1f}")
 
     alpha_L = 0.5 * nu_val
     u_nodes, w_nodes = roots_genlaguerre(Q_RAD, alpha_L)                 # [Qr]
@@ -221,15 +190,9 @@ def T_Omega(
     log_gain_I = logsumexp(log_G_I_masked, axis=-1)                        # [B,M]
     gain_I_np  = np.exp(np.clip(log_gain_I, a_min=np.log(tiny64), a_max=None))
 
-    _stat_np("I: log Σ_u (α=ν/2)", log_sum_u_I)
-    _stat_np("I: log G(t)", log_G_I)
-    _stat_np("I: log gain_I", log_gain_I)
-
     # ============================================================
     #                 Branch J_ν
     # ============================================================
-    print(f"[HYBRID][J-branch] closed-form, nu={nu_val:.1f}")
-
     lamJ = lam_cl                                                          # [B,M,Q]
     beta2_over_4_abs = (beta_np[..., None] ** 2) / (4.0 * lamJ)            # [B,M,Q]
     coeffJ = (beta_np[..., None] ** nu_val) * np.power(2.0 * lamJ, -(nu_val + 1.0))  # [B,M,Q]
@@ -243,30 +206,12 @@ def T_Omega(
     G_J_masked = np.where(mask_J, G_J, 0.0)
     gain_J_np  = np.sum(G_J_masked, axis=-1)                               # [B,M]
 
-    _stat_np("J: coeffJ", coeffJ)
-    _stat_np("J: exp(-β^2/(4λ))", np.exp(-np.clip(beta2_over_4_abs, 0.0, 7.0e2)))
-    _stat_np("J: R_J(t)", R_J)
-    _stat_np("J: G_J(t)", G_J)
-    _stat_np("J: gain_J", gain_J_np)
-
     # ============================================================
     #                Assembly gain_tail and T_tail
     # ============================================================
     gain_tail_np = gain_I_np + gain_J_np                                   # [B,M]
-    gain_tail = torch.from_numpy(gain_tail_np).to(device=device, dtype=torch.float64).to(a.dtype)
+    gain_tail = torch.from_numpy(gain_tail_np).to(device=device, dtype=dtype_r)
     T_tail = (gain_tail.unsqueeze(-1) * T_hat_j).sum(dim=1)                # [B,S]
-
-    def _stat_t(name, t):
-        fin = t[torch.isfinite(t)]
-        if fin.numel() == 0:
-            print(f"[HYBRID][{name}] no finite values")
-        else:
-            print(f"[HYBRID][{name}] min={fin.min().item():.3e} max={fin.max().item():.3e} mean={fin.mean().item():.3e}")
-    _stat_np("gain_tail (numpy)", gain_tail_np)
-    _stat_t("gain_tail", gain_tail)
-    _stat_t("T_tail.re", T_tail.real)
-    _stat_t("T_tail.im", T_tail.imag)
-
 
     if return_components == T_Omega_Components.TAIL:
         return T_tail
