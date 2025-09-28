@@ -1,17 +1,8 @@
-import math
 import torch
 
 from enum import Enum, auto as enum_auto
 
-import numpy as np
-from scipy.special import roots_genlaguerre, ive, gammaln, logsumexp
-
-from dyna.lib.cpsf.functional.core_math import (
-    delta_vec_d,
-)
-from dyna.lib.cpsf.functional.t_omega_math import (
-    _t_omega_roots_jacobi,
-)
+from dyna.lib.cpsf.functional.core_math import delta_vec_d
 
 
 class T_Omega_Components(Enum):
@@ -36,6 +27,7 @@ def T_Omega(
     #                      VARIABLES
     # ============================================================
     Q_THETA = 24
+    Q_RAD = 128
 
     # ============================================================
     #                      BASE
@@ -54,10 +46,14 @@ def T_Omega(
     vec_d = vec_d.unsqueeze(1).expand(B, M, N)
 
     # Constants
-    D = 2 * N
-    C = float(N)
-    NU = float(N - 1)
+    D = torch.tensor(float(2 * N), dtype=dtype_r, device=device)
+    C = torch.tensor(float(N), dtype=dtype_r, device=device)
+    NU = torch.tensor(float(N - 1), dtype=dtype_r, device=device)
     PI = torch.tensor(torch.pi, dtype=dtype_r, device=device)
+    HALF = torch.tensor(0.5, dtype=dtype_r, device=device)
+    LOG2 = torch.tensor(2.0, dtype=dtype_r, device=device).log()
+    TOW_PI = 2.0 * PI
+    FOUR_PI = 4.0 * PI
     PI2_SQRT = 2.0 * PI.sqrt()
 
     # Common
@@ -100,120 +96,67 @@ def T_Omega(
     inner_ux_re = (u_re * x.real + u_im * x.imag).sum(dim=-1)  # [B,M]
     inner_ux_im = (u_re * x.imag - u_im * x.real).sum(dim=-1)  # [B,M]
 
-    anisotropy_ratio = precision_excess_par / torch.clamp(precision_perp, min=tiny)  # [B,M]
+    # anisotropy_ratio = precision_excess_par / torch.clamp(precision_perp, min=tiny)  # [B,M]
 
-    metric_mix_re = precision_perp.unsqueeze(-1) * x.real + precision_excess_par.unsqueeze(-1) * (inner_ux_re.unsqueeze(-1) * u_re - inner_ux_im.unsqueeze(-1) * u_im)  # [B,M,N]
-    metric_mix_im = precision_perp.unsqueeze(-1) * x.imag + precision_excess_par.unsqueeze(-1) * (inner_ux_re.unsqueeze(-1) * u_im + inner_ux_im.unsqueeze(-1) * u_re)  # [B,M,N]
-    metric_mix_norm_sq = (metric_mix_re * metric_mix_re + metric_mix_im * metric_mix_im).sum(dim=-1)  # [B,M]
-    gamma_sq = torch.clamp(metric_mix_norm_sq / torch.clamp(precision_perp, min=tiny), min=0.0)  # [B,M]
+    # metric_mix_re = precision_perp.unsqueeze(-1) * x.real + precision_excess_par.unsqueeze(-1) * (inner_ux_re.unsqueeze(-1) * u_re - inner_ux_im.unsqueeze(-1) * u_im)  # [B,M,N]
+    # metric_mix_im = precision_perp.unsqueeze(-1) * x.imag + precision_excess_par.unsqueeze(-1) * (inner_ux_re.unsqueeze(-1) * u_im + inner_ux_im.unsqueeze(-1) * u_re)  # [B,M,N]
+    # metric_mix_norm_sq = (metric_mix_re * metric_mix_re + metric_mix_im * metric_mix_im).sum(dim=-1)  # [B,M]
+    # gamma_sq = torch.clamp(metric_mix_norm_sq / torch.clamp(precision_perp, min=tiny), min=0.0)  # [B,M]
 
-    gauss_dim_prefactor = (2.0 ** NU) * torch.pow(torch.clamp(precision_perp, min=tiny), -C)  # [B,M]
-    bessel_arg = PI2_SQRT * torch.sqrt(gamma_sq)  # [B,M]
+    # gauss_dim_prefactor = (2.0 ** NU) * torch.pow(torch.clamp(precision_perp, min=tiny), -C)  # [B,M]
+    # bessel_arg = PI2_SQRT * torch.sqrt(gamma_sq)  # [B,M]
 
-    # ============================================================
-    # JACOBI
-    # ============================================================
-    x_jac, w_jac = _t_omega_roots_jacobi(
-        N=Q_THETA,
-        alpha=-0.5,
-        beta=NU - 0.5,
-        normalize=True,
-        return_weights=True,
-        dtype=dtype_c,
-        device=device,
-    )
+    # # ============================================================
+    # # JACOBI
+    # # ============================================================
+    # x_jac, w_jac = _t_omega_roots_jacobi(
+    #     N=Q_THETA,
+    #     alpha=-0.5,
+    #     beta=NU - 0.5,
+    #     normalize=True,
+    #     return_weights=True,
+    #     dtype=dtype_c,
+    #     device=device,
+    # )
 
-    t_theta_bm = x_jac.view(1, 1, -1)  # [1,1,Q]
-    w_theta_bm = w_jac.view(1, 1, -1)  # [1,1,Q]
+    # t_theta_bm = x_jac.view(1, 1, -1)  # [1,1,Q]
+    # w_theta_bm = w_jac.view(1, 1, -1)  # [1,1,Q]
 
-    lam_theta = 1.0 + anisotropy_ratio.to(dtype_r)[..., None] * (1.0 - t_theta_bm)  # [B,M,Q]
-    lam_theta = torch.clamp(lam_theta, min=tiny)
-    beta_theta = bessel_arg.to(dtype_r)[..., None] / torch.sqrt(lam_theta)  # [B,M,Q]
-
-    # ============================================================
-    #         Masks
-    # ============================================================
-    tiny64 = np.finfo(np.float64).tiny
-
-    lam_np    = lam_theta.detach().cpu().numpy()                         # [B,M,Q]
-    beta_t_np = beta_theta.detach().cpu().numpy()                        # [B,M,Q]
-    KD_np     = gauss_dim_prefactor.detach().cpu().numpy()             # [B,M]
-    wth_np    = w_theta_bm.detach().cpu().numpy()                        # [1,1,Q]
-    Adir_np   = A_dir.detach().cpu().numpy()           # [B,M]
-    alpha_np  = alpha_j.detach().cpu().numpy()         # [B,M]
-    beta_np   = bessel_arg.detach().cpu().numpy()            # [B,M]
-    qpos_np   = q_pos.detach().cpu().numpy()           # [B,M]
-    gamma2_np = gamma_sq.detach().cpu().numpy()          # [B,M]
-
-    Delta_np  = PI.cpu().numpy() * (gamma2_np[..., None] / np.clip(lam_np, tiny64, None) - qpos_np[..., None])  # [B,M,Q]
-    mask_J    = (Delta_np > 0.0)
-    mask_I    = ~mask_J
+    # lam_theta = 1.0 + anisotropy_ratio.to(dtype_r)[..., None] * (1.0 - t_theta_bm)  # [B,M,Q]
+    # lam_theta = torch.clamp(lam_theta, min=tiny)
+    # beta_theta = bessel_arg.to(dtype_r)[..., None] / torch.sqrt(lam_theta)  # [B,M,Q]
 
     # ============================================================
-    #                 Branch I_ν : Gauss–Laguerre (log-domein)
+    # WHITENING
     # ============================================================
-    Q_RAD = 128
+    inner_ux_abs_sq = inner_ux_re * inner_ux_re + inner_ux_im * inner_ux_im  # [B,M]
+    
+    x_perp_re = x.real - (inner_ux_re.unsqueeze(-1) * u_re - inner_ux_im.unsqueeze(-1) * u_im)  # [B,M,N]
+    x_perp_im = x.imag - (inner_ux_re.unsqueeze(-1) * u_im + inner_ux_im.unsqueeze(-1) * u_re)  # [B,M,N]
+    x_perp_norm_sq = (x_perp_re * x_perp_re + x_perp_im * x_perp_im).sum(dim=-1)  # [B,M]
 
-    alpha_L = 0.5 * NU
-    u_nodes, w_nodes = roots_genlaguerre(Q_RAD, alpha_L)                 # [Qr]
-    U_L   = u_nodes.reshape(1, 1, 1, Q_RAD)                               # [1,1,1,Qr]
-    W_L   = w_nodes.reshape(1, 1, 1, Q_RAD)                               # [1,1,1,Qr]
-    logW_L = np.log(np.clip(W_L, tiny64, None))                           # [1,1,1,Qr]
-
-    Z_I = np.maximum(beta_t_np[..., None] * np.sqrt(U_L), tiny64)         # [B,M,Q,Qr]
-    z_small = (Z_I <= 1e-12)
-    log_I = np.empty_like(Z_I)
-    ive_small = np.clip(ive(NU, np.maximum(Z_I[z_small], tiny64)), tiny64, None) if np.any(z_small) else None
-    ive_big   = np.clip(ive(NU, np.maximum(Z_I[~z_small], tiny64)), tiny64, None) if np.any(~z_small) else None
-    if np.any(z_small):
-        log_I[z_small] = np.log(ive_small) + Z_I[z_small]
-    if np.any(~z_small):
-        log_I[~z_small] = np.log(ive_big) + Z_I[~z_small]
-
-    beta2_over_4 = 0.25 * (beta_t_np ** 2)                                # [B,M,Q]
-    log_phi_I   = log_I - beta2_over_4[..., None]                         # [B,M,Q,Qr]
-    log_sum_u_I = logsumexp(logW_L + log_phi_I, axis=-1)                  # [B,M,Q]
-
-    lam_cl   = np.clip(lam_np, tiny64, None)
-    log_lam  = np.log(lam_cl)                                             # [B,M,Q]
-    log_pref_I = math.log(0.5) - (NU / 2.0 + 1.0) * log_lam           # [B,M,Q]
-
-    log_Ck = float(gammaln(NU + 1.0) - gammaln(NU + 0.5) - gammaln(0.5)) # Константа Куммера
-    log_G_I = (log_Ck
-               + np.log(np.clip(KD_np, tiny64, None))[..., None]
-               + log_sum_u_I + log_pref_I
-               + np.log(np.clip(wth_np, tiny64, None))
-               + np.log(np.clip(Adir_np, tiny64, None))[..., None]
-               + np.log(np.clip(alpha_np, tiny64, None))[..., None]
-               )                                                          # [B,M,Q]
-    # Mask I
-    neg_inf = -1e300
-    log_G_I_masked = np.where(mask_I, log_G_I, neg_inf)
-    log_gain_I = logsumexp(log_G_I_masked, axis=-1)                        # [B,M]
-    gain_I_np  = np.exp(np.clip(log_gain_I, a_min=np.log(tiny64), a_max=None))
+    precision_perp_clamped = torch.clamp(precision_perp, min=tiny)  # [B,M]
+    precision_par_clamped  = torch.clamp(precision_par,  min=tiny)  # [B,M]
+    xprime_norm_sq = precision_perp_clamped * x_perp_norm_sq + precision_par_clamped * inner_ux_abs_sq  # [B,M]
 
     # ============================================================
-    #                 Branch J_ν
+    # J_v
     # ============================================================
-    lamJ = lam_cl                                                          # [B,M,Q]
-    beta2_over_4_abs = (beta_np[..., None] ** 2) / (4.0 * lamJ)            # [B,M,Q]
-    coeffJ = (beta_np[..., None] ** NU) * np.power(2.0 * lamJ, -(NU + 1.0))  # [B,M,Q]
-    R_J = coeffJ * np.exp(-np.clip(beta2_over_4_abs, 0.0, 7.0e2))          # [B,M,Q]
+    log_Ck = torch.lgamma(NU + 1.0) - torch.lgamma(NU + 0.5) - torch.lgamma(HALF)  # [] - scalar
+    log_Kp = NU * LOG2  # [] - scalar
+    log_beta = 0.5 * torch.log(torch.clamp(FOUR_PI * xprime_norm_sq, min=tiny))  # [B,M]
+    log_RJ   = NU * log_beta - (NU + 1.0) * LOG2 - PI * xprime_norm_sq  # [B,M]
+    log_Cj = -torch.log(precision_par_clamped) - (2.0 * C - 1.0) * torch.log(precision_perp_clamped)  # [B,M]
+    log_A_dir  = torch.log(torch.clamp(A_dir,  min=tiny))  # [B,M]
+    log_alpha  = torch.log(torch.clamp(alpha_j, min=tiny))  # [B,M]
+    log_gain_jv = log_Ck + log_Kp + log_RJ + log_A_dir + log_alpha + log_Cj  # [B,M]
 
-    log_Ck = float(gammaln(NU + 1.0) - gammaln(NU + 0.5) - gammaln(0.5))
-    Ck = float(np.exp(log_Ck))
-
-    G_J = (Ck * KD_np[..., None] * wth_np *
-           Adir_np[..., None] * alpha_np[..., None] * R_J)                 # [B,M,Q]
-    G_J_masked = np.where(mask_J, G_J, 0.0)
-    gain_J_np  = np.sum(G_J_masked, axis=-1)                               # [B,M]
+    gain_tail     = torch.exp(log_gain_jv)  # [B,M]
 
     # ============================================================
     #                Assembly gain_tail and T_tail
     # ============================================================
-    gain_tail_np = gain_I_np + gain_J_np                                   # [B,M]
-    gain_tail = torch.from_numpy(gain_tail_np).to(device=device, dtype=dtype_r)
-    T_tail = (gain_tail.unsqueeze(-1) * T_hat_j).sum(dim=1)                # [B,S]
+    T_tail = (gain_tail.unsqueeze(-1) * T_hat_j).sum(dim=1)  # [B,S]
 
     if return_components == T_Omega_Components.TAIL:
         return T_tail
