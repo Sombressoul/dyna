@@ -68,17 +68,17 @@ def T_Omega(
     #                      ZERO-FRAME
     # ============================================================
     # q_pos: [B,M]
-    norm_sq_x = (x.real * x.real + x.imag * x.imag).sum(dim=-1)
+    x_norm_sq = (x.real * x.real + x.imag * x.imag).sum(dim=-1)
     inner_re = (vec_d_j.real * x.real + vec_d_j.imag * x.imag).sum(dim=-1)
     inner_im = (vec_d_j.real * x.imag - vec_d_j.imag * x.real).sum(dim=-1)
     inner_abs_sq = inner_re * inner_re + inner_im * inner_im
-    q_pos = precision_perp * norm_sq_x + precision_excess_par * inner_abs_sq
+    q_pos = precision_perp * x_norm_sq + precision_excess_par * inner_abs_sq
     A_pos = torch.exp(-math.pi * q_pos)  # [B,M]
 
     # A_dir: [B,M]
-    d_vec_d = delta_vec_d(vec_d, vec_d_j)  # [B,M,N] complex
-    norm_sq_dv = (d_vec_d.real * d_vec_d.real + d_vec_d.imag * d_vec_d.imag).sum(dim=-1)
-    A_dir = torch.exp(-math.pi * torch.reciprocal(sigma_perp) * norm_sq_dv)  # [B,M]
+    delta_d = delta_vec_d(vec_d, vec_d_j)  # [B,M,N] complex
+    delta_d_norm_sq = (delta_d.real * delta_d.real + delta_d.imag * delta_d.imag).sum(dim=-1)
+    A_dir = torch.exp(-math.pi * precision_perp * delta_d_norm_sq)  # [B,M]
 
     # Gain
     gain_zero = alpha_j * A_pos * A_dir  # [B,M]
@@ -90,10 +90,10 @@ def T_Omega(
     # ============================================================
     # DERIVATIVES
     # ============================================================
-    norm_sq_vec_d_j = (vec_d_j.real * vec_d_j.real + vec_d_j.imag * vec_d_j.imag).sum(dim=-1)  # [B,M]
-    norm_dj_inv = torch.rsqrt(torch.clamp(norm_sq_vec_d_j, min=tiny))  # [B,M]
-    u_re = vec_d_j.real * norm_dj_inv.unsqueeze(-1)  # [B,M,N]
-    u_im = vec_d_j.imag * norm_dj_inv.unsqueeze(-1)  # [B,M,N]
+    vec_d_j_norm_sq = (vec_d_j.real * vec_d_j.real + vec_d_j.imag * vec_d_j.imag).sum(dim=-1)  # [B,M]
+    vec_d_j_norm_inv = torch.rsqrt(torch.clamp(vec_d_j_norm_sq, min=tiny))  # [B,M]
+    u_re = vec_d_j.real * vec_d_j_norm_inv.unsqueeze(-1)  # [B,M,N]
+    u_im = vec_d_j.imag * vec_d_j_norm_inv.unsqueeze(-1)  # [B,M,N]
 
     inner_ux_re = (u_re * x.real + u_im * x.imag).sum(dim=-1)  # [B,M]
     inner_ux_im = (u_re * x.imag - u_im * x.real).sum(dim=-1)  # [B,M]
