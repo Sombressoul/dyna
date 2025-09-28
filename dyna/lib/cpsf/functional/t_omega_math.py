@@ -77,7 +77,6 @@ def _t_omega_roots_jacobi(
     if N > 1:
         J.diagonal(1).copy_(off)
         J.diagonal(-1).copy_(off)
-
     J = 0.5 * (J + (J.conj().T if torch.is_complex(J) else J.T))
 
     if not return_weights:
@@ -106,12 +105,13 @@ def _t_omega_roots_jacobi(
 
         return nodes, weights
 
+
 def _t_omega_roots_gen_laguerre(
     *,
     N: int,
     alpha: Union[torch.FloatTensor, float],
     return_weights: bool = False,
-    normalize: bool = False,  # (0,1) mapping + optional weight normalization
+    normalize: bool = False,  # (0,1) mapping via u->u/(1+u) + optional weight normalization
     device: Optional[torch.device] = None,
     dtype: Optional[torch.dtype] = None,
 ) -> torch.Tensor:
@@ -129,20 +129,41 @@ def _t_omega_roots_gen_laguerre(
 
     if N < 1 or N != int(N):
         raise ValueError("N must be a positive integer.")
-    if alpha < -1:
+
+    a = torch.as_tensor(alpha, dtype=dtype, device=device)
+    if torch.any(a <= -1):
         raise ValueError("alpha must be greater than -1.")
 
+    k = _cpu_safe_arange(N=N, dtype=dtype, device=device)  # 0..N-1
+    m = _cpu_safe_arange(N=N - 1, dtype=dtype, device=device)  # 0..N-2
+
+    diag = 2.0 * k + a + 1.0
+    off = torch.sqrt(torch.clamp((m + 1.0) * (m + a + 1.0), min=0.0))
+
+    J = torch.zeros((N, N), dtype=dtype, device=device)
+    J.diagonal().copy_(diag)
+    if N > 1:
+        J.diagonal(1).copy_(off)
+        J.diagonal(-1).copy_(off)
+    J = 0.5 * (J + (J.conj().T if torch.is_complex(J) else J.T))
+
     if not return_weights:
-        ... # TODO
+        nodes = torch.linalg.eigvalsh(J)
+        nodes = nodes.to(dtype=dtype)
 
-        if normalize:
-            ... # TODO
-        
-        return ...
+        return nodes / (nodes + 1.0) if normalize else nodes
     else:
-        ... # TODO
+        evals, evecs = torch.linalg.eigh(J)
+        nodes = evals.to(dtype=dtype)
+
+        log_mu_0 = torch.lgamma(a + 1.0)
+        mu_0 = torch.exp(log_mu_0)
+
+        v_0 = evecs[0, :]
+        weights = (mu_0 * (v_0 * v_0)).to(dtype=dtype)
 
         if normalize:
-            ... # TODO
-        
-        return ...
+            nodes = nodes / (nodes + 1.0)
+            weights = weights / mu_0
+
+        return nodes, weights
