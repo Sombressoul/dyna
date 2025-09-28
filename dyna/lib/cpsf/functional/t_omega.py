@@ -59,14 +59,16 @@ def T_Omega(
     # Common
     x = z - z_j  # [B,M,N] complex
     precision_perp = torch.reciprocal(sigma_perp)  # [B,M]
-    precision_par  = torch.reciprocal(sigma_par)  # [B,M]
+    precision_par = torch.reciprocal(sigma_par)  # [B,M]
     precision_excess_par = precision_par - precision_perp  # [B,M]
+    precision_perp_clamped = torch.clamp(precision_perp, min=tiny)  # [B,M]
+    precision_par_clamped = torch.clamp(precision_par,  min=tiny)  # [B,M]
 
     # ============================================================
     #                      ZERO-FRAME
     # ============================================================
     # q_pos: [B,M]
-    x_norm_sq = (x.real * x.real + x.imag * x.imag).sum(dim=-1)  # [B,M,N]
+    x_norm_sq = (x.real * x.real + x.imag * x.imag).sum(dim=-1)  # [B,M]
     inner_re = (vec_d_j.real * x.real + vec_d_j.imag * x.imag).sum(dim=-1)  # [B,M]
     inner_im = (vec_d_j.real * x.imag - vec_d_j.imag * x.real).sum(dim=-1)  # [B,M]
     inner_abs_sq = inner_re * inner_re + inner_im * inner_im  # [B,M]
@@ -76,7 +78,7 @@ def T_Omega(
     # A_dir: [B,M]
     delta_d = delta_vec_d(vec_d, vec_d_j)  # [B,M,N] complex
     delta_d_norm_sq = (delta_d.real * delta_d.real + delta_d.imag * delta_d.imag).sum(dim=-1)  # [B,M]
-    A_dir = torch.exp(-PI * precision_perp * delta_d_norm_sq)  # [B,M]
+    A_dir = torch.exp(-PI * precision_perp_clamped * delta_d_norm_sq)  # [B,M]
 
     # Gain
     gain_zero = alpha_j * A_pos * A_dir  # [B,M]
@@ -135,8 +137,6 @@ def T_Omega(
     x_perp_im = x.imag - (inner_ux_re.unsqueeze(-1) * u_im + inner_ux_im.unsqueeze(-1) * u_re)  # [B,M,N]
     x_perp_norm_sq = (x_perp_re * x_perp_re + x_perp_im * x_perp_im).sum(dim=-1)  # [B,M]
 
-    precision_perp_clamped = torch.clamp(precision_perp, min=tiny)  # [B,M]
-    precision_par_clamped  = torch.clamp(precision_par,  min=tiny)  # [B,M]
     xprime_norm_sq = precision_perp_clamped * x_perp_norm_sq + precision_par_clamped * inner_ux_abs_sq  # [B,M]
 
     # ============================================================
