@@ -46,6 +46,7 @@ def T_Omega(
     HALF = torch.tensor(0.5, dtype=dtype_r, device=device)
     LOG2 = torch.tensor(2.0, dtype=dtype_r, device=device).log()
     FOUR_PI = 4.0 * PI
+    LOG_PI = PI.log()
 
     # Common
     x = z - z_j  # [B,M,N] complex
@@ -110,8 +111,9 @@ def T_Omega(
     log_Cj = -torch.log(precision_par_clamped) - (C - 1.0) * torch.log(precision_perp_clamped)  # [B,M]
     log_A_dir = torch.log(torch.clamp(A_dir,  min=tiny))  # [B,M]
     log_alpha = torch.log(torch.clamp(alpha_j, min=tiny))  # [B,M]
+    log_Cang = C * LOG_PI - torch.lgamma(C)
 
-    log_gain_jv = log_RJ + log_A_dir + log_alpha + log_Cj  # [B,M]
+    log_gain_jv = log_RJ + log_A_dir + log_alpha + log_Cj + log_Cang  # [B,M]
 
     print("\n" + "\n".join(
         [
