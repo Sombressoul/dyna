@@ -9,8 +9,6 @@ from dyna.lib.cpsf.periodization import CPSFPeriodization
 from dyna.lib.cpsf.functional.core_math import T_classic_window
 from dyna.lib.cpsf.functional.t_omega import T_Omega, T_Omega_Components
 
-torch.manual_seed(1337)
-
 
 def TEST_TAIL(*args, **kwargs) -> torch.Tensor:
     return T_Omega(return_components=T_Omega_Components.TAIL, *args, **kwargs)
@@ -110,7 +108,10 @@ def main():
         default="Proposed tail",
         help="label for proposed method",
     )
+    ap.add_argument("--seed", type=int, default=1337, help="RNG seed")
     args = ap.parse_args()
+
+    torch.manual_seed(args.seed)
 
     dev = _pick_device(args.device)
 
@@ -138,13 +139,37 @@ def main():
     assert O0 == 1
     print(f"window size: O(W)={O:,}, O(0)={O0}")
 
-    z = _make_cplx(B, N, dtype=dtype_z, device=dev, seed=10, unitize=False)
-    z_j = _make_cplx(B * M, N, dtype=dtype_z, device=dev, seed=20, unitize=False).view(
-        B, M, N
+    z = _make_cplx(
+        B,
+        N,
+        dtype=dtype_z,
+        device=dev,
+        seed=args.seed + 1,
+        unitize=False,
     )
-    vec_d = _make_cplx(B, N, dtype=dtype_z, device=dev, seed=30, unitize=True)
+    z_j = _make_cplx(
+        B * M,
+        N,
+        dtype=dtype_z,
+        device=dev,
+        seed=args.seed + 2,
+        unitize=False,
+    ).view(B, M, N)
+    vec_d = _make_cplx(
+        B,
+        N,
+        dtype=dtype_z,
+        device=dev,
+        seed=args.seed + 3,
+        unitize=True,
+    )
     vec_d_j = _make_cplx(
-        B * M, N, dtype=dtype_z, device=dev, seed=40, unitize=True
+        B * M,
+        N,
+        dtype=dtype_z,
+        device=dev,
+        seed=args.seed + 4,
+        unitize=True,
     ).view(B, M, N)
 
     alpha_j = 0.2 + 1.3 * torch.rand(B, M, device=dev, dtype=REAL_T)
