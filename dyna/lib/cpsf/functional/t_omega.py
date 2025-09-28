@@ -112,7 +112,7 @@ def T_Omega(
     log_A_dir = torch.log(torch.clamp(A_dir,  min=tiny))  # [B,M]
     log_alpha = torch.log(torch.clamp(alpha_j, min=tiny))  # [B,M]
     log_Cang = C * LOG_PI - torch.lgamma(C)  # [], scalar
-    log_Kp = (C - 1.0) * LOG2  # [], scalar
+    log_Kp = C * LOG2  # [], scalar
 
     log_gain_jv = log_RJ + log_Cj + log_A_dir + log_alpha + log_Cang + log_Kp  # [B,M]
 
