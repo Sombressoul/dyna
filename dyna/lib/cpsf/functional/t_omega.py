@@ -70,16 +70,16 @@ def T_Omega(
     #                      ZERO-FRAME
     # ============================================================
     # q_pos: [B,M]
-    x_norm_sq = (x.real * x.real + x.imag * x.imag).sum(dim=-1)
-    inner_re = (vec_d_j.real * x.real + vec_d_j.imag * x.imag).sum(dim=-1)
-    inner_im = (vec_d_j.real * x.imag - vec_d_j.imag * x.real).sum(dim=-1)
-    inner_abs_sq = inner_re * inner_re + inner_im * inner_im
-    q_pos = precision_perp * x_norm_sq + precision_excess_par * inner_abs_sq
+    x_norm_sq = (x.real * x.real + x.imag * x.imag).sum(dim=-1)  # [B,M,N]
+    inner_re = (vec_d_j.real * x.real + vec_d_j.imag * x.imag).sum(dim=-1)  # [B,M]
+    inner_im = (vec_d_j.real * x.imag - vec_d_j.imag * x.real).sum(dim=-1)  # [B,M]
+    inner_abs_sq = inner_re * inner_re + inner_im * inner_im  # [B,M]
+    q_pos = precision_perp * x_norm_sq + precision_excess_par * inner_abs_sq  # [B,M]
     A_pos = torch.exp(-PI * q_pos)  # [B,M]
 
     # A_dir: [B,M]
     delta_d = delta_vec_d(vec_d, vec_d_j)  # [B,M,N] complex
-    delta_d_norm_sq = (delta_d.real * delta_d.real + delta_d.imag * delta_d.imag).sum(dim=-1)
+    delta_d_norm_sq = (delta_d.real * delta_d.real + delta_d.imag * delta_d.imag).sum(dim=-1)  # [B,M]
     A_dir = torch.exp(-PI * precision_perp * delta_d_norm_sq)  # [B,M]
 
     # Gain
@@ -102,8 +102,8 @@ def T_Omega(
 
     anisotropy_ratio = precision_excess_par / torch.clamp(precision_perp, min=tiny)  # [B,M]
 
-    metric_mix_re = precision_perp.unsqueeze(-1) * x.real + precision_excess_par.unsqueeze(-1) * (inner_ux_re.unsqueeze(-1) * u_re - inner_ux_im.unsqueeze(-1) * u_im)
-    metric_mix_im = precision_perp.unsqueeze(-1) * x.imag + precision_excess_par.unsqueeze(-1) * (inner_ux_re.unsqueeze(-1) * u_im + inner_ux_im.unsqueeze(-1) * u_re)
+    metric_mix_re = precision_perp.unsqueeze(-1) * x.real + precision_excess_par.unsqueeze(-1) * (inner_ux_re.unsqueeze(-1) * u_re - inner_ux_im.unsqueeze(-1) * u_im)  # [B,M,N]
+    metric_mix_im = precision_perp.unsqueeze(-1) * x.imag + precision_excess_par.unsqueeze(-1) * (inner_ux_re.unsqueeze(-1) * u_im + inner_ux_im.unsqueeze(-1) * u_re)  # [B,M,N]
     metric_mix_norm_sq = (metric_mix_re * metric_mix_re + metric_mix_im * metric_mix_im).sum(dim=-1)  # [B,M]
     gamma_sq = torch.clamp(metric_mix_norm_sq / torch.clamp(precision_perp, min=tiny), min=0.0)  # [B,M]
 
