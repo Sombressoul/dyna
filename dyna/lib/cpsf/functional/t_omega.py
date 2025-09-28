@@ -91,22 +91,22 @@ def T_Omega(
     # DERIVATIVES
     # ============================================================
     norm_sq_vec_d_j = (vec_d_j.real * vec_d_j.real + vec_d_j.imag * vec_d_j.imag).sum(dim=-1)  # [B,M]
-    inv_norm_dj = torch.rsqrt(torch.clamp(norm_sq_vec_d_j, min=tiny))  # [B,M]
-    u_re = vec_d_j.real * inv_norm_dj.unsqueeze(-1)  # [B,M,N]
-    u_im = vec_d_j.imag * inv_norm_dj.unsqueeze(-1)  # [B,M,N]
+    norm_dj_inv = torch.rsqrt(torch.clamp(norm_sq_vec_d_j, min=tiny))  # [B,M]
+    u_re = vec_d_j.real * norm_dj_inv.unsqueeze(-1)  # [B,M,N]
+    u_im = vec_d_j.imag * norm_dj_inv.unsqueeze(-1)  # [B,M,N]
 
-    c_re = (u_re * x.real + u_im * x.imag).sum(dim=-1)  # [B,M]
-    c_im = (u_re * x.imag - u_im * x.real).sum(dim=-1)  # [B,M]
+    inner_ux_re = (u_re * x.real + u_im * x.imag).sum(dim=-1)  # [B,M]
+    inner_ux_im = (u_re * x.imag - u_im * x.real).sum(dim=-1)  # [B,M]
 
-    kappa = precision_excess_par / torch.clamp(precision_perp, min=tiny)  # [B,M]
+    anisotropy_ratio = precision_excess_par / torch.clamp(precision_perp, min=tiny)  # [B,M]
 
-    v_re = precision_perp.unsqueeze(-1) * x.real + precision_excess_par.unsqueeze(-1) * (c_re.unsqueeze(-1) * u_re - c_im.unsqueeze(-1) * u_im)
-    v_im = precision_perp.unsqueeze(-1) * x.imag + precision_excess_par.unsqueeze(-1) * (c_re.unsqueeze(-1) * u_im + c_im.unsqueeze(-1) * u_re)
-    norm_sq_v = (v_re * v_re + v_im * v_im).sum(dim=-1)  # [B,M]
-    gamma_sq = torch.clamp(norm_sq_v / torch.clamp(precision_perp, min=tiny), min=0.0)  # [B,M]
+    metric_mix_re = precision_perp.unsqueeze(-1) * x.real + precision_excess_par.unsqueeze(-1) * (inner_ux_re.unsqueeze(-1) * u_re - inner_ux_im.unsqueeze(-1) * u_im)
+    metric_mix_im = precision_perp.unsqueeze(-1) * x.imag + precision_excess_par.unsqueeze(-1) * (inner_ux_re.unsqueeze(-1) * u_im + inner_ux_im.unsqueeze(-1) * u_re)
+    metric_mix_norm_sq = (metric_mix_re * metric_mix_re + metric_mix_im * metric_mix_im).sum(dim=-1)  # [B,M]
+    gamma_sq = torch.clamp(metric_mix_norm_sq / torch.clamp(precision_perp, min=tiny), min=0.0)  # [B,M]
 
-    K_D = (2.0 ** NU) * torch.pow(torch.clamp(precision_perp, min=tiny), -C)  # [B,M]
-    beta = (2.0 * math.sqrt(math.pi)) * torch.sqrt(gamma_sq)  # [B,M]
+    gauss_dim_prefactor = (2.0 ** NU) * torch.pow(torch.clamp(precision_perp, min=tiny), -C)  # [B,M]
+    bessel_arg = (2.0 * math.sqrt(math.pi)) * torch.sqrt(gamma_sq)  # [B,M]
 
     # ============================================================
     # JACOBI
@@ -124,9 +124,9 @@ def T_Omega(
     t_theta_bm = x_jac.view(1, 1, -1)  # [1,1,Q]
     w_theta_bm = w_jac.view(1, 1, -1)  # [1,1,Q]
 
-    lam_theta = 1.0 + kappa.to(dtype_r)[..., None] * (1.0 - t_theta_bm)  # [B,M,Q]
+    lam_theta = 1.0 + anisotropy_ratio.to(dtype_r)[..., None] * (1.0 - t_theta_bm)  # [B,M,Q]
     lam_theta = torch.clamp(lam_theta, min=tiny)
-    beta_theta = beta.to(dtype_r)[..., None] / torch.sqrt(lam_theta)  # [B,M,Q]
+    beta_theta = bessel_arg.to(dtype_r)[..., None] / torch.sqrt(lam_theta)  # [B,M,Q]
 
     # ============================================================
     #         Masks
@@ -135,11 +135,11 @@ def T_Omega(
 
     lam_np    = lam_theta.detach().cpu().numpy()                         # [B,M,Q]
     beta_t_np = beta_theta.detach().cpu().numpy()                        # [B,M,Q]
-    KD_np     = K_D.detach().to(torch.float64).cpu().numpy()             # [B,M]
+    KD_np     = gauss_dim_prefactor.detach().to(torch.float64).cpu().numpy()             # [B,M]
     wth_np    = w_theta_bm.detach().cpu().numpy()                        # [1,1,Q]
     Adir_np   = A_dir.detach().to(torch.float64).cpu().numpy()           # [B,M]
     alpha_np  = alpha_j.detach().to(torch.float64).cpu().numpy()         # [B,M]
-    beta_np   = beta.detach().to(torch.float64).cpu().numpy()            # [B,M]
+    beta_np   = bessel_arg.detach().to(torch.float64).cpu().numpy()            # [B,M]
     qpos_np   = q_pos.detach().to(torch.float64).cpu().numpy()           # [B,M]
     gamma2_np = gamma_sq.detach().to(torch.float64).cpu().numpy()          # [B,M]
 
