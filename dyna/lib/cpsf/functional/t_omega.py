@@ -43,7 +43,6 @@ def T_Omega(
     C = torch.tensor(float(N), dtype=dtype_r, device=device)
     NU = torch.tensor(float(N - 1), dtype=dtype_r, device=device)
     PI = torch.tensor(torch.pi, dtype=dtype_r, device=device)
-    HALF = torch.tensor(0.5, dtype=dtype_r, device=device)
     LOG2 = torch.tensor(2.0, dtype=dtype_r, device=device).log()
     FOUR_PI = 4.0 * PI
     LOG_PI = PI.log()
@@ -115,13 +114,12 @@ def T_Omega(
     log_Cang = C * LOG_PI - torch.lgamma(C)  # [], scalar
     log_Kp = (C - 1.0) * LOG2  # [], scalar
 
-    log_gain_jv = log_RJ + log_A_dir + log_alpha + log_Cj + log_Cang + log_Kp  # [B,M]
+    log_gain_jv = log_RJ + log_Cj + log_A_dir + log_alpha + log_Cang + log_Kp  # [B,M]
 
     print("\n" + "\n".join(
         [
             f"xprime_norm_sq: {xprime_norm_sq.mean().item()}",
             f"-------------------------------------------",
-            # f"log_beta mean : {log_beta.mean().item()}",
             f"log_RJ mean   : {log_RJ.mean().item()}",
             f"log_Cj mean   : {log_Cj.mean().item()}",
             f"log_A_dir mean: {log_A_dir.mean().item()}",
