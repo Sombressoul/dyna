@@ -33,6 +33,11 @@ def T_Omega(
     return_components: T_Omega_Components = T_Omega_Components.UNION,
 ) -> torch.Tensor:
     # ============================================================
+    #                      VARIABLES
+    # ============================================================
+    Q_THETA = 24
+
+    # ============================================================
     #                      BASE
     # ============================================================
     device = z.device
@@ -47,6 +52,11 @@ def T_Omega(
     B, M, N = vec_d_j.shape
     z = z.unsqueeze(1).expand(B, M, N)
     vec_d = vec_d.unsqueeze(1).expand(B, M, N)
+
+    # Constants
+    D = 2 * N
+    C = float(N)
+    NU = float(N - 1)
 
     # Common
     x = z - z_j  # [B,M,N] complex
@@ -80,12 +90,8 @@ def T_Omega(
         return T_zero
 
     # ============================================================
-    #                      TAIL  (HYBRID)
+    # DERIVATIVES
     # ============================================================
-    D = 2 * N
-    c_val = float(N)
-    nu_val = float(N - 1)
-
     norm2_dj = (dr * dr + di * di).sum(dim=-1)                      # [B,M]
     inv_norm_dj = torch.rsqrt(torch.clamp(norm2_dj, min=tiny))  # [B,M]
     ur = dr * inv_norm_dj.unsqueeze(-1)                             # [B,M,N]
@@ -101,20 +107,16 @@ def T_Omega(
     norm2_v = (vr * vr + vi * vi).sum(dim=-1)                       # [B,M]
     gamma2 = torch.clamp(norm2_v / torch.clamp(a, min=tiny), min=0.0)  # [B,M]
 
-    K_D = (2.0 ** nu_val) * torch.pow(torch.clamp(a, min=tiny), -c_val)  # [B,M]
+    K_D = (2.0 ** NU) * torch.pow(torch.clamp(a, min=tiny), -C)  # [B,M]
     beta = (2.0 * math.sqrt(math.pi)) * torch.sqrt(gamma2)          # [B,M]
 
     # ============================================================
-    #                JACOBI
+    # JACOBI
     # ============================================================
-    Q_THETA = 24
-    alpha_old = -0.5
-    beta_old  = float(nu_val - 0.5)
-
     x_jac, w_jac = _t_omega_roots_jacobi(
         N=Q_THETA,
-        alpha=alpha_old,
-        beta=beta_old,
+        alpha=-0.5,
+        beta=NU - 0.5,
         normalize=True,
         return_weights=True,
         dtype=dtype_c,
@@ -152,7 +154,7 @@ def T_Omega(
     # ============================================================
     Q_RAD = 128
 
-    alpha_L = 0.5 * nu_val
+    alpha_L = 0.5 * NU
     u_nodes, w_nodes = roots_genlaguerre(Q_RAD, alpha_L)                 # [Qr]
     U_L   = u_nodes.reshape(1, 1, 1, Q_RAD)                               # [1,1,1,Qr]
     W_L   = w_nodes.reshape(1, 1, 1, Q_RAD)                               # [1,1,1,Qr]
@@ -161,8 +163,8 @@ def T_Omega(
     Z_I = np.maximum(beta_t_np[..., None] * np.sqrt(U_L), tiny64)         # [B,M,Q,Qr]
     z_small = (Z_I <= 1e-12)
     log_I = np.empty_like(Z_I)
-    ive_small = np.clip(ive(nu_val, np.maximum(Z_I[z_small], tiny64)), tiny64, None) if np.any(z_small) else None
-    ive_big   = np.clip(ive(nu_val, np.maximum(Z_I[~z_small], tiny64)), tiny64, None) if np.any(~z_small) else None
+    ive_small = np.clip(ive(NU, np.maximum(Z_I[z_small], tiny64)), tiny64, None) if np.any(z_small) else None
+    ive_big   = np.clip(ive(NU, np.maximum(Z_I[~z_small], tiny64)), tiny64, None) if np.any(~z_small) else None
     if np.any(z_small):
         log_I[z_small] = np.log(ive_small) + Z_I[z_small]
     if np.any(~z_small):
@@ -174,9 +176,9 @@ def T_Omega(
 
     lam_cl   = np.clip(lam_np, tiny64, None)
     log_lam  = np.log(lam_cl)                                             # [B,M,Q]
-    log_pref_I = math.log(0.5) - (nu_val / 2.0 + 1.0) * log_lam           # [B,M,Q]
+    log_pref_I = math.log(0.5) - (NU / 2.0 + 1.0) * log_lam           # [B,M,Q]
 
-    log_Ck = float(gammaln(nu_val + 1.0) - gammaln(nu_val + 0.5) - gammaln(0.5)) # Константа Куммера
+    log_Ck = float(gammaln(NU + 1.0) - gammaln(NU + 0.5) - gammaln(0.5)) # Константа Куммера
     log_G_I = (log_Ck
                + np.log(np.clip(KD_np, tiny64, None))[..., None]
                + log_sum_u_I + log_pref_I
@@ -195,10 +197,10 @@ def T_Omega(
     # ============================================================
     lamJ = lam_cl                                                          # [B,M,Q]
     beta2_over_4_abs = (beta_np[..., None] ** 2) / (4.0 * lamJ)            # [B,M,Q]
-    coeffJ = (beta_np[..., None] ** nu_val) * np.power(2.0 * lamJ, -(nu_val + 1.0))  # [B,M,Q]
+    coeffJ = (beta_np[..., None] ** NU) * np.power(2.0 * lamJ, -(NU + 1.0))  # [B,M,Q]
     R_J = coeffJ * np.exp(-np.clip(beta2_over_4_abs, 0.0, 7.0e2))          # [B,M,Q]
 
-    log_Ck = float(gammaln(nu_val + 1.0) - gammaln(nu_val + 0.5) - gammaln(0.5))
+    log_Ck = float(gammaln(NU + 1.0) - gammaln(NU + 0.5) - gammaln(0.5))
     Ck = float(np.exp(log_Ck))
 
     G_J = (Ck * KD_np[..., None] * wth_np *
