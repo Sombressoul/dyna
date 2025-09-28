@@ -106,8 +106,10 @@ def T_Omega(
     beta = torch.sqrt(torch.clamp(FOUR_PI * xprime_norm_sq, min=tiny))  # [B,M]
     log_beta = torch.log(torch.clamp(beta, min=tiny))  # [B,M]
     J_nu = _t_omega_jv(v=NU, z=beta, dtype=dtype_r, device=device)  # [B,M]
+    env = torch.sqrt(torch.clamp(2.0 / (PI * beta), min=tiny))  # [B,M]
+    env_eps = torch.finfo(env.dtype).eps * env  # [B,M]
 
-    log_RJ = torch.log(torch.clamp(J_nu.abs(), min=tiny)) + torch.lgamma(C) + (1.0 - C) * log_beta  # [B,M]
+    log_RJ = torch.log(torch.clamp(J_nu.abs() + env_eps, min=tiny)) + torch.lgamma(C) + (1.0 - C) * log_beta  # [B,M]
     log_Cj = -torch.log(precision_par_clamped) - (C - 1.0) * torch.log(precision_perp_clamped)  # [B,M]
     log_A_dir = torch.log(torch.clamp(A_dir,  min=tiny))  # [B,M]
     log_alpha = torch.log(torch.clamp(alpha_j, min=tiny))  # [B,M]
@@ -119,11 +121,22 @@ def T_Omega(
     print("\n" + "\n".join(
         [
             f"xprime_norm_sq: {xprime_norm_sq.mean().item()}",
+            f"beta mean     : {beta.mean().item()}",
+            f"log_beta mean : {log_beta.mean().item()}",
+            f"env mean      : {env.mean().item()}",
+            f"env_eps mean  : {env_eps.mean().item()}",
+            f"-------------------------------------------",
+            f"J_nu:",
+            f"J_nu min      : {J_nu.min().item()}",
+            f"J_nu max      : {J_nu.max().item()}",
+            f"J_nu mean     : {J_nu.mean().item()}",
             f"-------------------------------------------",
             f"log_RJ mean   : {log_RJ.mean().item()}",
             f"log_Cj mean   : {log_Cj.mean().item()}",
             f"log_A_dir mean: {log_A_dir.mean().item()}",
             f"log_alpha mean: {log_alpha.mean().item()}",
+            f"log_Cang      : {log_Cang.item()}",
+            f"log_Kp        : {log_Kp.item()}",
         ]
     ))
 
