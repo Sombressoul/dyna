@@ -57,6 +57,8 @@ def T_Omega(
     D = 2 * N
     C = float(N)
     NU = float(N - 1)
+    PI = torch.tensor(torch.pi, dtype=dtype_r, device=device)
+    PI2_SQRT = 2.0 * PI.sqrt()
 
     # Common
     x = z - z_j  # [B,M,N] complex
@@ -73,12 +75,12 @@ def T_Omega(
     inner_im = (vec_d_j.real * x.imag - vec_d_j.imag * x.real).sum(dim=-1)
     inner_abs_sq = inner_re * inner_re + inner_im * inner_im
     q_pos = precision_perp * x_norm_sq + precision_excess_par * inner_abs_sq
-    A_pos = torch.exp(-math.pi * q_pos)  # [B,M]
+    A_pos = torch.exp(-PI * q_pos)  # [B,M]
 
     # A_dir: [B,M]
     delta_d = delta_vec_d(vec_d, vec_d_j)  # [B,M,N] complex
     delta_d_norm_sq = (delta_d.real * delta_d.real + delta_d.imag * delta_d.imag).sum(dim=-1)
-    A_dir = torch.exp(-math.pi * precision_perp * delta_d_norm_sq)  # [B,M]
+    A_dir = torch.exp(-PI * precision_perp * delta_d_norm_sq)  # [B,M]
 
     # Gain
     gain_zero = alpha_j * A_pos * A_dir  # [B,M]
@@ -106,7 +108,7 @@ def T_Omega(
     gamma_sq = torch.clamp(metric_mix_norm_sq / torch.clamp(precision_perp, min=tiny), min=0.0)  # [B,M]
 
     gauss_dim_prefactor = (2.0 ** NU) * torch.pow(torch.clamp(precision_perp, min=tiny), -C)  # [B,M]
-    bessel_arg = (2.0 * math.sqrt(math.pi)) * torch.sqrt(gamma_sq)  # [B,M]
+    bessel_arg = PI2_SQRT * torch.sqrt(gamma_sq)  # [B,M]
 
     # ============================================================
     # JACOBI
@@ -143,7 +145,7 @@ def T_Omega(
     qpos_np   = q_pos.detach().to(torch.float64).cpu().numpy()           # [B,M]
     gamma2_np = gamma_sq.detach().to(torch.float64).cpu().numpy()          # [B,M]
 
-    Delta_np  = np.pi * (gamma2_np[..., None] / np.clip(lam_np, tiny64, None) - qpos_np[..., None])  # [B,M,Q]
+    Delta_np  = PI.cpu().numpy() * (gamma2_np[..., None] / np.clip(lam_np, tiny64, None) - qpos_np[..., None])  # [B,M,Q]
     mask_J    = (Delta_np > 0.0)
     mask_I    = ~mask_J
 
