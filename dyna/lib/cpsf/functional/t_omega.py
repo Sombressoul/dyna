@@ -23,17 +23,10 @@ def T_Omega(
     sigma_perp: torch.Tensor,  # sigma_perp: [B,M] (real)
     return_components: T_Omega_Components = T_Omega_Components.UNION,
 ) -> torch.Tensor:
-    # # ============================================================
-    # #                      VARIABLES
-    # # ============================================================
-    # Q_THETA = 24
-    # Q_RAD = 128
-
     # ============================================================
     #                      BASE
     # ============================================================
     device = z.device
-    # dtype_c = z.dtype
     dtype_r = z.real.dtype
     tiny = torch.finfo(dtype_r).tiny
 
@@ -46,15 +39,12 @@ def T_Omega(
     vec_d = vec_d.unsqueeze(1).expand(B, M, N)
 
     # Constants
-    # D = torch.tensor(float(2 * N), dtype=dtype_r, device=device)
     C = torch.tensor(float(N), dtype=dtype_r, device=device)
     NU = torch.tensor(float(N - 1), dtype=dtype_r, device=device)
     PI = torch.tensor(torch.pi, dtype=dtype_r, device=device)
     HALF = torch.tensor(0.5, dtype=dtype_r, device=device)
     LOG2 = torch.tensor(2.0, dtype=dtype_r, device=device).log()
-    # TOW_PI = 2.0 * PI
     FOUR_PI = 4.0 * PI
-    # PI2_SQRT = 2.0 * PI.sqrt()
 
     # Common
     x = z - z_j  # [B,M,N] complex
@@ -98,36 +88,6 @@ def T_Omega(
     inner_ux_re = (u_re * x.real + u_im * x.imag).sum(dim=-1)  # [B,M]
     inner_ux_im = (u_re * x.imag - u_im * x.real).sum(dim=-1)  # [B,M]
 
-    # anisotropy_ratio = precision_excess_par / torch.clamp(precision_perp, min=tiny)  # [B,M]
-
-    # metric_mix_re = precision_perp.unsqueeze(-1) * x.real + precision_excess_par.unsqueeze(-1) * (inner_ux_re.unsqueeze(-1) * u_re - inner_ux_im.unsqueeze(-1) * u_im)  # [B,M,N]
-    # metric_mix_im = precision_perp.unsqueeze(-1) * x.imag + precision_excess_par.unsqueeze(-1) * (inner_ux_re.unsqueeze(-1) * u_im + inner_ux_im.unsqueeze(-1) * u_re)  # [B,M,N]
-    # metric_mix_norm_sq = (metric_mix_re * metric_mix_re + metric_mix_im * metric_mix_im).sum(dim=-1)  # [B,M]
-    # gamma_sq = torch.clamp(metric_mix_norm_sq / torch.clamp(precision_perp, min=tiny), min=0.0)  # [B,M]
-
-    # gauss_dim_prefactor = (2.0 ** NU) * torch.pow(torch.clamp(precision_perp, min=tiny), -C)  # [B,M]
-    # bessel_arg = PI2_SQRT * torch.sqrt(gamma_sq)  # [B,M]
-
-    # # ============================================================
-    # # JACOBI
-    # # ============================================================
-    # x_jac, w_jac = _t_omega_roots_jacobi(
-    #     N=Q_THETA,
-    #     alpha=-0.5,
-    #     beta=NU - 0.5,
-    #     normalize=True,
-    #     return_weights=True,
-    #     dtype=dtype_c,
-    #     device=device,
-    # )
-
-    # t_theta_bm = x_jac.view(1, 1, -1)  # [1,1,Q]
-    # w_theta_bm = w_jac.view(1, 1, -1)  # [1,1,Q]
-
-    # lam_theta = 1.0 + anisotropy_ratio.to(dtype_r)[..., None] * (1.0 - t_theta_bm)  # [B,M,Q]
-    # lam_theta = torch.clamp(lam_theta, min=tiny)
-    # beta_theta = bessel_arg.to(dtype_r)[..., None] / torch.sqrt(lam_theta)  # [B,M,Q]
-
     # ============================================================
     # WHITENING
     # ============================================================
@@ -144,9 +104,9 @@ def T_Omega(
     # ============================================================
     log_Ck = torch.lgamma(NU + 1.0) - torch.lgamma(NU + 0.5) - torch.lgamma(HALF)  # [] - scalar
     log_Kp = NU * LOG2  # [] - scalar
-    log_beta = 0.5 * torch.log(torch.clamp(FOUR_PI * xprime_norm_sq, min=tiny))  # [B,M]
+    log_beta = 0.5 * torch.log(torch.clamp(FOUR_PI * xprime_norm_sq, min=tiny)) + xprime_norm_sq.clamp(tiny).log()  # [B,M]
     log_RJ   = NU * log_beta - (NU + 1.0) * LOG2 - PI * xprime_norm_sq  # [B,M]
-    log_Cj = -torch.log(precision_par_clamped) - (2.0 * C - 1.0) * torch.log(precision_perp_clamped)  # [B,M]
+    log_Cj = -torch.log(precision_par_clamped) - (C - 1.0) * torch.log(precision_perp_clamped)  # [B,M]
     log_A_dir  = torch.log(torch.clamp(A_dir,  min=tiny))  # [B,M]
     log_alpha  = torch.log(torch.clamp(alpha_j, min=tiny))  # [B,M]
     log_gain_jv = log_Ck + log_Kp + log_RJ + log_A_dir + log_alpha + log_Cj  # [B,M]
