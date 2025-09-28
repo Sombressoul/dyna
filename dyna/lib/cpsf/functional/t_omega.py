@@ -60,27 +60,25 @@ def T_Omega(
 
     # Common
     x = z - z_j  # [B,M,N] complex
-    xr, xi = x.real, x.imag  # [B,M,N]
-    a = torch.reciprocal(sigma_perp)  # [B,M]
-    b = torch.reciprocal(sigma_par) - a  # [B,M]
+    precision_perp = torch.reciprocal(sigma_perp)  # [B,M]
+    precision_par  = torch.reciprocal(sigma_par)  # [B,M]
+    precision_excess_par = precision_par - precision_perp  # [B,M]
 
     # ============================================================
     #                      ZERO-FRAME
     # ============================================================
     # q_pos: [B,M]
-    dr, di = vec_d_j.real, vec_d_j.imag  # [B,M,N]
-    norm2_x = (xr * xr + xi * xi).sum(dim=-1)
-    inner_re = (dr * xr + di * xi).sum(dim=-1)
-    inner_im = (dr * xi - di * xr).sum(dim=-1)
-    inner_abs2 = inner_re * inner_re + inner_im * inner_im
-    q_pos = a * norm2_x + b * inner_abs2
+    norm_sq_x = (x.real * x.real + x.imag * x.imag).sum(dim=-1)
+    inner_re = (vec_d_j.real * x.real + vec_d_j.imag * x.imag).sum(dim=-1)
+    inner_im = (vec_d_j.real * x.imag - vec_d_j.imag * x.real).sum(dim=-1)
+    inner_abs_sq = inner_re * inner_re + inner_im * inner_im
+    q_pos = precision_perp * norm_sq_x + precision_excess_par * inner_abs_sq
     A_pos = torch.exp(-math.pi * q_pos)  # [B,M]
 
     # A_dir: [B,M]
-    dv = delta_vec_d(vec_d, vec_d_j)  # [B,M,N] complex
-    dvr, dvi = dv.real, dv.imag
-    norm2_dv = (dvr * dvr + dvi * dvi).sum(dim=-1)
-    A_dir = torch.exp(-math.pi * torch.reciprocal(sigma_perp) * norm2_dv)  # [B,M]
+    d_vec_d = delta_vec_d(vec_d, vec_d_j)  # [B,M,N] complex
+    norm_sq_dv = (d_vec_d.real * d_vec_d.real + d_vec_d.imag * d_vec_d.imag).sum(dim=-1)
+    A_dir = torch.exp(-math.pi * torch.reciprocal(sigma_perp) * norm_sq_dv)  # [B,M]
 
     # Gain
     gain_zero = alpha_j * A_pos * A_dir  # [B,M]
@@ -92,23 +90,23 @@ def T_Omega(
     # ============================================================
     # DERIVATIVES
     # ============================================================
-    norm2_dj = (dr * dr + di * di).sum(dim=-1)                      # [B,M]
-    inv_norm_dj = torch.rsqrt(torch.clamp(norm2_dj, min=tiny))  # [B,M]
-    ur = dr * inv_norm_dj.unsqueeze(-1)                             # [B,M,N]
-    ui = di * inv_norm_dj.unsqueeze(-1)                             # [B,M,N]
+    norm_sq_vec_d_j = (vec_d_j.real * vec_d_j.real + vec_d_j.imag * vec_d_j.imag).sum(dim=-1)  # [B,M]
+    inv_norm_dj = torch.rsqrt(torch.clamp(norm_sq_vec_d_j, min=tiny))  # [B,M]
+    u_re = vec_d_j.real * inv_norm_dj.unsqueeze(-1)  # [B,M,N]
+    u_im = vec_d_j.imag * inv_norm_dj.unsqueeze(-1)  # [B,M,N]
 
-    c_re = (ur * xr + ui * xi).sum(dim=-1)                          # [B,M]
-    c_im = (ur * xi - ui * xr).sum(dim=-1)                          # [B,M]
+    c_re = (u_re * x.real + u_im * x.imag).sum(dim=-1)  # [B,M]
+    c_im = (u_re * x.imag - u_im * x.real).sum(dim=-1)  # [B,M]
 
-    kappa = b / torch.clamp(a, min=tiny)                        # [B,M]
+    kappa = precision_excess_par / torch.clamp(precision_perp, min=tiny)  # [B,M]
 
-    vr = a.unsqueeze(-1) * xr + b.unsqueeze(-1) * (c_re.unsqueeze(-1) * ur - c_im.unsqueeze(-1) * ui)
-    vi = a.unsqueeze(-1) * xi + b.unsqueeze(-1) * (c_re.unsqueeze(-1) * ui + c_im.unsqueeze(-1) * ur)
-    norm2_v = (vr * vr + vi * vi).sum(dim=-1)                       # [B,M]
-    gamma2 = torch.clamp(norm2_v / torch.clamp(a, min=tiny), min=0.0)  # [B,M]
+    v_re = precision_perp.unsqueeze(-1) * x.real + precision_excess_par.unsqueeze(-1) * (c_re.unsqueeze(-1) * u_re - c_im.unsqueeze(-1) * u_im)
+    v_im = precision_perp.unsqueeze(-1) * x.imag + precision_excess_par.unsqueeze(-1) * (c_re.unsqueeze(-1) * u_im + c_im.unsqueeze(-1) * u_re)
+    norm_sq_v = (v_re * v_re + v_im * v_im).sum(dim=-1)  # [B,M]
+    gamma_sq = torch.clamp(norm_sq_v / torch.clamp(precision_perp, min=tiny), min=0.0)  # [B,M]
 
-    K_D = (2.0 ** NU) * torch.pow(torch.clamp(a, min=tiny), -C)  # [B,M]
-    beta = (2.0 * math.sqrt(math.pi)) * torch.sqrt(gamma2)          # [B,M]
+    K_D = (2.0 ** NU) * torch.pow(torch.clamp(precision_perp, min=tiny), -C)  # [B,M]
+    beta = (2.0 * math.sqrt(math.pi)) * torch.sqrt(gamma_sq)  # [B,M]
 
     # ============================================================
     # JACOBI
@@ -143,7 +141,7 @@ def T_Omega(
     alpha_np  = alpha_j.detach().to(torch.float64).cpu().numpy()         # [B,M]
     beta_np   = beta.detach().to(torch.float64).cpu().numpy()            # [B,M]
     qpos_np   = q_pos.detach().to(torch.float64).cpu().numpy()           # [B,M]
-    gamma2_np = gamma2.detach().to(torch.float64).cpu().numpy()          # [B,M]
+    gamma2_np = gamma_sq.detach().to(torch.float64).cpu().numpy()          # [B,M]
 
     Delta_np  = np.pi * (gamma2_np[..., None] / np.clip(lam_np, tiny64, None) - qpos_np[..., None])  # [B,M,Q]
     mask_J    = (Delta_np > 0.0)
