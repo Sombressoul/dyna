@@ -105,10 +105,12 @@ def T_Omega(
     # ============================================================
     beta = torch.sqrt(torch.clamp(FOUR_PI * xprime_norm_sq, min=tiny))# [B,M]
     J_nu = _t_omega_jv(v=NU, z=beta, dtype=dtype_r, device=device) # [B,M]
+
     log_RJ = torch.log(torch.clamp(J_nu.abs(), min=tiny))  # [B,M]
     log_Cj = -torch.log(precision_par_clamped) - (C - 1.0) * torch.log(precision_perp_clamped)  # [B,M]
-    log_A_dir  = torch.log(torch.clamp(A_dir,  min=tiny))  # [B,M]
-    log_alpha  = torch.log(torch.clamp(alpha_j, min=tiny))  # [B,M]
+    log_A_dir = torch.log(torch.clamp(A_dir,  min=tiny))  # [B,M]
+    log_alpha = torch.log(torch.clamp(alpha_j, min=tiny))  # [B,M]
+
     log_gain_jv = log_RJ + log_A_dir + log_alpha + log_Cj  # [B,M]
 
     print("\n" + "\n".join(
