@@ -137,13 +137,13 @@ def T_Omega(
 
     lam_np    = lam_theta.detach().cpu().numpy()                         # [B,M,Q]
     beta_t_np = beta_theta.detach().cpu().numpy()                        # [B,M,Q]
-    KD_np     = gauss_dim_prefactor.detach().to(torch.float64).cpu().numpy()             # [B,M]
+    KD_np     = gauss_dim_prefactor.detach().cpu().numpy()             # [B,M]
     wth_np    = w_theta_bm.detach().cpu().numpy()                        # [1,1,Q]
-    Adir_np   = A_dir.detach().to(torch.float64).cpu().numpy()           # [B,M]
-    alpha_np  = alpha_j.detach().to(torch.float64).cpu().numpy()         # [B,M]
-    beta_np   = bessel_arg.detach().to(torch.float64).cpu().numpy()            # [B,M]
-    qpos_np   = q_pos.detach().to(torch.float64).cpu().numpy()           # [B,M]
-    gamma2_np = gamma_sq.detach().to(torch.float64).cpu().numpy()          # [B,M]
+    Adir_np   = A_dir.detach().cpu().numpy()           # [B,M]
+    alpha_np  = alpha_j.detach().cpu().numpy()         # [B,M]
+    beta_np   = bessel_arg.detach().cpu().numpy()            # [B,M]
+    qpos_np   = q_pos.detach().cpu().numpy()           # [B,M]
+    gamma2_np = gamma_sq.detach().cpu().numpy()          # [B,M]
 
     Delta_np  = PI.cpu().numpy() * (gamma2_np[..., None] / np.clip(lam_np, tiny64, None) - qpos_np[..., None])  # [B,M,Q]
     mask_J    = (Delta_np > 0.0)
