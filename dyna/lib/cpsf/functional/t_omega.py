@@ -4,7 +4,7 @@ import torch
 from enum import Enum, auto as enum_auto
 
 import numpy as np
-from scipy.special import roots_genlaguerre, ive, gammaln, logsumexp, roots_hermite, jv
+from scipy.special import roots_genlaguerre, ive, gammaln, logsumexp
 
 from dyna.lib.cpsf.functional.core_math import (
     delta_vec_d,
