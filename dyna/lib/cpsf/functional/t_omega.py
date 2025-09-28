@@ -3,6 +3,7 @@ import torch
 from enum import Enum, auto as enum_auto
 
 from dyna.lib.cpsf.functional.core_math import delta_vec_d
+from dyna.lib.cpsf.functional.t_omega_math import _t_omega_jv
 
 
 class T_Omega_Components(Enum):
@@ -102,14 +103,25 @@ def T_Omega(
     # ============================================================
     # J_v
     # ============================================================
-    log_Ck = torch.lgamma(NU + 1.0) - torch.lgamma(NU + 0.5) - torch.lgamma(HALF)  # [] - scalar
-    log_Kp = NU * LOG2  # [] - scalar
-    log_beta = 0.5 * torch.log(torch.clamp(FOUR_PI * xprime_norm_sq, min=tiny)) + xprime_norm_sq.clamp(tiny).log()  # [B,M]
-    log_RJ   = NU * log_beta - (NU + 1.0) * LOG2 - PI * xprime_norm_sq  # [B,M]
+    beta = torch.sqrt(torch.clamp(FOUR_PI * xprime_norm_sq, min=tiny))# [B,M]
+    J_nu = _t_omega_jv(v=NU, z=beta, dtype=dtype_r, device=device) # [B,M]
+    log_RJ = torch.log(torch.clamp(J_nu.abs(), min=tiny))  # [B,M]
     log_Cj = -torch.log(precision_par_clamped) - (C - 1.0) * torch.log(precision_perp_clamped)  # [B,M]
     log_A_dir  = torch.log(torch.clamp(A_dir,  min=tiny))  # [B,M]
     log_alpha  = torch.log(torch.clamp(alpha_j, min=tiny))  # [B,M]
-    log_gain_jv = log_Ck + log_Kp + log_RJ + log_A_dir + log_alpha + log_Cj  # [B,M]
+    log_gain_jv = log_RJ + log_A_dir + log_alpha + log_Cj  # [B,M]
+
+    print("\n" + "\n".join(
+        [
+            f"xprime_norm_sq: {xprime_norm_sq.mean().item()}",
+            f"-------------------------------------------",
+            # f"log_beta mean : {log_beta.mean().item()}",
+            f"log_RJ mean   : {log_RJ.mean().item()}",
+            f"log_Cj mean   : {log_Cj.mean().item()}",
+            f"log_A_dir mean: {log_A_dir.mean().item()}",
+            f"log_alpha mean: {log_alpha.mean().item()}",
+        ]
+    ))
 
     gain_tail     = torch.exp(log_gain_jv)  # [B,M]
 
