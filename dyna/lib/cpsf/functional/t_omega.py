@@ -38,6 +38,7 @@ def T_Omega(
     device = z.device
     dtype_c = z.dtype
     dtype_r = z.real.dtype
+    tiny = torch.finfo(dtype_r).tiny
 
     # ============================================================
     #                      MAIN
@@ -85,10 +86,8 @@ def T_Omega(
     c_val = float(N)
     nu_val = float(N - 1)
 
-    tiny_f32 = torch.finfo(a.dtype).tiny
-
     norm2_dj = (dr * dr + di * di).sum(dim=-1)                      # [B,M]
-    inv_norm_dj = torch.rsqrt(torch.clamp(norm2_dj, min=tiny_f32))  # [B,M]
+    inv_norm_dj = torch.rsqrt(torch.clamp(norm2_dj, min=tiny))  # [B,M]
     ur = dr * inv_norm_dj.unsqueeze(-1)                             # [B,M,N]
     ui = di * inv_norm_dj.unsqueeze(-1)                             # [B,M,N]
 
@@ -96,15 +95,15 @@ def T_Omega(
     c_im = (ur * xi - ui * xr).sum(dim=-1)                          # [B,M]
     inner_abs2_u = c_re * c_re + c_im * c_im                        # [B,M]
 
-    kappa = b / torch.clamp(a, min=tiny_f32)                        # [B,M]
+    kappa = b / torch.clamp(a, min=tiny)                        # [B,M]
     onepk = 1.0 + kappa                                             # [B,M]
 
     vr = a.unsqueeze(-1) * xr + b.unsqueeze(-1) * (c_re.unsqueeze(-1) * ur - c_im.unsqueeze(-1) * ui)
     vi = a.unsqueeze(-1) * xi + b.unsqueeze(-1) * (c_re.unsqueeze(-1) * ui + c_im.unsqueeze(-1) * ur)
     norm2_v = (vr * vr + vi * vi).sum(dim=-1)                       # [B,M]
-    gamma2 = torch.clamp(norm2_v / torch.clamp(a, min=tiny_f32), min=0.0)  # [B,M]
+    gamma2 = torch.clamp(norm2_v / torch.clamp(a, min=tiny), min=0.0)  # [B,M]
 
-    K_D = (2.0 ** nu_val) * torch.pow(torch.clamp(a, min=tiny_f32), -c_val)  # [B,M]
+    K_D = (2.0 ** nu_val) * torch.pow(torch.clamp(a, min=tiny), -c_val)  # [B,M]
     beta = (2.0 * math.sqrt(math.pi)) * torch.sqrt(gamma2)          # [B,M]
 
     def _stat(name, t):
@@ -140,20 +139,12 @@ def T_Omega(
         device=device,
     )
 
-    # Константа Куммера
-    log_Ck = float(gammaln(nu_val + 1.0) - gammaln(nu_val + 0.5) - gammaln(0.5))
-    Ck = float(np.exp(log_Ck))
+    t_theta_bm = x_jac.view(1, 1, -1)  # [1,1,Q]
+    w_theta_bm = w_jac.view(1, 1, -1)  # [1,1,Q]
 
-    t_theta_bm = x_jac.view(1, 1, -1)                                              # [1,1,Q]
-    w_theta_bm = w_jac.view(1, 1, -1)                                              # [1,1,Q]
-
-    one64 = torch.tensor(1.0, dtype=torch.float64, device=device)
-    lam_theta = one64 + kappa.to(torch.float64)[..., None] * (one64 - t_theta_bm)    # [B,M,Q]
-    lam_theta = torch.clamp(lam_theta, min=torch.finfo(torch.float64).tiny)
-    beta_theta = beta.to(torch.float64)[..., None] / torch.sqrt(lam_theta)           # [B,M,Q]
-
-    print(f"[JACOBI][params] Q={Q_THETA}, α_old={alpha_old:.3f}, β_old={beta_old:.3f}")
-
+    lam_theta = 1.0 + kappa.to(dtype_r)[..., None] * (1.0 - t_theta_bm)  # [B,M,Q]
+    lam_theta = torch.clamp(lam_theta, min=tiny)
+    beta_theta = beta.to(dtype_r)[..., None] / torch.sqrt(lam_theta)  # [B,M,Q]
 
     # ============================================================
     #         Masks
@@ -216,6 +207,7 @@ def T_Omega(
     log_lam  = np.log(lam_cl)                                             # [B,M,Q]
     log_pref_I = math.log(0.5) - (nu_val / 2.0 + 1.0) * log_lam           # [B,M,Q]
 
+    log_Ck = float(gammaln(nu_val + 1.0) - gammaln(nu_val + 0.5) - gammaln(0.5)) # Константа Куммера
     log_G_I = (log_Ck
                + np.log(np.clip(KD_np, tiny64, None))[..., None]
                + log_sum_u_I + log_pref_I
@@ -242,6 +234,9 @@ def T_Omega(
     beta2_over_4_abs = (beta_np[..., None] ** 2) / (4.0 * lamJ)            # [B,M,Q]
     coeffJ = (beta_np[..., None] ** nu_val) * np.power(2.0 * lamJ, -(nu_val + 1.0))  # [B,M,Q]
     R_J = coeffJ * np.exp(-np.clip(beta2_over_4_abs, 0.0, 7.0e2))          # [B,M,Q]
+
+    log_Ck = float(gammaln(nu_val + 1.0) - gammaln(nu_val + 0.5) - gammaln(0.5))
+    Ck = float(np.exp(log_Ck))
 
     G_J = (Ck * KD_np[..., None] * wth_np *
            Adir_np[..., None] * alpha_np[..., None] * R_J)                 # [B,M,Q]
