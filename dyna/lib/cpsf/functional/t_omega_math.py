@@ -39,7 +39,7 @@ def _t_omega_roots_jacobi(
         device = torch.device("cpu")
 
     if dtype is None:
-        dtype = torch.complex64
+        dtype = torch.float64
     else:
         dtype = (
             torch.float64
@@ -105,3 +105,44 @@ def _t_omega_roots_jacobi(
             weights = weights / mu_0
 
         return eigvals, weights
+
+def _t_omega_roots_gen_laguerre(
+    *,
+    N: int,
+    alpha: Union[torch.FloatTensor, float],
+    return_weights: bool = False,
+    normalize: bool = False,  # (0,1) mapping + optional weight normalization
+    device: Optional[torch.device] = None,
+    dtype: Optional[torch.dtype] = None,
+) -> torch.Tensor:
+    if device is None:
+        device = torch.device("cpu")
+
+    if dtype is None:
+        dtype = torch.float64
+    else:
+        dtype = (
+            torch.float64
+            if dtype in [torch.complex128, torch.float64]
+            else torch.float32
+        )
+
+    if N < 1 or N != int(N):
+        raise ValueError("N must be a positive integer.")
+    if alpha < -1:
+        raise ValueError("alpha must be greater than -1.")
+
+    if not return_weights:
+        ... # TODO
+
+        if normalize:
+            ... # TODO
+        
+        return ...
+    else:
+        ... # TODO
+
+        if normalize:
+            ... # TODO
+        
+        return ...
