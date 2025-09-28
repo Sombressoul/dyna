@@ -81,13 +81,13 @@ def _t_omega_roots_jacobi(
     J = 0.5 * (J + (J.conj().T if torch.is_complex(J) else J.T))
 
     if not return_weights:
-        eigvals = torch.linalg.eigvalsh(J)
-        eigvals = eigvals.to(dtype=dtype)
+        nodes = torch.linalg.eigvalsh(J)
+        nodes = nodes.to(dtype=dtype)
 
-        return 0.5 * (eigvals + 1.0) if normalize else eigvals
+        return 0.5 * (nodes + 1.0) if normalize else nodes
     else:
         evals, evecs = torch.linalg.eigh(J)
-        eigvals = evals.to(dtype=dtype)
+        nodes = evals.to(dtype=dtype)
 
         log_mu_0 = (
             (a + b + 1.0) * torch.log(torch.as_tensor(2.0, dtype=dtype, device=device))
@@ -101,10 +101,10 @@ def _t_omega_roots_jacobi(
         weights = (mu_0 * (v_0 * v_0)).to(dtype=dtype)
 
         if normalize:
-            eigvals = 0.5 * (eigvals + 1.0)
+            nodes = 0.5 * (nodes + 1.0)
             weights = weights / mu_0
 
-        return eigvals, weights
+        return nodes, weights
 
 def _t_omega_roots_gen_laguerre(
     *,
