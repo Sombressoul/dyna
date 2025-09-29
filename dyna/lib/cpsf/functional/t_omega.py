@@ -43,9 +43,9 @@ def T_Omega(
     C = torch.tensor(float(N), dtype=dtype_r, device=device)
     NU = torch.tensor(float(N - 1), dtype=dtype_r, device=device)
     PI = torch.tensor(torch.pi, dtype=dtype_r, device=device)
-    LOG2 = torch.tensor(2.0, dtype=dtype_r, device=device).log()
     FOUR_PI = 4.0 * PI
     LOG_PI = PI.log()
+    LOG2 = torch.tensor(2.0, dtype=dtype_r, device=device).log()
 
     # Common
     x = z - z_j  # [B,M,N] complex
@@ -101,7 +101,7 @@ def T_Omega(
     xprime_norm_sq = precision_perp_clamped * x_perp_norm_sq + precision_par_clamped * inner_ux_abs_sq  # [B,M]
 
     # ============================================================
-    # J_v
+    # TAIL
     # ============================================================
     beta = torch.sqrt(torch.clamp(FOUR_PI * xprime_norm_sq, min=tiny))  # [B,M]
     log_beta = torch.log(torch.clamp(beta, min=tiny))  # [B,M]
