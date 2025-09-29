@@ -28,15 +28,14 @@ which is orthogonal to $\vec d_j$ (tangency: $\langle \vec d_j,\delta\vec d\rang
 The **zero-frame, non-periodized** contribution of index $j$ is
 $$
 \eta^{(0)}_j(z,\vec d)
-======================
-
+=
 \exp!\bigl(-\pi,q^{(\mathrm{pos})}_j(\delta z)\bigr);
 \exp!\bigl(-\pi,q^{(\mathrm{dir})}_j(\delta\vec d)\bigr),
 $$
 with
 $$
 q^{(\mathrm{pos})}_j(\delta z)
-==============================
+=
 
 \sigma_{\perp j}^{-1},|\delta z|_2^2
 
