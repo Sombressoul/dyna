@@ -3,7 +3,7 @@ import torch
 from enum import Enum, auto as enum_auto
 
 from dyna.lib.cpsf.functional.core_math import delta_vec_d
-from dyna.lib.cpsf.functional.t_omega_math import _t_omega_jv
+from dyna.lib.cpsf.functional.t_omega_math import _t_omega_jv, _t_omega_roots_jacobi, _t_omega_roots_gen_laguerre
 
 
 class T_Omega_Components(Enum):
@@ -25,9 +25,16 @@ def T_Omega(
     return_components: T_Omega_Components = T_Omega_Components.UNION,
 ) -> torch.Tensor:
     # ============================================================
+    # VARIABLES
+    # ============================================================
+    Q_THETA = 24
+    Q_RAD = 128
+
+    # ============================================================
     # BASE
     # ============================================================
     device = z.device
+    dtype_c = z.dtype
     dtype_r = z.real.dtype
     tiny = torch.finfo(dtype_r).tiny
 
@@ -40,12 +47,15 @@ def T_Omega(
     vec_d = vec_d.unsqueeze(1).expand(B, M, N)
 
     # Constants
+    D = torch.tensor(float(2 * N), dtype=dtype_r, device=device)
     C = torch.tensor(float(N), dtype=dtype_r, device=device)
     NU = torch.tensor(float(N - 1), dtype=dtype_r, device=device)
     PI = torch.tensor(torch.pi, dtype=dtype_r, device=device)
-    FOUR_PI = 4.0 * PI
-    LOG_PI = PI.log()
+    HALF = torch.tensor(0.5, dtype=dtype_r, device=device)
     LOG2 = torch.tensor(2.0, dtype=dtype_r, device=device).log()
+    TOW_PI = 2.0 * PI
+    FOUR_PI = 4.0 * PI
+    PI2_SQRT = 2.0 * PI.sqrt()
 
     # Common
     x = z - z_j  # [B,M,N] complex
@@ -89,11 +99,55 @@ def T_Omega(
     inner_ux_re = (u_re * x.real + u_im * x.imag).sum(dim=-1)  # [B,M]
     inner_ux_im = (u_re * x.imag - u_im * x.real).sum(dim=-1)  # [B,M]
 
+    anisotropy_ratio = precision_excess_par / torch.clamp(precision_perp, min=tiny)  # [B,M]
+
+    metric_mix_re = precision_perp.unsqueeze(-1) * x.real + precision_excess_par.unsqueeze(-1) * (inner_ux_re.unsqueeze(-1) * u_re - inner_ux_im.unsqueeze(-1) * u_im)  # [B,M,N]
+    metric_mix_im = precision_perp.unsqueeze(-1) * x.imag + precision_excess_par.unsqueeze(-1) * (inner_ux_re.unsqueeze(-1) * u_im + inner_ux_im.unsqueeze(-1) * u_re)  # [B,M,N]
+    metric_mix_norm_sq = (metric_mix_re * metric_mix_re + metric_mix_im * metric_mix_im).sum(dim=-1)  # [B,M]
+    gamma_sq = torch.clamp(metric_mix_norm_sq / torch.clamp(precision_perp, min=tiny), min=0.0)  # [B,M]
+
+    gauss_dim_prefactor = (2.0 ** NU) * torch.pow(torch.clamp(precision_perp, min=tiny), -C)  # [B,M]
+    bessel_arg = PI2_SQRT * torch.sqrt(gamma_sq)  # [B,M]
+
+    # ============================================================
+    # JACOBI
+    # ============================================================
+    x_jac, w_jac = _t_omega_roots_jacobi(
+        N=Q_THETA,
+        alpha=-0.5,
+        beta=NU - 0.5,
+        normalize=True,
+        return_weights=True,
+        dtype=dtype_c,
+        device=device,
+    )
+
+    t_theta_bm = x_jac.view(1, 1, -1)  # [1,1,Q]
+    w_theta_bm = w_jac.view(1, 1, -1)  # [1,1,Q]
+
+    lam_theta = 1.0 + anisotropy_ratio[..., None] * (1.0 - t_theta_bm)  # [B,M,Q]
+    lam_theta = torch.clamp(lam_theta, min=tiny)
+    beta_theta = bessel_arg[..., None] / torch.sqrt(lam_theta)  # [B,M,Q]
+
+    # ============================================================
+    # LAGUERRE
+    # ============================================================
+    x_rad, w_rad = _t_omega_roots_gen_laguerre(
+        N=Q_RAD,
+        alpha=NU,  # NU = N-1
+        normalize=True,
+        return_weights=True,
+        dtype=dtype_c,
+        device=device,
+    )
+
     # ============================================================
     # WHITENING
     # ============================================================
+    inner_ux_abs_sq = inner_ux_re * inner_re + inner_ux_im * inner_im  # wait, inner_ux_abs_sq = inner_ux_re **2 + inner_ux_im **2
+
     inner_ux_abs_sq = inner_ux_re * inner_ux_re + inner_ux_im * inner_ux_im  # [B,M]
-    
+
     x_perp_re = x.real - (inner_ux_re.unsqueeze(-1) * u_re - inner_ux_im.unsqueeze(-1) * u_im)  # [B,M,N]
     x_perp_im = x.imag - (inner_ux_re.unsqueeze(-1) * u_im + inner_ux_im.unsqueeze(-1) * u_re)  # [B,M,N]
     x_perp_norm_sq = (x_perp_re * x_perp_re + x_perp_im * x_perp_im).sum(dim=-1)  # [B,M]
@@ -103,47 +157,39 @@ def T_Omega(
     # ============================================================
     # TAIL
     # ============================================================
-    beta = torch.sqrt(torch.clamp(FOUR_PI * xprime_norm_sq, min=tiny))  # [B,M]
-    log_beta = torch.log(torch.clamp(beta, min=tiny))  # [B,M]
-    J_nu = _t_omega_jv(v=NU, z=beta, dtype=dtype_r, device=device)  # [B,M]
-    env = torch.sqrt(torch.clamp(2.0 / (PI * beta), min=tiny))  # [B,M]
-    env_eps = torch.finfo(env.dtype).eps * env  # [B,M]
+    sqrt_t_over_pi = torch.sqrt(torch.clamp(x_rad.real, min=tiny)).to(dtype_r) / PI.sqrt()
+    sqrt_t_over_pi = sqrt_t_over_pi.view(1, 1, 1, -1)  # [1,1,1,Q_RAD]
 
-    log_RJ = torch.log(torch.clamp(J_nu.abs() + env_eps, min=tiny)) + torch.lgamma(C) + (1.0 - C) * log_beta  # [B,M]
-    log_Cj = -torch.log(precision_par_clamped) - (C - 1.0) * torch.log(precision_perp_clamped)  # [B,M]
-    log_A_dir = torch.log(torch.clamp(A_dir,  min=tiny))  # [B,M]
-    log_alpha = torch.log(torch.clamp(alpha_j, min=tiny))  # [B,M]
-    log_Cang = C * LOG_PI - torch.lgamma(C)  # [], scalar
-    log_Kp = C * LOG2  # [], scalar
+    beta = beta_theta.to(dtype_r).unsqueeze(-1)  # [B,M,Q_THETA,1]
+    arg_bessel = beta * sqrt_t_over_pi  # [B,M,Q_THETA,Q_RAD]
 
-    log_gain_jv = log_RJ + log_Cj + log_A_dir + log_alpha + log_Cang + log_Kp  # [B,M]
+    # Bessel J_{NU}(arg), (custom)
+    Jv = _t_omega_jv(
+        v=NU.to(dtype_r),
+        z=arg_bessel,
+        device=device,
+        dtype=dtype_r,
+    )  # [B,M,Q_THETA,Q_RAD]
 
-    print("\n" + "\n".join(
-        [
-            f"xprime_norm_sq: {xprime_norm_sq.mean().item()}",
-            f"beta mean     : {beta.mean().item()}",
-            f"log_beta mean : {log_beta.mean().item()}",
-            f"env mean      : {env.mean().item()}",
-            f"env_eps mean  : {env_eps.mean().item()}",
-            f"-------------------------------------------",
-            f"J_nu:",
-            f"J_nu min      : {J_nu.min().item()}",
-            f"J_nu max      : {J_nu.max().item()}",
-            f"J_nu mean     : {J_nu.mean().item()}",
-            f"-------------------------------------------",
-            f"log_RJ mean   : {log_RJ.mean().item()}",
-            f"log_Cj mean   : {log_Cj.mean().item()}",
-            f"log_A_dir mean: {log_A_dir.mean().item()}",
-            f"log_alpha mean: {log_alpha.mean().item()}",
-            f"log_Cang      : {log_Cang.item()}",
-            f"log_Kp        : {log_Kp.item()}",
-        ]
-    ))
+    w_rad_r = w_rad.real.view(1, 1, 1, -1).to(dtype_r)  # [1,1,1,Q_RAD]
+    I_rad = (w_rad_r * Jv).sum(dim=-1)  # [B,M,Q_THETA]
 
-    gain_tail = torch.exp(log_gain_jv)  # [B,M]
+    lam_pow = torch.pow(torch.clamp(lam_theta.to(dtype_r), min=tiny), C.to(dtype_r))  # [B,M,Q]
+    w_theta_r = w_theta_bm.to(dtype_r).expand_as(lam_pow)  # [B,M,Q_THETA]
+    I_theta = (w_theta_r * (I_rad / lam_pow)).sum(dim=-1)  # [B,M]
+
+    base = gauss_dim_prefactor.to(dtype_r) * torch.exp(-PI * xprime_norm_sq.to(dtype_r))  # [B,M]
+    integral = torch.clamp(I_theta, min=tiny)  # [B,M]
+
+    log_gain_tail = (
+        torch.log(torch.clamp(alpha_j.to(dtype_r), min=tiny))
+        + torch.log(torch.clamp(base, min=tiny))
+        + torch.log(integral)
+    )
+    gain_tail = alpha_j * A_dir * torch.exp(log_gain_tail)
 
     # ============================================================
-    # Assembly T_tail
+    #                Assembly gain_tail and T_tail
     # ============================================================
     T_tail = (gain_tail.unsqueeze(-1) * T_hat_j).sum(dim=1)  # [B,S]
 
