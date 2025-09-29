@@ -157,32 +157,32 @@ def T_Omega(
     # ============================================================
     # TAIL
     # ============================================================
-    sqrt_t_over_pi = torch.sqrt(torch.clamp(x_rad.real, min=tiny)).to(dtype_r) / PI.sqrt()
+    sqrt_t_over_pi = torch.sqrt(torch.clamp(x_rad.real, min=tiny)) / PI.sqrt()
     sqrt_t_over_pi = sqrt_t_over_pi.view(1, 1, 1, -1)  # [1,1,1,Q_RAD]
 
-    beta = beta_theta.to(dtype_r).unsqueeze(-1)  # [B,M,Q_THETA,1]
+    beta = beta_theta.unsqueeze(-1)  # [B,M,Q_THETA,1]
     arg_bessel = beta * sqrt_t_over_pi  # [B,M,Q_THETA,Q_RAD]
 
     # Bessel J_{NU}(arg), (custom)
     Jv = _t_omega_jv(
-        v=NU.to(dtype_r),
+        v=NU,
         z=arg_bessel,
         device=device,
         dtype=dtype_r,
     )  # [B,M,Q_THETA,Q_RAD]
 
-    w_rad_r = w_rad.real.view(1, 1, 1, -1).to(dtype_r)  # [1,1,1,Q_RAD]
+    w_rad_r = w_rad.real.view(1, 1, 1, -1)  # [1,1,1,Q_RAD]
     I_rad = (w_rad_r * Jv).sum(dim=-1)  # [B,M,Q_THETA]
 
-    lam_pow = torch.pow(torch.clamp(lam_theta.to(dtype_r), min=tiny), C.to(dtype_r))  # [B,M,Q]
-    w_theta_r = w_theta_bm.to(dtype_r).expand_as(lam_pow)  # [B,M,Q_THETA]
+    lam_pow = torch.pow(torch.clamp(lam_theta, min=tiny), C)  # [B,M,Q]
+    w_theta_r = w_theta_bm.expand_as(lam_pow)  # [B,M,Q_THETA]
     I_theta = (w_theta_r * (I_rad / lam_pow)).sum(dim=-1)  # [B,M]
 
-    base = gauss_dim_prefactor.to(dtype_r) * torch.exp(-PI * xprime_norm_sq.to(dtype_r))  # [B,M]
+    base = gauss_dim_prefactor * torch.exp(-PI * xprime_norm_sq)  # [B,M]
     integral = torch.clamp(I_theta, min=tiny)  # [B,M]
 
     log_gain_tail = (
-        torch.log(torch.clamp(alpha_j.to(dtype_r), min=tiny))
+        torch.log(torch.clamp(alpha_j, min=tiny))
         + torch.log(torch.clamp(base, min=tiny))
         + torch.log(integral)
     )
