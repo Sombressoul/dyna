@@ -165,11 +165,12 @@ def T_Omega(
 
     # ============================================================
     # TAIL
+    # Note: constants pi and 2*pi are consistent with T_PD (see: t_pd.py).
     # ============================================================
-    t = torch.clamp(x_rad, min=tiny)  # [Q_RAD]
-    bessel_arg = 2.0 * torch.sqrt(
+    t_std = torch.clamp(x_rad, min=tiny)  # [Q_RAD]
+    bessel_arg = 2.0 * PI * torch.sqrt(
         (gamma_sq[..., None, None] / lam_theta[..., None])  # [B,M,Q_THETA,1]
-        * t.view(1, 1, 1, -1)  # [1,1,1,Q_RAD]
+        * (t_std.view(1, 1, 1, -1) / PI)  # [1,1,1,Q_RAD]
     )  # [B,M,Q_THETA,Q_RAD]
 
     # Bessel J_{NU}(arg), (custom)
@@ -180,7 +181,7 @@ def T_Omega(
         dtype=dtype_r,
     )  # [B,M,Q_THETA,Q_RAD]
 
-    w_rad_r = w_rad.view(1, 1, 1, -1)  # [1,1,1,Q_RAD]
+    w_rad_r = (w_rad / PI.pow(NU + 1)).view(1, 1, 1, -1)  # [1,1,1,Q_RAD]
     I_rad = (w_rad_r * Jv).sum(dim=-1)  # [B,M,Q_THETA]
 
     w_theta_r = w_theta_bm.expand_as(I_rad)  # [B,M,Q_THETA]
