@@ -141,12 +141,6 @@ def T_Omega(
         device=device,
     )
 
-    a = torch.tensor(-0.5, dtype=dtype_r, device=device)
-    b = NU - 0.5
-    log_mu_0 = (a + b + 1.0) * torch.log(torch.tensor(2.0, dtype=dtype_r, device=device)) \
-                + torch.lgamma(a + 1.0) + torch.lgamma(b + 1.0) - torch.lgamma(a + b + 2.0)
-    mu_0 = torch.exp(log_mu_0)  # Scalar tensor, broadcastable
-
     t_theta_bm = x_jac.view(1, 1, -1)  # [1,1,Q]
     w_theta_bm = w_jac.view(1, 1, -1)  # [1,1,Q]
 
@@ -184,8 +178,6 @@ def T_Omega(
 
     # ============================================================
     # TAIL
-    # Note: The Jacobi weights are normalized (sum=1), the absolute measure integral 
-    #   requires multiplication by mu_0 to restore the full scale.
     # ============================================================
     t_std = torch.clamp(x_rad_clamped / (1.0 - x_rad_clamped), min=tiny)  # [Q_RAD]
     bessel_arg = 2.0 * torch.sqrt(
@@ -206,7 +198,7 @@ def T_Omega(
 
     w_theta_r = w_theta_bm.expand_as(I_rad)  # [B,M,Q_THETA]
     lam_pow = lam_theta.pow(C)  # [B,M,Q_THETA]
-    I_theta = mu_0 * (w_theta_r * (I_rad / lam_pow)).sum(dim=-1)  # [B,M]
+    I_theta = (w_theta_r * (I_rad / lam_pow)).sum(dim=-1)  # [B,M]
 
     gauss_dim_prefactor = sigma_par_clamped * torch.pow(sigma_perp_clamped, C - 1.0)  # [B,M]
     tail_base = gauss_dim_prefactor * torch.exp(-PI * xprime_norm_sq)  # [B,M]
