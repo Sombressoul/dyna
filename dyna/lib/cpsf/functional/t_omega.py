@@ -123,8 +123,8 @@ def T_Omega(
 
     anisotropy_ratio = precision_excess_par / precision_perp_clamped  # [B,M]
 
-    metric_mix_re = precision_perp_clamped.unsqueeze(-1) * x_frac.real + precision_excess_par.unsqueeze(-1) * (inner_ux_re.unsqueeze(-1) * u_re - inner_ux_im.unsqueeze(-1) * u_im)  # [B,M,N]
-    metric_mix_im = precision_perp_clamped.unsqueeze(-1) * x_frac.imag + precision_excess_par.unsqueeze(-1) * (inner_ux_re.unsqueeze(-1) * u_im + inner_ux_im.unsqueeze(-1) * u_re)  # [B,M,N]
+    metric_mix_re = precision_perp_clamped.unsqueeze(-1) * x_frac.real + precision_excess_par_clamped.unsqueeze(-1) * (inner_ux_re.unsqueeze(-1) * u_re - inner_ux_im.unsqueeze(-1) * u_im)  # [B,M,N]
+    metric_mix_im = precision_perp_clamped.unsqueeze(-1) * x_frac.imag + precision_excess_par_clamped.unsqueeze(-1) * (inner_ux_re.unsqueeze(-1) * u_im + inner_ux_im.unsqueeze(-1) * u_re)  # [B,M,N]
     metric_mix_norm_sq = (metric_mix_re * metric_mix_re + metric_mix_im * metric_mix_im).sum(dim=-1)  # [B,M]
     gamma_sq = torch.clamp(metric_mix_norm_sq / precision_perp_clamped, min=0.0)  # [B,M]
 
