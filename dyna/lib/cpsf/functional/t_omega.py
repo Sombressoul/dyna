@@ -135,7 +135,7 @@ def T_Omega(
         N=Q_THETA,
         alpha=-0.5,
         beta=NU - 0.5,
-        normalize=True,
+        normalize=True, # Weights sum = 1.0
         return_weights=True,
         dtype=dtype_r,
         device=device,
