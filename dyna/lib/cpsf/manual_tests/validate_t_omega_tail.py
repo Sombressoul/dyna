@@ -160,7 +160,7 @@ def main():
     ap = argparse.ArgumentParser(description="Tail-to-tail validator: T_Omega (TAIL) vs windowed reference minus ZERO.")
     ap.add_argument("--ref", choices=["pd", "classic"], default="pd", help="Reference: PD or classic window")
     ap.add_argument("--device", choices=["auto", "cpu", "cuda"], default="auto")
-    ap.add_argument("--seed", type=int, default=123)
+    ap.add_argument("--seed", type=int, default=42)
 
     # shapes
     ap.add_argument("--B", type=int, default=1, help="Batch size per iteration")
