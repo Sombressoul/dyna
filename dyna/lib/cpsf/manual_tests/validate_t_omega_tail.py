@@ -1,5 +1,5 @@
-# > python -m dyna.lib.cpsf.manual_tests.validate_t_omega_tail --ref classic --N 2 --M 16 --S 8 --W 11 --B 1 --iters 128 --dtype_z c128 --dtype_T c128 --device cuda --seed 42
-# > python -m dyna.lib.cpsf.manual_tests.validate_t_omega_tail --ref pd --N 3 --M 8 --S 8 --W 7 --B 1 --iters 128 --dtype_z c128 --dtype_T c128 --device cuda --seed 42
+# > python -m dyna.lib.cpsf.manual_tests.validate_t_omega_tail --ref pd --N 2 --M 8 --S 8 --W 7 --B 1 --iters 512 --dtype_z c128 --dtype_T c128 --device cuda --seed 42
+# > python -m dyna.lib.cpsf.manual_tests.validate_t_omega_tail --ref pd --N 3 --M 4 --S 8 --W 7 --B 1 --iters 512 --dtype_z c128 --dtype_T c128 --device cuda --seed 42
 import os
 import math
 import argparse
