@@ -106,6 +106,7 @@ def T_Omega(
 
     # ============================================================
     # DERIVATIVES
+    #
     # Note: vec_d, vec_d_j — unit by default.
     # ============================================================
     u_re = vec_d_j.real
@@ -142,6 +143,10 @@ def T_Omega(
 
     # ============================================================
     # LAGUERRE
+    #
+    # Note: Weights sum to 1 (divide by mu0); nodes are returned as t = x/(x+1) in [0,1);
+    #   to use the Gamma(a+1, 1) measure with density ~ x^a * exp(-x) on [0,∞),
+    #   first recover x via x = t/(1 - t).
     # ============================================================
     x_rad, w_rad = _t_omega_roots_gen_laguerre(
         N=Q_RAD,
@@ -165,9 +170,10 @@ def T_Omega(
 
     # ============================================================
     # TAIL
+    #
     # Note: constants pi and 2*pi are consistent with T_PD (see: t_pd.py).
     # ============================================================
-    t_std = torch.clamp(x_rad, min=tiny)  # [Q_RAD]
+    t_std = torch.clamp(x_rad / (1.0 - x_rad), min=tiny)  # [Q_RAD]
     bessel_arg = 2.0 * PI * torch.sqrt(
         (gamma_sq[..., None, None] / lam_theta[..., None])  # [B,M,Q_THETA,1]
         * (t_std.view(1, 1, 1, -1) / PI)  # [1,1,1,Q_RAD]
