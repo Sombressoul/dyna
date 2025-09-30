@@ -59,6 +59,8 @@ def T_Omega(
 
     # Common
     x = z - z_j  # [B,M,N] complex
+    sigma_par_clamped = torch.clamp(sigma_par, min=tiny)
+    sigma_perp_clamped = torch.clamp(sigma_perp, min=tiny)
     precision_perp = torch.reciprocal(sigma_perp)  # [B,M]
     precision_par = torch.reciprocal(sigma_par)  # [B,M]
     precision_excess_par = precision_par - precision_perp  # [B,M]
@@ -168,19 +170,14 @@ def T_Omega(
     w_rad_r = w_rad.real.view(1, 1, 1, -1)  # [1,1,1,Q_RAD]
     I_rad = (w_rad_r * Jv).sum(dim=-1)  # [B,M,Q_THETA]
 
-    w_theta_r = w_theta_bm.expand_as(I_rad)  # [B,M,Q_THETA]
+    w_theta_r = w_theta_bm.real.expand_as(I_rad)  # [B,M,Q_THETA]
     I_theta = (w_theta_r * I_rad).sum(dim=-1)  # [B,M]
 
-    gauss_dim_prefactor = precision_par_clamped * torch.pow(precision_perp_clamped, C - 1.0)  # [B,M]
-    base = gauss_dim_prefactor * torch.exp(-PI * xprime_norm_sq)  # [B,M]
-    integral = torch.clamp(I_theta, min=tiny)  # [B,M]
+    gauss_dim_prefactor = sigma_par_clamped * torch.pow(sigma_perp_clamped, C - 1.0)  # [B,M]
+    tail_base = gauss_dim_prefactor * torch.exp(-PI * xprime_norm_sq)  # [B,M]
+    tail_integral = torch.clamp(I_theta, min=tiny)  # [B,M]
 
-    log_base = base.clamp(tiny).log()
-    log_integral = integral.log()
-
-    log_gain_tail = log_base + log_integral
-
-    gain_tail = alpha_j * A_dir * torch.exp(log_gain_tail)
+    gain_tail = alpha_j * A_dir * tail_base * tail_integral
 
     # ============================================================
     #                Assembly gain_tail and T_tail
