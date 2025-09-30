@@ -110,6 +110,10 @@ def T_PD_window(
     dz = lift(z) - lift(z_j)  # [B,M,N] complex
     dd = delta_vec_d(vec_d, vec_d_j)  # [B,M,N] complex
 
+    # Phase base (torus fractional coords)
+    dz_re_frac = torch.remainder(dz.real + 0.5, 1.0) - 0.5  # [B,M,N]
+    dz_im_frac = torch.remainder(dz.imag + 0.5, 1.0) - 0.5  # [B,M,N]
+
     # Frames
     Rmat = R(vec_d_j) if R_j is None else R_j
     RH = Rmat.conj().transpose(-2, -1)  # [B,M,N,N]
@@ -144,13 +148,8 @@ def T_PD_window(
     )  # [B,M,O]
 
     # Phase
-    dot = (
-        k_r.unsqueeze(0).unsqueeze(0) * torch.remainder(dz.real, 1.0).unsqueeze(2)
-    ).sum(dim=-1) + (
-        k_i.unsqueeze(0).unsqueeze(0) * torch.remainder(dz.imag, 1.0).unsqueeze(2)
-    ).sum(
-        dim=-1
-    )
+    dot = (k_r.unsqueeze(0).unsqueeze(0) * dz_re_frac.unsqueeze(2)).sum(dim=-1) \
+        + (k_i.unsqueeze(0).unsqueeze(0) * dz_im_frac.unsqueeze(2)).sum(dim=-1)
     ang = (2.0 * pi).to(dot.dtype) * dot
     phase = torch.polar(torch.ones_like(ang), ang)
 
@@ -317,8 +316,8 @@ def T_PD_full(
     C_dir_j = torch.exp(-pi * q_dir)  # [B,M]
 
     # Phase base (torus fractional coords)
-    dz_re_frac = torch.remainder(dz.real, 1.0)  # [B,M,N]
-    dz_im_frac = torch.remainder(dz.imag, 1.0)  # [B,M,N]
+    dz_re_frac = torch.remainder(dz.real + 0.5, 1.0) - 0.5  # [B,M,N]
+    dz_im_frac = torch.remainder(dz.imag + 0.5, 1.0) - 0.5  # [B,M,N]
 
     # Prefactor (complex-N convention)
     prefac = (sigma_par * (sigma_perp ** (N - 1))) / (t**N)  # [B,M], complex, no sqrt
@@ -347,11 +346,8 @@ def T_PD_full(
         )  # [B,M,O]
 
         # Phase
-        dot = (k_r.unsqueeze(0).unsqueeze(0) * dz_re_frac.unsqueeze(2)).sum(dim=-1) + (
-            k_i.unsqueeze(0).unsqueeze(0) * dz_im_frac.unsqueeze(2)
-        ).sum(
-            dim=-1
-        )  # [B,M,O]
+        dot = (k_r.unsqueeze(0).unsqueeze(0) * dz_re_frac.unsqueeze(2)).sum(dim=-1) \
+            + (k_i.unsqueeze(0).unsqueeze(0) * dz_im_frac.unsqueeze(2)).sum(dim=-1)  # [B,M,O]
         ang = (2.0 * pi).to(dot.dtype) * dot
         phase = torch.polar(torch.ones_like(ang), ang)  # [B,M,O] complex (unit modulus)
 
