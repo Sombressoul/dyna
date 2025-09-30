@@ -54,8 +54,8 @@ def T_Omega(
     # ============================================================
     # MAIN
     #
-    # Note: sigma_par and sigma_perp uses 1/sigma convention,
-    #   not 1/sigma^2.
+    # Note: precision = 1/sigma (not 1/sigma^2); sigma_ are scale
+    #   parameters.
     # ============================================================
     # Broadcast
     B, M, N = vec_d_j.shape
@@ -86,6 +86,8 @@ def T_Omega(
 
     # ============================================================
     # ZERO-FRAME
+    # 
+    # Note: non-periodized.
     # ============================================================
     # q_pos: [B,M]
     x_norm_sq = (x.real * x.real + x.imag * x.imag).sum(dim=-1)  # [B,M]
@@ -111,6 +113,7 @@ def T_Omega(
     # DERIVATIVES
     #
     # Note: vec_d, vec_d_j — unit by default.
+    # Note: tail *is* periodized, thus use x_frac.
     # ============================================================
     u_re = vec_d_j.real
     u_im = vec_d_j.imag
@@ -176,7 +179,7 @@ def T_Omega(
     #
     # Note: constants pi and 2*pi are consistent with T_PD (see: t_pd.py).
     # ============================================================
-    t_std = torch.clamp(x_rad / (1.0 - x_rad), min=tiny)  # [Q_RAD]
+    t_std = torch.clamp(x_rad.clamp(max=1.0 - eps) / (1.0 - x_rad), min=tiny)  # [Q_RAD]
     bessel_arg = 2.0 * PI * torch.sqrt(
         (gamma_sq[..., None, None] / lam_theta[..., None])  # [B,M,Q_THETA,1]
         * (t_std.view(1, 1, 1, -1) / PI)  # [1,1,1,Q_RAD]
