@@ -16,8 +16,8 @@ class T_Omega_Components(Enum):
 def T_Omega(
     z: torch.Tensor,  # [B,N] (complex)
     z_j: torch.Tensor,  # [B,M,N] (complex)
-    vec_d: torch.Tensor,  # vec_d: [B,N] (complex)
-    vec_d_j: torch.Tensor,  # vec_d_j: [B,M,N] (complex)
+    vec_d: torch.Tensor,  # vec_d: [B,N] (complex); unit
+    vec_d_j: torch.Tensor,  # vec_d_j: [B,M,N] (complex); unit
     T_hat_j: torch.Tensor,  # T_hat_j: [B,M,S] (complex)
     alpha_j: torch.Tensor,  # alpha_j: [B,M] (real)
     sigma_par: torch.Tensor,  # sigma_par: [B,M] (real)
@@ -47,15 +47,9 @@ def T_Omega(
     vec_d = vec_d.unsqueeze(1).expand(B, M, N)
 
     # Constants
-    D = torch.tensor(float(2 * N), dtype=dtype_r, device=device)
     C = torch.tensor(float(N), dtype=dtype_r, device=device)
     NU = torch.tensor(float(N - 1), dtype=dtype_r, device=device)
     PI = torch.tensor(torch.pi, dtype=dtype_r, device=device)
-    HALF = torch.tensor(0.5, dtype=dtype_r, device=device)
-    LOG2 = torch.tensor(2.0, dtype=dtype_r, device=device).log()
-    TOW_PI = 2.0 * PI
-    FOUR_PI = 4.0 * PI
-    PI2_SQRT = 2.0 * PI.sqrt()
 
     # Common
     x = z - z_j  # [B,M,N] complex
