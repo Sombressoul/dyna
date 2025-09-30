@@ -106,9 +106,6 @@ def T_Omega(
     metric_mix_norm_sq = (metric_mix_re * metric_mix_re + metric_mix_im * metric_mix_im).sum(dim=-1)  # [B,M]
     gamma_sq = torch.clamp(metric_mix_norm_sq / torch.clamp(precision_perp, min=tiny), min=0.0)  # [B,M]
 
-    gauss_dim_prefactor = (2.0 ** NU) * torch.pow(torch.clamp(precision_perp, min=tiny), -C)  # [B,M]
-    bessel_arg = PI2_SQRT * torch.sqrt(gamma_sq)  # [B,M]
-
     # ============================================================
     # JACOBI
     # ============================================================
@@ -127,7 +124,6 @@ def T_Omega(
 
     lam_theta = 1.0 + anisotropy_ratio[..., None] * (1.0 - t_theta_bm)  # [B,M,Q]
     lam_theta = torch.clamp(lam_theta, min=tiny)
-    beta_theta = bessel_arg[..., None] / torch.sqrt(lam_theta)  # [B,M,Q]
 
     # ============================================================
     # LAGUERRE
@@ -144,8 +140,6 @@ def T_Omega(
     # ============================================================
     # WHITENING
     # ============================================================
-    inner_ux_abs_sq = inner_ux_re * inner_re + inner_ux_im * inner_im  # wait, inner_ux_abs_sq = inner_ux_re **2 + inner_ux_im **2
-
     inner_ux_abs_sq = inner_ux_re * inner_ux_re + inner_ux_im * inner_ux_im  # [B,M]
 
     x_perp_re = x.real - (inner_ux_re.unsqueeze(-1) * u_re - inner_ux_im.unsqueeze(-1) * u_im)  # [B,M,N]
@@ -157,16 +151,16 @@ def T_Omega(
     # ============================================================
     # TAIL
     # ============================================================
-    sqrt_t_over_pi = torch.sqrt(torch.clamp(x_rad.real, min=tiny)) / PI.sqrt()
-    sqrt_t_over_pi = sqrt_t_over_pi.view(1, 1, 1, -1)  # [1,1,1,Q_RAD]
-
-    beta = beta_theta.unsqueeze(-1)  # [B,M,Q_THETA,1]
-    arg_bessel = beta * sqrt_t_over_pi  # [B,M,Q_THETA,Q_RAD]
+    t = torch.clamp(x_rad.real, min=tiny)  # [Qr]
+    bessel_arg = 2.0 * torch.sqrt(
+        (gamma_sq[..., None, None] / torch.clamp(lam_theta[..., None], min=tiny))  # [B,M,Qθ,1]
+        * t.view(1, 1, 1, -1)  # [1,1,1,Qr]
+    )  # [B,M,Qθ,Qr]
 
     # Bessel J_{NU}(arg), (custom)
     Jv = _t_omega_jv(
         v=NU,
-        z=arg_bessel,
+        z=bessel_arg,
         device=device,
         dtype=dtype_r,
     )  # [B,M,Q_THETA,Q_RAD]
@@ -174,18 +168,18 @@ def T_Omega(
     w_rad_r = w_rad.real.view(1, 1, 1, -1)  # [1,1,1,Q_RAD]
     I_rad = (w_rad_r * Jv).sum(dim=-1)  # [B,M,Q_THETA]
 
-    lam_pow = torch.pow(torch.clamp(lam_theta, min=tiny), C)  # [B,M,Q]
-    w_theta_r = w_theta_bm.expand_as(lam_pow)  # [B,M,Q_THETA]
-    I_theta = (w_theta_r * (I_rad / lam_pow)).sum(dim=-1)  # [B,M]
+    w_theta_r = w_theta_bm.expand_as(I_rad)  # [B,M,Q_THETA]
+    I_theta = (w_theta_r * I_rad).sum(dim=-1)  # [B,M]
 
+    gauss_dim_prefactor = precision_par_clamped * torch.pow(precision_perp_clamped, C - 1.0)  # [B,M]
     base = gauss_dim_prefactor * torch.exp(-PI * xprime_norm_sq)  # [B,M]
     integral = torch.clamp(I_theta, min=tiny)  # [B,M]
 
-    log_gain_tail = (
-        torch.log(torch.clamp(alpha_j, min=tiny))
-        + torch.log(torch.clamp(base, min=tiny))
-        + torch.log(integral)
-    )
+    log_base = base.clamp(tiny).log()
+    log_integral = integral.log()
+
+    log_gain_tail = log_base + log_integral
+
     gain_tail = alpha_j * A_dir * torch.exp(log_gain_tail)
 
     # ============================================================
