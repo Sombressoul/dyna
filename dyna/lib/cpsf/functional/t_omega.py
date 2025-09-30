@@ -174,8 +174,8 @@ def T_Omega(
     x_perp_im = x_frac.imag - (inner_ux_re.unsqueeze(-1) * u_im + inner_ux_im.unsqueeze(-1) * u_re)  # [B,M,N]
     x_perp_norm_sq = (x_perp_re * x_perp_re + x_perp_im * x_perp_im).sum(dim=-1)  # [B,M]
 
-    xprime_norm_sq = precision_perp_clamped * x_perp_norm_sq + precision_par_clamped * inner_ux_abs_sq  # [B,M]
-    gamma_sq = torch.clamp(xprime_norm_sq, min=0.0)  # [B,M]
+    x_frac_norm_sq = (x_frac.real * x_frac.real + x_frac.imag * x_frac.imag).sum(dim=-1)  # [B,M]
+    gamma_sq = precision_perp_clamped * x_frac_norm_sq  # [B,M]
 
     # ============================================================
     # TAIL
