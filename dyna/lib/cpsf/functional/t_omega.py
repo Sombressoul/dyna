@@ -53,6 +53,9 @@ def T_Omega(
 
     # ============================================================
     # MAIN
+    #
+    # Note: sigma_par and sigma_perp uses 1/sigma convention,
+    #   not 1/sigma^2.
     # ============================================================
     # Broadcast
     B, M, N = vec_d_j.shape
