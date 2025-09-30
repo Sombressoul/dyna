@@ -202,7 +202,8 @@ def T_Omega(
     I_rad = (w_rad_r * Jv).sum(dim=-1)  # [B,M,Q_THETA]
 
     w_theta_r = w_theta_bm.expand_as(I_rad)  # [B,M,Q_THETA]
-    I_theta = (w_theta_r * I_rad).sum(dim=-1)  # [B,M]
+    lam_pow = lam_theta.pow(C)  # [B,M,Q_THETA]
+    I_theta = (w_theta_r * (I_rad / lam_pow)).sum(dim=-1)  # [B,M]
 
     gauss_dim_prefactor = sigma_par_clamped * torch.pow(sigma_perp_clamped, C - 1.0)  # [B,M]
     tail_base = gauss_dim_prefactor * torch.exp(-PI * xprime_norm_sq)  # [B,M]
