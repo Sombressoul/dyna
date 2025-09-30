@@ -86,6 +86,7 @@ def T_Omega(
 
     # ============================================================
     # DERIVATIVES
+    # Note: vec_d, vec_d_j — unit by default.
     # ============================================================
     vec_d_j_norm_sq = (vec_d_j.real * vec_d_j.real + vec_d_j.imag * vec_d_j.imag).sum(dim=-1)  # [B,M]
     vec_d_j_norm_inv = torch.rsqrt(torch.clamp(vec_d_j_norm_sq, min=tiny))  # [B,M]
