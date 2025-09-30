@@ -121,12 +121,11 @@ def T_Omega(
     inner_ux_re = (u_re * x_frac.real + u_im * x_frac.imag).sum(dim=-1)  # [B,M]
     inner_ux_im = (u_re * x_frac.imag - u_im * x_frac.real).sum(dim=-1)  # [B,M]
 
-    anisotropy_ratio = precision_excess_par / precision_perp_clamped  # [B,M]
+    anisotropy_ratio = (precision_par_clamped / precision_perp_clamped) - 1.0  # [B,M]
 
     metric_mix_re = precision_perp_clamped.unsqueeze(-1) * x_frac.real + precision_excess_par_clamped.unsqueeze(-1) * (inner_ux_re.unsqueeze(-1) * u_re - inner_ux_im.unsqueeze(-1) * u_im)  # [B,M,N]
     metric_mix_im = precision_perp_clamped.unsqueeze(-1) * x_frac.imag + precision_excess_par_clamped.unsqueeze(-1) * (inner_ux_re.unsqueeze(-1) * u_im + inner_ux_im.unsqueeze(-1) * u_re)  # [B,M,N]
     metric_mix_norm_sq = (metric_mix_re * metric_mix_re + metric_mix_im * metric_mix_im).sum(dim=-1)  # [B,M]
-    gamma_sq = torch.clamp(metric_mix_norm_sq / precision_perp_clamped, min=0.0)  # [B,M]
 
     # ============================================================
     # JACOBI
@@ -175,19 +174,22 @@ def T_Omega(
     x_perp_norm_sq = (x_perp_re * x_perp_re + x_perp_im * x_perp_im).sum(dim=-1)  # [B,M]
 
     xprime_norm_sq = precision_perp_clamped * x_perp_norm_sq + precision_par_clamped * inner_ux_abs_sq  # [B,M]
+    gamma_sq = torch.clamp(xprime_norm_sq, min=0.0)  # [B,M]
 
     # ============================================================
     # TAIL
     # ============================================================
     t_std = torch.clamp(x_rad_clamped / (1.0 - x_rad_clamped), min=tiny)  # [Q_RAD]
     bessel_arg = 2.0 * torch.sqrt(
-        (gamma_sq[..., None, None] / lam_theta[..., None])  # [B,M,Q_THETA,1]
+        (PI * gamma_sq[..., None, None] / lam_theta[..., None])  # [B,M,Q_THETA,1]
+        # (gamma_sq[..., None, None] / lam_theta[..., None])  # [B,M,Q_THETA,1] # !!! POTENTIAL_SOLUTION_01
         * t_std.view(1, 1, 1, -1)  # [1,1,1,Q_RAD]
     )  # [B,M,Q_THETA,Q_RAD]
 
-    # Bessel J_{NU}(arg), (custom)
+    # Bessel J_{NU}(arg), (custom), with spherical normalizing divider
     Jv = _t_omega_jv(
         v=NU,
+        # v=N - 2, # !!! POTENTIAL_SOLUTION_01
         z=bessel_arg,
         device=device,
         dtype=dtype_r,
@@ -201,7 +203,7 @@ def T_Omega(
     I_theta = (w_theta_r * (I_rad / lam_pow)).sum(dim=-1)  # [B,M]
 
     gauss_dim_prefactor = sigma_par_clamped * torch.pow(sigma_perp_clamped, C - 1.0)  # [B,M]
-    tail_base = gauss_dim_prefactor * torch.exp(-PI * xprime_norm_sq)  # [B,M]
+    tail_base = gauss_dim_prefactor  # [B,M]
     tail_integral = torch.clamp(I_theta, min=0.0)  # [B,M]
 
     gain_tail = alpha_j * A_dir * tail_base * tail_integral
