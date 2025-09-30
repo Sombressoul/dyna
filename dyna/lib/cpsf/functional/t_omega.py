@@ -23,12 +23,25 @@ def T_Omega(
     sigma_par: torch.Tensor,  # sigma_par: [B,M] (real)
     sigma_perp: torch.Tensor,  # sigma_perp: [B,M] (real)
     return_components: T_Omega_Components = T_Omega_Components.UNION,
+    guards: bool = True, # Use numerical guards (True/False -> stability/speed)
+    q_theta: int = 24,  # Jacobi nodes
+    q_rad: int = 128,  # Laguerre nodes
 ) -> torch.Tensor:
+    # ============================================================
+    # GUARDS
+    # ============================================================
+    if bool(guards):
+        assert (alpha_j > 0).all(), "CPSF/T_Omega requires alpha_j > 0."
+        assert (sigma_par > 0).all(), "CPSF/T_Omega requires sigma_par > 0."
+        assert (sigma_perp > 0).all(), "CPSF/T_Omega requires sigma_perp > 0."
+        assert int(q_theta) > 0, "CPSF/T_Omega requires q_theta > 0."
+        assert int(q_rad) > 0, "CPSF/T_Omega requires q_rad > 0."
+
     # ============================================================
     # VARIABLES
     # ============================================================
-    Q_THETA = 24
-    Q_RAD = 128
+    Q_THETA = int(q_theta)
+    Q_RAD = int(q_rad)
 
     # ============================================================
     # BASE
@@ -36,6 +49,7 @@ def T_Omega(
     device = z.device
     dtype_r = z.real.dtype
     tiny = torch.finfo(dtype_r).tiny
+    eps = torch.finfo(dtype_r).eps
 
     # ============================================================
     # MAIN
@@ -44,6 +58,9 @@ def T_Omega(
     B, M, N = vec_d_j.shape
     z = z.unsqueeze(1).expand(B, M, N)
     vec_d = vec_d.unsqueeze(1).expand(B, M, N)
+
+    # Fast checks
+    assert N >= 2, "CPSF/T_Omega requires N >= 2 (complex N)."
 
     # Constants
     C = torch.tensor(float(N), dtype=dtype_r, device=device)
@@ -68,7 +85,7 @@ def T_Omega(
     inner_re = (vec_d_j.real * x.real + vec_d_j.imag * x.imag).sum(dim=-1)  # [B,M]
     inner_im = (vec_d_j.real * x.imag - vec_d_j.imag * x.real).sum(dim=-1)  # [B,M]
     inner_abs_sq = inner_re * inner_re + inner_im * inner_im  # [B,M]
-    q_pos = precision_perp * x_norm_sq + precision_excess_par * inner_abs_sq  # [B,M]
+    q_pos = precision_perp_clamped * x_norm_sq + precision_excess_par * inner_abs_sq  # [B,M]
     A_pos = torch.exp(-PI * q_pos)  # [B,M]
 
     # A_dir: [B,M]
@@ -93,12 +110,12 @@ def T_Omega(
     inner_ux_re = (u_re * x.real + u_im * x.imag).sum(dim=-1)  # [B,M]
     inner_ux_im = (u_re * x.imag - u_im * x.real).sum(dim=-1)  # [B,M]
 
-    anisotropy_ratio = precision_excess_par / torch.clamp(precision_perp, min=tiny)  # [B,M]
+    anisotropy_ratio = precision_excess_par / precision_perp_clamped  # [B,M]
 
-    metric_mix_re = precision_perp.unsqueeze(-1) * x.real + precision_excess_par.unsqueeze(-1) * (inner_ux_re.unsqueeze(-1) * u_re - inner_ux_im.unsqueeze(-1) * u_im)  # [B,M,N]
-    metric_mix_im = precision_perp.unsqueeze(-1) * x.imag + precision_excess_par.unsqueeze(-1) * (inner_ux_re.unsqueeze(-1) * u_im + inner_ux_im.unsqueeze(-1) * u_re)  # [B,M,N]
+    metric_mix_re = precision_perp_clamped.unsqueeze(-1) * x.real + precision_excess_par.unsqueeze(-1) * (inner_ux_re.unsqueeze(-1) * u_re - inner_ux_im.unsqueeze(-1) * u_im)  # [B,M,N]
+    metric_mix_im = precision_perp_clamped.unsqueeze(-1) * x.imag + precision_excess_par.unsqueeze(-1) * (inner_ux_re.unsqueeze(-1) * u_im + inner_ux_im.unsqueeze(-1) * u_re)  # [B,M,N]
     metric_mix_norm_sq = (metric_mix_re * metric_mix_re + metric_mix_im * metric_mix_im).sum(dim=-1)  # [B,M]
-    gamma_sq = torch.clamp(metric_mix_norm_sq / torch.clamp(precision_perp, min=tiny), min=0.0)  # [B,M]
+    gamma_sq = torch.clamp(metric_mix_norm_sq / precision_perp_clamped, min=0.0)  # [B,M]
 
     # ============================================================
     # JACOBI
@@ -117,7 +134,7 @@ def T_Omega(
     w_theta_bm = w_jac.view(1, 1, -1)  # [1,1,Q]
 
     lam_theta = 1.0 + anisotropy_ratio[..., None] * (1.0 - t_theta_bm)  # [B,M,Q]
-    lam_theta = torch.clamp(lam_theta, min=tiny)
+    lam_theta = torch.clamp(lam_theta, min=eps)
 
     # ============================================================
     # LAGUERRE
