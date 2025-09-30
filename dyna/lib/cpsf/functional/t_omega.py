@@ -156,7 +156,7 @@ def T_Omega(
     # ============================================================
     x_rad, w_rad = _t_omega_roots_gen_laguerre(
         N=Q_RAD,
-        alpha=NU,  # NU = N-1
+        alpha=NU_EFF,  # NU = N-1
         normalize=True,
         return_weights=True,
         dtype=dtype_r,
@@ -194,11 +194,11 @@ def T_Omega(
         dtype=dtype_r,
     )  # [B,M,Q_THETA,Q_RAD]
 
-    w_rad_r = (w_rad * torch.exp(torch.lgamma(NU + 1.0))).view(1, 1, 1, -1)  # [1,1,1,Q_RAD]
+    w_rad_r = (w_rad * torch.exp(torch.lgamma(NU_EFF + 1.0))).view(1, 1, 1, -1)  # [1,1,1,Q_RAD]
     I_rad = (w_rad_r * Jv).sum(dim=-1)  # [B,M,Q_THETA]
 
     w_theta_r = w_theta_bm.expand_as(I_rad)  # [B,M,Q_THETA]
-    lam_pow = lam_theta.pow(C - 1.0)  # [B,M,Q_THETA]
+    lam_pow = lam_theta.pow(C - 2.0)  # [B,M,Q_THETA]
     I_theta = (w_theta_r * (I_rad / lam_pow)).sum(dim=-1)  # [B,M]
 
     gauss_dim_prefactor = sigma_par_clamped * torch.pow(sigma_perp_clamped, C - 1.0)  # [B,M]
