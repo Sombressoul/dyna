@@ -34,7 +34,6 @@ def T_Omega(
     # BASE
     # ============================================================
     device = z.device
-    dtype_c = z.dtype
     dtype_r = z.real.dtype
     tiny = torch.finfo(dtype_r).tiny
 
@@ -112,7 +111,7 @@ def T_Omega(
         beta=NU - 0.5,
         normalize=True,
         return_weights=True,
-        dtype=dtype_c,
+        dtype=dtype_r,
         device=device,
     )
 
@@ -130,7 +129,7 @@ def T_Omega(
         alpha=NU,  # NU = N-1
         normalize=True,
         return_weights=True,
-        dtype=dtype_c,
+        dtype=dtype_r,
         device=device,
     )
 
@@ -148,7 +147,7 @@ def T_Omega(
     # ============================================================
     # TAIL
     # ============================================================
-    t = torch.clamp(x_rad.real, min=tiny)  # [Qr]
+    t = torch.clamp(x_rad, min=tiny)  # [Qr]
     bessel_arg = 2.0 * torch.sqrt(
         (gamma_sq[..., None, None] / torch.clamp(lam_theta[..., None], min=tiny))  # [B,M,Qθ,1]
         * t.view(1, 1, 1, -1)  # [1,1,1,Qr]
@@ -162,10 +161,10 @@ def T_Omega(
         dtype=dtype_r,
     )  # [B,M,Q_THETA,Q_RAD]
 
-    w_rad_r = w_rad.real.view(1, 1, 1, -1)  # [1,1,1,Q_RAD]
+    w_rad_r = w_rad.view(1, 1, 1, -1)  # [1,1,1,Q_RAD]
     I_rad = (w_rad_r * Jv).sum(dim=-1)  # [B,M,Q_THETA]
 
-    w_theta_r = w_theta_bm.real.expand_as(I_rad)  # [B,M,Q_THETA]
+    w_theta_r = w_theta_bm.expand_as(I_rad)  # [B,M,Q_THETA]
     I_theta = (w_theta_r * I_rad).sum(dim=-1)  # [B,M]
 
     gauss_dim_prefactor = sigma_par_clamped * torch.pow(sigma_perp_clamped, C - 1.0)  # [B,M]
