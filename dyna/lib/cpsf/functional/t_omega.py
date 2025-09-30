@@ -186,7 +186,7 @@ def T_Omega(
         * t_std.view(1, 1, 1, -1)  # [1,1,1,Q_RAD]
     )  # [B,M,Q_THETA,Q_RAD]
 
-    # Bessel J_{NU}(arg), (custom), with spherical normalizing divider
+    # Bessel J_{NU}(arg), (custom)
     Jv = _t_omega_jv(
         v=NU_EFF,
         z=bessel_arg,
