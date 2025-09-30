@@ -68,6 +68,7 @@ def T_Omega(
     # Constants
     C = torch.tensor(float(N), dtype=dtype_r, device=device)
     NU = torch.tensor(float(N - 1), dtype=dtype_r, device=device)
+    NU_EFF = torch.tensor(float(N - 2), dtype=dtype_r, device=device)
     PI = torch.tensor(torch.pi, dtype=dtype_r, device=device)
 
     # Common
@@ -181,15 +182,13 @@ def T_Omega(
     # ============================================================
     t_std = torch.clamp(x_rad_clamped / (1.0 - x_rad_clamped), min=tiny)  # [Q_RAD]
     bessel_arg = 2.0 * torch.sqrt(
-        (PI * gamma_sq[..., None, None] / lam_theta[..., None])  # [B,M,Q_THETA,1]
-        # (gamma_sq[..., None, None] / lam_theta[..., None])  # [B,M,Q_THETA,1] # !!! POTENTIAL_SOLUTION_01
+        (gamma_sq[..., None, None] / lam_theta[..., None])  # [B,M,Q_THETA,1]
         * t_std.view(1, 1, 1, -1)  # [1,1,1,Q_RAD]
     )  # [B,M,Q_THETA,Q_RAD]
 
     # Bessel J_{NU}(arg), (custom), with spherical normalizing divider
     Jv = _t_omega_jv(
-        v=NU,
-        # v=N - 2, # !!! POTENTIAL_SOLUTION_01
+        v=NU_EFF,
         z=bessel_arg,
         device=device,
         dtype=dtype_r,
