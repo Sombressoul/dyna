@@ -73,9 +73,10 @@ def T_Omega(
     sigma_perp_clamped = torch.clamp(sigma_perp, min=tiny)
     precision_perp = torch.reciprocal(sigma_perp)  # [B,M]
     precision_par = torch.reciprocal(sigma_par)  # [B,M]
-    precision_excess_par = precision_par - precision_perp  # [B,M]
     precision_perp_clamped = torch.clamp(precision_perp, min=tiny)  # [B,M]
     precision_par_clamped = torch.clamp(precision_par,  min=tiny)  # [B,M]
+    precision_excess_par = precision_par - precision_perp  # [B,M]
+    precision_excess_par_clamped = precision_par_clamped - precision_perp_clamped
 
     # ============================================================
     # ZERO-FRAME
@@ -85,7 +86,7 @@ def T_Omega(
     inner_re = (vec_d_j.real * x.real + vec_d_j.imag * x.imag).sum(dim=-1)  # [B,M]
     inner_im = (vec_d_j.real * x.imag - vec_d_j.imag * x.real).sum(dim=-1)  # [B,M]
     inner_abs_sq = inner_re * inner_re + inner_im * inner_im  # [B,M]
-    q_pos = precision_perp_clamped * x_norm_sq + precision_excess_par * inner_abs_sq  # [B,M]
+    q_pos = precision_perp_clamped * x_norm_sq + precision_excess_par_clamped * inner_abs_sq  # [B,M]
     A_pos = torch.exp(-PI * q_pos)  # [B,M]
 
     # A_dir: [B,M]
@@ -162,11 +163,11 @@ def T_Omega(
     # ============================================================
     # TAIL
     # ============================================================
-    t = torch.clamp(x_rad, min=tiny)  # [Qr]
+    t = torch.clamp(x_rad, min=tiny)  # [Q_RAD]
     bessel_arg = 2.0 * torch.sqrt(
-        (gamma_sq[..., None, None] / torch.clamp(lam_theta[..., None], min=tiny))  # [B,M,Qθ,1]
-        * t.view(1, 1, 1, -1)  # [1,1,1,Qr]
-    )  # [B,M,Qθ,Qr]
+        (gamma_sq[..., None, None] / lam_theta[..., None])  # [B,M,Q_THETA,1]
+        * t.view(1, 1, 1, -1)  # [1,1,1,Q_RAD]
+    )  # [B,M,Q_THETA,Q_RAD]
 
     # Bessel J_{NU}(arg), (custom)
     Jv = _t_omega_jv(
