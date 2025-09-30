@@ -163,6 +163,8 @@ def T_Omega(
         device=device,
     )
 
+    x_rad_clamped = x_rad.clamp(max=1.0 - eps)
+
     # ============================================================
     # WHITENING
     # ============================================================
@@ -179,7 +181,7 @@ def T_Omega(
     #
     # Note: constants pi and 2*pi are consistent with T_PD (see: t_pd.py).
     # ============================================================
-    t_std = torch.clamp(x_rad.clamp(max=1.0 - eps) / (1.0 - x_rad), min=tiny)  # [Q_RAD]
+    t_std = torch.clamp(x_rad_clamped / (1.0 - x_rad_clamped), min=tiny)  # [Q_RAD]
     bessel_arg = 2.0 * PI * torch.sqrt(
         (gamma_sq[..., None, None] / lam_theta[..., None])  # [B,M,Q_THETA,1]
         * (t_std.view(1, 1, 1, -1) / PI)  # [1,1,1,Q_RAD]
@@ -193,7 +195,10 @@ def T_Omega(
         dtype=dtype_r,
     )  # [B,M,Q_THETA,Q_RAD]
 
-    w_rad_r = (w_rad / PI.pow(NU + 1)).view(1, 1, 1, -1)  # [1,1,1,Q_RAD]; pi^{nu + 1} by T_PD
+    w_rad_r = (
+        w_rad * torch.exp(torch.lgamma(NU + 1.0)) 
+        / PI.pow(NU + 1.0)  # pi^{nu + 1} by T_PD
+    ).view(1, 1, 1, -1)  # [1,1,1,Q_RAD]
     I_rad = (w_rad_r * Jv).sum(dim=-1)  # [B,M,Q_THETA]
 
     w_theta_r = w_theta_bm.expand_as(I_rad)  # [B,M,Q_THETA]
