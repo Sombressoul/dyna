@@ -126,8 +126,8 @@ def main():
     # sigma and anisotropy control
     p.add_argument("--sigma_min", type=float, default=0.25)
     p.add_argument("--sigma_max", type=float, default=2.0)
-    p.add_argument("--anisotropy_min", type=float, default=1.0)
-    p.add_argument("--anisotropy_max", type=float, default=1.0)
+    p.add_argument("--anisotropy_min", type=float, default=0.5)
+    p.add_argument("--anisotropy_max", type=float, default=1.5)
 
     # thresholds (scaled by eps*scale)
     p.add_argument("--tau_abs_scale", type=float, default=2.0)
