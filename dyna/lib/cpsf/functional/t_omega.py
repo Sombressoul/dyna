@@ -79,14 +79,10 @@ def T_Omega(
 
     sigma_par_clamped = torch.clamp(sigma_par,  min=tiny)  # [B,M]
     sigma_perp_clamped = torch.clamp(sigma_perp, min=tiny)  # [B,M]
-
     precision_par = torch.reciprocal(sigma_par_clamped)   # 1/sigma_par
     precision_perp = torch.reciprocal(sigma_perp_clamped)  # 1/sigma_perp
-
     precision_par_clamped = torch.clamp(precision_par,  min=tiny)
     precision_perp_clamped = torch.clamp(precision_perp, min=tiny)
-
-    precision_excess_par = precision_par - precision_perp
     precision_excess_par_clamped = precision_par_clamped - precision_perp_clamped
 
     # ============================================================
@@ -120,17 +116,8 @@ def T_Omega(
     # Note: vec_d, vec_d_j — unit by default.
     # Note: tail *is* periodized, thus use x_frac.
     # ============================================================
-    u_re = vec_d_j.real
-    u_im = vec_d_j.imag
-
-    inner_ux_re = (u_re * x_frac.real + u_im * x_frac.imag).sum(dim=-1)  # [B,M]
-    inner_ux_im = (u_re * x_frac.imag - u_im * x_frac.real).sum(dim=-1)  # [B,M]
-
     anisotropy_ratio = (precision_par_clamped / precision_perp_clamped) - 1.0  # [B,M]
 
-    metric_mix_re = precision_perp_clamped.unsqueeze(-1) * x_frac.real + precision_excess_par_clamped.unsqueeze(-1) * (inner_ux_re.unsqueeze(-1) * u_re - inner_ux_im.unsqueeze(-1) * u_im)  # [B,M,N]
-    metric_mix_im = precision_perp_clamped.unsqueeze(-1) * x_frac.imag + precision_excess_par_clamped.unsqueeze(-1) * (inner_ux_re.unsqueeze(-1) * u_im + inner_ux_im.unsqueeze(-1) * u_re)  # [B,M,N]
-    metric_mix_norm_sq = (metric_mix_re * metric_mix_re + metric_mix_im * metric_mix_im).sum(dim=-1)  # [B,M]
 
     # ============================================================
     # JACOBI
@@ -172,12 +159,6 @@ def T_Omega(
     # ============================================================
     # WHITENING
     # ============================================================
-    inner_ux_abs_sq = inner_ux_re * inner_ux_re + inner_ux_im * inner_ux_im  # [B,M]
-
-    x_perp_re = x_frac.real - (inner_ux_re.unsqueeze(-1) * u_re - inner_ux_im.unsqueeze(-1) * u_im)  # [B,M,N]
-    x_perp_im = x_frac.imag - (inner_ux_re.unsqueeze(-1) * u_im + inner_ux_im.unsqueeze(-1) * u_re)  # [B,M,N]
-    x_perp_norm_sq = (x_perp_re * x_perp_re + x_perp_im * x_perp_im).sum(dim=-1)  # [B,M]
-
     x_frac_norm_sq = (x_frac.real * x_frac.real + x_frac.imag * x_frac.imag).sum(dim=-1)  # [B,M]
     gamma_sq = precision_perp_clamped * x_frac_norm_sq  # [B,M]
 
