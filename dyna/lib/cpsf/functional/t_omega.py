@@ -180,12 +180,11 @@ def T_Omega(
     )  # [B,M,Q_THETA,Q_RAD]
 
     w_rad_r = (w_rad * torch.exp(torch.lgamma(NU_EFF + 1.0))).view(1, 1, 1, -1)  # [1,1,1,Q_RAD]
-    # I_rad = (w_rad_r * Jv).sum(dim=-1)  # [B,M,Q_THETA]
-    
-    # >> !!! HERE IS IT !!! <<
     I_rad = (w_rad_r * Jv).sum(dim=-1)  # [B,M,Q_THETA]
+
+    # >> !!! HERE IS IT !!! THIS SHIT !!! THE KEY !!! <<
     I_rad = I_rad - I_rad.mean(dim=-1, keepdim=True) + 1.0
-    # >> !!! HERE IS IT !!! <<
+    # >> !!! HERE IS IT !!! THIS SHIT !!! THE KEY !!! <<
 
     w_theta_r = w_theta_bm.expand_as(I_rad)  # [B,M,Q_THETA]
     lam_pow = lam_theta.pow(NU_EFF)  # [B,M,Q_THETA]
