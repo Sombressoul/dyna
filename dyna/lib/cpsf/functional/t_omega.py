@@ -76,13 +76,17 @@ def T_Omega(
     x_frac_re = torch.remainder((z - z_j).real + 0.5, 1.0) - 0.5
     x_frac_im = torch.remainder((z - z_j).imag + 0.5, 1.0) - 0.5
     x_frac = torch.complex(x_frac_re, x_frac_im)
-    sigma_par_clamped = torch.clamp(sigma_par, min=tiny)
-    sigma_perp_clamped = torch.clamp(sigma_perp, min=tiny)
-    precision_perp = torch.reciprocal(sigma_perp)  # [B,M]
-    precision_par = torch.reciprocal(sigma_par)  # [B,M]
-    precision_perp_clamped = torch.clamp(precision_perp, min=tiny)  # [B,M]
-    precision_par_clamped = torch.clamp(precision_par,  min=tiny)  # [B,M]
-    precision_excess_par = precision_par - precision_perp  # [B,M]
+
+    sigma_par_clamped = torch.clamp(sigma_par,  min=tiny)  # [B,M]
+    sigma_perp_clamped = torch.clamp(sigma_perp, min=tiny)  # [B,M]
+
+    precision_par = torch.reciprocal(sigma_par_clamped)   # 1/sigma_par
+    precision_perp = torch.reciprocal(sigma_perp_clamped)  # 1/sigma_perp
+
+    precision_par_clamped = torch.clamp(precision_par,  min=tiny)
+    precision_perp_clamped = torch.clamp(precision_perp, min=tiny)
+
+    precision_excess_par = precision_par - precision_perp
     precision_excess_par_clamped = precision_par_clamped - precision_perp_clamped
 
     # ============================================================
