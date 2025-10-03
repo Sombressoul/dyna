@@ -1,9 +1,9 @@
 # > python -m dyna.lib.cpsf.manual_tests.validate_t_omega_tail --ref pd --N 2 --M 16 --S 8 --W 7 --B 1 --iters 1024 --dtype_z c128 --dtype_T c128 --device cuda --seed 1337
 # > python -m dyna.lib.cpsf.manual_tests.validate_t_omega_tail --ref pd --N 3 --M 8 --S 8 --W 5 --B 1 --iters 1024 --dtype_z c128 --dtype_T c128 --device cuda --seed 1337
 # > python -m dyna.lib.cpsf.manual_tests.validate_t_omega_tail --ref pd --N 4 --M 4 --S 8 --W 3 --B 1 --iters 1024 --dtype_z c128 --dtype_T c128 --device cuda --seed 1337
-# > python -m dyna.lib.cpsf.manual_tests.validate_t_omega_tail --ref classic --N 2 --M 16 --S 8 --W 7 --B 1 --iters 1024 --dtype_z c128 --dtype_T c128 --device cuda --seed 1337
-# > python -m dyna.lib.cpsf.manual_tests.validate_t_omega_tail --ref classic --N 3 --M 4 --S 8 --W 3 --B 1 --iters 1024 --dtype_z c128 --dtype_T c128 --device cuda --seed 1337
-# > python -m dyna.lib.cpsf.manual_tests.validate_t_omega_tail --ref classic --N 4 --M 2 --S 8 --W 2 --B 2 --iters 1024 --dtype_z c128 --dtype_T c128 --device cuda --seed 1337
+# > python -m dyna.lib.cpsf.manual_tests.validate_t_omega_tail --ref classic --N 2 --M 16 --S 8 --W 7 --B 1 --iters 1024 --dtype_z c128 --dtype_T c128 --device cuda --seed 42
+# > python -m dyna.lib.cpsf.manual_tests.validate_t_omega_tail --ref classic --N 3 --M 4 --S 8 --W 3 --B 1 --iters 1024 --dtype_z c128 --dtype_T c128 --device cuda --seed 42
+# > python -m dyna.lib.cpsf.manual_tests.validate_t_omega_tail --ref classic --N 4 --M 2 --S 8 --W 2 --B 2 --iters 1024 --dtype_z c128 --dtype_T c128 --device cuda --seed 42
 import os
 import math
 import argparse
