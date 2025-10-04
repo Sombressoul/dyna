@@ -3,7 +3,6 @@ import torch
 from enum import Enum, auto as enum_auto
 
 from dyna.lib.cpsf.functional.core_math import delta_vec_d
-from dyna.lib.cpsf.functional.t_omega_math import _t_omega_jv, _t_omega_roots_jacobi, _t_omega_roots_gen_laguerre
 
 
 class T_Omega_Components(Enum):
@@ -24,8 +23,6 @@ def T_Omega(
     sigma_perp: torch.Tensor,  # sigma_perp: [B,M] (real)
     return_components: T_Omega_Components = T_Omega_Components.UNION,
     guards: bool = True, # Use numerical guards (True/False -> stability/speed)
-    q_theta: int = 24,  # Jacobi nodes
-    q_rad: int = 128,  # Laguerre nodes
 ) -> torch.Tensor:
     # ============================================================
     # GUARDS
@@ -34,14 +31,11 @@ def T_Omega(
         assert (alpha_j > 0).all(), "CPSF/T_Omega requires alpha_j > 0."
         assert (sigma_par > 0).all(), "CPSF/T_Omega requires sigma_par > 0."
         assert (sigma_perp > 0).all(), "CPSF/T_Omega requires sigma_perp > 0."
-        assert int(q_theta) > 0, "CPSF/T_Omega requires q_theta > 0."
-        assert int(q_rad) > 0, "CPSF/T_Omega requires q_rad > 0."
 
     # ============================================================
     # VARIABLES
     # ============================================================
-    Q_THETA = int(q_theta)
-    Q_RAD = int(q_rad)
+    # For future use.
 
     # ============================================================
     # BASE
@@ -67,15 +61,10 @@ def T_Omega(
 
     # Constants
     C = torch.tensor(float(N), dtype=dtype_r, device=device)
-    NU = torch.tensor(float(N - 1), dtype=dtype_r, device=device)
-    NU_EFF = torch.tensor(float(N - 2), dtype=dtype_r, device=device)
     PI = torch.tensor(torch.pi, dtype=dtype_r, device=device)
 
     # Common
     x = z - z_j  # [B,M,N] complex
-    x_frac_re = torch.remainder((z - z_j).real + 0.5, 1.0) - 0.5
-    x_frac_im = torch.remainder((z - z_j).imag + 0.5, 1.0) - 0.5
-    x_frac = torch.complex(x_frac_re, x_frac_im)
 
     sigma_par_clamped = torch.clamp(sigma_par,  min=tiny)  # [B,M]
     sigma_perp_clamped = torch.clamp(sigma_perp, min=tiny)  # [B,M]
@@ -88,7 +77,7 @@ def T_Omega(
     # ============================================================
     # ZERO-FRAME
     # 
-    # Note: non-periodized.
+    # Note: non-periodized, real space.
     # ============================================================
     # q_pos: [B,M]
     x_norm_sq = (x.real * x.real + x.imag * x.imag).sum(dim=-1)  # [B,M]
@@ -111,90 +100,23 @@ def T_Omega(
         return T_zero
 
     # ============================================================
-    # DERIVATIVES
+    # TAIL VARIABLES
     #
     # Note: vec_d, vec_d_j — unit by default.
     # Note: tail *is* periodized, thus use x_frac.
     # ============================================================
+    x_frac_re = torch.remainder((z - z_j).real + 0.5, 1.0) - 0.5
+    x_frac_im = torch.remainder((z - z_j).imag + 0.5, 1.0) - 0.5
+    x_frac = torch.complex(x_frac_re, x_frac_im)
+
     anisotropy_ratio = (precision_par_clamped / precision_perp_clamped) - 1.0  # [B,M]
-
-
-    # ============================================================
-    # JACOBI
-    # ============================================================
-    x_jac, w_jac = _t_omega_roots_jacobi(
-        N=Q_THETA,
-        alpha=-0.5,
-        beta=NU - 0.5,
-        normalize=True, # Weights sum = 1.0
-        return_weights=True,
-        dtype=dtype_r,
-        device=device,
-    )
-
-    t_theta_bm = x_jac.view(1, 1, -1)  # [1,1,Q]
-    w_theta_bm = w_jac.view(1, 1, -1)  # [1,1,Q]
-
-    lam_theta = 1.0 + anisotropy_ratio[..., None] * (1.0 - t_theta_bm)  # [B,M,Q]
-    lam_theta = torch.clamp(lam_theta, min=eps)
-
-    # ============================================================
-    # LAGUERRE
-    #
-    # Note: Weights sum to 1 (divide by mu0); nodes are returned as t = x/(x+1) in [0,1);
-    #   to use the Gamma(a+1, 1) measure with density ~ x^a * exp(-x) on [0,∞),
-    #   first recover x via x = t/(1 - t).
-    # ============================================================
-    x_rad, w_rad = _t_omega_roots_gen_laguerre(
-        N=Q_RAD,
-        alpha=NU_EFF,  # NU = N-1
-        normalize=True,
-        return_weights=True,
-        dtype=dtype_r,
-        device=device,
-    )
-
-    x_rad_clamped = x_rad.clamp(max=1.0 - eps)
-
-    # ============================================================
-    # WHITENING
-    # ============================================================
-    x_frac_norm_sq = (x_frac.real * x_frac.real + x_frac.imag * x_frac.imag).sum(dim=-1)  # [B,M]
-    gamma_sq = precision_perp_clamped * x_frac_norm_sq  # [B,M]
 
     # ============================================================
     # TAIL
     # ============================================================
-    t_std = torch.clamp(x_rad_clamped / (1.0 - x_rad_clamped), min=tiny)  # [Q_RAD]
-    bessel_arg = 2.0 * torch.sqrt(
-        (gamma_sq[..., None, None] / lam_theta[..., None])  # [B,M,Q_THETA,1]
-        * t_std.view(1, 1, 1, -1)  # [1,1,1,Q_RAD]
-    )  # [B,M,Q_THETA,Q_RAD]
+    tail_weights = ...
 
-    # Bessel J_{NU}(arg), (custom)
-    Jv = _t_omega_jv(
-        v=NU_EFF,
-        z=bessel_arg,
-        device=device,
-        dtype=dtype_r,
-    )  # [B,M,Q_THETA,Q_RAD]
-
-    w_rad_r = (w_rad * torch.exp(torch.lgamma(NU_EFF + 1.0))).view(1, 1, 1, -1)  # [1,1,1,Q_RAD]
-    I_rad = (w_rad_r * Jv).sum(dim=-1)  # [B,M,Q_THETA]
-
-    # >> !!! HERE IS IT !!! THIS SHIT !!! THE KEY !!! <<
-    I_rad = I_rad - I_rad.mean(dim=-1, keepdim=True) + 1.0
-    # >> !!! HERE IS IT !!! THIS SHIT !!! THE KEY !!! <<
-
-    w_theta_r = w_theta_bm.expand_as(I_rad)  # [B,M,Q_THETA]
-    lam_pow = lam_theta.pow(NU_EFF)  # [B,M,Q_THETA]
-    I_theta = (w_theta_r * (I_rad / lam_pow)).sum(dim=-1)  # [B,M]
-
-    gauss_dim_prefactor = sigma_par_clamped * torch.pow(sigma_perp_clamped, C - 1.0)  # [B,M]
-    tail_base = gauss_dim_prefactor  # [B,M]
-    tail_integral = torch.clamp(I_theta, min=0.0)  # [B,M]
-
-    gain_tail = alpha_j * A_dir * tail_base * tail_integral
+    gain_tail = alpha_j * A_dir * tail_weights
 
     # ============================================================
     #                Assembly gain_tail and T_tail

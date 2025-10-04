@@ -214,14 +214,14 @@ def main():
                 T_hat_j=T_hat_j, alpha_j=alpha_j,
                 sigma_par=sigma_par, sigma_perp=sigma_perp,
                 return_components=T_Omega_Components.TAIL,
-                guards=args.guards, q_theta=args.q_theta, q_rad=args.q_rad,
+                guards=args.guards, q=args.q_theta, q_rad=args.q_rad,
             )  # [B,S]
             T_zero_omega = T_Omega(
                 z=z, z_j=z_j, vec_d=vec_d, vec_d_j=vec_d_j,
                 T_hat_j=T_hat_j, alpha_j=alpha_j,
                 sigma_par=sigma_par, sigma_perp=sigma_perp,
                 return_components=T_Omega_Components.ZERO,
-                guards=args.guards, q_theta=args.q_theta, q_rad=args.q_rad,
+                guards=args.guards, q=args.q_theta, q_rad=args.q_rad,
             )  # [B,S]
 
             # reference full windowed sum
