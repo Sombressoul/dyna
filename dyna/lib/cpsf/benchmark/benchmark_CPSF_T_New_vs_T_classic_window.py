@@ -3,12 +3,8 @@
 #
 # Examples:
 # > python -m dyna.lib.cpsf.benchmark.benchmark_CPSF_T_New_vs_T_classic_window --N 2 --M 16 --S 16 --W 11 --batch 16 --dtype_z c64 --dtype_T c64 --device cuda --iters 10 --warmup 5 --etol_abs 1e-5 --etol_rel 1e-5 --per_iter
-# > python -m dyna.lib.cpsf.benchmark.benchmark_CPSF_T_New_vs_T_classic_window --N 3 --M 4 --S 16 --W 5  --batch 1  --dtype_z c64 --dtype_T c64 --device cuda --iters 100 --warmup 5 --etol_abs 1e-5 --etol_rel 1e-5 --per_iter
+# > python -m dyna.lib.cpsf.benchmark.benchmark_CPSF_T_New_vs_T_classic_window --N 3 --M 4 --S 16 --W 5  --batch 1  --dtype_z c64 --dtype_T c64 --device cuda --iters 10 --warmup 5 --etol_abs 1e-5 --etol_rel 1e-5 --per_iter
 # > python -m dyna.lib.cpsf.benchmark.benchmark_CPSF_T_New_vs_T_classic_window --N 4 --M 4 --S 16 --W 3  --batch 1  --dtype_z c64 --dtype_T c64 --device cuda --iters 10 --warmup 5 --etol_abs 1e-5 --etol_rel 1e-5 --per_iter
-#
-# Changes vs original:
-#  - sigma_par, sigma_perp are now sampled per-j from [sigma_min, sigma_max]
-#  - small robustness tweaks (device/dtype handling, reproducible RNG)
 
 import argparse, math
 import torch
