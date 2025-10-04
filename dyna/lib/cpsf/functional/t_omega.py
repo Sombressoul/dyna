@@ -48,8 +48,7 @@ def T_Omega(
     # ============================================================
     # MAIN
     #
-    # Note: precision = 1/sigma (not 1/sigma^2); sigma_ are scale
-    #   parameters.
+    # Note: 1/sigma (not 1/sigma^2); sigma_* are scale parameters.
     # ============================================================
     # Broadcast
     B, M, N = vec_d_j.shape
@@ -68,11 +67,11 @@ def T_Omega(
 
     sigma_par_clamped = torch.clamp(sigma_par,  min=tiny)  # [B,M]
     sigma_perp_clamped = torch.clamp(sigma_perp, min=tiny)  # [B,M]
-    precision_par = torch.reciprocal(sigma_par_clamped)   # 1/sigma_par
-    precision_perp = torch.reciprocal(sigma_perp_clamped)  # 1/sigma_perp
-    precision_par_clamped = torch.clamp(precision_par,  min=tiny)
-    precision_perp_clamped = torch.clamp(precision_perp, min=tiny)
-    precision_excess_par_clamped = precision_par_clamped - precision_perp_clamped
+    sigma_par_inv = torch.reciprocal(sigma_par_clamped)   # 1/sigma_par
+    sigma_perp_inv = torch.reciprocal(sigma_perp_clamped)  # 1/sigma_perp
+    sigma_par_inv_clamped = torch.clamp(sigma_par_inv,  min=tiny)
+    sigma_perp_inv_clamped = torch.clamp(sigma_perp_inv, min=tiny)
+    sigma_excess_par_clamped = sigma_par_inv_clamped - sigma_perp_inv_clamped
 
     # ============================================================
     # ZERO-FRAME
@@ -84,13 +83,13 @@ def T_Omega(
     inner_re = (vec_d_j.real * x.real + vec_d_j.imag * x.imag).sum(dim=-1)  # [B,M]
     inner_im = (vec_d_j.real * x.imag - vec_d_j.imag * x.real).sum(dim=-1)  # [B,M]
     inner_abs_sq = inner_re * inner_re + inner_im * inner_im  # [B,M]
-    q_pos = precision_perp_clamped * x_norm_sq + precision_excess_par_clamped * inner_abs_sq  # [B,M]
+    q_pos = sigma_perp_inv_clamped * x_norm_sq + sigma_excess_par_clamped * inner_abs_sq  # [B,M]
     A_pos = torch.exp(-PI * q_pos)  # [B,M]
 
     # A_dir: [B,M]
     delta_d = delta_vec_d(vec_d, vec_d_j)  # [B,M,N] complex
     delta_d_norm_sq = (delta_d.real * delta_d.real + delta_d.imag * delta_d.imag).sum(dim=-1)  # [B,M]
-    A_dir = torch.exp(-PI * precision_perp_clamped * delta_d_norm_sq)  # [B,M]
+    A_dir = torch.exp(-PI * sigma_perp_inv_clamped * delta_d_norm_sq)  # [B,M]
 
     # Gain
     gain_zero = alpha_j * A_pos * A_dir  # [B,M]
@@ -100,27 +99,40 @@ def T_Omega(
         return T_zero
 
     # ============================================================
-    # TAIL VARIABLES
-    #
-    # Note: vec_d, vec_d_j — unit by default.
-    # Note: tail *is* periodized, thus use x_frac.
+    # PREPARE GEOMETRY (1D-HS core in R^{2N})
     # ============================================================
-    x_frac_re = torch.remainder((z - z_j).real + 0.5, 1.0) - 0.5
-    x_frac_im = torch.remainder((z - z_j).imag + 0.5, 1.0) - 0.5
-    x_frac = torch.complex(x_frac_re, x_frac_im)
+    # Periodized displacement in R^{2N}: wrap BOTH Re/Im to [-1/2, 1/2]
+    x_wrapped_re = torch.remainder(x.real + 0.5, 1.0) - 0.5  # [B,M,N]
+    x_wrapped_im = torch.remainder(x.imag + 0.5, 1.0) - 0.5  # [B,M,N]
+    x_wrapped_R2N = torch.cat([x_wrapped_re, x_wrapped_im], dim=-1)  # [B,M,2*N]
 
-    anisotropy_ratio = (precision_par_clamped / precision_perp_clamped) - 1.0  # [B,M]
+    # Orientation u in R^{2N} (unit)
+    u_re = vec_d_j.real  # [B,M,N]
+    u_im = vec_d_j.imag  # [B,M,N]
+    u_raw = torch.cat([u_re, u_im], dim=-1)  # [B,M,2*N]
+    u_norm = torch.linalg.norm(u_raw, dim=-1, keepdim=True).clamp(min=tiny)  # [B,M,1]
+    u_R2N = u_raw / u_norm  # [B,M,2*N]
+
+    # Anisotropy params
+    delta_sigma = sigma_par_clamped - sigma_perp_clamped  # [B,M]
+    abs_delta_sigma = delta_sigma.abs()  # [B,M]
+    sign_delta = torch.sign(delta_sigma).to(dtype_r)  # [B,M] (+1 osc, -1 hyp)
+
+    # Theta base (dual isotropic scale)
+    q = torch.exp(-PI * sigma_perp_clamped)  # [B,M]
+
+    # HS scaling
+    xi_scale = (1.0 / (2.0 * PI)).to(dtype_r)  # scalar
+    s_scale = torch.sqrt(4.0 * PI * abs_delta_sigma).clamp_min(tiny)  # [B,M]
+
+    # Flags
+    is_iso = (abs_delta_sigma <= eps)  # [B,M]  (delta sigma ~= 0 -> isotropic limit)
+    is_osc = (delta_sigma >= 0)  # [B,M]  (HS branch: osc vs hyperbolic)
 
     # ============================================================
-    # TAIL
+    # ASSEMBLY TAIL
     # ============================================================
-    tail_weights = ...
-
-    gain_tail = alpha_j * A_dir * tail_weights
-
-    # ============================================================
-    #                Assembly gain_tail and T_tail
-    # ============================================================
+    gain_tail = ...
     T_tail = (gain_tail.unsqueeze(-1) * T_hat_j).sum(dim=1)  # [B,S]
 
     if return_components == T_Omega_Components.TAIL:
