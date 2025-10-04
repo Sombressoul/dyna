@@ -25,7 +25,7 @@ def _cpu_safe_arange(
     return torch.arange(start, start + N, dtype=rtype, device=device)
 
 
-def _t_omega_roots_jacobi(
+def roots_jacobi(
     *,
     N: int,
     alpha: Union[torch.FloatTensor, float],
@@ -106,7 +106,7 @@ def _t_omega_roots_jacobi(
         return nodes, weights
 
 
-def _t_omega_roots_gen_laguerre(
+def roots_gen_laguerre(
     *,
     N: int,
     alpha: Union[torch.FloatTensor, float],
