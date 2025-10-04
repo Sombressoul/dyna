@@ -1,5 +1,7 @@
 import torch
 
+from typing import Tuple, Optional
+
 from enum import Enum, auto as enum_auto
 
 from dyna.lib.cpsf.functional.core_math import delta_vec_d
@@ -11,8 +13,67 @@ class T_Omega_Components(Enum):
     BOTH = enum_auto()
     UNION = enum_auto()
 
+import torch
+
+
+def theta3_log(
+    *,
+    z: torch.Tensor,  # [...], real or complex
+    q: torch.Tensor,  # [...], real in (0,1), broadcastable to z
+    m: torch.Tensor,  # [M], real
+    device: torch.device,  # target device
+    dtype_r: torch.dtype,  # real dtype
+    dtype_c: torch.dtype,  # complex dtype
+    shift: float = 1.18e-38,  # small shift to avoid log(0)
+) -> torch.Tensor:
+    # move to device/dtype
+    zc = z.to(device=device, dtype=dtype_c)
+    qr = q.to(device=device, dtype=dtype_r)
+    m = m.to(device=device, dtype=dtype_r)
+
+    # 2*pi and phases
+    two_pi = torch.tensor(2.0 * torch.pi, device=device, dtype=dtype_r)
+    theta = two_pi.to(dtype=dtype_c) * zc  # [...], complex
+
+    # cos for all m: shape [..., M]
+    cos_m_theta = torch.cos(theta.unsqueeze(-1) * m.to(dtype=dtype_c))  # [..., M], complex
+
+    # q^{m^2}
+    q_b, _ = torch.broadcast_tensors(qr, zc.real)  # [...], real
+    m2 = m * m  # [M], real
+    q_pow = torch.pow(q_b.unsqueeze(-1), m2)  # [..., M], real
+    q_pow_c = q_pow.to(dtype=dtype_c)  # [..., M], complex
+
+    # series sum and log
+    one_c = torch.ones((), device=device, dtype=dtype_c)
+    S = (one_c * (1.0 + float(shift))) + 2.0 * torch.sum(q_pow_c * cos_m_theta, dim=-1)  # [...], complex
+
+    return torch.log(S)
+
+
+def hermite_gauss(
+    *,
+    n: int,
+    device: torch.device,
+    dtype: torch.dtype,
+) -> Tuple[torch.Tensor, torch.Tensor]:
+    k = torch.arange(1, n, device=device, dtype=dtype)
+    beta = torch.sqrt(k * 0.5)
+
+    J = torch.zeros((n, n), device=device, dtype=dtype)
+    J.diagonal(1).copy_(beta)
+    J.diagonal(-1).copy_(beta)
+
+    evals, evecs = torch.linalg.eigh(J)
+    x = evals
+    mu_0 = torch.sqrt(torch.tensor(torch.pi, device=device, dtype=dtype))
+    w = mu_0 * (evecs[0, :] ** 2)
+
+    return x, w
+
 
 def T_Omega(
+    *,
     z: torch.Tensor,  # [B,N] (complex)
     z_j: torch.Tensor,  # [B,M,N] (complex)
     vec_d: torch.Tensor,  # vec_d: [B,N] (complex); unit
@@ -23,9 +84,18 @@ def T_Omega(
     sigma_perp: torch.Tensor,  # sigma_perp: [B,M] (real)
     return_components: T_Omega_Components = T_Omega_Components.UNION,
     guards: bool = True, # Use numerical guards (True/False -> stability/speed)
+    gh_order: int = 16, # Hermite-Gauss order
+    theta_series_tol: Optional[float] = None,  # theta-3 series truncation
+    theta_series_m_cap: int = 512,  # theta-3 series elements cap
 ) -> torch.Tensor:
     # ============================================================
-    # GUARDS
+    # SIMPLE GUARDS
+    # ============================================================
+    assert int(gh_order) >= 1, "CPSF/T_Omega requires gh_order >= 1."
+    assert int(theta_series_m_cap) >= 1, "CPSF/T_Omega requires theta_series_m_cap >= 1."
+
+    # ============================================================
+    # HEAVY GUARDS
     # ============================================================
     if bool(guards):
         assert (alpha_j > 0).all(), "CPSF/T_Omega requires alpha_j > 0."
@@ -35,13 +105,15 @@ def T_Omega(
     # ============================================================
     # VARIABLES
     # ============================================================
-    # For future use.
+    GH_Q = int(gh_order)
+    M_CAP = int(theta_series_m_cap)
 
     # ============================================================
     # BASE
     # ============================================================
     device = z.device
     dtype_r = z.real.dtype
+    dtype_c = z.dtype
     tiny = torch.finfo(dtype_r).tiny
     eps = torch.finfo(dtype_r).eps
 
@@ -59,8 +131,8 @@ def T_Omega(
     assert N >= 2, "CPSF/T_Omega requires N >= 2 (complex N)."
 
     # Constants
-    C = torch.tensor(float(N), dtype=dtype_r, device=device)
     PI = torch.tensor(torch.pi, dtype=dtype_r, device=device)
+    INV_SQRT_PI_C = (1.0 / torch.sqrt(PI)).to(dtype=dtype_c)
 
     # Common
     x = z - z_j  # [B,M,N] complex
@@ -130,9 +202,60 @@ def T_Omega(
     is_osc = (delta_sigma >= 0)  # [B,M]  (HS branch: osc vs hyperbolic)
 
     # ============================================================
+    # PREPARE AND EXECUTE THETA-3  (1D-HS integral, memory-lean)
+    # ============================================================
+    # 1) Gauss–Hermite nodes/weights (measure e^{-y^2})
+    gh_n, gh_w = hermite_gauss(n=GH_Q, device=device, dtype=dtype_r)  # n:[K], w:[K]
+    K = gh_n.shape[0]
+
+    # 2) HS shifts: s = s_scale * y; xi = (s / 2pi) for osc, i*(s / 2pi) for hyp
+    s = s_scale.unsqueeze(-1) * gh_n.view(1, 1, K)  # [B,M,K], real
+    xi_real = xi_scale * s  # [B,M,K], real
+    osc_mask = is_osc.unsqueeze(-1).to(dtype_r)  # [B,M,1], real {0,1}
+    xi_c = torch.complex(xi_real * osc_mask, xi_real * (1.0 - osc_mask)) # [B,M,K], complex
+
+    # 3) Theta arguments: z_arg = x + xi(s) * u
+    x_arg_r = x_wrapped_R2N.unsqueeze(-1)  # [B,M,2N,1], real
+    u_arg_r = u_R2N.unsqueeze(-1)  # [B,M,2N,1], real
+    xi_arg_c = xi_c.unsqueeze(-2)  # [B,M,1,K],  complex
+    z_arg = x_arg_r + u_arg_r * xi_arg_c  # [B,M,2N,K], complex (via promotion)
+
+    # 4) Theta-3 execution
+    # 4.1) Per-batch optimal m_vec
+    tolerance = float(theta_series_tol) if (theta_series_tol is not None) else float(eps)
+    q_max = torch.amax(q)
+    q_max = torch.clamp(q_max, max=1.0 - eps)
+    ln_q   = torch.log(q_max)
+    target = torch.log(torch.tensor(tolerance, dtype=dtype_r, device=device)) - torch.log(torch.tensor(4.0, dtype=dtype_r, device=device))
+    m_max_f = torch.sqrt(target / ln_q)
+    m_max_i = int(torch.clamp(torch.ceil(m_max_f), min=torch.tensor(0.0, dtype=dtype_r, device=device)).item())
+    m_max_i = max(0, min(M_CAP, m_max_i))
+    m_vec = torch.arange(1, m_max_i + 1, device=device, dtype=dtype_r)    
+
+    # 4.2) Batched theta3 (single shot over axes and GH nodes)
+    log_theta = theta3_log(
+        z=z_arg,
+        q=q,
+        m=m_vec,
+        device=device,
+        dtype_r=dtype_r,
+        dtype_c=dtype_c,
+        shift=float(tiny),
+    )  # [B,M,2N,K], complex
+
+    # 5) Reduce: sum over 2N axes, GH-weighted sum over K
+    L = torch.sum(log_theta, dim=-2)  # [B,M,K], complex
+    prod_theta_minus_1 = torch.exp(L) - 1.0  # [B,M,K], complex
+    prod_theta_minus_1.mul_(gh_w.view(1, 1, K))  # in-place weight multiply
+    I_tail_c = INV_SQRT_PI_C * torch.sum(prod_theta_minus_1, dim=-1)  # [B,M], complex
+    I_tail = I_tail_c.real  # [B,M], real
+
+    # ============================================================
     # ASSEMBLY TAIL
     # ============================================================
-    gain_tail = ...
+    gauss_dim_pref = sigma_par_clamped * torch.pow(sigma_perp_clamped, float(N - 1))  # [B,M]
+    gain_tail = alpha_j * A_dir * gauss_dim_pref * I_tail  # [B,M]
+
     T_tail = (gain_tail.unsqueeze(-1) * T_hat_j).sum(dim=1)  # [B,S]
 
     if return_components == T_Omega_Components.TAIL:
