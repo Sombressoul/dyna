@@ -1,11 +1,7 @@
 import torch
 import math
 
-from dyna.lib.cpsf.functional.core_math import (
-    delta_vec_d,
-    R,
-    R_ext,
-)  # разрешено каноном
+from dyna.lib.cpsf.functional.core_math import delta_vec_d, R, R_ext
 
 
 def T_New(
