@@ -3,6 +3,7 @@ import math
 
 from dyna.lib.cpsf.functional.core_math import delta_vec_d
 
+@torch.jit.script
 def flat3(
     *,
     x: torch.Tensor, 
@@ -11,6 +12,7 @@ def flat3(
 ) -> torch.Tensor: 
     return x.reshape(B * M, x.shape[-1])
 
+@torch.jit.script
 def flat2(
     *,
     x: torch.Tensor, 
@@ -19,6 +21,7 @@ def flat2(
 ) -> torch.Tensor: 
     return x.reshape(B * M)
 
+@torch.jit.script
 def _choose_K_unshifted(
     *,
     lam_max: float,
@@ -31,6 +34,7 @@ def _choose_K_unshifted(
     K = int(math.ceil(val + 0.5))
     return max(K, 1)
 
+@torch.jit.script
 def _choose_K_shifted(
     *,
     lam_sel: torch.Tensor,
@@ -69,6 +73,7 @@ def _choose_K_shifted(
 
     return K_neg
 
+@torch.jit.script
 def _theta1d_phase(
     *,
     a: torch.Tensor, 
@@ -86,24 +91,27 @@ def _theta1d_phase(
     expo = torch.exp(-PI.to(dtype_r) * (n ** 2) / lam_b)
     return (expo.to(phase.dtype) * phase).sum(dim=-1)
 
+@torch.jit.script
 def _theta1d_shifted(
+    *,
     a: torch.Tensor,
     beta: torch.Tensor,
     lam: torch.Tensor,
     K: int,
     PI: torch.Tensor,
+    dtype_r: torch.dtype,
+    dtype_c: torch.dtype,
+    device: torch.device,
 ) -> torch.Tensor:
-    device = a.device
-    dr = a.dtype
     n0 = torch.floor(beta + 0.5)
     delta = beta - n0
-    m = torch.arange(-K, K + 1, dtype=dr, device=device).view(1, 1, 1, -1)
+    m = torch.arange(-K, K + 1, dtype=dtype_r, device=device).view(1, 1, 1, -1)
     lam_b = lam.view(-1, 1, 1, 1)
     a_b = a.unsqueeze(-1)
     delta_b = delta.unsqueeze(-1)
-    phase_n0 = torch.exp((2.0 * PI).to(dr) * 1j * (n0 * a).to(torch.complex64 if dr == torch.float32 else torch.complex128))
-    phase_m = torch.exp((2.0 * PI).to(dr) * 1j * (m * a_b).to(torch.complex64 if dr == torch.float32 else torch.complex128))
-    expo = torch.exp(-PI.to(dr) * ((m - delta_b) ** 2) / lam_b)
+    phase_n0 = torch.exp((2.0 * PI).to(dtype_r) * 1j * (n0 * a).to(dtype_c))
+    phase_m = torch.exp((2.0 * PI).to(dtype_r) * 1j * (m * a_b).to(dtype_c))
+    expo = torch.exp(-PI.to(dtype_r) * ((m - delta_b) ** 2) / lam_b)
     inner = (expo.to(phase_m.dtype) * phase_m).sum(dim=-1)
     return phase_n0 * inner
 
@@ -277,9 +285,26 @@ def T_New(
             device=device,
             dtype_r=dtype_r,
         )
-
-        theta_R = _theta1d_shifted(aR, beta_R, lam_sel, K_neg, PI)
-        theta_I = _theta1d_shifted(aI, beta_I, lam_sel, K_neg, PI)
+        theta_R = _theta1d_shifted(
+            a=aR,
+            beta=beta_R,
+            lam=lam_sel,
+            K=K_neg,
+            PI=PI,
+            dtype_r=aR.real.dtype,
+            dtype_c=gamma.dtype,
+            device=aR.device,
+        )
+        theta_I = _theta1d_shifted(
+            a=aI,
+            beta=beta_I,
+            lam=lam_sel,
+            K=K_neg,
+            PI=PI,
+            dtype_r=aI.real.dtype,
+            dtype_c=gamma.dtype,
+            device=aI.device,
+        )
 
         gain_log = (PI * lam_sel.view(-1, 1, 1)) * (cR.pow(2) + cI.pow(2))
         gain_log = gain_log.sum(dim=-1)
