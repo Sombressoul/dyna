@@ -153,7 +153,8 @@ def main():
         f"Device={dev.type}, dtype_z={dtype_z}, dtype_T={dtype_T}, "
         f"B={B}, N={N}, M={M}, S={S}, W={W}, iters={args.iters}, warmup={args.warmup}, "
         f"sigma_min={args.sigma_min}, sigma_max={args.sigma_max}, "
-        f"etol_abs={args.etol_abs}, etol_rel={args.etol_rel}"
+        f"etol_abs={args.etol_abs}, etol_rel={args.etol_rel}, "
+        f"error_budget={args.error_budget}, q_order={args.q_order}"
     )
 
     # Offsets for PD window
