@@ -9,7 +9,7 @@ from dyna.functional.backward_gradient_normalization import (
     backward_gradient_normalization,
 )
 
-torch.autograd.set_detect_anomaly(True)
+# torch.autograd.set_detect_anomaly(True)
 
 class ConvBlock(nn.Module):
     def __init__(
@@ -240,6 +240,7 @@ class CPSFSpectralAutoencoder(nn.Module):
 
         # Retrieve
         x = self.codebook(x)
+        x = x.view(B, H, W, -1).permute(0, 3, 1, 2).contiguous()
         x = backward_gradient_normalization(x)
 
 
@@ -273,8 +274,8 @@ class CPSFSpectralAutoencoder(nn.Module):
 
         # exit()
 
-        x = self.head_c2r(x, B, H, W)
-        x = backward_gradient_normalization(x)
+        # x = self.head_c2r(x, B, H, W)
+        # x = backward_gradient_normalization(x)
         x = self.codebook_norm(x)
         x = self.codebook_dropout(x)
 

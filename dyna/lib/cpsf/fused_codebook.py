@@ -184,30 +184,54 @@ class CPSFFusedCodebook(nn.Module):
         self,
         s: torch.Tensor,
     ) -> torch.Tensor:
-        # x = torch.fft.ifft(s, self.S, dim=-1) # BUGGY SHIT
-        dtype = s.real.dtype
+        assert torch.is_complex(s), "s should be complex"
+
+        B, X = s.shape
+        S = int(self.S)
+
+        dtype_c = s.dtype
+        dtype_r = torch.float64 if dtype_c == torch.complex128 else torch.float32
         device = s.device
-        x = spectrum_to_vector(
-            spectra=s,
-            scale=torch.tensor([1.0], device=device, dtype=dtype).unsqueeze(0).expand([s.shape[0], 1]),
-            shift=torch.tensor([0.0], device=device, dtype=dtype).unsqueeze(0).expand([s.shape[0], 1]),
-            vec_len=self.S,
-        )
+
+        n = torch.arange(S, dtype=dtype_r, device=device)[:, None]
+        k = torch.arange(X, dtype=dtype_r, device=device)[None, :]
+        ang = (2.0 * math.pi / float(S)) * (n * k)
+        A = torch.exp(1j * ang).to(dtype=dtype_c)
+        x = (A @ s.transpose(0, 1)).transpose(0, 1)
+
+        # project to real
+        r = torch.abs(x)
+        theta = torch.angle(x)
+        x = r * theta.cos()
+
         return x
 
     def _vector_to_spectrum(
         self,
         v: torch.Tensor,
     ) -> torch.Tensor:
-        # x = torch.fft.fft(v, 2 * self.N, dim=-1) # BUGGY SHIT
-        dtype = v.real.dtype
-        device = v.device
-        x = vector_to_spectrum(
-            samples=v + 0j,
-            scale=torch.tensor([1.0], device=device, dtype=dtype).unsqueeze(0).expand([v.shape[0], 1]),
-            shift=torch.tensor([0.0], device=device, dtype=dtype).unsqueeze(0).expand([v.shape[0], 1]),
-            num_modes=2 * self.N,
+        assert not torch.is_complex(v), "v should be real"
+
+        B, L = v.shape
+        K = int(2 * self.N)
+
+        dtype_c = (
+            torch.complex128
+            if v.dtype in (torch.float64, torch.double)
+            else torch.complex64
         )
+        dtype_r = torch.float64 if dtype_c == torch.complex128 else torch.float32
+        device = v.device
+
+        n = torch.arange(L, dtype=dtype_r, device=device)[:, None]
+        k = torch.arange(K, dtype=dtype_r, device=device)[None, :]
+        ang = (2.0 * math.pi / float(L)) * (n * k)
+        A = torch.exp(1j * ang).to(dtype=dtype_c)
+
+        b = v.to(dtype=dtype_c).transpose(0, 1)
+        sol = torch.linalg.lstsq(A, b).solution
+        x = sol.transpose(0, 1)
+
         return x
 
     def forward(
