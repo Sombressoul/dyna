@@ -3,8 +3,15 @@ import torch
 import torch.nn as nn
 
 from typing import Optional, Union
+from enum import Enum, auto as enum_auto
 
 from dyna.lib.cpsf.functional.t_phc_fused import T_PHC_Fused
+from dyna.lib.cpsf.functional.t_zero import T_Zero
+
+
+class CPSFFusedCodebookMode(Enum):
+    FAST = enum_auto()
+    DUAL = enum_auto()
 
 
 class CPSFFusedCodebook(nn.Module):
@@ -24,6 +31,7 @@ class CPSFFusedCodebook(nn.Module):
         init_S_scale: float = 1.0e-3,
         phase_scale: float = 1.0,  # Use when T-value explodes.
         c_dtype: torch.dtype = torch.complex64,
+        mode: CPSFFusedCodebookMode = CPSFFusedCodebookMode.FAST,
     ) -> None:
         super().__init__()
 
@@ -47,6 +55,8 @@ class CPSFFusedCodebook(nn.Module):
             raise ValueError("phase_scale must be >= 0.")
         if c_dtype not in [torch.complex64, torch.complex128]:
             raise ValueError("c_dtype must be torch.complex64 or torch.complex128.")
+        if not isinstance(mode, CPSFFusedCodebookMode):
+            raise ValueError("mode must be CPSFFusedCodebookMode.")
 
         self.N = int(N)
         self.M = int(M)
@@ -63,6 +73,7 @@ class CPSFFusedCodebook(nn.Module):
         self.phase_scale = float(phase_scale)
         self.c_dtype = c_dtype
         self.r_dtype = torch.float32 if c_dtype == torch.complex64 else torch.float64
+        self.mode = mode
 
         self._init_sigmas()
 
@@ -117,11 +128,11 @@ class CPSFFusedCodebook(nn.Module):
         sigma_perp = 2.0 * math.pi * (r_perp**2)
         sigma_par = (rho**2) * sigma_perp
 
-        self.sigma_par_j = torch.nn.Parameter(
+        self.sigma_par = torch.nn.Parameter(
             data=torch.full((self.M,), sigma_par, dtype=self.r_dtype).detach(),
             requires_grad=True,
         )
-        self.sigma_perp_j = torch.nn.Parameter(
+        self.sigma_perp = torch.nn.Parameter(
             data=torch.full((self.M,), sigma_perp, dtype=self.r_dtype).detach(),
             requires_grad=True,
         )
@@ -197,41 +208,64 @@ class CPSFFusedCodebook(nn.Module):
         z = x[..., : self.N]
         vec_d = x[..., self.N :]
 
-        x = T_PHC_Fused(
-            z=self._scale_phase(z),
-            vec_d=(
-                self._to_unit(
-                    vec_d,
-                )
-                if self.autonorm_vec_d
-                else vec_d
-            ),
-            z_j=self._scale_phase(self.z_j),
-            vec_d_j=(
-                self._to_unit(
-                    self.vec_d_j,
-                )
-                if self.autonorm_vec_d_j
-                else self.vec_d_j
-            ),
-            T_hat_j=self.T_hat_j,
-            alpha_j=torch.clamp(
-                self.alpha_j,
-                min=self._get_tiny(self.alpha_j),
-            ),
-            sigma_par_j=torch.clamp(
-                self.sigma_par_j,
-                min=self._get_tiny(self.sigma_par_j),
-            ),
-            sigma_perp_j=torch.clamp(
-                self.sigma_perp_j,
-                min=self._get_tiny(self.sigma_perp_j),
-            ),
-            quad_nodes=self.quad_nodes,
-            eps_total=self.eps_total,
-            n_chunk=self.n_chunk,
-            m_chunk=self.m_chunk,
-            dtype_override=self.c_dtype,
+        z = self._scale_phase(z)
+        vec_d = (
+            self._to_unit(
+                vec_d,
+            )
+            if self.autonorm_vec_d
+            else vec_d
         )
+        z_j = self._scale_phase(self.z_j)
+        vec_d_j = (
+            self._to_unit(
+                self.vec_d_j,
+            )
+            if self.autonorm_vec_d_j
+            else self.vec_d_j
+        )
+        T_hat_j = self.T_hat_j
+        alpha_j = torch.clamp(
+            self.alpha_j,
+            min=self._get_tiny(self.alpha_j),
+        )
+        sigma_par = torch.clamp(
+            self.sigma_par,
+            min=self._get_tiny(self.sigma_par),
+        )
+        sigma_perp = torch.clamp(
+            self.sigma_perp,
+            min=self._get_tiny(self.sigma_perp),
+        )
+
+        if self.mode == CPSFFusedCodebookMode.FAST:
+            x = T_Zero(
+                z=z,
+                z_j=z_j,
+                vec_d=vec_d,
+                vec_d_j=vec_d_j,
+                T_hat_j=T_hat_j,
+                alpha_j=alpha_j,
+                sigma_par=sigma_par,
+                sigma_perp=sigma_perp,
+            )
+        elif self.mode == CPSFFusedCodebookMode.DUAL:
+            x = T_PHC_Fused(
+                z=z,
+                vec_d=vec_d,
+                z_j=z_j,
+                vec_d_j=vec_d_j,
+                T_hat_j=T_hat_j,
+                alpha_j=alpha_j,
+                sigma_par_j=sigma_par,
+                sigma_perp_j=sigma_perp,
+                quad_nodes=self.quad_nodes,
+                eps_total=self.eps_total,
+                n_chunk=self.n_chunk,
+                m_chunk=self.m_chunk,
+                dtype_override=self.c_dtype,
+            )
+        else:
+            raise ValueError(f"Unknown mode: '{self.mode}'")
 
         return self._spectrum_to_vector(x)
