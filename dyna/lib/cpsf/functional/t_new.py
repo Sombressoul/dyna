@@ -115,6 +115,29 @@ def _theta1d_shifted(
     inner = (expo.to(phase_m.dtype) * phase_m).sum(dim=-1)
     return phase_n0 * inner
 
+@torch.jit.script
+def _gh_nodes_weights(
+    *,
+    n: int, 
+    device: torch.device,
+    dtype: torch.dtype,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    k = torch.arange(1, n, device=device, dtype=dtype)
+    off = torch.sqrt(k * torch.tensor(0.5, dtype=dtype, device=device))
+    J = torch.zeros((n, n), device=device, dtype=dtype)
+    J = J + torch.diag(off, diagonal=1) + torch.diag(off, diagonal=-1)
+    evals, evecs = torch.linalg.eigh(J)
+    w0 = evecs[0, :] ** 2
+    PI = torch.tensor(math.pi, dtype=dtype, device=device)
+    weights = torch.sqrt(PI) * w0
+    return evals, weights
+
+@torch.jit.script
+def _frac_unit(
+    *,
+    x: torch.Tensor,
+) -> torch.Tensor:
+    return torch.remainder(x + 0.5, 1.0) - 0.5
 
 def T_New(
     *,
@@ -127,29 +150,8 @@ def T_New(
     sigma_par: torch.Tensor,
     sigma_perp: torch.Tensor,
     error_budget: float = 1.0e-5,
+    q_order: int = 7,
 ) -> torch.Tensor:
-    def _frac_unit(x: torch.Tensor) -> torch.Tensor:
-        return torch.remainder(x + 0.5, 1.0) - 0.5
-
-    def _choose_gh_order(eps_quad: float) -> int:
-        if eps_quad < 3e-7:
-            return 9
-        elif eps_quad < 3e-6:
-            return 7
-        else:
-            return 5
-
-    def _gh_nodes_weights(n: int, device, dtype):
-        k = torch.arange(1, n, device=device, dtype=dtype)
-        off = torch.sqrt(k * torch.tensor(0.5, dtype=dtype, device=device))
-        J = torch.zeros((n, n), device=device, dtype=dtype)
-        J = J + torch.diag(off, diagonal=1) + torch.diag(off, diagonal=-1)
-        evals, evecs = torch.linalg.eigh(J)
-        w0 = evecs[0, :] ** 2
-        PI = torch.tensor(math.pi, dtype=dtype, device=device)
-        weights = torch.sqrt(PI) * w0
-        return evals, weights
-
     device = z.device
     dtype_r = z.real.dtype
     dtype_c = z.dtype
@@ -161,8 +163,8 @@ def T_New(
     z_b = z.unsqueeze(1).expand(B, M, N)
     d_b = vec_d.unsqueeze(1).expand(B, M, N)
     dz = z_b - z_j
-    dz_re = _frac_unit(dz.real)
-    dz_im = _frac_unit(dz.imag)
+    dz_re = _frac_unit(x=dz.real)
+    dz_im = _frac_unit(x=dz.imag)
 
     delta_d = delta_vec_d(d_b, vec_d_j)
     dd2 = (delta_d.real**2 + delta_d.imag**2).sum(dim=-1)
@@ -172,12 +174,7 @@ def T_New(
     b = (vec_d_j / denom.unsqueeze(-1)).to(dtype_c)
     b_conj = b.conj()
 
-    eps_total = float(error_budget)
-    eps_quad = 0.4 * eps_total
-    eps_theta = 0.6 * eps_total
-
-    q_order = _choose_gh_order(eps_quad)
-    gh_nodes, gh_w = _gh_nodes_weights(q_order, device=device, dtype=dtype_r)
+    gh_nodes, gh_w = _gh_nodes_weights(n=q_order, device=device, dtype=dtype_r)
     Q = gh_nodes.numel()
     Xr = gh_nodes.view(Q, 1).expand(Q, Q).reshape(-1)
     Xi = gh_nodes.view(1, Q).expand(Q, Q).reshape(-1)
@@ -188,7 +185,7 @@ def T_New(
     lam_for_K = float(lam_base.max().item())
     K_pos = _choose_K_unshifted(
         lam_max=lam_for_K,
-        eps_theta=eps_theta,
+        eps_theta=error_budget,
         N=2 * N,
         QQ=QQ,
     )
@@ -279,7 +276,7 @@ def T_New(
             lam_sel=lam_sel,
             delta_I=delta_I,
             delta_R=delta_R,
-            eps_theta=eps_theta,
+            eps_theta=error_budget,
             tiny=tiny,
             PI=PI,
             device=device,
