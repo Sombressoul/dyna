@@ -97,7 +97,7 @@ def _theta1d_shifted(
     a: torch.Tensor,
     beta: torch.Tensor,
     lam: torch.Tensor,
-    K: int,
+    K: torch.Tensor,
     PI: torch.Tensor,
     dtype_r: torch.dtype,
     dtype_c: torch.dtype,
@@ -281,7 +281,7 @@ def T_New(
             PI=PI,
             device=device,
             dtype_r=dtype_r,
-        )
+        ).to(torch.int64)
         theta_R = _theta1d_shifted(
             a=aR,
             beta=beta_R,
