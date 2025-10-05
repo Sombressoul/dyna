@@ -1,5 +1,3 @@
-# dyna/lib/cpsf/benchmark/benchmark_CPSF_T_New.py
-#
 # Run examples:
 # > python -m dyna.lib.cpsf.benchmark.benchmark_CPSF_T_New --B 2048 --N 4 --M 64 --S 16 --dtype c64 --device cuda --iters 50 --warmup 10
 # > python -m dyna.lib.cpsf.benchmark.benchmark_CPSF_T_New --B 256 --N 8 --M 128 --S 32 --dtype c128 --device cuda --iters 30 --warmup 10 --error_budget 1e-6 --q_order 9
