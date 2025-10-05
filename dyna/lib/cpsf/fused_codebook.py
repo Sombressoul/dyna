@@ -7,6 +7,7 @@ from enum import Enum, auto as enum_auto
 
 from dyna.lib.cpsf.functional.t_phc_fused import T_PHC_Fused
 from dyna.lib.cpsf.functional.t_zero import T_Zero
+from dyna.lib.cpsf.functional.sv_transform import spectrum_to_vector, vector_to_spectrum
 
 
 class CPSFFusedCodebookMode(Enum):
@@ -183,14 +184,30 @@ class CPSFFusedCodebook(nn.Module):
         self,
         s: torch.Tensor,
     ) -> torch.Tensor:
-        x = torch.fft.ifft(s, self.S, dim=-1)
+        # x = torch.fft.ifft(s, self.S, dim=-1) # BUGGY SHIT
+        dtype = s.real.dtype
+        device = s.device
+        x = spectrum_to_vector(
+            spectra=s,
+            scale=torch.tensor([1.0], device=device, dtype=dtype).unsqueeze(0).expand([s.shape[0], 1]),
+            shift=torch.tensor([0.0], device=device, dtype=dtype).unsqueeze(0).expand([s.shape[0], 1]),
+            vec_len=self.S,
+        )
         return x
 
     def _vector_to_spectrum(
         self,
         v: torch.Tensor,
     ) -> torch.Tensor:
-        x = torch.fft.fft(v, 2 * self.N, dim=-1)
+        # x = torch.fft.fft(v, 2 * self.N, dim=-1) # BUGGY SHIT
+        dtype = v.real.dtype
+        device = v.device
+        x = vector_to_spectrum(
+            samples=v + 0j,
+            scale=torch.tensor([1.0], device=device, dtype=dtype).unsqueeze(0).expand([v.shape[0], 1]),
+            shift=torch.tensor([0.0], device=device, dtype=dtype).unsqueeze(0).expand([v.shape[0], 1]),
+            num_modes=2 * self.N,
+        )
         return x
 
     def forward(
@@ -239,15 +256,17 @@ class CPSFFusedCodebook(nn.Module):
         )
 
         if self.mode == CPSFFusedCodebookMode.FAST:
+            B, N = z.shape
+            M, S = T_hat_j.shape
             x = T_Zero(
                 z=z,
-                z_j=z_j,
+                z_j=z_j.unsqueeze(0).expand([B, M, N]),
                 vec_d=vec_d,
-                vec_d_j=vec_d_j,
-                T_hat_j=T_hat_j,
-                alpha_j=alpha_j,
-                sigma_par=sigma_par,
-                sigma_perp=sigma_perp,
+                vec_d_j=vec_d_j.unsqueeze(0).expand([B, M, N]),
+                T_hat_j=T_hat_j.unsqueeze(0).expand([B, M, S]),
+                alpha_j=alpha_j.unsqueeze(0).expand([B, M]),
+                sigma_par=sigma_par.unsqueeze(0).expand([B, M]),
+                sigma_perp=sigma_perp.unsqueeze(0).expand([B, M]),
             )
         elif self.mode == CPSFFusedCodebookMode.DUAL:
             x = T_PHC_Fused(

@@ -9,6 +9,7 @@ from dyna.functional.backward_gradient_normalization import (
     backward_gradient_normalization,
 )
 
+torch.autograd.set_detect_anomaly(True)
 
 class ConvBlock(nn.Module):
     def __init__(
@@ -168,7 +169,7 @@ class CPSFSpectralAutoencoder(nn.Module):
             eps_total=eps_total,
             autonorm_vec_d=True,
             autonorm_vec_d_j=True,
-            overlap_rate=0.01,
+            overlap_rate=0.05,
             anisotropy=1.5,
             init_S_scale=1.0e-3,
             phase_scale=1.0,
@@ -187,6 +188,9 @@ class CPSFSpectralAutoencoder(nn.Module):
         self.d2 = DeconvBlock(256, 128, act=act_dec)
         self.d3 = DeconvBlock(128, 64, act=act_dec)
         self.d4 = DeconvBlock(64, 3, act=act_dec)
+
+        # DEBUG LAYER
+        self.debug_linear = nn.Linear(128, 2048)
 
         self.reset_parameters()
 
@@ -238,18 +242,32 @@ class CPSFSpectralAutoencoder(nn.Module):
         x = self.codebook(x)
         x = backward_gradient_normalization(x)
 
-        raise NotImplementedError("FIX THE FUCKING IMAGINARY PERIODIZATION!!!111")
 
-        # def dbg_c_val(x: torch.Tensor, name: str):
-        #     print(f"DEBUG '{name}':")
-        #     print(f"\t{x.real.std()=}")
-        #     print(f"\t{x.real.mean()=}")
-        #     print(f"\t{x.real.max()=}")
-        #     print(f"\t{x.real.min()=}")
-        #     print(f"\t{x.imag.std()=}")
-        #     print(f"\t{x.imag.mean()=}")
-        #     print(f"\t{x.imag.max()=}")
-        #     print(f"\t{x.imag.min()=}")
+        # x = self.debug_linear(x)
+        # x = x.view(B, H, W, -1).permute(0, 3, 1, 2).contiguous()
+        # print(f"{x.shape=}")
+        # exit()
+
+        def dbg_c_val(x: torch.Tensor, name: str):
+            print(f"DEBUG '{name}':")
+            print(f"\t{x.real.std()=}")
+            print(f"\t{x.real.mean()=}")
+            print(f"\t{x.real.max()=}")
+            print(f"\t{x.real.min()=}")
+            if torch.is_complex(x):
+                print(f"\t{x.imag.std()=}")
+                print(f"\t{x.imag.mean()=}")
+                print(f"\t{x.imag.max()=}")
+                print(f"\t{x.imag.min()=}")
+
+        if torch.isnan(x).any().item():
+            dbg_c_val(self.codebook.z_j, "z_j")
+            dbg_c_val(self.codebook.vec_d_j, "vec_d_j")
+            dbg_c_val(self.codebook.T_hat_j, "T_hat_j")
+            dbg_c_val(self.codebook.alpha_j, "alpha_j")
+            dbg_c_val(self.codebook.sigma_par, "sigma_par")
+            dbg_c_val(self.codebook.sigma_perp, "sigma_perp")
+            exit()
 
         # dbg_c_val(self.codebook.z_j, "z_j")
 
