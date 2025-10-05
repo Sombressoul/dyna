@@ -5,6 +5,10 @@
 # > python -m dyna.lib.cpsf.benchmark.benchmark_CPSF_T_New_vs_T_PD_window --N 2 --M 16 --S 16 --W 11 --batch 16 --dtype_z c64 --dtype_T c64 --device cuda --iters 100 --warmup 5 --etol_abs 1e-5 --etol_rel 1e-5 --per_iter
 # > python -m dyna.lib.cpsf.benchmark.benchmark_CPSF_T_New_vs_T_PD_window --N 3 --M 16 --S 16 --W 7 --batch 1 --dtype_z c64 --dtype_T c64 --device cuda --iters 100 --warmup 5 --etol_abs 1e-5 --etol_rel 1e-5 --per_iter
 # > python -m dyna.lib.cpsf.benchmark.benchmark_CPSF_T_New_vs_T_PD_window --N 4 --M 16 --S 16 --W 3 --batch 2 --dtype_z c64 --dtype_T c64 --device cuda --iters 100 --warmup 5 --etol_abs 1e-5 --etol_rel 1e-5 --per_iter
+#
+# Examples for q_order and error_budget checks:
+# > python -m dyna.lib.cpsf.benchmark.benchmark_CPSF_T_New_vs_T_PD_window --N 2 --M 16 --S 16 --W 11 --batch 16 --dtype_z c64 --dtype_T c64 --device cuda --iters 100 --warmup 5 --etol_abs 1e-5 --etol_rel 1e-5 --per_iter --error_budget 1.0e-7 --q_order 12
+# > python -m dyna.lib.cpsf.benchmark.benchmark_CPSF_T_New_vs_T_PD_window --N 2 --M 16 --S 16 --W 11 --batch 16 --dtype_z c64 --dtype_T c64 --device cuda --iters 100 --warmup 5 --etol_abs 1e-5 --etol_rel 1e-5 --per_iter --error_budget 1.0e-3 --q_order 5
 
 import argparse, math
 import torch
@@ -113,6 +117,14 @@ def main():
         "--etol_rel", type=float, default=1e-6, help="relative error tolerance (max)"
     )
 
+    # algoalgorithm params
+    ap.add_argument(
+        "--error_budget", type=float, default=1e-5, help="error budget"
+    )
+    ap.add_argument(
+        "--q_order", type=int, default=7, help="GH Q order"
+    )
+
     args = ap.parse_args()
 
     if args.sigma_min <= 0.0 or args.sigma_max <= 0.0:
@@ -212,6 +224,8 @@ def main():
             alpha_j=alpha_j,
             sigma_par=sigma_par,
             sigma_perp=sigma_perp,
+            error_budget=args.error_budget,
+            q_order=args.q_order,
         )
         _ = T_PD_window(
             z=z,
@@ -293,6 +307,8 @@ def main():
             alpha_j=alpha_j,
             sigma_par=sigma_par,
             sigma_perp=sigma_perp,
+            error_budget=args.error_budget,
+            q_order=args.q_order,
         )  # [B,S] complex
 
         out_cls = T_PD_window(
