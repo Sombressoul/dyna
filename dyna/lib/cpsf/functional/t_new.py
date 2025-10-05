@@ -28,42 +28,15 @@ def T_New(
             return 5
 
     def _gh_nodes_weights(n: int, device, dtype):
-        if n == 5:
-            nodes = torch.tensor(
-                [-2.0201828704560856, -0.9585724646138185, 0.0, 0.9585724646138185, 2.0201828704560856],
-                dtype=dtype, device=device
-            )
-            weights = torch.tensor(
-                [0.01995324205904591, 0.39361932315224116, 0.9453087204829419, 0.39361932315224116, 0.01995324205904591],
-                dtype=dtype, device=device
-            )
-        elif n == 7:
-            nodes = torch.tensor(
-                [-2.651961356835233, -1.673551628767471, -0.816287882858965, 0.0,
-                 0.816287882858965, 1.673551628767471, 2.651961356835233],
-                dtype=dtype, device=device
-            )
-            weights = torch.tensor(
-                [0.000971781245099519, 0.054515582819127, 0.425607252610127, 0.810264617556807,
-                 0.425607252610127, 0.054515582819127, 0.000971781245099519],
-                dtype=dtype, device=device
-            )
-        elif n == 9:
-            nodes = torch.tensor(
-                [-2.9592107790638380, -2.0232301911005157, -1.2247448713915890,
-                 -0.5240335474869576, 0.0,
-                  0.5240335474869576,  1.2247448713915890,  2.0232301911005157,  2.9592107790638380],
-                dtype=dtype, device=device
-            )
-            weights = torch.tensor(
-                [0.000199604072211367, 0.017077983007413, 0.207802325814892,
-                 0.661147012558241,   0.981560634246719,
-                 0.661147012558241,   0.207802325814892, 0.017077983007413, 0.000199604072211367],
-                dtype=dtype, device=device
-            )
-        else:
-            raise ValueError("Hermite order must be one of {5,7,9}.")
-        return nodes, weights
+        k = torch.arange(1, n, device=device, dtype=dtype)
+        off = torch.sqrt(k * 0.5)
+        J = torch.zeros((n, n), device=device, dtype=dtype)
+        J = J + torch.diag(off, diagonal=1) + torch.diag(off, diagonal=-1)
+        evals, evecs = torch.linalg.eigh(J)
+        w0 = evecs[0, :] ** 2
+        PI = torch.tensor(math.pi, dtype=dtype, device=device)
+        weights = torch.sqrt(PI) * w0
+        return evals, weights
 
     def _theta1d_phase(a: torch.Tensor, lam: torch.Tensor, K: int, PI: torch.Tensor) -> torch.Tensor:
         L, QQ, N = a.shape
@@ -72,34 +45,37 @@ def T_New(
         n = torch.arange(-K, K + 1, dtype=dr, device=device).view(1, 1, 1, -1)
         a_b = a.unsqueeze(-1)
         lam_b = lam.view(-1, 1, 1, 1)
-        phase = torch.exp(
-            (2.0 * PI).to(dr)
-            * 1j
-            * (n * a_b).to(torch.complex64 if dr == torch.float32 else torch.complex128)
-        )
+        phase = torch.exp((2.0 * PI).to(dr) * 1j * (n * a_b).to(torch.complex64 if dr == torch.float32 else torch.complex128))
         expo = torch.exp(-PI.to(dr) * (n ** 2) / lam_b)
         return (expo.to(phase.dtype) * phase).sum(dim=-1)
 
-    def _theta1d_shifted(a: torch.Tensor, beta: torch.Tensor, lam: torch.Tensor, K: int, PI: torch.Tensor) -> torch.Tensor:
+    def _theta1d_shifted_recent(a: torch.Tensor, beta: torch.Tensor, lam: torch.Tensor, K: int, PI: torch.Tensor) -> torch.Tensor:
         L, QQ, N = a.shape
         device = a.device
         dr = a.dtype
-        n = torch.arange(-K, K + 1, dtype=dr, device=device).view(1, 1, 1, -1)
-        a_b = a.unsqueeze(-1)
-        beta_b = beta.unsqueeze(-1)
+        n0 = torch.round(beta)
+        delta = beta - n0
+        m = torch.arange(-K, K + 1, dtype=dr, device=device).view(1, 1, 1, -1)
         lam_b = lam.view(-1, 1, 1, 1)
-        phase = torch.exp(
-            (2.0 * PI).to(dr)
-            * 1j
-            * (n * a_b).to(torch.complex64 if dr == torch.float32 else torch.complex128)
-        )
-        expo = torch.exp(-PI.to(dr) * ((n - beta_b) ** 2) / lam_b)
-        return (expo.to(phase.dtype) * phase).sum(dim=-1)
+        a_b = a.unsqueeze(-1)
+        delta_b = delta.unsqueeze(-1)
+        phase_n0 = torch.exp((2.0 * PI).to(dr) * 1j * (n0 * a).to(torch.complex64 if dr == torch.float32 else torch.complex128))
+        phase_m = torch.exp((2.0 * PI).to(dr) * 1j * (m * a_b).to(torch.complex64 if dr == torch.float32 else torch.complex128))
+        expo = torch.exp(-PI.to(dr) * ((m - delta_b) ** 2) / lam_b)
+        inner = (expo.to(phase_m.dtype) * phase_m).sum(dim=-1)
+        return phase_n0 * inner
 
-    def _choose_K_for_theta(lam_max: float, eps_theta: float, dims: int, q2: int) -> int:
+    def _choose_K_unshifted(lam_max: float, eps_theta: float, dims: int, q2: int) -> int:
         per = max(eps_theta / max(1, dims * q2), 1e-16)
         val = math.sqrt(max(lam_max, 1.0e-12) * math.log(1.0 / per) / math.pi)
         K = int(math.ceil(val + 0.5))
+        return max(K, 1)
+
+    def _choose_K_shifted(lam_max: float, eps_theta: float, dims: int, q2: int, delta_max: float) -> int:
+        per_star = max(eps_theta / max(1, dims * q2), 1.0e-16)
+        val = math.sqrt(max(lam_max, 1.0e-12) * math.log(1.0 / per_star) / math.pi)
+        Kf = delta_max - 1.0 + val + 0.5
+        K = int(math.ceil(Kf))
         return max(K, 1)
 
     device = z.device
@@ -138,7 +114,7 @@ def T_New(
 
     lam_base = 1.0 / sigma_perp
     lam_for_K = float(lam_base.max().item())
-    Kterms = _choose_K_for_theta(lam_for_K, eps_theta, dims=2 * N, q2=QQ)
+    K_pos = _choose_K_unshifted(lam_for_K, eps_theta, dims=2 * N, q2=QQ)
 
     def flat3(x): return x.reshape(B * M, x.shape[-1])
     def flat2(x): return x.reshape(B * M)
@@ -165,54 +141,50 @@ def T_New(
 
     if mask_pos.any():
         idx = mask_pos
-
         lam_sel = lam_base_f[idx]
         mu_sel = mu[idx].clamp_min(0.0)
         dz_re_sel = dz_re_f[idx, :]
         dz_im_sel = dz_im_f[idx, :]
         bconj_sel = b_conj_f[idx, :]
-
         s = torch.sqrt(PI * mu_sel)
         xi = s.view(-1, 1, 1).to(cdt) * (Xr_b + 1j * Xi_b).to(cdt)
         gamma = xi * bconj_sel.to(cdt).unsqueeze(1)
-
         aR_eff = dz_re_sel.unsqueeze(1).expand(-1, QQ, -1) + (gamma.real / PI)
         aI_eff = dz_im_sel.unsqueeze(1).expand(-1, QQ, -1) - (gamma.imag / PI)
-
-        theta_R = _theta1d_phase(aR_eff, lam_sel, Kterms, PI)
-        theta_I = _theta1d_phase(aI_eff, lam_sel, Kterms, PI)
-
+        theta_R = _theta1d_phase(aR_eff, lam_sel, K_pos, PI)
+        theta_I = _theta1d_phase(aI_eff, lam_sel, K_pos, PI)
         mag_log = torch.log(theta_R.abs().clamp_min(tiny)).sum(dim=-1) + torch.log(theta_I.abs().clamp_min(tiny)).sum(dim=-1)
         ang_sum = torch.angle(theta_R).sum(dim=-1) + torch.angle(theta_I).sum(dim=-1)
         f_l = torch.exp(mag_log).to(cdt) * torch.exp(1j * ang_sum)
-
         acc = (f_l * Wr_b.to(cdt)).sum(dim=-1) * (1.0 / math.pi)
         Theta_pos_flat[idx] = pref_global[idx] * acc
 
     if mask_neg.any():
         idx = mask_neg
-
         lam_sel = lam_base_f[idx]
         mu_abs = (sigma_perp_f[idx] - sigma_par_f[idx]).clamp_min(0.0)
         dz_re_sel = dz_re_f[idx, :]
         dz_im_sel = dz_im_f[idx, :]
         bconj_sel = b_conj_f[idx, :]
-
         s = torch.sqrt(PI * mu_abs)
         xi = s.view(-1, 1, 1).to(cdt) * (Xr_b + 1j * Xi_b).to(cdt)
         gamma = xi * bconj_sel.to(cdt).unsqueeze(1)
-
         cR = (gamma.real / PI)
         cI = (-gamma.imag / PI)
-
         beta_R = lam_sel.view(-1, 1, 1) * cR
         beta_I = lam_sel.view(-1, 1, 1) * cI
-
         aR = dz_re_sel.unsqueeze(1).expand(-1, QQ, -1)
         aI = dz_im_sel.unsqueeze(1).expand(-1, QQ, -1)
 
-        theta_R = _theta1d_shifted(aR, beta_R, lam_sel, Kterms, PI)
-        theta_I = _theta1d_shifted(aI, beta_I, lam_sel, Kterms, PI)
+        delta_R = beta_R - torch.round(beta_R)
+        delta_I = beta_I - torch.round(beta_I)
+        delta_abs_max_R = float(delta_R.abs().max().item()) if delta_R.numel() > 0 else 0.0
+        delta_abs_max_I = float(delta_I.abs().max().item()) if delta_I.numel() > 0 else 0.0
+        delta_abs_max = max(delta_abs_max_R, delta_abs_max_I)
+        K_neg = _choose_K_shifted(float(lam_sel.max().item()), eps_theta, dims=2 * N, q2=QQ, delta_max=delta_abs_max)
+
+        theta_R = _theta1d_shifted_recent(aR, beta_R, lam_sel, K_neg, PI)
+        theta_I = _theta1d_shifted_recent(aI, beta_I, lam_sel, K_neg, PI)
 
         gain_log = (PI * lam_sel.view(-1, 1, 1)) * (cR.pow(2) + cI.pow(2))
         gain_log = gain_log.sum(dim=-1)
@@ -221,7 +193,6 @@ def T_New(
         mag_log = mag_log + gain_log
         ang_sum = torch.angle(theta_R).sum(dim=-1) + torch.angle(theta_I).sum(dim=-1)
         f_l = torch.exp(mag_log).to(cdt) * torch.exp(1j * ang_sum)
-
         acc = (f_l * Wr_b.to(cdt)).sum(dim=-1) * (1.0 / math.pi)
         Theta_pos_flat[idx] = pref_global[idx] * acc
 
