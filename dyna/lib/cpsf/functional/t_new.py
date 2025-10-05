@@ -29,7 +29,7 @@ def T_New(
 
     def _gh_nodes_weights(n: int, device, dtype):
         k = torch.arange(1, n, device=device, dtype=dtype)
-        off = torch.sqrt(k * 0.5)
+        off = torch.sqrt(k * torch.tensor(0.5, dtype=dtype, device=device))
         J = torch.zeros((n, n), device=device, dtype=dtype)
         J = J + torch.diag(off, diagonal=1) + torch.diag(off, diagonal=-1)
         evals, evecs = torch.linalg.eigh(J)
@@ -53,7 +53,7 @@ def T_New(
         L, QQ, N = a.shape
         device = a.device
         dr = a.dtype
-        n0 = torch.round(beta)
+        n0 = torch.floor(beta + 0.5)
         delta = beta - n0
         m = torch.arange(-K, K + 1, dtype=dr, device=device).view(1, 1, 1, -1)
         lam_b = lam.view(-1, 1, 1, 1)
@@ -76,7 +76,7 @@ def T_New(
         val = math.sqrt(max(lam_max, 1.0e-12) * math.log(1.0 / per_star) / math.pi)
         Kf = delta_max - 1.0 + val + 0.5
         K = int(math.ceil(Kf))
-        return max(K, 1)
+        return max(K + 1, 1)
 
     device = z.device
     rdt = z.real.dtype
@@ -176,8 +176,10 @@ def T_New(
         aR = dz_re_sel.unsqueeze(1).expand(-1, QQ, -1)
         aI = dz_im_sel.unsqueeze(1).expand(-1, QQ, -1)
 
-        delta_R = beta_R - torch.round(beta_R)
-        delta_I = beta_I - torch.round(beta_I)
+        n0_R = torch.floor(beta_R + 0.5)
+        n0_I = torch.floor(beta_I + 0.5)
+        delta_R = beta_R - n0_R
+        delta_I = beta_I - n0_I
         delta_abs_max_R = float(delta_R.abs().max().item()) if delta_R.numel() > 0 else 0.0
         delta_abs_max_I = float(delta_I.abs().max().item()) if delta_I.numel() > 0 else 0.0
         delta_abs_max = max(delta_abs_max_R, delta_abs_max_I)
