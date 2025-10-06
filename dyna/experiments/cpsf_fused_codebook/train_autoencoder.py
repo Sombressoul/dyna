@@ -17,8 +17,12 @@ from torchvision.models import (
     VGG19_Weights,
 )
 
-from dyna.experiments.cpsf_fused_codebook.cpsf_spectral_autoencoder import CPSFSpectralAutoencoder
-from dyna.experiments.cpsf_fused_codebook.cpsf_memcell_autoencoder import CPSFMemcellAutoencoder
+from dyna.experiments.cpsf_fused_codebook.cpsf_spectral_autoencoder import (
+    CPSFSpectralAutoencoder,
+)
+from dyna.experiments.cpsf_fused_codebook.cpsf_memcell_autoencoder import (
+    CPSFMemcellAutoencoder,
+)
 from dyna.experiments.cpsf_fused_codebook.local_image_dataset import LocalImageDataset
 
 
@@ -216,6 +220,35 @@ def train(
             loss = loss_raw / accum
 
             loss.backward()
+
+            # print("\n\n========================\n\n")
+
+            # def dbg_c_val(x: torch.Tensor, name: str):
+            #     print(f"DEBUG '{name}':")
+            #     print(f"\t{x.real.std()=}")
+            #     print(f"\t{x.real.mean()=}")
+            #     print(f"\t{x.real.min()=}")
+            #     print(f"\t{x.real.max()=}")
+            #     if x.grad is not None:
+            #         if x.grad.data is not None:
+            #             print(f"\tDEBUG '{name}' - GRAD:")
+            #             print(f"\t\t{x.grad.data.std()=}")
+            #             print(f"\t\t{x.grad.data.mean()=}")
+            #             print(f"\t\t{x.grad.data.min()=}")
+            #             print(f"\t\t{x.grad.data.max()=}")
+            #     else:
+            #         print(f"\tDEBUG '{name}' - !NO_GRAD!")
+
+            # dbg_c_val(model.cell_0.alpha, "alpha")
+            # dbg_c_val(model.cell_0.store.z_j, "z_j")
+            # dbg_c_val(model.cell_0.store.vec_d_j, "vec_d_j")
+            # dbg_c_val(model.cell_0.store.T_hat_j, "T_hat_j")
+            # dbg_c_val(model.cell_0.store.alpha_j, "alpha_j")
+            # dbg_c_val(model.cell_0.store.sigma_par, "sigma_par")
+            # dbg_c_val(model.cell_0.store.sigma_perp, "sigma_perp")
+
+            # exit()
+
             micro_count += 1
             loss_accum += float(loss_raw.detach().item())
 

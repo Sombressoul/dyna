@@ -6,7 +6,7 @@ import torch.nn.functional as F
 
 from dyna.lib.cpsf.memcell_fused_real import CPSFMemcellFusedReal
 
-# torch.autograd.set_detect_anomaly(True)
+torch.autograd.set_detect_anomaly(True)
 
 
 class ConvBlock(nn.Module):
@@ -83,14 +83,14 @@ class CPSFMemcellAutoencoder(nn.Module):
         M: int = 32,
         S: int = 128,
         bottleneck_channels: int = 4,
-        alpha: float = 1.0e-6,
+        initial_alpha: float = 1.0e-9,
     ) -> None:
         super().__init__()
         self.N = N
         self.M = M
         self.S = S
-        self.alpha = alpha
         self.bottleneck_channels = bottleneck_channels
+        self.initial_alpha = initial_alpha
 
         act_enc = lambda x: F.silu(x)
         act_bn = lambda x: F.silu(x)
@@ -109,9 +109,17 @@ class CPSFMemcellAutoencoder(nn.Module):
         self.e4_n = ConvBlock(self.S, self.N, downsample=True, act=act_enc)
         self.e4_s = ConvBlock(self.S, self.S, downsample=True, act=act_enc)
 
+        # Encoder norms
+        self.e0_norm = nn.BatchNorm2d(self.S)
+        self.e1_norm = nn.BatchNorm2d(self.S)
+        self.e2_norm = nn.BatchNorm2d(self.S)
+        self.e3_norm = nn.BatchNorm2d(self.S)
+        self.e4_norm = nn.BatchNorm2d(self.S)
+
         # Bottleneck
         self.bn_n = Bottleneck(self.S, self.bottleneck_channels, act=act_bn)
-        self.bn_s = Bottleneck(self.S, self.S, act=act_bn)
+        self.bn_s = Bottleneck(self.S, self.N, act=act_bn)
+        self.bn_norm = nn.BatchNorm2d(self.N)
 
         # Decoder starting from S channels
         self.d4 = DeconvBlock(self.S, self.N, act=act_dec)
@@ -120,36 +128,49 @@ class CPSFMemcellAutoencoder(nn.Module):
         self.d1 = DeconvBlock(self.S, self.N, act=act_dec)
         self.d0 = DeconvBlock(self.S, 3, act=act_dec)
 
+        # Decoder norms
+        self.d4_norm = nn.BatchNorm2d(self.S)
+        self.d3_norm = nn.BatchNorm2d(self.S)
+        self.d2_norm = nn.BatchNorm2d(self.S)
+        self.d1_norm = nn.BatchNorm2d(self.S)
+        self.d0_norm = nn.BatchNorm2d(self.S)
+
         # Memcells
         self.cell_0 = CPSFMemcellFusedReal(
             N=self.N,
             S=self.S,
             M=self.M,
+            initial_alpha=self.initial_alpha,
         )
         self.cell_1 = CPSFMemcellFusedReal(
             N=self.N,
             S=self.S,
             M=self.M,
+            initial_alpha=self.initial_alpha,
         )
         self.cell_2 = CPSFMemcellFusedReal(
             N=self.N,
             S=self.S,
             M=self.M,
+            initial_alpha=self.initial_alpha,
         )
-        # self.cell_3 = CPSFMemcellFusedReal(
-        #     N=self.N,
-        #     S=self.S,
-        #     M=self.M,
-        # )
-        # self.cell_4 = CPSFMemcellFusedReal(
-        #     N=self.N,
-        #     S=self.S,
-        #     M=self.M,
-        # )
-        self.cell_bottleneck = CPSFMemcellFusedReal(
-            N=self.bottleneck_channels,
+        self.cell_3 = CPSFMemcellFusedReal(
+            N=self.N,
             S=self.S,
             M=self.M,
+            initial_alpha=self.initial_alpha,
+        )
+        self.cell_4 = CPSFMemcellFusedReal(
+            N=self.N,
+            S=self.S,
+            M=self.M,
+            initial_alpha=self.initial_alpha,
+        )
+        self.cell_bottleneck = CPSFMemcellFusedReal(
+            N=self.bottleneck_channels,
+            S=self.N,
+            M=self.M,
+            initial_alpha=self.initial_alpha,
         )
 
         # DEBUG LAYER
@@ -168,61 +189,135 @@ class CPSFMemcellAutoencoder(nn.Module):
         # Encoder cell 0
         e0_n = self.e0_n(x)
         e0_s = self.e0_s(x)
-        e0_m = self.cell_0.read_update(
+        x = self.cell_0.recall(
             z=e0_n.permute([0, 2, 3, 1]).flatten(0, 2),
             T_star=e0_s.permute([0, 2, 3, 1]).flatten(0, 2),
-            alpha=self.alpha,
         )
         B, C, H, W = e0_s.shape
-        e0_m = e0_m.reshape([B, H, W, C]).permute([0, 3, 1, 2])
+        x = x.reshape([B, H, W, C]).permute([0, 3, 1, 2])
+        x = self.e0_norm(x)
+
+        x = e0_n
 
         # # Encoder cell 1
-        # e1_n = self.e1_n(e0_m)
-        # e1_s = self.e1_s(e0_m)
-        # e1_m = self.cell_1.read_update(
+        # e1_n = self.e1_n(x)
+        # e1_s = self.e1_s(x)
+        # x = self.cell_1.recall(
         #     z=e1_n.permute([0, 2, 3, 1]).flatten(0, 2),
         #     T_star=e1_s.permute([0, 2, 3, 1]).flatten(0, 2),
-        #     alpha=self.alpha,
         # )
         # B, C, H, W = e1_s.shape
-        # e1_m = e1_m.reshape([B, H, W, C]).permute([0, 3, 1, 2])
+        # x = x.reshape([B, H, W, C]).permute([0, 3, 1, 2])
+        # x = self.e1_norm(x)
 
         # # Encoder cell 2
-        # e2_n = self.e1_n(e1_m)
-        # e2_s = self.e1_s(e1_m)
-        # e2_m = self.cell_2.read_update(
+        # e2_n = self.e2_n(x)
+        # e2_s = self.e2_s(x)
+        # x = self.cell_2.recall(
         #     z=e2_n.permute([0, 2, 3, 1]).flatten(0, 2),
         #     T_star=e2_s.permute([0, 2, 3, 1]).flatten(0, 2),
-        #     alpha=self.alpha,
         # )
         # B, C, H, W = e2_s.shape
-        # e2_m = e2_m.reshape([B, H, W, C]).permute([0, 3, 1, 2])
+        # x = x.reshape([B, H, W, C]).permute([0, 3, 1, 2])
+        # x = self.e2_norm(x)
+
+        # # Encoder cell 3
+        # e3_n = self.e3_n(x)
+        # e3_s = self.e3_s(x)
+        # x = self.cell_3.recall(
+        #     z=e3_n.permute([0, 2, 3, 1]).flatten(0, 2),
+        #     T_star=e3_s.permute([0, 2, 3, 1]).flatten(0, 2),
+        # )
+        # B, C, H, W = e3_s.shape
+        # x = x.reshape([B, H, W, C]).permute([0, 3, 1, 2])
+        # x = self.e3_norm(x)
+
+        # # Encoder cell 4
+        # e4_n = self.e4_n(x)
+        # e4_s = self.e4_s(x)
+        # x = self.cell_4.recall(
+        #     z=e4_n.permute([0, 2, 3, 1]).flatten(0, 2),
+        #     T_star=e4_s.permute([0, 2, 3, 1]).flatten(0, 2),
+        # )
+        # B, C, H, W = e4_s.shape
+        # x = x.reshape([B, H, W, C]).permute([0, 3, 1, 2])
+        # x = self.e4_norm(x)
 
         # # Bottleneck
-        # bn_n = self.bn_n(e2_m)
-        # bn_s = self.bn_s(e2_m)
+        # bn_n = self.bn_n(x)
+        # bn_s = self.bn_s(x)
         # # Bottleneck write
-        # self.cell_bottleneck.read_update(
+        # self.cell_bottleneck.recall(
         #     z=bn_n.permute([0, 2, 3, 1]).flatten(0, 2),
         #     T_star=bn_s.permute([0, 2, 3, 1]).flatten(0, 2),
-        #     alpha=self.alpha,
         # )
         # # Bottleneck read
-        # bn_m = self.cell_bottleneck.read(
+        # x = self.cell_bottleneck.recall(
         #     z=bn_n.permute([0, 2, 3, 1]).flatten(0, 2),
         # )
         # B, C, H, W = bn_s.shape
-        # bn_m = bn_m.reshape([B, H, W, C]).permute([0, 3, 1, 2])
+        # x = x.reshape([B, H, W, C]).permute([0, 3, 1, 2])
+        # x = self.bn_norm(x)
 
-        # SHORTCUT
-        d1_n = e0_n
+        # # Decoder cell 4
+        # d4_m = self.cell_4.recall(
+        #     z=x.permute([0, 2, 3, 1]).flatten(0, 2),
+        # )
+        # B, C, H, W = x.shape
+        # d4_m = d4_m.reshape([B, H, W, -1]).permute([0, 3, 1, 2])
+        # d4_m = self.d4_norm(d4_m)
+        # x = self.d4(d4_m)
+
+        # # Decoder cell 3
+        # d3_m = self.cell_3.recall(
+        #     z=x.permute([0, 2, 3, 1]).flatten(0, 2),
+        # )
+        # B, C, H, W = x.shape
+        # d3_m = d3_m.reshape([B, H, W, -1]).permute([0, 3, 1, 2])
+        # d3_m = self.d3_norm(d3_m)
+        # x = self.d3(d3_m)
+
+        # # Decoder cell 2
+        # d2_m = self.cell_2.recall(
+        #     z=x.permute([0, 2, 3, 1]).flatten(0, 2),
+        # )
+        # B, C, H, W = x.shape
+        # d2_m = d2_m.reshape([B, H, W, -1]).permute([0, 3, 1, 2])
+        # d2_m = self.d2_norm(d2_m)
+        # x = self.d2(d2_m)
+
+        # # Decoder cell 1
+        # d1_m = self.cell_1.recall(
+        #     z=x.permute([0, 2, 3, 1]).flatten(0, 2),
+        # )
+        # B, C, H, W = x.shape
+        # d1_m = d1_m.reshape([B, H, W, -1]).permute([0, 3, 1, 2])
+        # d1_m = self.d1_norm(d1_m)
+        # x = self.d1(d1_m)
 
         # Decoder cell 0
-        d0_m = self.cell_0.read(
-            z=d1_n.permute([0, 2, 3, 1]).flatten(0, 2),
+        d0_m = self.cell_0.recall(
+            z=x.permute([0, 2, 3, 1]).flatten(0, 2),
         )
-        B, C, H, W = d1_n.shape
+        B, C, H, W = x.shape
         d0_m = d0_m.reshape([B, H, W, -1]).permute([0, 3, 1, 2])
-        d0_n = self.d0(d0_m)
+        d0_m = self.d0_norm(d0_m)
+        x = self.d0(d0_m)
 
-        return d0_n
+        # print("\n\n========================\n\n")
+        # def dbg_c_val(x: torch.Tensor, name: str):
+        #     print(f"DEBUG '{name}':")
+        #     print(f"\t{x.real.std()=}")
+        #     print(f"\t{x.real.mean()=}")
+        #     print(f"\t{x.real.max()=}")
+        #     print(f"\t{x.real.min()=}")
+
+        # dbg_c_val(self.cell_0.alpha, "alpha")
+        # dbg_c_val(self.cell_0.store.z_j, "z_j")
+        # dbg_c_val(self.cell_0.store.vec_d_j, "vec_d_j")
+        # dbg_c_val(self.cell_0.store.T_hat_j, "T_hat_j")
+        # dbg_c_val(self.cell_0.store.alpha_j, "alpha_j")
+        # dbg_c_val(self.cell_0.store.sigma_par, "sigma_par")
+        # dbg_c_val(self.cell_0.store.sigma_perp, "sigma_perp")
+
+        return x
