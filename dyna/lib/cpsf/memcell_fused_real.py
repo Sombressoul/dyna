@@ -200,7 +200,7 @@ class CPSFMemcellFusedReal(nn.Module):
         delta_T_hat_j_cap: float = 1.0,
         max_q: float = 25.0,
         eps: float = 1.0e-6,
-        grad_mode: CPSFMemcellFusedRealGradMode = CPSFMemcellFusedRealGradMode.FULL,
+        grad_mode: CPSFMemcellFusedRealGradMode = CPSFMemcellFusedRealGradMode.MIXED,
         dtype: torch.dtype = torch.float32,
     ):
         super().__init__()
