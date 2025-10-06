@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Tuple, List, Optional, Union
 
 
-def T_Zero_Fused_Real_Backproject(
+def T_Zero_Fused_Real(
     *,
     z: torch.Tensor,  # [B, N] (real)
     z_j: torch.Tensor,  # [M, N] (real)
@@ -15,11 +15,9 @@ def T_Zero_Fused_Real_Backproject(
     alpha_j: torch.Tensor,  # [M] (real)
     sigma_par: torch.Tensor,  # [M] (real, >0)
     sigma_perp: torch.Tensor,  # [M] (real, >0)
-    T_star: Optional[torch.Tensor] = None,  # [B, S] (real)
-    alpha: Optional[torch.Tensor] = None,  # scalar LR
     eps: float = 1e-6,
     max_q: float = 25.0,
-) -> Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
+) -> Tuple[torch.Tensor, torch.Tensor]:
     device, dtype = z.device, z.dtype
 
     tiny = torch.finfo(sigma_par.dtype).eps
@@ -45,14 +43,7 @@ def T_Zero_Fused_Real_Backproject(
     gain = alpha_j.unsqueeze(0) * A_pos  # [B,M]
     T = (gain.unsqueeze(-1) * T_hat_j.unsqueeze(0)).sum(dim=1)  # [B,S]
 
-    if T_star is None and alpha is None:
-        return T
-
-    E = T - T_star  # [B,S]
-    grad_T_hat = gain.transpose(0, 1) @ E  # [M,S]
-    T_hat_j_delta = -alpha * grad_T_hat
-
-    return T, T_hat_j_delta
+    return T, gain
 
 
 @dataclass
@@ -75,6 +66,7 @@ class CPSFContributionStoreFusedReal(nn.Module):
         init_range_z: Tuple[float, float] = (-1.0e-3, +1.0e-3),
         init_range_vec_d: Tuple[float, float] = (-1.0e-3, +1.0e-3),
         init_range_T: Tuple[float, float] = (-1.0e-3, +1.0e-3),
+        init_range_alpha_j: Tuple[float, float] = (0.9, 1.1),
         init_range_sigma_par: Tuple[float, float] = (0.9, 1.5),
         init_range_sigma_perp: Tuple[float, float] = (0.1, 0.8),
         dtype: torch.dtype = torch.float32,
@@ -119,7 +111,11 @@ class CPSFContributionStoreFusedReal(nn.Module):
             requires_grad=False,
         )
         self.alpha_j = torch.nn.Parameter(
-            data=torch.ones([self.M], dtype=self.dtype),
+            data=self._init_param(
+                shape=[self.M],
+                min=init_range_alpha_j[0],
+                max=init_range_alpha_j[1],
+            ),
             requires_grad=True,
         )
         self.sigma_par = torch.nn.Parameter(
@@ -169,7 +165,8 @@ class CPSFContributionStoreFusedReal(nn.Module):
         *,
         T_hat_j_delta: torch.Tensor,
     ) -> None:
-        self.T_hat_j_delta.add_(T_hat_j_delta)
+        dT = T_hat_j_delta.detach()
+        self.T_hat_j_delta.add_(dT)
 
     @torch.no_grad()
     def consolidate(
@@ -189,8 +186,11 @@ class CPSFMemcellFusedReal(nn.Module):
         init_range_z: Tuple[float, float] = (-1.0e-3, +1.0e-3),
         init_range_vec_d: Tuple[float, float] = (-1.0e-3, +1.0e-3),
         init_range_T: Tuple[float, float] = (-1.0e-3, +1.0e-3),
+        init_range_alpha_j: Tuple[float, float] = (0.9, 1.1),
         init_range_sigma_par: Tuple[float, float] = (0.9, 1.5),
         init_range_sigma_perp: Tuple[float, float] = (0.1, 0.8),
+        initial_alpha: float = 1.0e-9,
+        delta_T_hat_j_cap: float = 1.0,
         max_q: float = 25.0,
         eps: float = 1.0e-6,
         dtype: torch.dtype = torch.float32,
@@ -200,6 +200,8 @@ class CPSFMemcellFusedReal(nn.Module):
         self.N = int(N)
         self.M = int(M)
         self.S = int(S)
+        self.initial_alpha = float(initial_alpha)
+        self.delta_T_hat_j_cap = float(delta_T_hat_j_cap)
         self.max_q = float(max_q)
         self.eps = float(eps)
         self.dtype = dtype
@@ -210,27 +212,35 @@ class CPSFMemcellFusedReal(nn.Module):
             init_range_z=init_range_z,
             init_range_vec_d=init_range_vec_d,
             init_range_T=init_range_T,
+            init_range_alpha_j=init_range_alpha_j,
             init_range_sigma_par=init_range_sigma_par,
             init_range_sigma_perp=init_range_sigma_perp,
             dtype=self.dtype,
+        )
+
+        self.alpha = torch.nn.Parameter(
+            data=torch.logit(
+                torch.as_tensor(float(initial_alpha), dtype=dtype),
+                eps=torch.finfo(self.dtype).eps,
+            ),
+            requires_grad=True,
         )
 
     def forward(
         self,
         z: torch.Tensor,
     ) -> torch.Tensor:
-        return self.read(
-            z=z,
-        )
+        raise RuntimeError("The module is not intended to be called directly.")
 
-    def read(
+    def recall(
         self,
         *,
         z: torch.Tensor,
+        T_star: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
         data = self.store.read()
 
-        T = T_Zero_Fused_Real_Backproject(
+        T_base, gain = T_Zero_Fused_Real(
             z=z,
             z_j=data.z_j,
             vec_d_j=data.vec_d_j,
@@ -242,33 +252,32 @@ class CPSFMemcellFusedReal(nn.Module):
             eps=self.eps,
         )
 
-        return T
+        tiny = torch.finfo(z.dtype).tiny
+        alpha = torch.sigmoid(self.alpha)
 
-    def read_update(
-        self,
-        *,
-        z: torch.Tensor,
-        T_star: torch.Tensor,
-        alpha: torch.Tensor,
-    ) -> torch.Tensor:
-        data = self.store.read()
+        if T_star is None:
+            T_star = torch.zeros_like(T_base)
 
-        T, T_hat_j_delta = T_Zero_Fused_Real_Backproject(
-            z=z,
-            T_star=T_star,
-            alpha=alpha,
-            z_j=data.z_j,
-            vec_d_j=data.vec_d_j,
-            T_hat_j=data.T_hat_j,
-            alpha_j=data.alpha_j,
-            sigma_par=data.sigma_par,
-            sigma_perp=data.sigma_perp,
-            max_q=self.max_q,
-            eps=self.eps,
-        )
+        gain_det = gain.detach()
+        E_det = (T_base - T_star).detach()
 
-        self.store.update(
-            T_hat_j_delta=T_hat_j_delta,
-        )
+        grad_T_hat_j = gain_det.transpose(0, 1) @ E_det
+        T_hat_j_delta = -alpha * grad_T_hat_j
+
+        with torch.no_grad():
+            n = torch.linalg.norm(T_hat_j_delta, ord="fro")
+            s = torch.clamp(self.delta_T_hat_j_cap / (n + tiny), max=1.0)
+        T_hat_j_delta = T_hat_j_delta * s
+
+        T_hat_base = self.store.T_hat_j
+        old_delta = self.store.T_hat_j_delta.clone().detach()
+
+        T_from_local = gain.unsqueeze(-1) * (T_hat_base + T_hat_j_delta).unsqueeze(0)
+        T_from_local = T_from_local.sum(dim=1)
+        T_from_store = gain.unsqueeze(-1) * old_delta.unsqueeze(0)
+        T_from_store = T_from_store.sum(dim=1)
+        T = T_from_local + T_from_store
+
+        self.store.update(T_hat_j_delta=T_hat_j_delta)
 
         return T
