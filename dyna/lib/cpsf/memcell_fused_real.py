@@ -37,8 +37,7 @@ def T_Zero_Fused_Real(
     q_pos_a = w_perp.unsqueeze(0) * dz_norm_sq  # [B,M]
     q_pos_b = w_diff.unsqueeze(0) * (proj * proj)  # [B,M]
     q_pos = q_pos_a + q_pos_b  # [B,M]
-    q_cap = torch.tensor(max_q, dtype=dtype, device=device)
-    q_pos = torch.minimum(q_pos, q_cap)  # clamp max
+    q_pos = max_q - torch.nn.functional.softplus(max_q - q_pos)  # soft cap
     A_pos = torch.exp(-torch.pi * q_pos)  # [B,M]
 
     gain = alpha_j.unsqueeze(0) * A_pos  # [B,M]
