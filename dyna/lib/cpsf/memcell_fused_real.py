@@ -347,7 +347,8 @@ class CPSFMemcellFusedReal(nn.Module):
             with torch.no_grad():
                 n = torch.linalg.norm(T_hat_j_delta_new, ord="fro")
                 s = torch.clamp(self.delta_T_hat_j_cap / (n + tiny), max=1.0)
-        T_hat_j_delta_new = T_hat_j_delta_new * s
+                T_hat_j_delta_new = T_hat_j_delta_new * s
+        
         T_hat_j_delta_old = self.store.T_hat_j_delta.detach()
         T_hat_j_delta_eff = T_hat_j_delta_old + T_hat_j_delta_new
 
