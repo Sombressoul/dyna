@@ -252,11 +252,11 @@ class CPSFMemcellFusedReal(nn.Module):
             eps=self.eps,
         )
 
+        if T_star is None:
+            return T_base
+
         tiny = torch.finfo(z.dtype).tiny
         alpha = torch.sigmoid(self.alpha)
-
-        if T_star is None:
-            T_star = torch.zeros_like(T_base)
 
         gain_det = gain.detach()
         E_det = (T_base - T_star).detach()
