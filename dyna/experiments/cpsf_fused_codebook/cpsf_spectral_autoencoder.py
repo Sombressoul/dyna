@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from dyna.lib.cpsf.fused_codebook import CPSFFusedCodebook
+from dyna.lib.cpsf.codebook_fused import CPSFFusedCodebook
 from dyna.functional.backward_gradient_normalization import (
     backward_gradient_normalization,
 )
@@ -74,41 +74,6 @@ class Bottleneck(nn.Module):
         return self.act(self.conv2(self.act(self.conv1(x))))
 
 
-def complex_to_polar_feats(
-    c: torch.Tensor,
-    gamma: float = 0.5,
-    eps: float = 1e-8,
-) -> torch.Tensor:
-    mag = torch.clamp(c.abs(), min=eps).pow(gamma)
-    ang = torch.angle(c)
-    cos = torch.cos(ang)
-    sin = torch.sin(ang)
-    return torch.cat([mag, cos, sin], dim=-1)
-
-
-class ComplexToReal(nn.Module):
-    def __init__(
-        self,
-        S: int,
-        out_ch: int,
-        gamma: float = 0.5,
-    ):
-        super().__init__()
-        self.gamma = gamma
-        self.proj = nn.Conv2d(3 * S, out_ch, kernel_size=1)
-
-    def forward(
-        self,
-        c: torch.Tensor,
-        B: int,
-        H: int,
-        W: int,
-    ) -> torch.Tensor:
-        r = complex_to_polar_feats(c, gamma=self.gamma)
-        r = r.view(B, H, W, -1).permute(0, 3, 1, 2).contiguous()
-        return self.proj(r)
-
-
 # -----------------------------
 # Model
 # -----------------------------
@@ -116,8 +81,11 @@ class CPSFSpectralAutoencoder(nn.Module):
     def __init__(
         self,
         *,
-        N: int = 32,
-        M: int = 2048,
+        # N: int = 32,
+        # M: int = 4096,
+        # S: int = 2048,
+        N: int = 256,
+        M: int = 1024,
         S: int = 2048,
         bottleneck_ch: int = 4,
         quad_nodes: int = 6,
@@ -155,9 +123,6 @@ class CPSFSpectralAutoencoder(nn.Module):
             padding_mode="reflect",
         )
 
-        # Head: complex to polar
-        self.head_c2r = ComplexToReal(self.S, self.S, gamma=0.5)
-
         # CPSF codebook
         self.codebook = CPSFFusedCodebook(
             N=self.N,
@@ -169,14 +134,14 @@ class CPSFSpectralAutoencoder(nn.Module):
             eps_total=eps_total,
             autonorm_vec_d=True,
             autonorm_vec_d_j=True,
-            overlap_rate=0.05,
-            anisotropy=1.5,
-            init_S_scale=1.0e-3,
+            overlap_rate=0.5,
+            anisotropy=10.0,
+            init_S_scale=1.0e-5,
             phase_scale=1.0,
             c_dtype=c_dtype,
         )
         self.codebook_norm = nn.LayerNorm(
-            normalized_shape=[self.S, 8, 8],
+            normalized_shape=[self.S, 16, 16],
             elementwise_affine=True,
         )
         self.codebook_dropout = nn.Dropout(0.2)
@@ -203,7 +168,7 @@ class CPSFSpectralAutoencoder(nn.Module):
 
     @staticmethod
     def expected_shapes() -> Tuple[Tuple[int, ...], Tuple[int, ...]]:
-        return (1, 3, 256, 256), (1, 3, 256, 256)
+        return (1, 3, 512, 512), (1, 3, 512, 512)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # Encoder
@@ -244,11 +209,6 @@ class CPSFSpectralAutoencoder(nn.Module):
         x = backward_gradient_normalization(x)
 
 
-        # x = self.debug_linear(x)
-        # x = x.view(B, H, W, -1).permute(0, 3, 1, 2).contiguous()
-        # print(f"{x.shape=}")
-        # exit()
-
         def dbg_c_val(x: torch.Tensor, name: str):
             print(f"DEBUG '{name}':")
             print(f"\t{x.real.std()=}")
@@ -270,12 +230,6 @@ class CPSFSpectralAutoencoder(nn.Module):
             dbg_c_val(self.codebook.sigma_perp, "sigma_perp")
             exit()
 
-        # dbg_c_val(self.codebook.z_j, "z_j")
-
-        # exit()
-
-        # x = self.head_c2r(x, B, H, W)
-        # x = backward_gradient_normalization(x)
         x = self.codebook_norm(x)
         x = self.codebook_dropout(x)
 
@@ -303,7 +257,7 @@ class CPSFSpectralAutoencoder(nn.Module):
 if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = CPSFSpectralAutoencoder(N=16, S=256).to(device)
-    x = torch.randn(2, 3, 256, 256, device=device)
+    x = torch.randn(2, 3, 512, 512, device=device)
     y = model(x)
     print("input:", tuple(x.shape))
     print("output:", tuple(y.shape))
