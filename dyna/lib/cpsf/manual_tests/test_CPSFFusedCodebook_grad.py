@@ -3,7 +3,7 @@
 
 import argparse, torch
 
-from dyna.lib.cpsf.fused_codebook import CPSFFusedCodebook
+from dyna.lib.cpsf.codebook_fused import CPSFFusedCodebook
 
 
 def main():
