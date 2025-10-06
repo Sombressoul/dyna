@@ -3,7 +3,7 @@
 
 import argparse, torch
 
-from dyna.lib.cpsf.codebook_fused import CPSFFusedCodebook
+from dyna.lib.cpsf.codebook_fused import CPSFCodebookFused
 
 
 def main():
@@ -32,7 +32,7 @@ def main():
     print(f"Device={device.type}, dtype={dtype}, B={B}, N={N}, M={M}, S={S}")
     print(f"quad_nodes={quad_nodes}, eps_total={eps_total}")
 
-    codebook = CPSFFusedCodebook(
+    codebook = CPSFCodebookFused(
         N=N,
         M=M,
         S=S,

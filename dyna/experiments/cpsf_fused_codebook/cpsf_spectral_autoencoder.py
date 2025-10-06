@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from dyna.lib.cpsf.codebook_fused import CPSFFusedCodebook
+from dyna.lib.cpsf.codebook_fused import CPSFCodebookFused
 from dyna.functional.backward_gradient_normalization import (
     backward_gradient_normalization,
 )
@@ -124,7 +124,7 @@ class CPSFSpectralAutoencoder(nn.Module):
         )
 
         # CPSF codebook
-        self.codebook = CPSFFusedCodebook(
+        self.codebook = CPSFCodebookFused(
             N=self.N,
             M=self.M,
             S=self.S,

@@ -15,7 +15,7 @@ class CPSFFusedCodebookMode(Enum):
     DUAL = enum_auto()
 
 
-class CPSFFusedCodebook(nn.Module):
+class CPSFCodebookFused(nn.Module):
     def __init__(
         self,
         N: int,
