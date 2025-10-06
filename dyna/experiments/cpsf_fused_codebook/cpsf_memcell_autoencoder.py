@@ -1,4 +1,4 @@
-from typing import Tuple
+# > python -m dyna.experiments.cpsf_fused_codebook.train_autoencoder --data-root "e:\git_AIResearch\!datasets\Img_512-512_4096_01\" --size 512 512 --epochs 1000 --batch 4 --grad_acc 1 --lr 1.0e-5 --device_target cuda --device_cache cpu --log_every 10 --out-dir ./temp --model_type memcell
 
 import torch
 import torch.nn as nn
@@ -83,7 +83,7 @@ class CPSFMemcellAutoencoder(nn.Module):
         M: int = 32,
         S: int = 128,
         bottleneck_channels: int = 4,
-        initial_alpha: float = 1.0e-9,
+        initial_alpha: float = 1.0e-6,
     ) -> None:
         super().__init__()
         self.N = N
