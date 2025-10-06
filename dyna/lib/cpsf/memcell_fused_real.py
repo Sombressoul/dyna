@@ -311,14 +311,18 @@ class CPSFMemcellFusedReal(nn.Module):
     ) -> torch.Tensor:
         data = self.store.read()
 
+        sigma_eps = torch.finfo(data.sigma_par.dtype).eps
+        sigma_par = torch.nn.functional.softplus(data.sigma_par) + sigma_eps
+        sigma_perp = torch.nn.functional.softplus(data.sigma_perp) + sigma_eps
+
         T_base, gain = T_Zero_Fused_Real(
             z=z,
             z_j=data.z_j,
             vec_d_j=data.vec_d_j,
             T_hat_j=data.T_hat_j,
             alpha_j=data.alpha_j,
-            sigma_par=data.sigma_par,
-            sigma_perp=data.sigma_perp,
+            sigma_par=sigma_par,
+            sigma_perp=sigma_perp,
             max_q=self.max_q,
             eps=self.eps,
         )
@@ -340,15 +344,16 @@ class CPSFMemcellFusedReal(nn.Module):
 
         tiny = torch.finfo(z.dtype).tiny
         alpha = torch.sigmoid(self.alpha)
-        grad_T_hat_j = gain_eff.transpose(0, 1) @ E_eff
+        grad_T_hat_j = (gain_eff.transpose(0, 1) @ E_eff) / max(z.shape[0], 1)
         T_hat_j_delta_new = -alpha * grad_T_hat_j
 
+        s = 1.0
         if self.delta_T_hat_j_cap is not None:
             with torch.no_grad():
                 n = torch.linalg.norm(T_hat_j_delta_new, ord="fro")
                 s = torch.clamp(self.delta_T_hat_j_cap / (n + tiny), max=1.0)
-                T_hat_j_delta_new = T_hat_j_delta_new * s
-        
+
+        T_hat_j_delta_new = T_hat_j_delta_new * s
         T_hat_j_delta_old = self.store.T_hat_j_delta.detach()
         T_hat_j_delta_eff = T_hat_j_delta_old + T_hat_j_delta_new
 
