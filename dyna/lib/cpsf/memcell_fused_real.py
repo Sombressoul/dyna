@@ -195,7 +195,7 @@ class CPSFMemcellFusedReal(nn.Module):
         init_range_alpha_j: Tuple[float, float] = (0.9, 1.1),
         init_range_sigma_par: Tuple[float, float] = (0.9, 1.5),
         init_range_sigma_perp: Tuple[float, float] = (0.1, 0.8),
-        initial_alpha: float = 1.0e-9,
+        initial_alpha: float = 1.0e-6,
         delta_T_hat_j_cap: Optional[float] = 1.0,
         max_q: float = 25.0,
         eps: float = 1.0e-6,
