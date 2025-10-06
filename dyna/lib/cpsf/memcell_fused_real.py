@@ -16,7 +16,7 @@ def T_Zero_Fused_Real_Backproject(
     sigma_par: torch.Tensor,  # [M] (real, >0)
     sigma_perp: torch.Tensor,  # [M] (real, >0)
     T_star: Optional[torch.Tensor] = None,  # [B, S] (real)
-    alpha: Optional[float] = None,  # scalar LR
+    alpha: Optional[torch.Tensor] = None,  # scalar LR
     eps: float = 1e-6,
     max_q: float = 25.0,
 ) -> Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
@@ -249,7 +249,7 @@ class CPSFMemcellFusedReal(nn.Module):
         *,
         z: torch.Tensor,
         T_star: torch.Tensor,
-        alpha: float,
+        alpha: torch.Tensor,
     ) -> torch.Tensor:
         data = self.store.read()
 
