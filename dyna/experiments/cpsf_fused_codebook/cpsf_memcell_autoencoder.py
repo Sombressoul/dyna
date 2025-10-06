@@ -5,11 +5,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from dyna.lib.cpsf.memcell_fused_real import CPSFMemcellFusedReal
-from dyna.functional.backward_gradient_normalization import (
-    backward_gradient_normalization,
-)
 
 # torch.autograd.set_detect_anomaly(True)
+
 
 class ConvBlock(nn.Module):
     def __init__(
@@ -82,57 +80,77 @@ class CPSFMemcellAutoencoder(nn.Module):
         self,
         *,
         N: int = 16,
-        M: int = 128,
-        S: int = 1024,
-        bottleneck_ch: int = 4,
+        M: int = 32,
+        S: int = 128,
+        bottleneck_channels: int = 4,
+        alpha: float = 1.0e-6,
     ) -> None:
         super().__init__()
         self.N = N
         self.M = M
         self.S = S
-        self.navigation_size = N
+        self.alpha = alpha
+        self.bottleneck_channels = bottleneck_channels
 
-        act_enc = lambda x: F.leaky_relu(x, 0.3)
+        act_enc = lambda x: F.silu(x)
+        act_bn = lambda x: F.silu(x)
         act_dec = lambda x: F.silu(x)
 
         # Encoder
         self.e_dropout = nn.Dropout(0.1)
-        self.e0 = ConvBlock(3, 16, downsample=True, act=act_enc)
-        self.e1 = ConvBlock(16, 32, downsample=True, act=act_enc)
-        self.e2 = ConvBlock(32, 64, downsample=True, act=act_enc)
-        self.e3 = ConvBlock(64, 128, downsample=True, act=act_enc)
-        self.e4 = ConvBlock(128, 256, downsample=True, act=act_enc)
-        self.bottleneck = Bottleneck(256, bottleneck_ch, act=act_enc)
+        self.e0_n = ConvBlock(3, self.N, downsample=True, act=act_enc)
+        self.e0_s = ConvBlock(3, self.S, downsample=True, act=act_enc)
+        self.e1_n = ConvBlock(self.S, self.N, downsample=True, act=act_enc)
+        self.e1_s = ConvBlock(self.S, self.S, downsample=True, act=act_enc)
+        self.e2_n = ConvBlock(self.S, self.N, downsample=True, act=act_enc)
+        self.e2_s = ConvBlock(self.S, self.S, downsample=True, act=act_enc)
+        self.e3_n = ConvBlock(self.S, self.N, downsample=True, act=act_enc)
+        self.e3_s = ConvBlock(self.S, self.S, downsample=True, act=act_enc)
+        self.e4_n = ConvBlock(self.S, self.N, downsample=True, act=act_enc)
+        self.e4_s = ConvBlock(self.S, self.S, downsample=True, act=act_enc)
 
-        # Head: channel compression
-        self.head_compression = nn.Conv2d(
-            bottleneck_ch,
-            self.navigation_size,
-            kernel_size=3,
-            padding=1,
-            stride=1,
-            padding_mode="reflect",
-        )
-
-        # CPSF codebook
-        self.memcell = CPSFMemcellFusedReal(
-            N=self.N,
-            M=self.M,
-            S=self.S,
-        )
-        self.codebook_norm = nn.LayerNorm(
-            normalized_shape=[self.S, 16, 16],
-            elementwise_affine=True,
-        )
-        self.codebook_dropout = nn.Dropout(0.2)
+        # Bottleneck
+        self.bn_n = Bottleneck(self.S, self.bottleneck_channels, act=act_bn)
+        self.bn_s = Bottleneck(self.S, self.S, act=act_bn)
 
         # Decoder starting from S channels
-        self.d_dropout = nn.Dropout(0.1)
-        self.d0 = DeconvBlock(S, 512, act=act_dec)
-        self.d1 = DeconvBlock(512, 256, act=act_dec)
-        self.d2 = DeconvBlock(256, 128, act=act_dec)
-        self.d3 = DeconvBlock(128, 64, act=act_dec)
-        self.d4 = DeconvBlock(64, 3, act=act_dec)
+        self.d4 = DeconvBlock(self.S, self.N, act=act_dec)
+        self.d3 = DeconvBlock(self.S, self.N, act=act_dec)
+        self.d2 = DeconvBlock(self.S, self.N, act=act_dec)
+        self.d1 = DeconvBlock(self.S, self.N, act=act_dec)
+        self.d0 = DeconvBlock(self.S, 3, act=act_dec)
+
+        # Memcells
+        self.cell_0 = CPSFMemcellFusedReal(
+            N=self.N,
+            S=self.S,
+            M=self.M,
+        )
+        self.cell_1 = CPSFMemcellFusedReal(
+            N=self.N,
+            S=self.S,
+            M=self.M,
+        )
+        self.cell_2 = CPSFMemcellFusedReal(
+            N=self.N,
+            S=self.S,
+            M=self.M,
+        )
+        # self.cell_3 = CPSFMemcellFusedReal(
+        #     N=self.N,
+        #     S=self.S,
+        #     M=self.M,
+        # )
+        # self.cell_4 = CPSFMemcellFusedReal(
+        #     N=self.N,
+        #     S=self.S,
+        #     M=self.M,
+        # )
+        self.cell_bottleneck = CPSFMemcellFusedReal(
+            N=self.bottleneck_channels,
+            S=self.S,
+            M=self.M,
+        )
 
         # DEBUG LAYER
         self.debug_linear = nn.Linear(128, 2048)
@@ -146,92 +164,65 @@ class CPSFMemcellAutoencoder(nn.Module):
                 if m.bias is not None:
                     nn.init.zeros_(m.bias)
 
-    @staticmethod
-    def expected_shapes() -> Tuple[Tuple[int, ...], Tuple[int, ...]]:
-        return (1, 3, 512, 512), (1, 3, 512, 512)
-
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        # Encoder
-        x = self.e0(x)
-        x = self.e_dropout(x)
-        x = backward_gradient_normalization(x)
-        x = self.e1(x)
-        x = self.e_dropout(x)
-        x = backward_gradient_normalization(x)
-        x = self.e2(x)
-        x = self.e_dropout(x)
-        x = backward_gradient_normalization(x)
-        x = self.e3(x)
-        x = self.e_dropout(x)
-        x = backward_gradient_normalization(x)
-        x = self.e4(x)
-        x = self.e_dropout(x)
-        x = backward_gradient_normalization(x)
-        x = self.bottleneck(x)
-        x = backward_gradient_normalization(x)
+        # Encoder cell 0
+        e0_n = self.e0_n(x)
+        e0_s = self.e0_s(x)
+        e0_m = self.cell_0.read_update(
+            z=e0_n.permute([0, 2, 3, 1]).flatten(0, 2),
+            T_star=e0_s.permute([0, 2, 3, 1]).flatten(0, 2),
+            alpha=self.alpha,
+        )
+        B, C, H, W = e0_s.shape
+        e0_m = e0_m.reshape([B, H, W, C]).permute([0, 3, 1, 2])
 
-        # Bottleneck
-        B, C, W, H = x.shape
-        x = self.head_compression(x)
-        x = backward_gradient_normalization(x)
-        x = x.permute([0, 2, 3, 1]).flatten(0, 2)
+        # # Encoder cell 1
+        # e1_n = self.e1_n(e0_m)
+        # e1_s = self.e1_s(e0_m)
+        # e1_m = self.cell_1.read_update(
+        #     z=e1_n.permute([0, 2, 3, 1]).flatten(0, 2),
+        #     T_star=e1_s.permute([0, 2, 3, 1]).flatten(0, 2),
+        #     alpha=self.alpha,
+        # )
+        # B, C, H, W = e1_s.shape
+        # e1_m = e1_m.reshape([B, H, W, C]).permute([0, 3, 1, 2])
 
-        # Retrieve
-        x = self.memcell.read(z=x)
-        x = x.view(B, H, W, -1).permute(0, 3, 1, 2).contiguous()
-        x = backward_gradient_normalization(x)
+        # # Encoder cell 2
+        # e2_n = self.e1_n(e1_m)
+        # e2_s = self.e1_s(e1_m)
+        # e2_m = self.cell_2.read_update(
+        #     z=e2_n.permute([0, 2, 3, 1]).flatten(0, 2),
+        #     T_star=e2_s.permute([0, 2, 3, 1]).flatten(0, 2),
+        #     alpha=self.alpha,
+        # )
+        # B, C, H, W = e2_s.shape
+        # e2_m = e2_m.reshape([B, H, W, C]).permute([0, 3, 1, 2])
 
+        # # Bottleneck
+        # bn_n = self.bn_n(e2_m)
+        # bn_s = self.bn_s(e2_m)
+        # # Bottleneck write
+        # self.cell_bottleneck.read_update(
+        #     z=bn_n.permute([0, 2, 3, 1]).flatten(0, 2),
+        #     T_star=bn_s.permute([0, 2, 3, 1]).flatten(0, 2),
+        #     alpha=self.alpha,
+        # )
+        # # Bottleneck read
+        # bn_m = self.cell_bottleneck.read(
+        #     z=bn_n.permute([0, 2, 3, 1]).flatten(0, 2),
+        # )
+        # B, C, H, W = bn_s.shape
+        # bn_m = bn_m.reshape([B, H, W, C]).permute([0, 3, 1, 2])
 
-        def dbg_c_val(x: torch.Tensor, name: str):
-            print(f"DEBUG '{name}':")
-            print(f"\t{x.real.std()=}")
-            print(f"\t{x.real.mean()=}")
-            print(f"\t{x.real.max()=}")
-            print(f"\t{x.real.min()=}")
-            if torch.is_complex(x):
-                print(f"\t{x.imag.std()=}")
-                print(f"\t{x.imag.mean()=}")
-                print(f"\t{x.imag.max()=}")
-                print(f"\t{x.imag.min()=}")
+        # SHORTCUT
+        d1_n = e0_n
 
-        if torch.isnan(x).any().item():
-            dbg_c_val(self.memcell.z_j, "z_j")
-            dbg_c_val(self.memcell.vec_d_j, "vec_d_j")
-            dbg_c_val(self.memcell.T_hat_j, "T_hat_j")
-            dbg_c_val(self.memcell.alpha_j, "alpha_j")
-            dbg_c_val(self.memcell.sigma_par, "sigma_par")
-            dbg_c_val(self.memcell.sigma_perp, "sigma_perp")
-            exit()
+        # Decoder cell 0
+        d0_m = self.cell_0.read(
+            z=d1_n.permute([0, 2, 3, 1]).flatten(0, 2),
+        )
+        B, C, H, W = d1_n.shape
+        d0_m = d0_m.reshape([B, H, W, -1]).permute([0, 3, 1, 2])
+        d0_n = self.d0(d0_m)
 
-        x = self.codebook_norm(x)
-        x = self.codebook_dropout(x)
-
-        # Decoder
-        x = self.d0(x)
-        x = self.d_dropout(x)
-        x = backward_gradient_normalization(x)
-        x = self.d1(x)
-        x = self.d_dropout(x)
-        x = backward_gradient_normalization(x)
-        x = self.d2(x)
-        x = self.d_dropout(x)
-        x = backward_gradient_normalization(x)
-        x = self.d3(x)
-        x = self.d_dropout(x)
-        x = backward_gradient_normalization(x)
-        x = self.d4(x)
-
-        return x
-
-
-# -----------------------------
-# Quick sanity check
-# -----------------------------
-if __name__ == "__main__":
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = CPSFMemcellAutoencoder(N=16, S=256).to(device)
-    x = torch.randn(2, 3, 512, 512, device=device)
-    y = model(x)
-    print("input:", tuple(x.shape))
-    print("output:", tuple(y.shape))
-    print("params:", sum(p.numel() for p in model.parameters()))
+        return d0_n
