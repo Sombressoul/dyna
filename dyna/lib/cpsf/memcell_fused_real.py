@@ -3,7 +3,8 @@ import torch.nn as nn
 
 
 from dataclasses import dataclass
-from typing import Tuple, List, Optional, Union
+from enum import Enum, auto as enum_auto
+from typing import Tuple, List, Optional
 
 
 def T_Zero_Fused_Real(
@@ -176,6 +177,12 @@ class CPSFContributionStoreFusedReal(nn.Module):
         self.T_hat_j_delta.zero_()
 
 
+class CPSFMemcellFusedRealGradMode(Enum):
+    FULL = enum_auto()
+    MIXED = enum_auto()
+    SAFE = enum_auto()
+
+
 class CPSFMemcellFusedReal(nn.Module):
     def __init__(
         self,
@@ -193,6 +200,7 @@ class CPSFMemcellFusedReal(nn.Module):
         delta_T_hat_j_cap: float = 1.0,
         max_q: float = 25.0,
         eps: float = 1.0e-6,
+        grad_mode: CPSFMemcellFusedRealGradMode = CPSFMemcellFusedRealGradMode.FULL,
         dtype: torch.dtype = torch.float32,
     ):
         super().__init__()
@@ -204,7 +212,9 @@ class CPSFMemcellFusedReal(nn.Module):
         self.delta_T_hat_j_cap = float(delta_T_hat_j_cap)
         self.max_q = float(max_q)
         self.eps = float(eps)
+        self.grad_mode = grad_mode
         self.dtype = dtype
+
         self.store = CPSFContributionStoreFusedReal(
             N=self.N,
             M=self.M,
@@ -232,6 +242,67 @@ class CPSFMemcellFusedReal(nn.Module):
     ) -> torch.Tensor:
         raise RuntimeError("The module is not intended to be called directly.")
 
+    # -----------------------------------------------------------------------------
+    # CPSFMemcellFusedReal.recall — Gradient Flow Cheat Sheet
+    # -----------------------------------------------------------------------------
+    # This call performs a one-step local adaptation inside forward:
+    #   1) Compute base prediction T_base and gain(z, z_j, vec_d_j, sigma_*, alpha_j)
+    #   2) Build a local update ΔT_hat_j = -sigmoid(alpha) * (gain_eff^T @ E_eff)
+    #   3) Trust-region scale ΔT_hat_j by ||Δ||_F (no_grad)
+    #   4) Assemble final T using LIVE gain:
+    #        T = sum_j gain * (T_hat_base + ΔT_hat_j) + sum_j gain * old_delta(detached)
+    #   5) Accumulate ΔT_hat_j into the store buffer (detached) for subsequent reads
+    #
+    # Gradient destinations (common to all modes unless explicitly detached):
+    #   — Request geometry: z
+    #   — Contribution geometry: z_j, vec_d_j, sigma_par, sigma_perp
+    #   — Contribution weight: alpha_j
+    #   — Contribution data (base): T_hat_j
+    #   — Memory-cell LR: self.alpha (always via ΔT_hat_j)
+    #   — Reference field: T_star (depends on mode)
+    #   — Store buffer (old deltas): NO grad (always detached)
+    #
+    # Modes control what participates in the local step ΔT_hat_j via (gain_eff, E_eff):
+    #
+    #   FULL mode:
+    #     gain_eff = gain
+    #     E_eff    = T_base - T_star
+    #     Gradients:
+    #       - Geometry: YES (two paths: via final T and via ΔT_hat_j)
+    #       - T_hat_j (base): YES (via final T and via Δ through T_base)
+    #       - alpha: YES
+    #       - T_star: YES
+    #
+    #   MIXED mode:
+    #     gain_eff = gain.detach()
+    #     E_eff    = T_base.detach() - T_star
+    #     Gradients:
+    #       - Geometry: YES (only via final T; Δ path is blocked)
+    #       - T_hat_j (base): YES (via final T; Δ path is blocked)
+    #       - alpha: YES (Δ depends on alpha)
+    #       - T_star: YES (appears in E_eff)
+    #
+    #   SAFE mode:
+    #     gain_eff = gain.detach()
+    #     E_eff    = (T_base - T_star).detach()
+    #     Gradients:
+    #       - Geometry: YES (only via final T; Δ path is blocked)
+    #       - T_hat_j (base): YES (via final T)
+    #       - alpha: YES (Δ depends on alpha)
+    #       - T_star: NO
+    #
+    # Special cases & stability:
+    #   — If T_star is None: returns T_base (pure read), no Δ computation, no store update.
+    #   — Trust-region scaling of ΔT_hat_j is done under no_grad; it rescales magnitude
+    #     without creating extra graph branches.
+    #   — Clamping q <= max_q can shrink gain strongly; small gain -> small grads through geometry.
+    #   — Keep the order: build T first, THEN store.update(Δ). This avoids double-counting the new Δ.
+    #   — alpha is passed through sigmoid; if you want a small effective step, use:
+    #         alpha = alpha_max * sigmoid(raw_alpha)
+    #     and initialize raw_alpha = logit(alpha_init / alpha_max).
+    #   — To ensure alpha receives gradients, compute your loss on the output of `recall(...)`,
+    #     not on a separate read path.
+    # -----------------------------------------------------------------------------
     def recall(
         self,
         *,
@@ -255,13 +326,21 @@ class CPSFMemcellFusedReal(nn.Module):
         if T_star is None:
             return T_base
 
+        if self.grad_mode is CPSFMemcellFusedRealGradMode.FULL:
+            gain_eff = gain
+            E_eff = T_base - T_star
+        elif self.grad_mode is CPSFMemcellFusedRealGradMode.MIXED:
+            gain_eff = gain.detach()
+            E_eff = T_base.detach() - T_star
+        elif self.grad_mode is CPSFMemcellFusedRealGradMode.SAFE:
+            gain_eff = gain.detach()
+            E_eff = (T_base - T_star).detach()
+        else:
+            raise ValueError(f"Unknown grad mode: '{self.grad_mode}'")
+
         tiny = torch.finfo(z.dtype).tiny
         alpha = torch.sigmoid(self.alpha)
-
-        gain_det = gain.detach()
-        E_det = (T_base - T_star).detach()
-
-        grad_T_hat_j = gain_det.transpose(0, 1) @ E_det
+        grad_T_hat_j = gain_eff.transpose(0, 1) @ E_eff
         T_hat_j_delta = -alpha * grad_T_hat_j
 
         with torch.no_grad():
