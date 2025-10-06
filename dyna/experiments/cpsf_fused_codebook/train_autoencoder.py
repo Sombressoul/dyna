@@ -17,9 +17,8 @@ from torchvision.models import (
     VGG19_Weights,
 )
 
-from dyna.experiments.cpsf_fused_codebook.cpsf_spectral_autoencoder import (
-    CPSFSpectralAutoencoder,
-)
+from dyna.experiments.cpsf_fused_codebook.cpsf_spectral_autoencoder import CPSFSpectralAutoencoder
+from dyna.experiments.cpsf_fused_codebook.cpsf_memcell_autoencoder import CPSFMemcellAutoencoder
 from dyna.experiments.cpsf_fused_codebook.local_image_dataset import LocalImageDataset
 
 
@@ -172,6 +171,7 @@ def train(
     device_target: str,
     device_cache: str,
     log_every: int,
+    model_type: str,
     grad_accumulation_steps: int = 1,
 ) -> None:
     device = torch.device(device_target)
@@ -181,7 +181,13 @@ def train(
     )
     loader = ds.get_dataloader(batch_size=batch_size, shuffle=True, drop_last=True)
 
-    model = CPSFSpectralAutoencoder().to(device)
+    if model_type == "spectral":
+        model = CPSFSpectralAutoencoder().to(device)
+    elif model_type == "memcell":
+        model = CPSFMemcellAutoencoder().to(device)
+    else:
+        raise ValueError(f"Unknown model_type: '{model_type}'")
+
     model.train()
     opt = torch.optim.AdamW(model.parameters(), lr=lr)
 
@@ -339,10 +345,15 @@ if __name__ == "__main__":
         default=("cuda" if torch.cuda.is_available() else "cpu"),
     )
     p.add_argument(
-        "--log-every",
+        "--log_every",
         type=int,
         default=100,
         help="Log/save preview every N optimizer steps",
+    )
+    p.add_argument(
+        "--model_type",
+        type=str,
+        default=None,
     )
     args = p.parse_args()
 
@@ -357,4 +368,5 @@ if __name__ == "__main__":
         device_cache=args.device_cache,
         log_every=args.log_every,
         grad_accumulation_steps=args.grad_acc,
+        model_type=args.model_type,
     )
