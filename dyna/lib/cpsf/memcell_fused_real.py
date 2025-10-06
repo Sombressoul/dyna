@@ -197,7 +197,7 @@ class CPSFMemcellFusedReal(nn.Module):
         init_range_sigma_par: Tuple[float, float] = (0.9, 1.5),
         init_range_sigma_perp: Tuple[float, float] = (0.1, 0.8),
         initial_alpha: float = 1.0e-9,
-        delta_T_hat_j_cap: float = 1.0,
+        delta_T_hat_j_cap: Optional[float] = 1.0,
         max_q: float = 25.0,
         eps: float = 1.0e-6,
         grad_mode: CPSFMemcellFusedRealGradMode = CPSFMemcellFusedRealGradMode.MIXED,
@@ -205,13 +205,13 @@ class CPSFMemcellFusedReal(nn.Module):
     ):
         super().__init__()
 
-        self.N = int(N)
-        self.M = int(M)
-        self.S = int(S)
-        self.initial_alpha = float(initial_alpha)
-        self.delta_T_hat_j_cap = float(delta_T_hat_j_cap)
-        self.max_q = float(max_q)
-        self.eps = float(eps)
+        self.N = N
+        self.M = M
+        self.S = S
+        self.initial_alpha = initial_alpha
+        self.delta_T_hat_j_cap = delta_T_hat_j_cap
+        self.max_q = max_q
+        self.eps = eps
         self.grad_mode = grad_mode
         self.dtype = dtype
 
@@ -341,22 +341,19 @@ class CPSFMemcellFusedReal(nn.Module):
         tiny = torch.finfo(z.dtype).tiny
         alpha = torch.sigmoid(self.alpha)
         grad_T_hat_j = gain_eff.transpose(0, 1) @ E_eff
-        T_hat_j_delta = -alpha * grad_T_hat_j
+        T_hat_j_delta_new = -alpha * grad_T_hat_j
 
-        with torch.no_grad():
-            n = torch.linalg.norm(T_hat_j_delta, ord="fro")
-            s = torch.clamp(self.delta_T_hat_j_cap / (n + tiny), max=1.0)
-        T_hat_j_delta = T_hat_j_delta * s
+        if self.delta_T_hat_j_cap is not None:
+            with torch.no_grad():
+                n = torch.linalg.norm(T_hat_j_delta_new, ord="fro")
+                s = torch.clamp(self.delta_T_hat_j_cap / (n + tiny), max=1.0)
+        T_hat_j_delta_new = T_hat_j_delta_new * s
+        T_hat_j_delta_old = self.store.T_hat_j_delta.detach()
+        T_hat_j_delta_eff = T_hat_j_delta_old + T_hat_j_delta_new
 
-        T_hat_base = self.store.T_hat_j
-        old_delta = self.store.T_hat_j_delta.clone().detach()
+        T = gain.unsqueeze(-1) * (self.store.T_hat_j + T_hat_j_delta_eff).unsqueeze(0)
+        T = T.sum(dim=1)
 
-        T_from_local = gain.unsqueeze(-1) * (T_hat_base + T_hat_j_delta).unsqueeze(0)
-        T_from_local = T_from_local.sum(dim=1)
-        T_from_store = gain.unsqueeze(-1) * old_delta.unsqueeze(0)
-        T_from_store = T_from_store.sum(dim=1)
-        T = T_from_local + T_from_store
-
-        self.store.update(T_hat_j_delta=T_hat_j_delta)
+        self.store.update(T_hat_j_delta=T_hat_j_delta_new)
 
         return T
