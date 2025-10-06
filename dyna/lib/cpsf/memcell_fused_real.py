@@ -3,7 +3,7 @@ import torch.nn as nn
 
 
 from dataclasses import dataclass
-from typing import Tuple, List, Optional
+from typing import Tuple, List, Optional, Union
 
 
 def T_Zero_Fused_Real_Backproject(
@@ -19,12 +19,12 @@ def T_Zero_Fused_Real_Backproject(
     alpha: Optional[float] = None,  # scalar LR
     eps: float = 1e-6,
     max_q: float = 25.0,
-) -> Tuple[torch.Tensor, torch.Tensor]:
+) -> Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
     device, dtype = z.device, z.dtype
 
     tiny = torch.finfo(sigma_par.dtype).eps
-    w_par = 1.0 / (sigma_par.clamp_min(tiny) ** 2)  # [M]
-    w_perp = 1.0 / (sigma_perp.clamp_min(tiny) ** 2)  # [M]
+    w_par = (1.0 / (sigma_par.clamp_min(tiny) ** 2)).to(dtype)  # [M]
+    w_perp = (1.0 / (sigma_perp.clamp_min(tiny) ** 2)).to(dtype)  # [M]
     w_diff = w_par - w_perp  # [M]
 
     dz = z.unsqueeze(1) - z_j.unsqueeze(0)  # [B,M,N]
@@ -169,7 +169,7 @@ class CPSFContributionStoreFusedReal(nn.Module):
         *,
         T_hat_j_delta: torch.Tensor,
     ) -> None:
-        self.T_hat_j_delta.copy_(T_hat_j_delta)
+        self.T_hat_j_delta.add_(T_hat_j_delta)
 
     @torch.no_grad()
     def consolidate(
