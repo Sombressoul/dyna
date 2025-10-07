@@ -90,7 +90,7 @@ class CPSFContributionStoreFusedReal(nn.Module):
             requires_grad=False,
         )
         self.alpha_j = torch.nn.Parameter(
-            data=torch.empty([self.M], dtype=self.dtype).uniform_(0.9, 1.1),
+            data=torch.empty([self.M], dtype=self.dtype).uniform_(0.5, 1.5),
             requires_grad=True,
         )
         sigma_par, sigma_perp = self._init_sigmas()
