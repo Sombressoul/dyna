@@ -5,7 +5,7 @@ import torch.nn as nn
 
 from dataclasses import dataclass
 from enum import Enum, auto as enum_auto
-from typing import Tuple, List, Optional
+from typing import Tuple, Optional
 
 
 def T_Zero_Fused_Real(
