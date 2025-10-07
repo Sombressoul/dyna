@@ -132,7 +132,7 @@ class CPSFContributionStoreFusedReal(nn.Module):
 
     def _init_T_hat_j(
         self,
-        scale: float = 1.0,
+        scale: float = 1.0e-3,
     ) -> torch.Tensor:
         # Orthogonal vectors for M < S
         vec = torch.randn([self.M, self.S], dtype=self.dtype)
