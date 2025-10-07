@@ -1,3 +1,4 @@
+import math
 import torch
 import torch.nn as nn
 
@@ -63,12 +64,6 @@ class CPSFContributionStoreFusedReal(nn.Module):
         N: int,
         M: int,
         S: int,
-        init_range_z: Tuple[float, float] = (-1.0e-3, +1.0e-3),
-        init_range_vec_d: Tuple[float, float] = (-1.0e-3, +1.0e-3),
-        init_range_T: Tuple[float, float] = (-1.0e-3, +1.0e-3),
-        init_range_alpha_j: Tuple[float, float] = (0.9, 1.1),
-        init_range_sigma_par: Tuple[float, float] = (0.9, 1.5),
-        init_range_sigma_perp: Tuple[float, float] = (0.1, 0.8),
         dtype: torch.dtype = torch.float32,
     ):
         super().__init__()
@@ -79,31 +74,15 @@ class CPSFContributionStoreFusedReal(nn.Module):
         self.dtype = dtype
 
         self.z_j = torch.nn.Parameter(
-            data=(
-                self._init_param(
-                    shape=[self.M, self.N],
-                    min=init_range_z[0],
-                    max=init_range_z[1],
-                )
-            ),
+            data=self._init_z_j(),
             requires_grad=True,
         )
         self.vec_d_j = torch.nn.Parameter(
-            data=(
-                self._init_param(
-                    shape=[self.M, self.N],
-                    min=init_range_vec_d[0],
-                    max=init_range_vec_d[1],
-                )
-            ),
+            data=self._init_vec_d_j(),
             requires_grad=True,
         )
         self.T_hat_j = torch.nn.Parameter(
-            data=self._init_param(
-                shape=[self.M, self.S],
-                min=init_range_T[0],
-                max=init_range_T[1],
-            ),
+            data=self._init_T_hat_j(),
             requires_grad=True,
         )
         self.T_hat_j_delta = torch.nn.Parameter(
@@ -111,39 +90,77 @@ class CPSFContributionStoreFusedReal(nn.Module):
             requires_grad=False,
         )
         self.alpha_j = torch.nn.Parameter(
-            data=self._init_param(
-                shape=[self.M],
-                min=init_range_alpha_j[0],
-                max=init_range_alpha_j[1],
-            ),
+            data=torch.empty([self.M], dtype=self.dtype).uniform_(0.9, 1.1),
             requires_grad=True,
         )
+        sigma_par, sigma_perp = self._init_sigmas()
         self.sigma_par = torch.nn.Parameter(
-            data=self._init_param(
-                shape=[self.M],
-                min=init_range_sigma_par[0],
-                max=init_range_sigma_par[1],
-            ),
+            data=sigma_par,
             requires_grad=True,
         )
         self.sigma_perp = torch.nn.Parameter(
-            data=self._init_param(
-                shape=[self.M],
-                min=init_range_sigma_perp[0],
-                max=init_range_sigma_perp[1],
-            ),
+            data=sigma_perp,
             requires_grad=True,
         )
 
-    def _init_param(
+    def _init_z_j(
         self,
-        shape: List[int],
-        min: float = -1.0,
-        max: float = +1.0,
+        scale: float = 1.0,
     ) -> torch.Tensor:
-        p = torch.empty(shape, dtype=self.dtype).uniform_(min, max)
+        # Pseudo Latin Hypercube
+        intervals = torch.arange(self.M, dtype=self.dtype) / self.M
+        samples = torch.zeros(self.M, self.N, dtype=self.dtype)
 
-        return p
+        for dim in range(self.N):
+            perm = torch.randperm(self.M)
+            samples[:, dim] = (
+                intervals[perm] + torch.rand(self.M, dtype=self.dtype) / self.M
+            )
+
+        samples = 2 * samples - 1
+        samples = samples * scale
+
+        return samples
+
+    def _init_vec_d_j(
+        self,
+    ) -> torch.Tensor:
+        # Random directions on the sphere
+        directions = torch.randn(self.M, self.N, dtype=self.dtype)
+        directions = directions / directions.norm(dim=-1, keepdim=True)
+        return directions
+
+    def _init_T_hat_j(
+        self,
+        scale: float = 1.0,
+    ) -> torch.Tensor:
+        # Orthogonal vectors for M < S
+        vec = torch.randn([self.M, self.S], dtype=self.dtype)
+        if self.M < self.S:
+            vec, _ = torch.linalg.qr(vec.T)
+            vec = vec.T * scale
+        return vec
+
+    def _init_sigmas(
+        self,
+        anisotropy: float = 2.0,
+        coverage_factor: float = 0.5,
+        min_sigma: float = 1e-3,
+    ) -> torch.Tensor:
+        # Uniform coverage
+        top_k = min(int(self.M**0.5), self.M - 1)
+        distances = torch.cdist(self.z_j, self.z_j, p=2)  # [M, M]
+        distances = distances + torch.eye(self.M) * 1.0e9  # ignore self
+        k_nearest = distances.topk(k=top_k, largest=False).values  # [M, top_k]
+        median_dist = k_nearest.median(dim=-1).values.to(self.dtype)  # [M]
+
+        sigma_perp = median_dist * coverage_factor
+        sigma_par = sigma_perp * (1.0 + anisotropy)
+
+        sigma_perp = torch.clamp(sigma_perp, min=min_sigma)
+        sigma_par = torch.clamp(sigma_par, min=min_sigma)
+
+        return sigma_par, sigma_perp
 
     def read(
         self,
@@ -189,12 +206,6 @@ class CPSFMemcellFusedReal(nn.Module):
         N: int,
         M: int,
         S: int,
-        init_range_z: Tuple[float, float] = (-1.0e-3, +1.0e-3),
-        init_range_vec_d: Tuple[float, float] = (-1.0e-3, +1.0e-3),
-        init_range_T: Tuple[float, float] = (-1.0e-3, +1.0e-3),
-        init_range_alpha_j: Tuple[float, float] = (0.9, 1.1),
-        init_range_sigma_par: Tuple[float, float] = (0.9, 1.5),
-        init_range_sigma_perp: Tuple[float, float] = (0.1, 0.8),
         initial_alpha: float = 1.0e-6,
         delta_T_hat_j_cap: Optional[float] = 1.0,
         max_q: float = 25.0,
@@ -218,12 +229,6 @@ class CPSFMemcellFusedReal(nn.Module):
             N=self.N,
             M=self.M,
             S=self.S,
-            init_range_z=init_range_z,
-            init_range_vec_d=init_range_vec_d,
-            init_range_T=init_range_T,
-            init_range_alpha_j=init_range_alpha_j,
-            init_range_sigma_par=init_range_sigma_par,
-            init_range_sigma_perp=init_range_sigma_perp,
             dtype=self.dtype,
         )
 
