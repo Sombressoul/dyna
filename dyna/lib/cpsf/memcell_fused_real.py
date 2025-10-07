@@ -206,7 +206,7 @@ class CPSFMemcellFusedReal(nn.Module):
         N: int,
         M: int,
         S: int,
-        initial_alpha: float = 1.0e-6,
+        initial_alpha: float = 1.0e-2,
         delta_T_hat_j_cap: Optional[float] = 1.0,
         max_q: float = 25.0,
         eps: float = 1.0e-6,
@@ -242,7 +242,8 @@ class CPSFMemcellFusedReal(nn.Module):
 
     def forward(
         self,
-        z: torch.Tensor,
+        *agrs,
+        **kwargs,
     ) -> torch.Tensor:
         raise RuntimeError("The module is not intended to be called directly.")
 
