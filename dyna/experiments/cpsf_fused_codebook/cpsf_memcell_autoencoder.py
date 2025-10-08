@@ -78,26 +78,25 @@ class Bottleneck(nn.Module):
 class CPSFMemcellAutoencoder(nn.Module):
     def __init__(
         self,
-        *,
-        N: int = 16,
-        M: int = 32,
-        S: int = 128,
-        bottleneck_channels: int = 4,
-        initial_alpha: float = 1.0e-6,
     ) -> None:
         super().__init__()
-        self.N = N
-        self.M = M
-        self.S = S
-        self.bottleneck_channels = bottleneck_channels
-        self.initial_alpha = initial_alpha
+        self.N = 16
+        self.M = 128
+        self.S = 128
+        self.alpha_initial = 1.0e-1
+        self.alpha_trainable = False
+        self.init_scale_T_hat_j = 1.0e-1
+        self.tau = 5.0
+        self.memcell_act = torch.nn.functional.tanh
 
         act_enc = lambda x: F.silu(x)
         act_bn = lambda x: F.silu(x)
         act_dec = lambda x: F.silu(x)
 
+        # Utils
+        self.dropout = nn.Dropout(0.05)
+
         # Encoder
-        self.e_dropout = nn.Dropout(0.1)
         self.e0_n = ConvBlock(3, self.N, downsample=True, act=act_enc)
         self.e0_s = ConvBlock(3, self.S, downsample=True, act=act_enc)
         self.e1_n = ConvBlock(self.S, self.N, downsample=True, act=act_enc)
@@ -117,7 +116,7 @@ class CPSFMemcellAutoencoder(nn.Module):
         self.e4_norm = nn.BatchNorm2d(self.S)
 
         # Bottleneck
-        self.bn_n = Bottleneck(self.S, self.bottleneck_channels, act=act_bn)
+        self.bn_n = Bottleneck(self.S, self.N, act=act_bn)
         self.bn_s = Bottleneck(self.S, self.N, act=act_bn)
         self.bn_norm = nn.BatchNorm2d(self.N)
 
@@ -141,43 +140,61 @@ class CPSFMemcellAutoencoder(nn.Module):
             N=self.N,
             S=self.S,
             M=self.M,
-            initial_alpha=self.initial_alpha,
+            alpha_initial=self.alpha_initial,
+            alpha_trainable=self.alpha_trainable,
             grad_mode=memcell_grad_mode,
+            init_scale_T_hat_j=self.init_scale_T_hat_j,
+            tau=self.tau,
         )
         self.cell_1 = CPSFMemcellFusedReal(
             N=self.N,
             S=self.S,
             M=self.M,
-            initial_alpha=self.initial_alpha,
+            alpha_initial=self.alpha_initial,
+            alpha_trainable=self.alpha_trainable,
             grad_mode=memcell_grad_mode,
+            init_scale_T_hat_j=self.init_scale_T_hat_j,
+            tau=self.tau,
         )
         self.cell_2 = CPSFMemcellFusedReal(
             N=self.N,
             S=self.S,
             M=self.M,
-            initial_alpha=self.initial_alpha,
+            alpha_initial=self.alpha_initial,
+            alpha_trainable=self.alpha_trainable,
             grad_mode=memcell_grad_mode,
+            init_scale_T_hat_j=self.init_scale_T_hat_j,
+            tau=self.tau,
         )
         self.cell_3 = CPSFMemcellFusedReal(
             N=self.N,
             S=self.S,
             M=self.M,
-            initial_alpha=self.initial_alpha,
+            alpha_initial=self.alpha_initial,
+            alpha_trainable=self.alpha_trainable,
             grad_mode=memcell_grad_mode,
+            init_scale_T_hat_j=self.init_scale_T_hat_j,
+            tau=self.tau,
         )
         self.cell_4 = CPSFMemcellFusedReal(
             N=self.N,
             S=self.S,
             M=self.M,
-            initial_alpha=self.initial_alpha,
+            alpha_initial=self.alpha_initial,
+            alpha_trainable=self.alpha_trainable,
             grad_mode=memcell_grad_mode,
+            init_scale_T_hat_j=self.init_scale_T_hat_j,
+            tau=self.tau,
         )
         self.cell_bottleneck = CPSFMemcellFusedReal(
-            N=self.bottleneck_channels,
-            S=self.N,
+            N=self.N,
+            S=self.N, # IMPORTANT: N
             M=self.M,
-            initial_alpha=self.initial_alpha,
+            alpha_initial=self.alpha_initial,
+            alpha_trainable=self.alpha_trainable,
             grad_mode=memcell_grad_mode,
+            init_scale_T_hat_j=self.init_scale_T_hat_j,
+            tau=self.tau,
         )
 
         # DEBUG LAYER
@@ -200,53 +217,63 @@ class CPSFMemcellAutoencoder(nn.Module):
             z=e0_n.permute([0, 2, 3, 1]).flatten(0, 2),
             T_star=e0_s.permute([0, 2, 3, 1]).flatten(0, 2),
         )
+        x = self.memcell_act(x)
         B, C, H, W = e0_s.shape
         x = x.reshape([B, H, W, C]).permute([0, 3, 1, 2])
         x = self.e0_norm(x)
+        x = self.dropout(x)
 
-        # Encoder cell 1
-        e1_n = self.e1_n(x)
-        e1_s = self.e1_s(x)
-        x = self.cell_1.recall(
-            z=e1_n.permute([0, 2, 3, 1]).flatten(0, 2),
-            T_star=e1_s.permute([0, 2, 3, 1]).flatten(0, 2),
-        )
-        B, C, H, W = e1_s.shape
-        x = x.reshape([B, H, W, C]).permute([0, 3, 1, 2])
-        x = self.e1_norm(x)
+        # # Encoder cell 1
+        # e1_n = self.e1_n(x)
+        # e1_s = self.e1_s(x)
+        # x = self.cell_1.recall(
+        #     z=e1_n.permute([0, 2, 3, 1]).flatten(0, 2),
+        #     T_star=e1_s.permute([0, 2, 3, 1]).flatten(0, 2),
+        # )
+        # x = self.memcell_act(x)
+        # B, C, H, W = e1_s.shape
+        # x = x.reshape([B, H, W, C]).permute([0, 3, 1, 2])
+        # x = self.e1_norm(x)
+        # x = self.dropout(x)
 
-        # Encoder cell 2
-        e2_n = self.e2_n(x)
-        e2_s = self.e2_s(x)
-        x = self.cell_2.recall(
-            z=e2_n.permute([0, 2, 3, 1]).flatten(0, 2),
-            T_star=e2_s.permute([0, 2, 3, 1]).flatten(0, 2),
-        )
-        B, C, H, W = e2_s.shape
-        x = x.reshape([B, H, W, C]).permute([0, 3, 1, 2])
-        x = self.e2_norm(x)
+        # # Encoder cell 2
+        # e2_n = self.e2_n(x)
+        # e2_s = self.e2_s(x)
+        # x = self.cell_2.recall(
+        #     z=e2_n.permute([0, 2, 3, 1]).flatten(0, 2),
+        #     T_star=e2_s.permute([0, 2, 3, 1]).flatten(0, 2),
+        # )
+        # x = self.memcell_act(x)
+        # B, C, H, W = e2_s.shape
+        # x = x.reshape([B, H, W, C]).permute([0, 3, 1, 2])
+        # x = self.e2_norm(x)
+        # x = self.dropout(x)
 
-        # Encoder cell 3
-        e3_n = self.e3_n(x)
-        e3_s = self.e3_s(x)
-        x = self.cell_3.recall(
-            z=e3_n.permute([0, 2, 3, 1]).flatten(0, 2),
-            T_star=e3_s.permute([0, 2, 3, 1]).flatten(0, 2),
-        )
-        B, C, H, W = e3_s.shape
-        x = x.reshape([B, H, W, C]).permute([0, 3, 1, 2])
-        x = self.e3_norm(x)
+        # # Encoder cell 3
+        # e3_n = self.e3_n(x)
+        # e3_s = self.e3_s(x)
+        # x = self.cell_3.recall(
+        #     z=e3_n.permute([0, 2, 3, 1]).flatten(0, 2),
+        #     T_star=e3_s.permute([0, 2, 3, 1]).flatten(0, 2),
+        # )
+        # x = self.memcell_act(x)
+        # B, C, H, W = e3_s.shape
+        # x = x.reshape([B, H, W, C]).permute([0, 3, 1, 2])
+        # x = self.e3_norm(x)
+        # x = self.dropout(x)
 
-        # Encoder cell 4
-        e4_n = self.e4_n(x)
-        e4_s = self.e4_s(x)
-        x = self.cell_4.recall(
-            z=e4_n.permute([0, 2, 3, 1]).flatten(0, 2),
-            T_star=e4_s.permute([0, 2, 3, 1]).flatten(0, 2),
-        )
-        B, C, H, W = e4_s.shape
-        x = x.reshape([B, H, W, C]).permute([0, 3, 1, 2])
-        x = self.e4_norm(x)
+        # # Encoder cell 4
+        # e4_n = self.e4_n(x)
+        # e4_s = self.e4_s(x)
+        # x = self.cell_4.recall(
+        #     z=e4_n.permute([0, 2, 3, 1]).flatten(0, 2),
+        #     T_star=e4_s.permute([0, 2, 3, 1]).flatten(0, 2),
+        # )
+        # x = self.memcell_act(x)
+        # B, C, H, W = e4_s.shape
+        # x = x.reshape([B, H, W, C]).permute([0, 3, 1, 2])
+        # x = self.e4_norm(x)
+        # x = self.dropout(x)
 
         # Bottleneck
         bn_n = self.bn_n(x)
@@ -255,53 +282,73 @@ class CPSFMemcellAutoencoder(nn.Module):
             z=bn_n.permute([0, 2, 3, 1]).flatten(0, 2),
             T_star=bn_s.permute([0, 2, 3, 1]).flatten(0, 2),
         )
+        x = self.memcell_act(x)
         B, C, H, W = bn_s.shape
         x = x.reshape([B, H, W, C]).permute([0, 3, 1, 2])
         x = self.bn_norm(x)
+        x = self.dropout(x)
 
-        # Decoder cell 4
-        d4_m = self.cell_4.recall(
-            z=x.permute([0, 2, 3, 1]).flatten(0, 2),
-        )
-        B, C, H, W = x.shape
-        d4_m = d4_m.reshape([B, H, W, -1]).permute([0, 3, 1, 2])
-        d4_m = self.d4_norm(d4_m)
-        x = self.d4(d4_m)
+        # # Decoder cell 4
+        # d4_m = self.cell_4.recall(
+        #     z=x.permute([0, 2, 3, 1]).flatten(0, 2),
+        # )
+        # d4_m = self.memcell_act(d4_m)
+        # B, C, H, W = x.shape
+        # d4_m = d4_m.reshape([B, H, W, -1]).permute([0, 3, 1, 2])
+        # d4_m = self.d4_norm(d4_m)
+        # d4_m = self.dropout(d4_m)
+        # x = self.d4(d4_m)
 
-        # Decoder cell 3
-        d3_m = self.cell_3.recall(
-            z=x.permute([0, 2, 3, 1]).flatten(0, 2),
-        )
-        B, C, H, W = x.shape
-        d3_m = d3_m.reshape([B, H, W, -1]).permute([0, 3, 1, 2])
-        d3_m = self.d3_norm(d3_m)
-        x = self.d3(d3_m)
+        # # Decoder cell 3
+        # d3_m = self.cell_3.recall(
+        #     z=x.permute([0, 2, 3, 1]).flatten(0, 2),
+        # )
+        # d3_m = self.memcell_act(d3_m)
+        # B, C, H, W = x.shape
+        # d3_m = d3_m.reshape([B, H, W, -1]).permute([0, 3, 1, 2])
+        # d3_m = self.d3_norm(d3_m)
+        # d3_m = self.dropout(d3_m)
+        # x = self.d3(d3_m)
 
-        # Decoder cell 2
-        d2_m = self.cell_2.recall(
-            z=x.permute([0, 2, 3, 1]).flatten(0, 2),
-        )
-        B, C, H, W = x.shape
-        d2_m = d2_m.reshape([B, H, W, -1]).permute([0, 3, 1, 2])
-        d2_m = self.d2_norm(d2_m)
-        x = self.d2(d2_m)
+        # # Decoder cell 2
+        # d2_m = self.cell_2.recall(
+        #     z=x.permute([0, 2, 3, 1]).flatten(0, 2),
+        # )
+        # d2_m = self.memcell_act(d2_m)
+        # B, C, H, W = x.shape
+        # d2_m = d2_m.reshape([B, H, W, -1]).permute([0, 3, 1, 2])
+        # d2_m = self.d2_norm(d2_m)
+        # d2_m = self.dropout(d2_m)
+        # x = self.d2(d2_m)
 
-        # Decoder cell 1
-        d1_m = self.cell_1.recall(
-            z=x.permute([0, 2, 3, 1]).flatten(0, 2),
-        )
-        B, C, H, W = x.shape
-        d1_m = d1_m.reshape([B, H, W, -1]).permute([0, 3, 1, 2])
-        d1_m = self.d1_norm(d1_m)
-        x = self.d1(d1_m)
+        # # Decoder cell 1
+        # d1_m = self.cell_1.recall(
+        #     z=x.permute([0, 2, 3, 1]).flatten(0, 2),
+        # )
+        # d1_m = self.memcell_act(d1_m)
+        # B, C, H, W = x.shape
+        # d1_m = d1_m.reshape([B, H, W, -1]).permute([0, 3, 1, 2])
+        # d1_m = self.d1_norm(d1_m)
+        # d1_m = self.dropout(d1_m)
+        # x = self.d1(d1_m)
 
         # Decoder cell 0
         d0_m = self.cell_0.recall(
             z=x.permute([0, 2, 3, 1]).flatten(0, 2),
         )
+        d0_m = self.memcell_act(d0_m)
         B, C, H, W = x.shape
         d0_m = d0_m.reshape([B, H, W, -1]).permute([0, 3, 1, 2])
         d0_m = self.d0_norm(d0_m)
+        d0_m = self.dropout(d0_m)
         x = self.d0(d0_m)
+
+        # Flush temp memory.
+        self.cell_0.clear_delta()
+        self.cell_1.clear_delta()
+        self.cell_2.clear_delta()
+        self.cell_3.clear_delta()
+        self.cell_4.clear_delta()
+        self.cell_bottleneck.clear_delta()
 
         return x
