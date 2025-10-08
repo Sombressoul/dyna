@@ -1,4 +1,3 @@
-import math
 import torch
 import torch.nn as nn
 
@@ -21,7 +20,7 @@ def T_Zero_Fused_Real(
     max_q: float = 25.0,
     tau: float = 1.0, # Temperature: higher -> smoother
 ) -> Tuple[torch.Tensor, torch.Tensor]:
-    device, dtype = z.device, z.dtype
+    dtype = z.dtype
 
     tiny = torch.finfo(sigma_par.dtype).eps
     w_par = (1.0 / (sigma_par.clamp_min(tiny) ** 2)).to(dtype)  # [M]
