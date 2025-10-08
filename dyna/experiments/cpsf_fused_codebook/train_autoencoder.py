@@ -197,6 +197,7 @@ def train(
 
     ploss = PerceptualLoss(device=device)
     loss_fn = lambda x, y: ploss.combined_loss(pred=x, target=y, p_k_alpha=0.75)
+    # loss_fn = lambda x, y: torch.nn.functional.l1_loss(x, y)
 
     out_dir = Path(out_dir)
     (out_dir / "previews").mkdir(parents=True, exist_ok=True)
@@ -220,7 +221,7 @@ def train(
             loss = loss_raw / accum
 
             loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+            # torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
 
             # print("\n\n========================\n\n")
 
