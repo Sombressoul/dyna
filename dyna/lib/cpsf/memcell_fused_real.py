@@ -19,6 +19,7 @@ def T_Zero_Fused_Real(
     sigma_perp: torch.Tensor,  # [M] (real, >0)
     eps: float = 1e-6,
     max_q: float = 25.0,
+    tau: float = 1.0, # Temperature: higher -> smoother
 ) -> Tuple[torch.Tensor, torch.Tensor]:
     device, dtype = z.device, z.dtype
 
@@ -42,7 +43,9 @@ def T_Zero_Fused_Real(
     A_pos = torch.exp(-torch.pi * q_pos)  # [B,M]
 
     gain = alpha_j.unsqueeze(0) * A_pos  # [B,M]
-    T = (gain.unsqueeze(-1) * T_hat_j.unsqueeze(0)).sum(dim=1)  # [B,S]
+    gain = gain * torch.nn.functional.softmax(gain / tau, dim=-1)
+    T = gain.unsqueeze(-1) * T_hat_j.unsqueeze(0)
+    T = T.sum(dim=1)  # [B,S]
 
     return T, gain
 
@@ -64,6 +67,7 @@ class CPSFContributionStoreFusedReal(nn.Module):
         N: int,
         M: int,
         S: int,
+        init_scale_T_hat_j: float = 1.0e-3,
         dtype: torch.dtype = torch.float32,
     ):
         super().__init__()
@@ -82,7 +86,9 @@ class CPSFContributionStoreFusedReal(nn.Module):
             requires_grad=True,
         )
         self.T_hat_j = torch.nn.Parameter(
-            data=self._init_T_hat_j(),
+            data=self._init_T_hat_j(
+                scale=init_scale_T_hat_j,
+            ),
             requires_grad=True,
         )
         self.T_hat_j_delta = torch.nn.Parameter(
@@ -190,6 +196,12 @@ class CPSFContributionStoreFusedReal(nn.Module):
         self,
     ) -> None:
         self.T_hat_j.add_(self.T_hat_j_delta)
+        self.clear_delta()
+
+    @torch.no_grad()
+    def clear_delta(
+        self,
+    ) -> None:
         self.T_hat_j_delta.zero_()
 
 
@@ -206,11 +218,14 @@ class CPSFMemcellFusedReal(nn.Module):
         N: int,
         M: int,
         S: int,
-        initial_alpha: float = 1.0e-2,
+        alpha_initial: float = 1.0e-2,
+        alpha_trainable: bool = True,
         delta_T_hat_j_cap: Optional[float] = 1.0,
         max_q: float = 25.0,
+        tau: float = 1.0,
         eps: float = 1.0e-6,
         grad_mode: CPSFMemcellFusedRealGradMode = CPSFMemcellFusedRealGradMode.MIXED,
+        init_scale_T_hat_j: float = 1.0e-3,
         dtype: torch.dtype = torch.float32,
     ):
         super().__init__()
@@ -218,8 +233,10 @@ class CPSFMemcellFusedReal(nn.Module):
         self.N = N
         self.M = M
         self.S = S
-        self.initial_alpha = initial_alpha
+        self.alpha_initial = alpha_initial
+        self.alpha_trainable = alpha_trainable
         self.delta_T_hat_j_cap = delta_T_hat_j_cap
+        self.tau = tau
         self.max_q = max_q
         self.eps = eps
         self.grad_mode = grad_mode
@@ -229,15 +246,16 @@ class CPSFMemcellFusedReal(nn.Module):
             N=self.N,
             M=self.M,
             S=self.S,
+            init_scale_T_hat_j=init_scale_T_hat_j,
             dtype=self.dtype,
         )
 
         self.alpha = torch.nn.Parameter(
             data=torch.logit(
-                torch.as_tensor(float(initial_alpha), dtype=dtype),
+                torch.as_tensor(float(alpha_initial), dtype=dtype),
                 eps=torch.finfo(self.dtype).eps,
             ),
-            requires_grad=True,
+            requires_grad=self.alpha_trainable,
         )
 
     def forward(
@@ -246,6 +264,11 @@ class CPSFMemcellFusedReal(nn.Module):
         **kwargs,
     ) -> torch.Tensor:
         raise RuntimeError("The module is not intended to be called directly.")
+    
+    def clear_delta(
+        self,
+    ) -> None:
+        self.store.clear_delta()
 
     # -----------------------------------------------------------------------------
     # CPSFMemcellFusedReal.recall — Gradient Flow Cheat Sheet
@@ -328,8 +351,9 @@ class CPSFMemcellFusedReal(nn.Module):
             alpha_j=data.alpha_j,
             sigma_par=sigma_par,
             sigma_perp=sigma_perp,
-            max_q=self.max_q,
             eps=self.eps,
+            max_q=self.max_q,
+            tau=self.tau,
         )
 
         if T_star is None:
